@@ -148,13 +148,25 @@ then the following command
   --repo=lcd6,file:///home/davidz/Hacking/livecd_rpms \
   --repo=e6,http://download.fedora.redhat.com/pub/fedora/linux/extras/6/i386 \
   --package=fedora-livecd-desktop \
-  --fslabel=Fedora-6-Zod-LiveCD-1-davidz
+  --fslabel=Fedora-6-Zod-LiveCD-1-foo
 
-will create a live CD called "Fedora-6-Zod-LiveCD-1-davidz". The name
-given by --fs-label is used 
+will create a live CD called "Fedora-6-Zod-LiveCD-1-foo". The name
+given by --fs-label is used. 
 
  o as a file system label on the ext3 and iso960 file systems
    (as such it's visible on the desktop as the CD name)
 
  o in the GRUB boot loader
 
+If you don't have the repositories available locally and don't mind waiting
+for the download of packages, the command is
+
+# livecd-creator \
+ --repo=c6,http://download.fedora.redhat.com/pub/fedora/linux/core/6/i386/os/ \
+ --repo=c6_upd,http://download.fedora.redhat.com/pub/fedora/linux/core/updates/6/i386/ \
+ --repo=lcd6,http://people.redhat.com/davidz/livecd/i386/ \
+ --repo=e6,http://download.fedora.redhat.com/pub/fedora/linux/extras/6/i386/ \
+ --package=fedora-livecd-desktop \
+ --fslabel=Fedora-6-Zod-LiveCD-1-foo2
+
+and this should work on any FC6 system.
