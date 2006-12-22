@@ -1,2 +1,166 @@
 
-TODO
+                       The Fedora live CD tools
+                    David Zeuthen <davidz@redhat.com>
+
+                    Last updated: Dec 22 2006 (v0.1)
+
+This project concerns tools to generate live CD's on Fedora based
+systems including derived distributions such as RHEL, CentOS and
+others. See the project Wiki at 
+
+ http://fedoraproject.org/wiki/FedoraLiveCD
+
+for more details. Discussion of  this project takes places at the
+fedora-livecd@redhat.com mailing list
+
+ http://www.redhat.com/mailman/listinfo/fedora-livecd-list
+
+This project and it's source files is licensed under the GPLv2
+license. See the file COPYING for details.
+
+1. LIVE CD DESIGN GOALS
+
+The live CD is designed in such a way that the when running from a
+live CD, the system should appear as much as possible as a standard
+system with all that entails; e.g. read-write rootfs (achieved using
+dm-snapshot), standard ext3 file system (for extended attributes) and
+so on. 
+
+Another design goal is that the live CD should be ''installable'',
+ie. an user should be able to install the bits from the live CD onto
+his hard disk without this process requiring network access or
+additional media. (NOTE: this feature is not yet implemented)
+
+Finally, another design goal is that the tool set itself should be
+separate from configuration; the same unmodified tool should be usable
+for building various live CD flavors with vastly different
+configurations, e.g. a GNOME live CD, a KDE live CD, a live cd with
+music programs and so on.
+
+2. CREATING A LIVE CD
+
+To create a live cd, the livecd-creator tool is used. Super user
+privileges are needed. The tool is more or less self-documenting, use
+the --help option to see options.
+
+2.1 HOW THE LIVE CD CREATOR WORKS
+
+In a nutshell, the livecd-creator program
+
+ o Sets up a file for the ext3 file system that will contain all the
+   data comprising the live CD
+
+ o Loopback mounts that file into the file system so there is an
+   installation root
+
+ o Bind mounts certain kernel file systems (/dev, /dev/pts, /proc,
+   /sys, /selinux) inside the installation root
+
+ o Installs, using yum, the requested packages into the installation
+   using the given repositories
+
+ o Looks at live CD configuration files dropped in the directory
+   /etc/livecd/ inside the installation root
+
+ o Optionally installs more packages as specified by the live CD
+   configuration files in /etc/livecd/ inside the installation root
+
+ o Optionally runs scripts as specified by the live CD configuration 
+   files in /etc/livecd/ inside the installation root
+
+ o Creates a live CD specific initramfs that matches the installed kernel
+
+ o Unmounts the kernel file systems mounted inside the installation root
+
+ o Unmounts the installation root
+
+ o Creates a squashfs file system containing only the ext3 file (compression)
+
+ o Configures the boot loader
+
+ o Creates an iso9660 bootable CD
+
+
+2.2 EXAMPLE: A BAREBONES LIVE CD
+
+The command
+
+# livecd-creator \
+  --repo=c6,http://download.fedora.redhat.com/pub/fedora/linux/core/6/i386/os \
+  --package=bash --package=kernel --package=grub
+
+will create a live CD that will boot to a login prompt. Not that since
+no configuration is done the user will not be able to login to the
+system as the root password is not set / cleared.
+
+2.3 LIVE CD CONFIGURATION FILES
+
+These are files that packages to be included on the live CD can
+install in /etc/livecd. They need to be bash scripts and is used to
+both specify additional packages to install as well as what system
+configuration (such as enabling NetworkManager by default) to do at
+build time. The live cd configurations in /etc/livecd/ are processed
+in alphabetical order (using the C local).
+
+The rationale behind moving the package manifest + system
+configuration into live cd configuration files is that maintainers of
+a certain live cd flavor (say "Acme Music Live CD") can keep all the
+relevant bits in an RPM (say acme-livecd-music) and use existing SCM
+mechanism to manage it.
+
+For the Fedora project, there are current three different live CD
+RPM's that contain live CD configuration files; they are
+
+ fedora-livecd         : the base livecd system
+
+ fedora-livecd-gnome   : a stock GNOME desktop; suitable for basing
+                         other more targeted live CD's on such as
+                         flavors for Eclipse, Music and so forth
+
+ fedora-livecd-desktop : complete desktop with applications and
+                         input/output support for all supported locales 
+                         in Fedora
+
+See the RPM's for details on what configuration they do.
+
+(NOTE: these are currently available 
+
+   from http://people.redhat.com/davidz/livecd/
+
+but will be proposed for inclusion in Fedora Extras)
+
+2.4 EXAMPLE: SPINNING THE FEDORA DESKTOP LIVE CD
+
+Assuming that 
+
+ o /home/davidz/Fedora/os contains a yum repository for the FC6 release
+ o /home/davidz/Fedora/i386 contains a yum repository for the FC6 updates
+ o /home/davidz/Hacking/livecd_rpms contains a yum repository for the
+   fedora-livecd-* RPMs
+
+then the following command
+
+# livecd-creator \
+  --repo=c6,file:///home/davidz/Fedora/os \
+  --repo=c6_upd,file:///home/davidz/Fedora/i386 \
+  --repo=lcd6,file:///home/davidz/Hacking/livecd_rpms \
+  --repo=e6,http://download.fedora.redhat.com/pub/fedora/linux/extras/6/i386 \
+  --package=fedora-livecd-desktop \
+  --fslabel=Fedora-6-Zod-LiveCD-1-davidz
+
+will create a live CD called "Fedora-6-Zod-LiveCD-1-davidz". The name
+given by --fs-label is used 
+
+ o as a file system label on the ext3 and iso960 file systems
+   (as such it's visible on the desktop as the CD name)
+
+ o in the GRUB boot loader
+   
+
+
+
+
+
+
+
+
