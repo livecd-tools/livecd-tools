@@ -1,0 +1,19 @@
+
+SOURCE CONTROL MANAGEMENT
+=========================
+
+This project is stored in git and can be checked out using
+
+ git clone git://people.freedesktop.org/~david/livecd-tools
+
+Change history etc. can be obtained from here
+
+ http://gitweb.freedesktop.org/?p=users/david/livecd-tools.git;a=summary
+
+PATCHES
+=======
+
+Send patches to the fedora-livecd@redhat.com mailing list
+
+ http://www.redhat.com/mailman/listinfo/fedora-livecd-list
+
