@@ -365,11 +365,12 @@ class InstallationTarget:
 
         # now install the additional packages...
         packages = ""
-        for p in additional_packages:
-            packages += " %s"%p
-        if os.system("/usr/bin/yum -y -c %s/yum.conf --disablerepo=* --enablerepo=lcdr_* --installroot=%s/install_root install %s"%(self.build_dir, self.build_dir, packages)) != 0:
-            print "Error installing packages"
-            return False
+        if len(additional_packages) > 0:
+            for p in additional_packages:
+                packages += " %s"%p
+            if os.system("/usr/bin/yum -y -c %s/yum.conf --disablerepo=* --enablerepo=lcdr_* --installroot=%s/install_root install %s"%(self.build_dir, self.build_dir, packages)) != 0:
+                print "Error installing packages"
+                return False
 
         os.system("/bin/touch %s/install_root/etc/shadow"%(self.build_dir))
         os.system("/bin/touch %s/install_root/etc/gshadow"%(self.build_dir))
