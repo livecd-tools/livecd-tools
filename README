@@ -68,6 +68,8 @@ In a nutshell, the livecd-creator program
  o Optionally runs scripts as specified by the live CD configuration 
    files in /etc/livecd/ inside the installation root
 
+ o Relabels the entire installation root (for SELinux)
+
  o Creates a live CD specific initramfs that matches the installed kernel
 
  o Unmounts the kernel file systems mounted inside the installation root
