@@ -1,0 +1,162 @@
+#!/bin/bash
+
+# welcome
+echo "Live CD installer for Fedora based live CD's. Copyright (c) 2006-"
+echo "2007 David Zeuthen <davidz@redhat.com>. Licensed under the GPLv2."
+echo ""
+
+# disclaimer
+echo " o  DISCLAIMER"
+echo "--------------"
+echo "Welcome to the live CD installer. This is experimental code and"
+echo "it may destroy all data on your hard disks. The author takes no"
+echo "responsibility at all for data loss. If something breaks you get"
+echo "to keep both pieces. Please acknowledge your understanding of"
+echo "this by typing 'yes' below."
+echo ""
+echo -n "I understand this is experimental code [yes/no]: "
+read agree
+if [ "$agree" != "yes" ] ; then
+    echo "Exiting."
+    exit 0
+fi
+echo ""
+echo ""
+
+# partitioning
+echo " o  INSTALLATION TARGET"
+echo "-----------------------"
+echo "You can install to either a full disk or you can install to a"
+echo "separate partition. If you decide to install to a full disk"
+echo "all existing data on that disk will be deleted."
+echo ""
+echo -n "Install to full disk [yes/no]: "
+read full_disk
+if [ "$full_disk" != "yes" ] ; then
+    echo "Partitioning not implemented. Exiting."
+    full_disk=""
+    exit 0
+else
+    echo -n "Please enter the device file of the disk (e.g. /dev/sda): "
+    read full_disk
+    # TODO: sanity check this is a block device
+    echo -n "Swap size in MB (typically 1.5 times RAM): "
+    read swap_size
+fi
+echo ""
+echo ""
+
+# user name
+echo " o  ACCOUNT"
+echo "-----------"
+echo "You need to create an account that is protected by a password. For"
+echo "this you need to choose an 'login' name (typically lower case letters"
+echo "with no spaces) and you may also enter you full name. Finally you need"
+echo "to choose a password."
+echo ""
+echo -n "Login name: "
+read user_login
+echo -n "Full name: "
+read user_name
+echo -n "Password: "
+read -s password
+echo ""
+echo -n "Confirm Password: "
+read -s password2
+echo ""
+if [ "$password" != "$password2" ] ; then
+    echo "Passwords do not match! Exiting."
+    exit 0
+fi
+echo ""
+echo ""
+
+# host name
+echo " o  COMPUTER NAME"
+echo "-----------------"
+echo "To identify your computer on the network you can give it a name. If"
+echo "you leave this blank the standard name 'localhost.localdomain' is"
+echo "used".
+echo ""
+echo -n "Computer name: "
+read host_name
+if [ "$host_name" == "" ] ; then
+    host_name="localhost.localdomain"
+fi
+echo ""
+echo ""
+
+# root password
+echo " o  ADMINISTRATOR PASSWORD"
+echo "--------------------------"
+echo "The administer the system a second password is needed. This is also"
+echo "called the ''root password''"
+echo ""
+echo -n "Administrator Password: "
+read -s root_password
+echo ""
+echo -n "Confirm Administrator Password: "
+read -s root_password2
+echo ""
+if [ "$root_password" != "$root_password2" ] ; then
+    echo "Passwords do not match! Exiting."
+    exit 0
+fi
+echo ""
+echo ""
+
+os_name=`cat /etc/redhat-release`
+if [ "$os_name" == "" ] ; then
+    os_name="Fedora"
+fi
+
+echo " o  CONFIRM CHOICES"
+echo "-------------------"
+echo "Please confirm the following choices before the installation"
+echo "commences. This is your last chance to bail out."
+echo ""
+echo " Operating System:     $os_name"
+echo " Installation target:  $full_disk  (Full Disk)"
+echo " Swap size:            $swap_size MB"
+echo " Computer name:        $host_name"
+echo " Account:              $user_name ($user_login)"
+echo ""
+echo -n "Really install using these choices [yes/no]: "
+read confirm
+if [ "$confirm" != "yes" ] ; then
+    echo "Exiting."
+    exit 0
+fi
+echo ""
+echo ""
+
+echo " o  INSTALLATION"
+echo "----------------"
+echo "Installation will now start. This will take several minutes and"
+echo "there is no feedback."
+
+exit 0
+
+if [ "$full_disk" != "" ] ; then
+    dbus-send \
+	--reply-timeout=$((86400 * 1000)) \
+	--system \
+	--print-reply \
+	--dest=com.redhat.LiveCDInstaller \
+	/com/redhat/LiveCDInstaller com.redhat.LiveCDInstaller.InstallToHarddisk \
+	string:/home/davidz/Desktop/livecd.iso \
+	string:\"$full_disk\" \
+	uint64:$(($swap_size * 1024 * 1024)) \
+	string:Fedora \
+	string:\"$host_name\" \
+	string:\"$root_password\" \
+	string:\"$user_name\" \
+	string:\"$user_login\" \
+	string:\"$password\"
+echo ""
+echo ""
+
+echo " o INSTALLATION COMPLETE"
+echo "------------------------"
+echo "Your system is now installed. Reboot your computer to use it."
+echo "Enjoy!"
