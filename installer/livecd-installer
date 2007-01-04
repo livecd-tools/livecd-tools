@@ -219,7 +219,9 @@ class LiveCDInstaller(dbus.service.Object):
         os.system("/sbin/e2fsck -f " + rootDeviceFile)
         uuid = subprocess.Popen(["/usr/bin/uuidgen"], stdout=subprocess.PIPE).communicate()[0].strip()
         os.system("/sbin/tune2fs -U " + uuid + " " + rootDeviceFile)
-        os.system("/sbin/tune2fs -L " + "\"" + osName + "\"" + " " + rootDeviceFile)
+        # sigh, mkinitrd is broken as it doesn't work with UUID=blah in /etc/fstab. So label the fs accordingly
+        uuid_as_label = uuid[0:16]
+        os.system("/sbin/tune2fs -L " + "\"" + uuid_as_label + "\"" + " " + rootDeviceFile)
 
         self.InstallActivityChanged("resizing-rootfs", 0.84)
 
@@ -257,7 +259,8 @@ class LiveCDInstaller(dbus.service.Object):
 
             # write out /etc/fstab
             fstab = open("/mnt/puritan_target/etc/fstab", "w")
-            fstab.write("UUID=%s  /    ext3    defaults        1 1\n"%uuid)
+            #fstab.write("UUID=%s  /    ext3    defaults        1 1\n"%uuid)
+            fstab.write("LABEL=%s  /                       ext3    defaults        1 1\n"%uuid_as_label)
             if swapDeviceFile != "":
                 fstab.write("LABEL=%s   swap                    swap    defaults        0 0\n"%swap_label)
             else:
@@ -288,7 +291,7 @@ class LiveCDInstaller(dbus.service.Object):
             mtab.close()
 
             # create new initramfs
-            os.system("/usr/sbin/chroot /mnt/puritan_target /sbin/mkinitrd -v --with=usb-storage -f /boot/initrd-%s.img %s"%(kver, kver))
+            os.system("/usr/sbin/chroot /mnt/puritan_target /sbin/mkinitrd -v -f /boot/initrd-%s.img %s"%(kver, kver))
 
 
             self.InstallActivityChanged("installing-bootloader", 0.96)
@@ -301,7 +304,8 @@ class LiveCDInstaller(dbus.service.Object):
             grub.write("hiddenmenu\n")
             grub.write("title %s (%s)\n"%(osName, kver))
             grub.write("    root %s\n"%grubDev)
-            grub.write("    kernel /boot/vmlinuz-%s ro quiet root=UUID=%s\n"%(kver, uuid))
+            #grub.write("    kernel /boot/vmlinuz-%s ro quiet root=UUID=%s\n"%(kver, uuid))
+            grub.write("    kernel /boot/vmlinuz-%s ro quiet root=LABEL=%s\n"%(kver, uuid_as_label))
             grub.write("    initrd /boot/initrd-%s.img\n"%kver)
             grub.close()
             os.system("rm -f /mnt/puritan_target/etc/grub.conf")
