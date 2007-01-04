@@ -26,7 +26,7 @@ RETVAL=0
 start() {
     echo -n $"Starting live CD installer daemon: "
     # nasty hack, but this is temporary...
-    /usr/libexec/$processname &
+    /usr/libexec/$processname > /dev/null 2>&1 &
     success
     echo
 }
