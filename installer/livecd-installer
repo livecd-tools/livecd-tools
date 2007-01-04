@@ -357,9 +357,26 @@ class LiveCDInstaller(dbus.service.Object):
                 f.write("HOSTNAME=%s\n"%(hostName))
                 f.close()
 
+            # clean up the rpm database (god knows why we need to do this?)
+            os.system("/bin/rm -f /mnt/puritan_target/var/lib/rpm/__db.*")
+
+            # now run through all .conf files and collect packages to remove
+            pkg_to_remove = []
+            for root, dirs, files in os.walk("/mnt/puritan_target/etc/livecd"):
+                files.sort()
+                for file in files:
+                    f = os.popen("/usr/sbin/chroot /mnt/puritan_target /etc/livecd/%s install-pkgrem"%(file))
+                    pkg_from_f = (f.read().strip()).splitlines()
+                    f.close()
+                    pkg_to_remove += pkg_from_f
+            # now remove the packages...
+            packages = ""
+            for pkg in pkg_to_remove:
+                packages += " %s"%pkg
+            os.system("/usr/sbin/chroot /mnt/puritan_target /bin/rpm -e %s"%(packages))
+
             # fix up some file contexts
             os.system("/usr/sbin/chroot /mnt/puritan_target /sbin/setfiles /etc/selinux/targeted/contexts/files/file_contexts /etc /var /home /boot")
-            
 
         except Exception, e:
             self.cleanupTarget()
