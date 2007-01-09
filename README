@@ -170,3 +170,23 @@ for the download of packages, the command is
  --fslabel=Fedora-6-Zod-LiveCD-1-foo2
 
 and this should work on any FC6 system.
+
+3. LIVE CD INSTALLS
+
+Currently there is only a textual live CD installer. It is a bit
+wonky; to use it first you have to disable SELinux's enforcing
+mode. From a root terminal (open a terminal and type 'su -') on the
+live CD do
+
+ # setenforce 0
+ # service livecd-install-daemon start
+
+Then disable automounting; go into "System -> Preferences -> Removable
+Drives and Media" and unclick all check boxes under the tab "Storage",
+heading " Removable Storage". Now open a terminal and run (not as
+root)
+
+ $ livecd-installer-tui
+
+and answer the questions. At any time you can hit Ctrl+C to cancel the
+installation. See the TODO file for planned work to make this easier.

@@ -46,6 +46,14 @@ else
     echo ""
 fi
 
+full_disk=""
+#
+part_disk=""
+part_ext3=""
+part_swap=""
+swapfile_size=""
+bootloader_mbr="false"
+
 # partitioning
 echo " o  INSTALLATION TARGET"
 echo "-----------------------"
@@ -56,11 +64,32 @@ echo ""
 echo -n "Install to full disk [yes/no]: "
 read full_disk
 if [ "$full_disk" != "yes" ] ; then
-    echo "Partitioning not implemented. Exiting."
     full_disk=""
-    exit 0
+    echo -n "Device file of the disk (e.g. /dev/sdb): "
+    read part_disk
+    echo -n "Device file of ext3 partition (e.g. /dev/sdb3): "
+    read part_ext3
+    echo -n "Device file of swap (e.g. /dev/sdb5 or blank to use swap file on ext3): "
+    read part_swap
+    if [ "$part_swap" == "" ] ; then
+	echo -n "Swap file size in MB (e.g. 1024MB): "
+	read swapfile_size
+	swapfile_size=$((swapfile_size * 1024 * 1024))
+    else
+	swapfile_size="0"
+    fi
+    echo -n "Install boot loader in the MBR [yes/no]: "
+    read tmp
+    if [ "$tmp" == "yes" ] ; then
+	bootloader_mbr="true"
+    elif [ "$tmp" == "no" ] ; then
+	bootloader_mbr="false"
+    else
+	echo "Expected 'yes' or 'no'. Exiting."
+	exit 0
+    fi
 else
-    echo -n "Please enter the device file of the disk (e.g. /dev/sda): "
+    echo -n "Device file of the disk (e.g. /dev/sda): "
     read full_disk
     # TODO: sanity check this is a block device
     echo -n "Swap size in MB (typically 1.5 times RAM): "
@@ -134,10 +163,22 @@ echo "Please confirm the following choices before the installation"
 echo "commences. This is your last chance to bail out."
 echo ""
 echo " Operating System:     $os_name"
-echo " Installation target:  $full_disk  (Full Disk)"
-echo " Swap size:            $swap_size MB"
 echo " Computer name:        $host_name"
 echo " Account:              $user_name ($user_login)"
+if [ "$full_disk" != "" ] ; then
+    echo " Installation target:  $full_disk  (Full Disk)"
+    echo " Swap size:            $swap_size MB"
+else
+    echo " Disk device:          $part_disk  (Will not erase)"
+    echo " Root device:          $part_ext3"
+    if [ "$part_swap" != "" ] ; then
+	echo " Swap device:          $part_swap"
+    else
+	echo " Swap file size:       $swapfile_size"
+    fi
+    echo " Boot loader in MBR:   $bootloader_mbr"
+fi
+
 echo ""
 echo -n "Really install using these choices [yes/no]: "
 read confirm
@@ -169,6 +210,26 @@ if [ "$full_disk" != "" ] ; then
 	string:"$user_login" \
 	string:"$user_name" \
 	string:"$password" > /dev/null 2>&1
+else
+    dbus-send \
+	--reply-timeout=$((86400 * 1000)) \
+	--system \
+	--print-reply \
+	--dest=com.redhat.LiveCDInstaller \
+	/com/redhat/LiveCDInstaller com.redhat.LiveCDInstaller.Install \
+	string:"$path_to_iso" \
+	string:"$part_disk" \
+	string:"$part_swap" \
+	string:"$swapfile_size" \
+	string:"$part_ext3" \
+	boolean:"$bootloader_mbr" \
+	string:"$os_name" \
+	string:"$host_name" \
+	string:"$root_password" \
+	string:"$user_login" \
+	string:"$user_name" \
+	string:"$password" > /dev/null 2>&1
+
 fi
 echo ""
 echo ""

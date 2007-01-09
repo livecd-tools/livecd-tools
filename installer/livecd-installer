@@ -35,18 +35,6 @@ class LiveCDInstaller(dbus.service.Object):
                                activity_overall_progress): # double
         pass
 
-    # Example
-    #
-    # dbus-send                                                                                                \
-    #   --reply-timeout=$((86400 * 1000))                                                                      \
-    #   --system --print-reply                                                                                 \
-    #   --dest=com.redhat.LiveCDInstaller                                                                      \
-    #   /com/redhat/LiveCDInstaller com.redhat.LiveCDInstaller.InstallToHarddisk                               \
-    #   string:/home/davidz/Desktop/fedora-desktop-davidz-stream-development-build-10-20061208_0016-livecd.iso \
-    #   string:/dev/sdb                                                                                        \
-    #   uint64:$((1024 * 1024 * 1024))                                                                         \
-    #   string:someRootPassword
-    #
     @dbus.service.method("com.redhat.LiveCDInstaller",
                          in_signature="sstssssss",
                          out_signature = "")
@@ -101,23 +89,6 @@ class LiveCDInstaller(dbus.service.Object):
                             userRealName,
                             userPassword)
 
-    # Example of how to call this method to install to /dev/sdb1
-    #
-    # dbus-send \
-    #   --reply-timeout=$((86400 * 1000)) --system --print-reply                                               \
-    #   --dest=com.redhat.LiveCDInstaller                                                                      \
-    #   /com/redhat/LiveCDInstaller com.redhat.LiveCDInstaller.Install                                         \
-    #   string:/home/davidz/Desktop/fedora-desktop-davidz-stream-development-build-10-20061208_0016-livecd.iso \
-    #   string:/dev/sdb                                                                                        \
-    #   string:/dev/sdb1                                                                                       \
-    #   uint64:0                                                                                               \
-    #   string:/dev/sdb2                                                                                       \
-    #   boolean:true                                                                                           \
-    #   string:someRootPassword                                                                                \
-    #   string:davidz                                                                                          \
-    #   string:David Zeuthen                                                                                   \
-    #   string:davidz_password                                                                                 \
-    #
     @dbus.service.method("com.redhat.LiveCDInstaller",
                          in_signature="ssstsbssssss",
                          out_signature = "")
@@ -247,11 +218,10 @@ class LiveCDInstaller(dbus.service.Object):
             self.InstallActivityChanged("creating-swap", 0.88)
 
             # create swap (swapfile or swap device)
-            if swapFileSize > 0:
-                os.system("/usr/sbin/chroot /mnt/puritan_target dd if=/dev/zero of=/var/cache/SWAP bs=1048576 count=%s"%(swapFileSize / 1048576))
+            if swapDeviceFile == "":
+                os.system("/usr/sbin/chroot /mnt/puritan_target dd if=/dev/zero of=/var/cache/SWAP bs=1048576 count=%d"%(long(swapFileSize) / 1048576))
                 os.system("/usr/sbin/chroot /mnt/puritan_target /sbin/mkswap /var/cache/SWAP")
-                os.system("/usr/sbin/chroot /mnt/puritan_target /sbin/setfiles /etc/selinux/targeted/contexts/files/file_contexts /var/cache/SWAP")
-            elif swapDeviceFile != "":
+            else:
                 swap_label = "SWAP-" + subprocess.Popen(["/usr/bin/uuidgen"], stdout=subprocess.PIPE).communicate()[0].strip()[0:10]
                 os.system("/usr/sbin/chroot /mnt/puritan_target /sbin/mkswap -L " + swap_label + " " + swapDeviceFile)
 
