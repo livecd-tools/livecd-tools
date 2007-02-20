@@ -22,6 +22,7 @@ import sys
 import tempfile
 import time
 import subprocess
+import shutil
 
 class LoopbackMount:
     def __init__(self, lofile, mountdir, fstype = None):
@@ -128,6 +129,16 @@ class SparseExt3LoopbackMount(LoopbackMount):
         self._formatFilesystem()
         return LoopbackMount.setup(self)
 
+def touch(fn):
+    f = open(fn, "w+")
+    f.close()
+
+def get_kernel_version(root):
+    # FIXME: this doesn't handle multiple kernels being installed
+    kdir = os.listdir("%s/install_root/lib/modules" %(root,))
+    kver = os.path.basename(kdir[0])
+    return kver
+
 class InstallationTarget:
     def base_on_iso(self, base_on):
         """helper function to extract ext3 file system from a live CD ISO"""
@@ -146,8 +157,11 @@ class InstallationTarget:
             return False
 
         # copy the ext3 fs out
-        if os.system("cp %s/base_on_squashfs/os.img %s/data/os.img"%(self.build_dir, self.build_dir)) != 0:
-            print "Cannot copy os.img from squashfs from ISO to base on"
+        try:
+            shutil.copyfile("%s/base_on_squashfs/os.img" %(self.build_dir,),
+                            "%s/data/os.img" %(self.build_dir,))
+        except Exception, e:
+            print "Cannot copy os.img from squashfs from ISO to base on: %s" %(e,)
             squashloop.cleanup()
             isoloop.cleanup()
             return False
@@ -326,13 +340,14 @@ class InstallationTarget:
 
     def installPackages(self, packageList, excludePackageList):
         """install packages into target file system"""
-        
+        def run_in_root():
+            os.chroot("%s/install_root" %(self.build_dir,))
+
         packages = ""
         for p in packageList:
             packages += " %s"%p
 
-        os.system("/bin/touch %s/install_root/var/log/yum.log"%(self.build_dir))
-
+        touch("%s/install_root/var/log/yum.log" %(self.build_dir,))
         if os.system("/usr/bin/yum -y -c %s/yum.conf --disablerepo=* --enablerepo=lcdr_* --installroot=%s/install_root install %s"%(self.build_dir, self.build_dir, packages)) != 0:
             print "Error installing packages"
             return False
@@ -366,19 +381,22 @@ class InstallationTarget:
                 print "Error installing packages"
                 return False
 
-        os.system("/bin/touch %s/install_root/etc/shadow"%(self.build_dir))
-        os.system("/bin/touch %s/install_root/etc/gshadow"%(self.build_dir))
+        touch("%s/install_root/etc/shadow" %(self.build_dir,))
+        touch("%s/install_root/etc/gshadow" %(self.build_dir,))        
 
         # now run through all the post scripts from livecd scripts
         for root, dirs, files in os.walk("%s/install_root/etc/livecd"%(self.build_dir)):
             files.sort()
             for file in files:
-                os.system("/usr/sbin/chroot %s/install_root /etc/livecd/%s post"%(self.build_dir, file))
+                subprocess.call(["/etc/livecd/%s" %(file,), "post"],
+                                preexec_fn = run_in_root)
 
         # Create initramfs
         #
-        os.system("/bin/cp /usr/lib/livecd-creator/mayflower %s/install_root/sbin/mayflower"%(self.build_dir))
-        os.system("/bin/cp /usr/lib/livecd-creator/run-init %s/install_root/sbin/run-init"%(self.build_dir))
+        shutil.copyfile("/usr/lib/livecd-creator/mayflower",
+                        "%s/install_root/sbin/mayflower" %(self.build_dir,))
+        shutil.copyfile("/usr/lib/livecd-creator/run-init",
+                        "%s/install_root/sbin/run-init" %(self.build_dir,))
         # modules needed for booting (this is butt ugly and we need to retrieve this from elsewhere, e.g. the kernel)
         mayflowerconf = open(self.build_dir + "/install_root/etc/mayflower.conf", "w")
         mayflowerconf.write('MODULES+="cdrom ide-cd ahci loop dm_snapshot squashfs ext3 ehci_hcd uhci_hcd ohci_hcd usb_storage sd_mod sr_mod usbhid ata_piix "\n')
@@ -387,17 +405,14 @@ class InstallationTarget:
         mayflowerconf.write('MODULES+="sata_promise sata_sil sata_sx4 sata_vsc"\n')
         mayflowerconf.close()
 
-        f = os.popen("/bin/basename %s/install_root/lib/modules/*"%(self.build_dir))
-        kver = f.read().strip()
-        f.close()
-
-        os.system("/usr/sbin/chroot %s/install_root /sbin/mayflower -f /boot/livecd-initramfs.img %s"%(self.build_dir, kver))
-        os.system("/bin/rm -f %s/install_root/sbin/mayflower"%(self.build_dir))
-        os.system("/bin/rm -f %s/install_root/sbin/run-init"%(self.build_dir))
-        os.system("/bin/rm -f %s/install_root/etc/mayflower.conf"%(self.build_dir))
+        subprocess.call(["/sbin/mayflower", "-f", "/boot/livecd-initramfs.img",
+                         get_kernel_version(self.build_dir)],
+                        preexec_fn=run_in_root)
+        for f in ("/sbin/mayflower", "/sbin/run-init", "/etc/mayflower.conf"):
+            os.unlink("%s/install_root/%s" %(self.build_dir, f))
 
         # finally relabel all files
-        os.system("/usr/sbin/chroot %s/install_root /sbin/fixfiles restore"%(self.build_dir))
+        subprocess.call(["/sbin/fixfiles", "restore"], preexec_fn=run_in_root)
         return True
 
     def configureBootloader(self):
@@ -410,10 +425,20 @@ class InstallationTarget:
         #  - fix for non-i386
         #  - error handling
         #
-        os.system("/bin/cp %s/install_root/boot/vmlinuz* %s/out/boot/vmlinuz"%(self.build_dir, self.build_dir))
-        os.system("/bin/mv %s/install_root/boot/livecd-initramfs.img %s/out/boot/livecd-initramfs.img"%(self.build_dir, self.build_dir))
-        os.system("/bin/cp %s/install_root/usr/share/grub/i386-redhat/stage2_eltorito %s/out/boot/grub"%(self.build_dir, self.build_dir))
-        os.system("/bin/cp %s/install_root/boot/grub/splash.xpm.gz %s/out/boot/grub"%(self.build_dir, self.build_dir))
+        shutil.copyfile("%s/install_root/boot/vmlinuz-%s"
+                        %(self.build_dir, get_kernel_version(self.build_dir,)),
+                        "%s/out/boot/vmlinuz" %(self.build_dir,))
+
+        shutil.copyfile("%s/install_root/boot/livecd-initramfs.img"
+                        %(self.build_dir,),
+                        "%s/out/boot/livecd-initramfs.img" %(self.build_dir,))
+        os.unlink("%s/install_root/boot/livecd-initramfs.img"
+                  %(self.build_dir,))
+
+        for f in ("/usr/share/grub/i386-redhat/stage2_eltorito",
+                  "/boot/grub/splash.xpm.gz"):
+            shutil.copy("%s/install_root/%s" %(self.build_dir, f),
+                        "%s/out/boot/grub/" %(self.build_dir,))
 
         grubconf = open(self.build_dir + "/out/boot/grub/grub.conf", "w")
         grubconf.write("default=1\n")
@@ -440,11 +465,20 @@ class InstallationTarget:
 
     def createIso(self, filename):
         """write out the live CD ISO"""
-        os.system("/usr/bin/mkisofs -o %s.iso -b boot/grub/stage2_eltorito -c boot/boot.catalog -no-emul-boot -boot-load-size 4 -boot-info-table -J -r -hide-rr-moved -V %s %s/out"%(filename, filename, self.build_dir))
+        subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(filename,),
+                         "-b", "boot/grub/stage2_eltorito",
+                         "-c", "boot/boot.catalog",
+                         "-no-emul-boot", "-boot-load-size", "4",
+                         "-boot-info-table", "-J", "-r", "-hide-rr-moved",
+                         "-V", "%s" %(filename,), "%s/out" %(self.build_dir)])
 
     def createSquashFS(self):
         """create compressed squashfs file system"""
-        os.system("cd %s/data; mksquashfs os.img sysroot ../out/squashfs.img"%(self.build_dir))
+        # FIXME: mksquashfs segfaults if PWD isn't set in the environment
+        subprocess.call(["/sbin/mksquashfs", "os.img", "sysroot",
+                         "../out/squashfs.img"],
+                        cwd="%s/data" %(self.build_dir,),
+                        env={"PWD": "%s/data" %(self.build_dir,)})
 
 def usage():
     print "usage: livecd-creator [--help] "
