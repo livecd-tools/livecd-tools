@@ -21,116 +21,140 @@ import os.path
 import sys
 import tempfile
 import time
+import subprocess
+
+class LoopbackMount:
+    def __init__(self, lofile, mountdir, fstype = None):
+        self.lofile = lofile
+        self.mountdir = mountdir
+        self.fstype = fstype
+
+        self.mounted = False
+        self.losetup = False
+        self.loopdev = None
+
+    def cleanup(self, rmdir = True):
+        self.umount()
+        self.lounsetup()
+        if rmdir:
+            try:
+                os.rmdir(self.mountdir)
+            except OSError, e:
+                pass
+
+    def umount(self):
+        if self.mounted:
+            rc = subprocess.call(["umount", self.mountdir])
+            self.mounted = False
+
+    def lounsetup(self):
+        if self.losetup and self.loopdev:
+            rc = subprocess.call(["losetup", "-d", self.loopdev])
+            self.losetup = False
+            self.loopdev = None
+
+    def setup(self):
+        if not os.path.exists(self.mountdir):
+            os.makedirs(self.mountdir)
+        if self.loopsetup():
+            if self.mount():
+                return True
+        return False
+
+    def loopsetup(self):
+        if self.losetup:
+            return self.losetup
+        rc = subprocess.call(["losetup", "-f", self.lofile])
+        if rc != 0:
+            return self.losetup
+
+        # succeeded; figure out which loopdevice we're using
+        buf = subprocess.Popen(["losetup", "-a"],
+                               stdout=subprocess.PIPE).communicate()[0]
+        for line in buf.split("\n"):
+            # loopdev: fdinfo (filename)
+            fields = line.split()
+            if len(fields) != 3:
+                continue
+            if fields[2] == "(%s)" %(self.lofile,):
+                self.loopdev = fields[0][:-1]
+                break
+
+        if self.loopdev:
+            self.losetup = True
+        return self.losetup
+
+    def mount(self):
+        if self.mounted or not self.loopdev:
+            return self.mounted
+        args = [ "mount", self.loopdev, self.mountdir ]
+        if self.fstype:
+            args.extend(["-t", self.fstype])
+        rc = subprocess.call(args)
+        if rc == 0:
+            self.mounted = True
+        return self.mounted
+
+class SparseExt3LoopbackMount(LoopbackMount):
+    def __init__(self, lofile, mountdir, size, fslabel = None):
+        LoopbackMount.__init__(self, lofile, mountdir, fstype = "ext3")
+        self.size = size
+        self.fslabel = fslabel
+        if not self.fslabel:
+            self.fslabel = "livecd-" + time.strftime("%Y%m%d-%H%M")
+
+    def _createSparseFile(self):
+        dir = os.path.dirname(self.lofile)
+        if not dir:
+            os.makedirs(dir)
+
+        # create the sparse file
+        fd = os.open(self.lofile, os.O_WRONLY | os.O_CREAT)
+        off = long(self.size * 1024L * 1024L)
+        os.lseek(fd, off, 0)
+        os.write(fd, '\x00')
+        os.close(fd)
+
+    def _formatFilesystem(self):
+        rc = subprocess.call(["mkfs.ext3", "-F", "-L", self.fslabel,
+                              "-m", "1", self.lofile])
+        if rc != 0:
+            raise OSError, "Error creating filesystem: %d" %(rc,)
+        rc = subprocess.call(["tune2fs", "-c0", "-i0", "-Odir_index",
+                              "-ouser_xattr,acl", self.lofile])
+
+    def setup(self):
+        self._createSparseFile()
+        self._formatFilesystem()
+        return LoopbackMount.setup(self)
 
 class InstallationTarget:
-
     def base_on_iso(self, base_on):
         """helper function to extract ext3 file system from a live CD ISO"""
-        
-        # create directories for iso9660 and squashfs file systems from the live cd ISO
-        try:
-            os.mkdir(self.build_dir + "/base_on_iso")
-            os.mkdir(self.build_dir + "/base_on_squashfs")
-        except OSError:
+
+        isoloop = LoopbackMount(base_on, "%s/base_on_iso" %(self.build_dir,))
+        if not isoloop.setup():
+            isoloop.cleanup()
             return False
 
-        # setup loop device for iso9660 file system
-        try:
-            f = os.popen("/sbin/losetup -f")
-            iso_loop_device = f.read().strip()
-            f.close()
-        except OSError:
-            print "Cannot get loop device"
-            try:
-                os.rmdir(self.build_dir + "/base_on_squashfs")
-                os.rmdir(self.build_dir + "/base_on_iso")
-            except OSError:
-                pass
-            return False
-        if os.system("/sbin/losetup %s %s"%(iso_loop_device, base_on)) != 0:
-            print "Cannot setup %s for ISO to base on"%(self.loop_device)
-            try:
-                os.rmdir(self.build_dir + "/base_on_squashfs")
-                os.rmdir(self.build_dir + "/base_on_iso")
-            except OSError:
-                pass
-            return False
-
-        # mount iso9660 file system
-        if os.system("/bin/mount %s %s/base_on_iso"%(iso_loop_device, self.build_dir)) != 0:
-            print "Cannot mount ISO to base on in %s/base_on_iso"%(self.build_dir)
-            os.system("/sbin/losetup -d %s"%(iso_loop_device))
-            try:
-                os.rmdir(self.build_dir + "/base_on_squashfs")
-                os.rmdir(self.build_dir + "/base_on_iso")
-            except OSError:
-                pass
-            return False
-
-        # setup loop device for squashfs file system
-        try:
-            f = os.popen("/sbin/losetup -f")
-            squashfs_loop_device = f.read().strip()
-            f.close()
-        except OSError:
-            print "Cannot get loop device"
-            os.system("/bin/umount %s/base_on_iso"%(self.build_dir))
-            os.system("/sbin/losetup -d %s"%(iso_loop_device))
-            try:
-                os.rmdir(self.build_dir + "/base_on_squashfs")
-                os.rmdir(self.build_dir + "/base_on_iso")
-            except OSError:
-                pass
-            return False        
-        if os.system("/sbin/losetup %s %s/base_on_iso/squashfs.img"%(squashfs_loop_device, self.build_dir)) != 0:
-            print "Cannot setup %s for squashfs on ISO to base on"%(self.loop_device)
-            os.system("/bin/umount %s/base_on_iso"%(self.build_dir))
-            os.system("/sbin/losetup -d %s"%(iso_loop_device))
-            try:
-                os.rmdir(self.build_dir + "/base_on_squashfs")
-                os.rmdir(self.build_dir + "/base_on_iso")
-            except OSError:
-                pass
-            return False
-
-        # mount squashfs file system
-        if os.system("/bin/mount -t squashfs -o ro %s %s/base_on_squashfs"%(squashfs_loop_device, self.build_dir)) != 0:
-            print "Cannot mount squashfs from ISO to base on in %s/base_on_iso"%(self.build_dir)
-            os.system("/sbin/losetup -d %s"%(squashfs_loop_device))
-            os.system("/bin/umount %s/base_on_iso"%(self.build_dir))
-            os.system("/sbin/losetup -d %s"%(iso_loop_device))
-            try:
-                os.rmdir(self.build_dir + "/base_on_squashfs")
-                os.rmdir(self.build_dir + "/base_on_iso")
-            except OSError:
-                pass
+        squashloop = LoopbackMount("%s/squashfs.img" %(isoloop.mountdir,),
+                                   "%s/base_on_squashfs" %(self.build_dir,),
+                                   "squashfs")
+        if not squashloop.setup():
+            squashloop.cleanup()
+            isoloop.cleanup()
             return False
 
         # copy the ext3 fs out
         if os.system("cp %s/base_on_squashfs/os.img %s/data/os.img"%(self.build_dir, self.build_dir)) != 0:
             print "Cannot copy os.img from squashfs from ISO to base on"
-            os.system("/bin/umount %s/base_on_squashfs"%(self.build_dir))
-            os.system("/sbin/losetup -d %s"%(squashfs_loop_device))
-            os.system("/bin/umount %s/base_on_iso"%(self.build_dir))
-            os.system("/sbin/losetup -d %s"%(iso_loop_device))
-            try:
-                os.rmdir(self.build_dir + "/base_on_squashfs")
-                os.rmdir(self.build_dir + "/base_on_iso")
-            except OSError:
-                pass
+            squashloop.cleanup()
+            isoloop.cleanup()
             return False
 
         # unmount and tear down the mount points and loop devices used
-        os.system("/bin/umount %s/base_on_squashfs"%(self.build_dir))
-        os.system("/sbin/losetup -d %s"%(squashfs_loop_device))
-        os.system("/bin/umount %s/base_on_iso"%(self.build_dir))
-        os.system("/sbin/losetup -d %s"%(iso_loop_device))
-        try:
-            os.rmdir(self.build_dir + "/base_on_squashfs")
-            os.rmdir(self.build_dir + "/base_on_iso")
-        except OSError:
-            pass
-        
+        squashloop.cleanup()
+        isoloop.cleanup()
         return True
 
 
@@ -139,8 +163,7 @@ class InstallationTarget:
 
         # global variables needed
         self.fs_label = fs_label
-        self.have_unmounted = False
-        self.loop_device = ""
+        self.instloop = None
 
         # setup temporary build dirs
         self.build_dir = "/var/tmp/livecd-creator/build-" + os.path.basename(tempfile.mktemp())
@@ -169,42 +192,17 @@ class InstallationTarget:
             if not self.base_on_iso(base_on):
                 self.teardown()
                 return False
+            self.instloop = LoopbackMount("%s/data/os.img" %(self.build_dir,),
+                                          "%s/install_root" %(self.build_dir,))
         else:
-            # otherwise create the image
-            if os.system("dd if=/dev/zero of=%s/data/os.img bs=512 count=1 seek=%d 2> /dev/null"%(self.build_dir, image_size/512)) != 0:
-                print "Cannot create sparse file of %d MiB for OS image"%(image_size/1024/1024)
-                self.teardown()
-                return False
+            self.instloop = SparseExt3LoopbackMount("%s/data/os.img"
+                                                    %(self.build_dir,),
+                                                    "%s/install_root"
+                                                    %(self.build_dir,),
+                                                    image_size)
+            
 
-        # get a loop device, self.loop_device, to point to the ext3 image we're using
-        try:
-            f = os.popen("/sbin/losetup -f")
-            self.loop_device = f.read().strip()
-            f.close()
-        except OSError:
-            print "Cannot get loop device"
-            self.teardown()
-            return False
-        if os.system("/sbin/losetup %s %s/data/os.img"%(self.loop_device, self.build_dir)) != 0:
-            print "Cannot setup %s for backing OS image"%(self.loop_device)
-            self.teardown()
-            return False
-
-        # create the ext3 image unless we're reusing one from an existing live CD ISO
-        if base_on == "":
-            if os.system("/sbin/mkfs.ext3 -L \"%s\" -m 1 %s > /dev/null 2>&1"%(self.fs_label, self.loop_device)) != 0:
-                print "Cannot create ext3 file system on OS image"
-                self.teardown()
-                return False
-
-            if os.system("/sbin/tune2fs -c 0 -i 0 %s > /dev/null 2>&1"%(self.loop_device)) != 0:
-                print "Cannot tune ext3 file system on OS image"
-                self.teardown()
-                return False
-
-        # mount ext3 image at install_root/ so we can write to it
-        if os.system("/bin/mount -t ext3 %s %s/install_root"%(self.loop_device, self.build_dir)) != 0:
-            print "Cannot mount ext3 fs from OS image in %s/install_root"%(self.build_dir)
+        if not self.instloop.setup():
             self.teardown()
             return False
 
@@ -285,22 +283,18 @@ class InstallationTarget:
 
         # TODO: need to handle when unmount fails because of lingering
         # processes that has open files
-        if not self.have_unmounted:
+        if self.instloop:
             os.system("/bin/umount %s/install_root/var/cache/yum"%(self.build_dir))
             for g in ["selinux", "dev/pts", "dev", "proc", "sys"]:
                 os.system("/bin/umount %s/install_root/%s"%(self.build_dir, g))
-            if self.loop_device != "":
-                os.system("/bin/umount %s"%(self.loop_device))
-                os.system("/sbin/losetup -d %s"%(self.loop_device))
-
+            self.instloop.cleanup()
             try:
-                os.rmdir(self.build_dir + "/install_root")
                 os.unlink(self.build_dir + "/yum.conf")
             except OSError:
                 pass
             os.system("/bin/rm -rf %s/yum-cache"%(self.build_dir))
-            
-            self.have_unmounted = True
+
+            self.instloop = None
 
     def teardown(self):
         """releases all resources and removes all temporary files"""
@@ -525,7 +519,7 @@ def main():
 
     target = InstallationTarget()
 
-    if not target.setup(3*1024*1024*1024, fs_label, base_on):
+    if not target.setup(3*1024, fs_label, base_on):
         print "Cannot setup installation target. Aborting."
         sys.exit(1)
 
