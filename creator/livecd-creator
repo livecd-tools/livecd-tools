@@ -388,9 +388,10 @@ class InstallationTarget:
         # modules needed for booting (this is butt ugly and we need to retrieve this from elsewhere, e.g. the kernel)
         mayflowerconf = open(self.build_dir + "/install_root/etc/mayflower.conf", "w")
         mayflowerconf.write('MODULES+="cdrom ide-cd ahci loop dm_snapshot squashfs ext3 ehci_hcd uhci_hcd ohci_hcd usb_storage sd_mod sr_mod usbhid ata_piix "\n')
-        mayflowerconf.write('MODULES+="sata_mv sata_qstor sata_sis sata_uli"\n')
-        mayflowerconf.write('MODULES+="sata_nv sata_sil24 sata_svw sata_via"\n')
-        mayflowerconf.write('MODULES+="sata_promise sata_sil sata_sx4 sata_vsc"\n')
+        mayflowerconf.write('MODULES+="sata_mv sata_qstor sata_sis sata_uli "\n')
+        mayflowerconf.write('MODULES+="sata_nv sata_sil24 sata_svw sata_via "\n')
+        mayflowerconf.write('MODULES+="sata_promise sata_sil sata_sx4 sata_vsc "\n')
+        mayflowerconf.write('MODULES+="ata_generic pata_ali pata_amd pata_artop pata_atiixp pata_cmd64x pata_cs5520 pata_cs5530 pata_cs5535 pata_cypress pata_efar pata_hpt366 pata_hpt37x pata_hpt3x2n pata_hpt3x3 pata_isapnp pata_it821x pata_jmicron pata_marvell pata_mpiix pata_netcell pata_ns87410 pata_oldpiix pata_optidma pata_opti pata_pcmcia pata_pdc2027x pata_pdc202xx_old pata_qdi pata_serverworks pata_sil680 pata_sis pata_sl82c105 pata_triflex pata_via pdc_adma "\n')        
         mayflowerconf.close()
 
         f = os.popen("/bin/basename %s/install_root/lib/modules/*"%(self.build_dir))
