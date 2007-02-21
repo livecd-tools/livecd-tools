@@ -340,7 +340,7 @@ class InstallationTarget:
                 os.unlink(self.build_dir + "/yum.conf")
             except OSError:
                 pass
-            os.system("/bin/rm -rf %s/yum-cache"%(self.build_dir))
+            shutil.rmtree("%s/yum-cache" %(self.build_dir,), ignore_errors=True)
 
             self.instloop = None
 
@@ -356,9 +356,9 @@ class InstallationTarget:
             os.rmdir(self.build_dir + "/data")
         except OSError:
             pass
-        os.system("/bin/rm -rf %s/out"%(self.build_dir))
+        shutil.rmtree("%s/out" %(self.build_dir,), ignore_errors=True)
         if "/var/tmp/livecd-creator/build-" in self.build_dir:
-            os.system("/bin/rm -rf %s"%self.build_dir)
+            shutil.rmtree(self.build_dir, ignore_errors=True)
 
     def addRepository(self, name, url):
         """adds a yum repository to temporary yum.conf file used"""
