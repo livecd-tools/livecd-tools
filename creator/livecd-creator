@@ -427,9 +427,9 @@ class InstallationTarget:
 
         # Create initramfs
         #
-        shutil.copyfile("/usr/lib/livecd-creator/mayflower",
+        shutil.copy("/usr/lib/livecd-creator/mayflower",
                         "%s/install_root/sbin/mayflower" %(self.build_dir,))
-        shutil.copyfile("/usr/lib/livecd-creator/run-init",
+        shutil.copy("/usr/lib/livecd-creator/run-init",
                         "%s/install_root/sbin/run-init" %(self.build_dir,))
         # modules needed for booting (this is butt ugly and we need to retrieve this from elsewhere, e.g. the kernel)
         mayflowerconf = open(self.build_dir + "/install_root/etc/mayflower.conf", "w")
