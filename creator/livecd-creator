@@ -24,6 +24,35 @@ import time
 import subprocess
 import shutil
 
+class BindChrootMount:
+    """Represents a bind mount of a directory into a chroot."""
+    def __init__(self, src, chroot, dest = None):
+        self.src = src
+        self.root = chroot
+        if dest:
+            self.dest = dest
+        else:
+            self.dest = src
+
+        self.mounted = False
+
+    def mount(self):
+        if not self.mounted:
+            if not os.path.exists("%s/%s" %(self.root, self.dest)):
+                os.makedirs("%s/%s" %(self.root, self.dest))
+            rc = subprocess.call(["/bin/mount", "--bind", self.src,
+                                  "%s/%s" %(self.root, self.dest)])
+            if rc == 0:
+                self.mounted = True
+        return self.mounted
+
+    def umount(self):
+        if self.mounted:
+            rc = subprocess.call(["/bin/umount",
+                                  "%s/%s" %(self.root, self.dest)])
+            self.mounted = False
+        
+
 class LoopbackMount:
     def __init__(self, lofile, mountdir, fstype = None):
         self.lofile = lofile
@@ -178,6 +207,7 @@ class InstallationTarget:
         # global variables needed
         self.fs_label = fs_label
         self.instloop = None
+        self.bindmounts = []
 
         # setup temporary build dirs
         self.build_dir = "/var/tmp/livecd-creator/build-" + os.path.basename(tempfile.mktemp())
@@ -235,12 +265,11 @@ class InstallationTarget:
                 return False
 
         # bind mount system directories into install_root/
-        for f in ["sys", "proc", "dev", "dev/pts", "selinux"]:
-            try:
-                os.makedirs(self.build_dir + "/install_root/%s"%f)
-            except:
-                pass
-            if os.system("/bin/mount --bind /%s %s/install_root/%s"%(f, self.build_dir, f)) != 0:
+        for f in ["/sys", "/proc", "/dev", "/dev/pts", "/selinux"]:
+            b = BindChrootMount(f, "%s/install_root" %(self.build_dir,))
+            if b.mount():
+                self.bindmounts.append(b)
+            else:
                 print "Cannot mount special file system %s"%f
                 self.teardown()
                 return False
@@ -262,7 +291,12 @@ class InstallationTarget:
         fstab.write("sysfs                   /sys                    sysfs   defaults        0 0\n")
         fstab.close()
 
-        if os.system("/bin/mount --bind %s/yum-cache %s/install_root/var/cache/yum"%(self.build_dir, self.build_dir)) != 0:
+        b = BindChrootMount("%s/yum-cache" %(self.build_dir,),
+                            "%s/install_root" %(self.build_dir,),
+                            "/var/cache/yum")
+        if b.mount():
+            self.bindmounts.append(b)
+        else:
             print "Cannot bind mount /var/cache/yum"
             self.teardown()
             return False
@@ -298,9 +332,9 @@ class InstallationTarget:
         # TODO: need to handle when unmount fails because of lingering
         # processes that has open files
         if self.instloop:
-            os.system("/bin/umount %s/install_root/var/cache/yum"%(self.build_dir))
-            for g in ["selinux", "dev/pts", "dev", "proc", "sys"]:
-                os.system("/bin/umount %s/install_root/%s"%(self.build_dir, g))
+            self.bindmounts.reverse()
+            for b in self.bindmounts:
+                b.umount()
             self.instloop.cleanup()
             try:
                 os.unlink(self.build_dir + "/yum.conf")
