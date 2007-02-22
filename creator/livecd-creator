@@ -219,8 +219,7 @@ class InstallationTarget:
 
         try:
             os.mkdir(self.build_dir + "/out")
-            os.mkdir(self.build_dir + "/out/boot")
-            os.mkdir(self.build_dir + "/out/boot/grub")
+            os.mkdir(self.build_dir + "/out/isolinux")
             os.mkdir(self.build_dir + "/out/sysroot")
             os.mkdir(self.build_dir + "/data")
             os.mkdir(self.build_dir + "/data/sysroot")
@@ -461,47 +460,57 @@ class InstallationTarget:
         #
         shutil.copyfile("%s/install_root/boot/vmlinuz-%s"
                         %(self.build_dir, get_kernel_version(self.build_dir,)),
-                        "%s/out/boot/vmlinuz" %(self.build_dir,))
+                        "%s/out/isolinux/vmlinuz" %(self.build_dir,))
 
         shutil.copyfile("%s/install_root/boot/livecd-initramfs.img"
                         %(self.build_dir,),
-                        "%s/out/boot/livecd-initramfs.img" %(self.build_dir,))
+                        "%s/out/isolinux/initrd.img" %(self.build_dir,))
         os.unlink("%s/install_root/boot/livecd-initramfs.img"
                   %(self.build_dir,))
 
-        for f in ("/usr/share/grub/i386-redhat/stage2_eltorito",
-                  "/boot/grub/splash.xpm.gz"):
-            shutil.copy("%s/install_root/%s" %(self.build_dir, f),
-                        "%s/out/boot/grub/" %(self.build_dir,))
+        shutil.copy("%s/install_root/usr/lib/syslinux/isolinux.bin" %(self.build_dir,),
+                    "%s/out/isolinux/isolinux.bin" %(self.build_dir,))
+        shutil.copy("%s/install_root/usr/lib/syslinux/vesamenu.c32" %(self.build_dir,),
+                    "%s/out/isolinux/vesamenu.c32" %(self.build_dir,))
+        shutil.copy("%s/install_root/usr/lib/anaconda-runtime/syslinux-vesa-splash.jpg" %(self.build_dir,),
+                    "%s/out/isolinux/splash.jpg" %(self.build_dir,))
 
-        grubconf = open(self.build_dir + "/out/boot/grub/grub.conf", "w")
-        grubconf.write("default=1\n")
-        grubconf.write("timeout=10\n")
-        grubconf.write("splashimage=(cd)/boot/grub/splash.xpm.gz\n")
-        grubconf.write("hiddenmenu\n")
-        grubconf.write("title %s (Run from RAM - requires 1GB+)\n"%(self.fs_label))
-        grubconf.write("        root (cd)\n")
-        grubconf.write("        kernel /boot/vmlinuz ro quiet root=CDLABEL=%s rootfstype=iso9660 livecd livecd_ram\n"%(self.fs_label))
-        grubconf.write("        initrd /boot/livecd-initramfs.img\n")
-        grubconf.write("title %s\n"%(self.fs_label))
-        grubconf.write("        root (cd)\n")
-        grubconf.write("        kernel /boot/vmlinuz ro quiet root=CDLABEL=%s rootfstype=iso9660 livecd\n"%(self.fs_label))
-        grubconf.write("        initrd /boot/livecd-initramfs.img\n")
+        cfg = """
+default vesamenu.c32
+timeout 600
+
+menu background splash.jpg
+menu title Welcome to Fedora!
+menu color border 0 #ffffffff #00000000
+menu color sel 0 #ffffffff #ff000000
+menu color title 0 #ffffffff #00000000
+menu color tabmsg 0 #ffffffff #00000000
+menu color unsel 0 #ffffffff #00000000
+menu color hotsel 0 #ff000000 #ffffffff
+menu color hotkey 0 #ffffffff #ff000000
+
+label linux
+  menu label %(label)s
+  kernel vmlinuz
+  append initrd=initrd.img  ro quiet root=CDLABEL=%(label)s rootfstype=iso9660 livecd
+
+label runfromram
+  menu label %(label)s from RAM
+  kernel vmlinuz
+  append initrd=initrd.img ro quiet root=CDLABEL=%(label)s rootfstype=iso9660 livecd livecd_ram
+""" %{"label": self.fs_label}
+
+        cfgf = open("%s/out/isolinux/isolinux.cfg" %(self.build_dir,), "w")
+        cfgf.write(cfg)
+        cfgf.close()
         
         # TODO: enable external entitity to partipate in adding boot entries
-        #
-        #grubconf.write("title %s (w/ Screen Reader)\n"%(self.fs_label))
-        #grubconf.write("        root (cd)\n")
-        #grubconf.write("        kernel /boot/vmlinuz ro quiet root=CDLABEL=%s rootfstype=iso9660 livecd a11y_screenreader\n"%(self.fs_label))
-        #grubconf.write("        initrd /boot/livecd-initramfs.img\n")
-        grubconf.write("\n")
-        grubconf.close()
 
     def createIso(self, filename):
         """write out the live CD ISO"""
         subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(filename,),
-                         "-b", "boot/grub/stage2_eltorito",
-                         "-c", "boot/boot.catalog",
+                         "-b", "isolinux/isolinux.bin",
+                         "-c", "isolinux/boot.cat",
                          "-no-emul-boot", "-boot-load-size", "4",
                          "-boot-info-table", "-J", "-r", "-hide-rr-moved",
                          "-V", "%s" %(filename,), "%s/out" %(self.build_dir)])
