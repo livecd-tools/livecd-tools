@@ -21,116 +21,183 @@ import os.path
 import sys
 import tempfile
 import time
+import subprocess
+import shutil
+
+class BindChrootMount:
+    """Represents a bind mount of a directory into a chroot."""
+    def __init__(self, src, chroot, dest = None):
+        self.src = src
+        self.root = chroot
+        if dest:
+            self.dest = dest
+        else:
+            self.dest = src
+
+        self.mounted = False
+
+    def mount(self):
+        if not self.mounted:
+            if not os.path.exists("%s/%s" %(self.root, self.dest)):
+                os.makedirs("%s/%s" %(self.root, self.dest))
+            rc = subprocess.call(["/bin/mount", "--bind", self.src,
+                                  "%s/%s" %(self.root, self.dest)])
+            if rc == 0:
+                self.mounted = True
+        return self.mounted
+
+    def umount(self):
+        if self.mounted:
+            rc = subprocess.call(["/bin/umount",
+                                  "%s/%s" %(self.root, self.dest)])
+            self.mounted = False
+        
+
+class LoopbackMount:
+    def __init__(self, lofile, mountdir, fstype = None):
+        self.lofile = lofile
+        self.mountdir = mountdir
+        self.fstype = fstype
+
+        self.mounted = False
+        self.losetup = False
+        self.loopdev = None
+
+    def cleanup(self, rmdir = True):
+        self.umount()
+        self.lounsetup()
+        if rmdir:
+            try:
+                os.rmdir(self.mountdir)
+            except OSError, e:
+                pass
+
+    def umount(self):
+        if self.mounted:
+            rc = subprocess.call(["umount", self.mountdir])
+            self.mounted = False
+
+    def lounsetup(self):
+        if self.losetup and self.loopdev:
+            rc = subprocess.call(["losetup", "-d", self.loopdev])
+            self.losetup = False
+            self.loopdev = None
+
+    def setup(self):
+        if not os.path.exists(self.mountdir):
+            os.makedirs(self.mountdir)
+        if self.loopsetup():
+            if self.mount():
+                return True
+        return False
+
+    def loopsetup(self):
+        if self.losetup:
+            return self.losetup
+        rc = subprocess.call(["losetup", "-f", self.lofile])
+        if rc != 0:
+            return self.losetup
+
+        # succeeded; figure out which loopdevice we're using
+        buf = subprocess.Popen(["losetup", "-a"],
+                               stdout=subprocess.PIPE).communicate()[0]
+        for line in buf.split("\n"):
+            # loopdev: fdinfo (filename)
+            fields = line.split()
+            if len(fields) != 3:
+                continue
+            if fields[2] == "(%s)" %(self.lofile,):
+                self.loopdev = fields[0][:-1]
+                break
+
+        if self.loopdev:
+            self.losetup = True
+        return self.losetup
+
+    def mount(self):
+        if self.mounted or not self.loopdev:
+            return self.mounted
+        args = [ "mount", self.loopdev, self.mountdir ]
+        if self.fstype:
+            args.extend(["-t", self.fstype])
+        rc = subprocess.call(args)
+        if rc == 0:
+            self.mounted = True
+        return self.mounted
+
+class SparseExt3LoopbackMount(LoopbackMount):
+    def __init__(self, lofile, mountdir, size, fslabel = None):
+        LoopbackMount.__init__(self, lofile, mountdir, fstype = "ext3")
+        self.size = size
+        self.fslabel = fslabel
+        if not self.fslabel:
+            self.fslabel = "livecd-" + time.strftime("%Y%m%d-%H%M")
+
+    def _createSparseFile(self):
+        dir = os.path.dirname(self.lofile)
+        if not dir:
+            os.makedirs(dir)
+
+        # create the sparse file
+        fd = os.open(self.lofile, os.O_WRONLY | os.O_CREAT)
+        off = long(self.size * 1024L * 1024L)
+        os.lseek(fd, off, 0)
+        os.write(fd, '\x00')
+        os.close(fd)
+
+    def _formatFilesystem(self):
+        rc = subprocess.call(["mkfs.ext3", "-F", "-L", self.fslabel,
+                              "-m", "1", self.lofile])
+        if rc != 0:
+            raise OSError, "Error creating filesystem: %d" %(rc,)
+        rc = subprocess.call(["tune2fs", "-c0", "-i0", "-Odir_index",
+                              "-ouser_xattr,acl", self.lofile])
+
+    def setup(self):
+        self._createSparseFile()
+        self._formatFilesystem()
+        return LoopbackMount.setup(self)
+
+def touch(fn):
+    f = open(fn, "w+")
+    f.close()
+
+def get_kernel_version(root):
+    # FIXME: this doesn't handle multiple kernels being installed
+    kdir = os.listdir("%s/install_root/lib/modules" %(root,))
+    kver = os.path.basename(kdir[0])
+    return kver
 
 class InstallationTarget:
-
     def base_on_iso(self, base_on):
         """helper function to extract ext3 file system from a live CD ISO"""
-        
-        # create directories for iso9660 and squashfs file systems from the live cd ISO
-        try:
-            os.mkdir(self.build_dir + "/base_on_iso")
-            os.mkdir(self.build_dir + "/base_on_squashfs")
-        except OSError:
+
+        isoloop = LoopbackMount(base_on, "%s/base_on_iso" %(self.build_dir,))
+        if not isoloop.setup():
+            isoloop.cleanup()
             return False
 
-        # setup loop device for iso9660 file system
-        try:
-            f = os.popen("/sbin/losetup -f")
-            iso_loop_device = f.read().strip()
-            f.close()
-        except OSError:
-            print "Cannot get loop device"
-            try:
-                os.rmdir(self.build_dir + "/base_on_squashfs")
-                os.rmdir(self.build_dir + "/base_on_iso")
-            except OSError:
-                pass
-            return False
-        if os.system("/sbin/losetup %s %s"%(iso_loop_device, base_on)) != 0:
-            print "Cannot setup %s for ISO to base on"%(self.loop_device)
-            try:
-                os.rmdir(self.build_dir + "/base_on_squashfs")
-                os.rmdir(self.build_dir + "/base_on_iso")
-            except OSError:
-                pass
-            return False
-
-        # mount iso9660 file system
-        if os.system("/bin/mount %s %s/base_on_iso"%(iso_loop_device, self.build_dir)) != 0:
-            print "Cannot mount ISO to base on in %s/base_on_iso"%(self.build_dir)
-            os.system("/sbin/losetup -d %s"%(iso_loop_device))
-            try:
-                os.rmdir(self.build_dir + "/base_on_squashfs")
-                os.rmdir(self.build_dir + "/base_on_iso")
-            except OSError:
-                pass
-            return False
-
-        # setup loop device for squashfs file system
-        try:
-            f = os.popen("/sbin/losetup -f")
-            squashfs_loop_device = f.read().strip()
-            f.close()
-        except OSError:
-            print "Cannot get loop device"
-            os.system("/bin/umount %s/base_on_iso"%(self.build_dir))
-            os.system("/sbin/losetup -d %s"%(iso_loop_device))
-            try:
-                os.rmdir(self.build_dir + "/base_on_squashfs")
-                os.rmdir(self.build_dir + "/base_on_iso")
-            except OSError:
-                pass
-            return False        
-        if os.system("/sbin/losetup %s %s/base_on_iso/squashfs.img"%(squashfs_loop_device, self.build_dir)) != 0:
-            print "Cannot setup %s for squashfs on ISO to base on"%(self.loop_device)
-            os.system("/bin/umount %s/base_on_iso"%(self.build_dir))
-            os.system("/sbin/losetup -d %s"%(iso_loop_device))
-            try:
-                os.rmdir(self.build_dir + "/base_on_squashfs")
-                os.rmdir(self.build_dir + "/base_on_iso")
-            except OSError:
-                pass
-            return False
-
-        # mount squashfs file system
-        if os.system("/bin/mount -t squashfs -o ro %s %s/base_on_squashfs"%(squashfs_loop_device, self.build_dir)) != 0:
-            print "Cannot mount squashfs from ISO to base on in %s/base_on_iso"%(self.build_dir)
-            os.system("/sbin/losetup -d %s"%(squashfs_loop_device))
-            os.system("/bin/umount %s/base_on_iso"%(self.build_dir))
-            os.system("/sbin/losetup -d %s"%(iso_loop_device))
-            try:
-                os.rmdir(self.build_dir + "/base_on_squashfs")
-                os.rmdir(self.build_dir + "/base_on_iso")
-            except OSError:
-                pass
+        squashloop = LoopbackMount("%s/squashfs.img" %(isoloop.mountdir,),
+                                   "%s/base_on_squashfs" %(self.build_dir,),
+                                   "squashfs")
+        if not squashloop.setup():
+            squashloop.cleanup()
+            isoloop.cleanup()
             return False
 
         # copy the ext3 fs out
-        if os.system("cp %s/base_on_squashfs/os.img %s/data/os.img"%(self.build_dir, self.build_dir)) != 0:
-            print "Cannot copy os.img from squashfs from ISO to base on"
-            os.system("/bin/umount %s/base_on_squashfs"%(self.build_dir))
-            os.system("/sbin/losetup -d %s"%(squashfs_loop_device))
-            os.system("/bin/umount %s/base_on_iso"%(self.build_dir))
-            os.system("/sbin/losetup -d %s"%(iso_loop_device))
-            try:
-                os.rmdir(self.build_dir + "/base_on_squashfs")
-                os.rmdir(self.build_dir + "/base_on_iso")
-            except OSError:
-                pass
+        try:
+            shutil.copyfile("%s/base_on_squashfs/os.img" %(self.build_dir,),
+                            "%s/data/os.img" %(self.build_dir,))
+        except Exception, e:
+            print "Cannot copy os.img from squashfs from ISO to base on: %s" %(e,)
+            squashloop.cleanup()
+            isoloop.cleanup()
             return False
 
         # unmount and tear down the mount points and loop devices used
-        os.system("/bin/umount %s/base_on_squashfs"%(self.build_dir))
-        os.system("/sbin/losetup -d %s"%(squashfs_loop_device))
-        os.system("/bin/umount %s/base_on_iso"%(self.build_dir))
-        os.system("/sbin/losetup -d %s"%(iso_loop_device))
-        try:
-            os.rmdir(self.build_dir + "/base_on_squashfs")
-            os.rmdir(self.build_dir + "/base_on_iso")
-        except OSError:
-            pass
-        
+        squashloop.cleanup()
+        isoloop.cleanup()
         return True
 
 
@@ -139,8 +206,8 @@ class InstallationTarget:
 
         # global variables needed
         self.fs_label = fs_label
-        self.have_unmounted = False
-        self.loop_device = ""
+        self.instloop = None
+        self.bindmounts = []
 
         # setup temporary build dirs
         self.build_dir = "/var/tmp/livecd-creator/build-" + os.path.basename(tempfile.mktemp())
@@ -169,42 +236,17 @@ class InstallationTarget:
             if not self.base_on_iso(base_on):
                 self.teardown()
                 return False
+            self.instloop = LoopbackMount("%s/data/os.img" %(self.build_dir,),
+                                          "%s/install_root" %(self.build_dir,))
         else:
-            # otherwise create the image
-            if os.system("dd if=/dev/zero of=%s/data/os.img bs=512 count=1 seek=%d 2> /dev/null"%(self.build_dir, image_size/512)) != 0:
-                print "Cannot create sparse file of %d MiB for OS image"%(image_size/1024/1024)
-                self.teardown()
-                return False
+            self.instloop = SparseExt3LoopbackMount("%s/data/os.img"
+                                                    %(self.build_dir,),
+                                                    "%s/install_root"
+                                                    %(self.build_dir,),
+                                                    image_size)
+            
 
-        # get a loop device, self.loop_device, to point to the ext3 image we're using
-        try:
-            f = os.popen("/sbin/losetup -f")
-            self.loop_device = f.read().strip()
-            f.close()
-        except OSError:
-            print "Cannot get loop device"
-            self.teardown()
-            return False
-        if os.system("/sbin/losetup %s %s/data/os.img"%(self.loop_device, self.build_dir)) != 0:
-            print "Cannot setup %s for backing OS image"%(self.loop_device)
-            self.teardown()
-            return False
-
-        # create the ext3 image unless we're reusing one from an existing live CD ISO
-        if base_on == "":
-            if os.system("/sbin/mkfs.ext3 -L \"%s\" -m 1 %s > /dev/null 2>&1"%(self.fs_label, self.loop_device)) != 0:
-                print "Cannot create ext3 file system on OS image"
-                self.teardown()
-                return False
-
-            if os.system("/sbin/tune2fs -c 0 -i 0 %s > /dev/null 2>&1"%(self.loop_device)) != 0:
-                print "Cannot tune ext3 file system on OS image"
-                self.teardown()
-                return False
-
-        # mount ext3 image at install_root/ so we can write to it
-        if os.system("/bin/mount -t ext3 %s %s/install_root"%(self.loop_device, self.build_dir)) != 0:
-            print "Cannot mount ext3 fs from OS image in %s/install_root"%(self.build_dir)
+        if not self.instloop.setup():
             self.teardown()
             return False
 
@@ -223,12 +265,11 @@ class InstallationTarget:
                 return False
 
         # bind mount system directories into install_root/
-        for f in ["sys", "proc", "dev", "dev/pts", "selinux"]:
-            try:
-                os.makedirs(self.build_dir + "/install_root/%s"%f)
-            except:
-                pass
-            if os.system("/bin/mount --bind /%s %s/install_root/%s"%(f, self.build_dir, f)) != 0:
+        for f in ["/sys", "/proc", "/dev", "/dev/pts", "/selinux"]:
+            b = BindChrootMount(f, "%s/install_root" %(self.build_dir,))
+            if b.mount():
+                self.bindmounts.append(b)
+            else:
                 print "Cannot mount special file system %s"%f
                 self.teardown()
                 return False
@@ -250,7 +291,12 @@ class InstallationTarget:
         fstab.write("sysfs                   /sys                    sysfs   defaults        0 0\n")
         fstab.close()
 
-        if os.system("/bin/mount --bind %s/yum-cache %s/install_root/var/cache/yum"%(self.build_dir, self.build_dir)) != 0:
+        b = BindChrootMount("%s/yum-cache" %(self.build_dir,),
+                            "%s/install_root" %(self.build_dir,),
+                            "/var/cache/yum")
+        if b.mount():
+            self.bindmounts.append(b)
+        else:
             print "Cannot bind mount /var/cache/yum"
             self.teardown()
             return False
@@ -285,22 +331,18 @@ class InstallationTarget:
 
         # TODO: need to handle when unmount fails because of lingering
         # processes that has open files
-        if not self.have_unmounted:
-            os.system("/bin/umount %s/install_root/var/cache/yum"%(self.build_dir))
-            for g in ["selinux", "dev/pts", "dev", "proc", "sys"]:
-                os.system("/bin/umount %s/install_root/%s"%(self.build_dir, g))
-            if self.loop_device != "":
-                os.system("/bin/umount %s"%(self.loop_device))
-                os.system("/sbin/losetup -d %s"%(self.loop_device))
-
+        if self.instloop:
+            self.bindmounts.reverse()
+            for b in self.bindmounts:
+                b.umount()
+            self.instloop.cleanup()
             try:
-                os.rmdir(self.build_dir + "/install_root")
                 os.unlink(self.build_dir + "/yum.conf")
             except OSError:
                 pass
-            os.system("/bin/rm -rf %s/yum-cache"%(self.build_dir))
-            
-            self.have_unmounted = True
+            shutil.rmtree("%s/yum-cache" %(self.build_dir,), ignore_errors=True)
+
+            self.instloop = None
 
     def teardown(self):
         """releases all resources and removes all temporary files"""
@@ -314,9 +356,9 @@ class InstallationTarget:
             os.rmdir(self.build_dir + "/data")
         except OSError:
             pass
-        os.system("/bin/rm -rf %s/out"%(self.build_dir))
+        shutil.rmtree("%s/out" %(self.build_dir,), ignore_errors=True)
         if "/var/tmp/livecd-creator/build-" in self.build_dir:
-            os.system("/bin/rm -rf %s"%self.build_dir)
+            shutil.rmtree(self.build_dir, ignore_errors=True)
 
     def addRepository(self, name, url):
         """adds a yum repository to temporary yum.conf file used"""
@@ -332,13 +374,14 @@ class InstallationTarget:
 
     def installPackages(self, packageList, excludePackageList):
         """install packages into target file system"""
-        
+        def run_in_root():
+            os.chroot("%s/install_root" %(self.build_dir,))
+
         packages = ""
         for p in packageList:
             packages += " %s"%p
 
-        os.system("/bin/touch %s/install_root/var/log/yum.log"%(self.build_dir))
-
+        touch("%s/install_root/var/log/yum.log" %(self.build_dir,))
         if os.system("/usr/bin/yum -y -c %s/yum.conf --disablerepo=* --enablerepo=lcdr_* --installroot=%s/install_root install %s"%(self.build_dir, self.build_dir, packages)) != 0:
             print "Error installing packages"
             return False
@@ -372,19 +415,22 @@ class InstallationTarget:
                 print "Error installing packages"
                 return False
 
-        os.system("/bin/touch %s/install_root/etc/shadow"%(self.build_dir))
-        os.system("/bin/touch %s/install_root/etc/gshadow"%(self.build_dir))
+        touch("%s/install_root/etc/shadow" %(self.build_dir,))
+        touch("%s/install_root/etc/gshadow" %(self.build_dir,))        
 
         # now run through all the post scripts from livecd scripts
         for root, dirs, files in os.walk("%s/install_root/etc/livecd"%(self.build_dir)):
             files.sort()
             for file in files:
-                os.system("/usr/sbin/chroot %s/install_root /etc/livecd/%s post"%(self.build_dir, file))
+                subprocess.call(["/etc/livecd/%s" %(file,), "post"],
+                                preexec_fn = run_in_root)
 
         # Create initramfs
         #
-        os.system("/bin/cp /usr/lib/livecd-creator/mayflower %s/install_root/sbin/mayflower"%(self.build_dir))
-        os.system("/bin/cp /usr/lib/livecd-creator/run-init %s/install_root/sbin/run-init"%(self.build_dir))
+        shutil.copy("/usr/lib/livecd-creator/mayflower",
+                        "%s/install_root/sbin/mayflower" %(self.build_dir,))
+        shutil.copy("/usr/lib/livecd-creator/run-init",
+                        "%s/install_root/sbin/run-init" %(self.build_dir,))
         # modules needed for booting (this is butt ugly and we need to retrieve this from elsewhere, e.g. the kernel)
         mayflowerconf = open(self.build_dir + "/install_root/etc/mayflower.conf", "w")
         mayflowerconf.write('MODULES+="cdrom ide-cd ahci loop dm_snapshot squashfs ext3 ehci_hcd uhci_hcd ohci_hcd usb_storage sd_mod sr_mod usbhid ata_piix "\n')
@@ -394,17 +440,14 @@ class InstallationTarget:
         mayflowerconf.write('MODULES+="ata_generic pata_ali pata_amd pata_artop pata_atiixp pata_cmd64x pata_cs5520 pata_cs5530 pata_cs5535 pata_cypress pata_efar pata_hpt366 pata_hpt37x pata_hpt3x2n pata_hpt3x3 pata_isapnp pata_it821x pata_jmicron pata_marvell pata_mpiix pata_netcell pata_ns87410 pata_oldpiix pata_optidma pata_opti pata_pcmcia pata_pdc2027x pata_pdc202xx_old pata_qdi pata_serverworks pata_sil680 pata_sis pata_sl82c105 pata_triflex pata_via pdc_adma "\n')        
         mayflowerconf.close()
 
-        f = os.popen("/bin/basename %s/install_root/lib/modules/*"%(self.build_dir))
-        kver = f.read().strip()
-        f.close()
-
-        os.system("/usr/sbin/chroot %s/install_root /sbin/mayflower -f /boot/livecd-initramfs.img %s"%(self.build_dir, kver))
-        os.system("/bin/rm -f %s/install_root/sbin/mayflower"%(self.build_dir))
-        os.system("/bin/rm -f %s/install_root/sbin/run-init"%(self.build_dir))
-        os.system("/bin/rm -f %s/install_root/etc/mayflower.conf"%(self.build_dir))
+        subprocess.call(["/sbin/mayflower", "-f", "/boot/livecd-initramfs.img",
+                         get_kernel_version(self.build_dir)],
+                        preexec_fn=run_in_root)
+        for f in ("/sbin/mayflower", "/sbin/run-init", "/etc/mayflower.conf"):
+            os.unlink("%s/install_root/%s" %(self.build_dir, f))
 
         # finally relabel all files
-        os.system("/usr/sbin/chroot %s/install_root /sbin/fixfiles restore"%(self.build_dir))
+        subprocess.call(["/sbin/fixfiles", "restore"], preexec_fn=run_in_root)
         return True
 
     def configureBootloader(self):
@@ -417,10 +460,20 @@ class InstallationTarget:
         #  - fix for non-i386
         #  - error handling
         #
-        os.system("/bin/cp %s/install_root/boot/vmlinuz* %s/out/boot/vmlinuz"%(self.build_dir, self.build_dir))
-        os.system("/bin/mv %s/install_root/boot/livecd-initramfs.img %s/out/boot/livecd-initramfs.img"%(self.build_dir, self.build_dir))
-        os.system("/bin/cp %s/install_root/usr/share/grub/i386-redhat/stage2_eltorito %s/out/boot/grub"%(self.build_dir, self.build_dir))
-        os.system("/bin/cp %s/install_root/boot/grub/splash.xpm.gz %s/out/boot/grub"%(self.build_dir, self.build_dir))
+        shutil.copyfile("%s/install_root/boot/vmlinuz-%s"
+                        %(self.build_dir, get_kernel_version(self.build_dir,)),
+                        "%s/out/boot/vmlinuz" %(self.build_dir,))
+
+        shutil.copyfile("%s/install_root/boot/livecd-initramfs.img"
+                        %(self.build_dir,),
+                        "%s/out/boot/livecd-initramfs.img" %(self.build_dir,))
+        os.unlink("%s/install_root/boot/livecd-initramfs.img"
+                  %(self.build_dir,))
+
+        for f in ("/usr/share/grub/i386-redhat/stage2_eltorito",
+                  "/boot/grub/splash.xpm.gz"):
+            shutil.copy("%s/install_root/%s" %(self.build_dir, f),
+                        "%s/out/boot/grub/" %(self.build_dir,))
 
         grubconf = open(self.build_dir + "/out/boot/grub/grub.conf", "w")
         grubconf.write("default=1\n")
@@ -447,11 +500,20 @@ class InstallationTarget:
 
     def createIso(self, filename):
         """write out the live CD ISO"""
-        os.system("/usr/bin/mkisofs -o %s.iso -b boot/grub/stage2_eltorito -c boot/boot.catalog -no-emul-boot -boot-load-size 4 -boot-info-table -J -r -hide-rr-moved -V %s %s/out"%(filename, filename, self.build_dir))
+        subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(filename,),
+                         "-b", "boot/grub/stage2_eltorito",
+                         "-c", "boot/boot.catalog",
+                         "-no-emul-boot", "-boot-load-size", "4",
+                         "-boot-info-table", "-J", "-r", "-hide-rr-moved",
+                         "-V", "%s" %(filename,), "%s/out" %(self.build_dir)])
 
     def createSquashFS(self):
         """create compressed squashfs file system"""
-        os.system("cd %s/data; mksquashfs os.img sysroot ../out/squashfs.img"%(self.build_dir))
+        # FIXME: mksquashfs segfaults if PWD isn't set in the environment
+        subprocess.call(["/sbin/mksquashfs", "os.img", "sysroot",
+                         "../out/squashfs.img"],
+                        cwd="%s/data" %(self.build_dir,),
+                        env={"PWD": "%s/data" %(self.build_dir,)})
 
 def usage():
     print "usage: livecd-creator [--help] "
@@ -526,7 +588,7 @@ def main():
 
     target = InstallationTarget()
 
-    if not target.setup(3*1024*1024*1024, fs_label, base_on):
+    if not target.setup(3*1024, fs_label, base_on):
         print "Cannot setup installation target. Aborting."
         sys.exit(1)
 
