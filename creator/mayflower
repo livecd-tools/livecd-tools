@@ -332,7 +332,7 @@ else
             ;;
         CDLABEL=*)
             CDLABEL=\${root#CDLABEL=}
-            echo "KERNEL==\"hd[a-z]\", BUS==\"ide\", SYSFS{removable}==\"1\", SYSFS{device/media}==\"cdrom\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"root\"" > /etc/udev/rules.d/00-cdlabel.rules
+            echo "KERNEL==\"hd[a-z]\", BUS==\"ide\", SYSFS{removable}==\"1\", ATTRS{media}==\"cdrom\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"root\"" > /etc/udev/rules.d/00-cdlabel.rules
             echo "KERNEL==\"sr[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"root\"" >> /etc/udev/rules.d/00-cdlabel.rules
             echo "KERNEL==\"scd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"root\"" >> /etc/udev/rules.d/00-cdlabel.rules
             echo "KERNEL==\"pcd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"root\"" >> /etc/udev/rules.d/00-cdlabel.rules
@@ -593,7 +593,7 @@ if [ -e /sysroot/squashfs.img ] ; then
     if [ "\$livecd_ram" == "1" ] ; then
        echo "KERNEL==\"loop118\", SYMLINK+=\"livecd\"" > /sysroot/etc/udev/rules.d/00-livecd.rules
     else
-       echo "KERNEL==\"hd[a-z]\", BUS==\"ide\", SYSFS{removable}==\"1\", SYSFS{device/media}==\"cdrom\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"livecd\"" > /sysroot/etc/udev/rules.d/00-livecd.rules
+       echo "KERNEL==\"hd[a-z]\", BUS==\"ide\", SYSFS{removable}==\"1\", ATTRS{media}==\"cdrom\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"livecd\"" > /sysroot/etc/udev/rules.d/00-livecd.rules
        echo "KERNEL==\"sr[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"livecd\"" >> /sysroot/etc/udev/rules.d/00-livecd.rules
        echo "KERNEL==\"scd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"livecd\"" >> /sysroot/etc/udev/rules.d/00-livecd.rules
        echo "KERNEL==\"pcd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"livecd\"" >> /sysroot/etc/udev/rules.d/00-livecd.rules
