@@ -6,10 +6,12 @@ INSTALL_PROGRAM = ${INSTALL}
 INSTALL_DATA = ${INSTALL} -m 644
 INSTALL_SCRIPT = ${INSTALL_PROGRAM}
 
+CC=gcc
+
 all: creator/run-init
 
 creator/run-init : creator/run-init.c creator/run-init.h creator/runinitlib.c Makefile
-	cd creator && gcc -o run-init -static run-init.c runinitlib.c && strip run-init
+	cd creator && $(CC) -o run-init -static run-init.c runinitlib.c && strip run-init
 
 install:
 	$(INSTALL_PROGRAM) -D creator/livecd-creator $(DESTDIR)/usr/bin/livecd-creator
