@@ -172,19 +172,13 @@ cp /sbin/lsmod sbin
 
 
 # Copy all required shared libs
-rm -f libs
 for i in bin/* sbin/*; do 
-    ldd $i | cut -d ' ' -f3 >> libs
-done
-LIBS=`cat libs | sort -u |grep -v ^dynamic`
-LIBS="/lib/ld-linux.so.2 $LIBS"
-cp libs /tmp/libs
-rm -f libs
-for l in $LIBS; do
-    if [ "$opt_verbose" == "1" ] ; then
-	echo "Copying DSO $l"
-    fi
-    cp $l lib
+    ldd $i | sed 's|.*=>||g' | awk '/\// { print $1 }' | while read lib ; do
+        if [ "$opt_verbose" == "1" ] ; then
+	    echo "Copying DSO $l"
+        fi
+        cp --parents $lib .
+    done
 done
 
 # Write out init

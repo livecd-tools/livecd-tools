@@ -446,7 +446,7 @@ class InstallationTarget:
             os.unlink("%s/install_root/%s" %(self.build_dir, f))
 
         # finally relabel all files
-        subprocess.call(["/sbin/fixfiles", "restore"], preexec_fn=run_in_root)
+        subprocess.call(["/sbin/fixfiles", "restore", "/"], preexec_fn=run_in_root)
         return True
 
     def configureBootloader(self):
