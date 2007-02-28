@@ -395,36 +395,6 @@ class InstallationTarget:
             if os.system("/usr/bin/yum -y -c %s/yum.conf --disablerepo=* --enablerepo=lcdr_* --installroot=%s/install_root groupinstall %s"%(self.build_dir, self.build_dir, groups)) != 0:
                 print "Error installing groups"
                 return False
-            
-
-        additional_packages = []
-
-        # now run through all .conf files and collect packages to install
-        for root, dirs, files in os.walk("%s/install_root/etc/livecd"%(self.build_dir)):
-            files.sort()
-            for file in files:
-                f = os.popen("%s/%s pkgadd"%(root, file))
-                pkg_from_f = (f.read().strip()).splitlines()
-                f.close()
-                additional_packages += pkg_from_f
-
-        # exclude the packages given on the command line with --exclude-package
-        for e in excludePackageList:
-            keep_removing = True
-            while keep_removing:
-                try:
-                    additional_packages.remove(e)
-                except ValueError:
-                    keep_removing = False
-
-        # now install the additional packages...
-        packages = ""
-        if len(additional_packages) > 0:
-            for p in additional_packages:
-                packages += " %s"%p
-            if os.system("/usr/bin/yum -y -c %s/yum.conf --disablerepo=* --enablerepo=lcdr_* --installroot=%s/install_root install %s"%(self.build_dir, self.build_dir, packages)) != 0:
-                print "Error installing packages"
-                return False
 
         touch("%s/install_root/etc/shadow" %(self.build_dir,))
         touch("%s/install_root/etc/gshadow" %(self.build_dir,))        
