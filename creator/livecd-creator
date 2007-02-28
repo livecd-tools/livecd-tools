@@ -623,8 +623,8 @@ def main():
             repos.append( (repo.name, repo.baseurl) )
 
         packages.extend(ksparser.handler.packages.packageList)
-        for g in groupList:
-            groups.append(g.name)
+        groups.extend(map(lambda g: g.name,
+                          ksparser.handler.packages.groupList))
         epackages.extend(ksparser.handler.packages.excludedList)
 
     target = InstallationTarget()
