@@ -230,7 +230,7 @@ class InstallationTarget:
             self.teardown()
             return False
 
-        if base_on != "":
+        if base_on:
             # get backing ext3 image if we're based this build on an existing live CD ISO
             if not self.base_on_iso(base_on):
                 self.teardown()
@@ -249,7 +249,7 @@ class InstallationTarget:
             self.teardown()
             return False
 
-        if base_on == "":
+        if not base_on:
             # create a few directories needed if it's a new image
             try:
                 os.mkdir(self.build_dir + "/install_root/etc")
@@ -371,7 +371,7 @@ class InstallationTarget:
         yumconf.write("\n")
         yumconf.close()
 
-    def installPackages(self, packageList, excludePackageList):
+    def installPackages(self, packageList, excludePackageList, groupList = []):
         """install packages into target file system"""
         def run_in_root():
             os.chroot("%s/install_root" %(self.build_dir,))
@@ -384,6 +384,15 @@ class InstallationTarget:
         if os.system("/usr/bin/yum -y -c %s/yum.conf --disablerepo=* --enablerepo=lcdr_* --installroot=%s/install_root install %s"%(self.build_dir, self.build_dir, packages)) != 0:
             print "Error installing packages"
             return False
+
+        groups = ""
+        for g in groupList:
+            groups += " %s" %g
+        if len(groups) > 0:
+            if os.system("/usr/bin/yum -y -c %s/yum.conf --disablerepo=* --enablerepo=lcdr_* --installroot=%s/install_root groupinstall %s"%(self.build_dir, self.build_dir, groups)) != 0:
+            print "Error installing groups"
+            return False
+            
 
         additional_packages = []
 
@@ -544,13 +553,15 @@ def main():
 
     repos = []
     packages = []
+    groups = []
     epackages = []
     fs_label = "livecd-" + time.strftime("%Y%m%d-%H%M")
-    base_on = ""
+    base_on = None
+    kscfg = None
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hr:b:p:e:f:",
-                                   ["help", "repo=", "base-on=", "package=", "exclude-package=", "fslabel="])
+        opts, args = getopt.getopt(sys.argv[1:], "hr:b:p:e:f:c:",
+                                   ["help", "repo=", "base-on=", "package=", "exclude-package=", "fslabel=", "config="])
     except getopt.GetoptError:
         usage()
         sys.exit(2)
@@ -560,6 +571,9 @@ def main():
         if o in ("-h", "--help"):
             usage()
             sys.exit(0)
+        if o in ("-c", "--config"):
+            kscfg = a
+            continue
         if o in ("-r", "--repo"):
             (name, url) = a.split(",")
             for (n, u) in repos:
@@ -569,6 +583,9 @@ def main():
             repos.append((name, url))
             continue
         if o in ("-p", "--package"):
+            if a.startswith("@"):
+                groups.append(a[1:])
+            else:
             packages.append(a)
             continue
         if o in ("-e", "--exclude-package"):
@@ -583,17 +600,31 @@ def main():
         print "Unknown option %s"%o
         sys.exit(2)
 
-    if len(packages) == 0:
-        print "No packages specified."
-        print ""
-        usage()
-        sys.exit(1)
+    if not kscfg:
+        if len(packages) == 0:
+            print "No packages specified."
+            print ""
+            usage()
+            sys.exit(1)
 
-    if len(repos) == 0:
-        print "No repositories specified."
-        print ""
-        usage()
-        sys.exit(1)
+        if len(repos) == 0:
+            print "No repositories specified."
+            print ""
+            usage()
+            sys.exit(1)
+    else:
+        from pykickstart.parser import *
+        from pykickstart.version import *
+
+        ksparser = KickstartParser(makeVersion())
+        ksparser.readKickstart(kscfg)
+
+        for repo in ksparser.handler.repo.repoList:
+            repos.append( (repo.name, repo.baseurl) )
+
+        packages.extend(ksparser.handler.packages.packageList)
+        groups.extend(ksparser.handler.packages.groupList)
+        epackages.extend(ksparser.handler.packages.excludedList)
 
     target = InstallationTarget()
 
@@ -605,7 +636,7 @@ def main():
         for (n, u) in repos:
             target.addRepository(n, u)
 
-        if not target.installPackages(packages, epackages):
+        if not target.installPackages(packages, epackages, groups):
             target.teardown()
             sys.exit(1)
             
