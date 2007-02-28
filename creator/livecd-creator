@@ -396,16 +396,83 @@ class InstallationTarget:
                 print "Error installing groups"
                 return False
 
-    def configureSystem(self):
-        touch("%s/install_root/etc/shadow" %(self.build_dir,))
-        touch("%s/install_root/etc/gshadow" %(self.build_dir,))        
+    def configureSystem(self, ksparser):
+        instroot = "%s/install_root" %(self.build_root,)
+        
+        # FIXME: this is a bit ugly, but with the current pykickstart
+        # API, we don't really have a lot of choice.  it'd be nice to
+        # be able to do something different, but so it goes
 
-        # now run through all the post scripts from livecd scripts
-        for root, dirs, files in os.walk("%s/install_root/etc/livecd"%(self.build_dir)):
-            files.sort()
-            for file in files:
-                subprocess.call(["/etc/livecd/%s" %(file,), "post"],
-                                preexec_fn = run_in_root)
+        # set up the language
+        lang = ksparser.handler.lang.lang or "en_US.UTF-8"
+        f = open("%s/etc/sysconfig/i18n" %(instroot,), "w+")
+        f.write("LANG=\"%s\"\n" %(lang,))
+        f.close()
+
+        # next, the keyboard
+        # FIXME: should this impact the X keyboard config too???
+        # or do we want to make X be able to do this mapping
+        import rhpl.keyboard
+        k = rhpl.keyboard.Keyboard()
+        if ksparser.handler.keyboard.keyboard:
+            k.set(ksparser.handler.keyboard.keyboard)
+        k.write(instroot)
+
+        # next up is timezone
+        tz = ksparser.handler.timezone.timezone or "America/New_York"
+        utc = ksparser.handler.timezone.isUtc
+        f = open("%s/etc/sysconfig/clock" %(instroot,), "w+")
+        f.write("ZONE=\"%s\"\n" %(tz,))
+        f.write("UTC=%s\n" %(utc,))
+        f.close()
+
+        # FIXME: we should handle network bits better
+        f = open("%s/etc/sysconfig/network" %(instroot,), "w+")
+        f.write("NETWORKING=yes\n")
+        f.write("HOSTNAME=localhost.localdomain\n")
+        f.close()
+        f = open("/%s/etc/hosts" %(instroot,), "w+")
+        f.write("127.0.0.1\t\tlocalhost.localdomain  localhost\n")
+        f.write("::1\t\tlocalhost6.localdomain6 localhost6\n")        
+        f.close()
+
+        # do any authconfig bits
+        auth = ksparser.handler.authconfig.authconfig or "--useshadow --enablemd5"
+        if os.path.exists("%s/usr/sbin/authconfig" %(instroot,)):
+            args = ["/usr/sbin/authconfig"]
+            args.extend(auth.split())
+            subprocess.call(args, preexec_fn=run_in_root)
+
+        # firewall.  FIXME: should handle the rest of the options
+        if ksparser.handler.firewall.enabled and os.path.exists("%s/usr/sbin/lokkit" %(instroot,)):
+            subprocess.call(["/usr/sbin/lokkit", "-f", "--quiet",
+                             "--nostart", "--enabled"],
+                            preexec_fn=run_in_root)
+
+        # selinux
+        if os.path.exists("%s/usr/sbin/lokkit" %(instroot,)):
+            args = ["/usr/sbin/lokkit", "-f", "--quiet", "--nostart"]
+            if ksparser.handler.selinux.selinux:
+                args.append("--selinux=enabled")
+            else:
+                args.append("--selinux=disabled")
+
+        # and now, for arbitrary %post scripts
+        for s in filter(lambda s: s.type == KS_SCRIPT_POST,
+                        ksparser.handler.scripts):
+            # we can only safely run scripts in the chroot
+            if not s.inChroot:
+                print >> sys.stderr, "Not running script outside of chroot"
+                continue
+
+            (fd, path) = tempfile.mkstemp("", "ks-script-", "%s/tmp" %(instroot,))
+            os.write(fd, s.script)
+            os.close(fd)
+            os.chmod(path, 0700)
+
+            subprocess.call([s.interp, "/tmp/%s" %(os.path.basename(path),)],
+                            preexec_fn = run_in_root)
+            
 
     def createInitramfs(self):
         # Create initramfs
@@ -428,7 +495,7 @@ class InstallationTarget:
         for f in ("/sbin/mayflower", "/sbin/run-init", "/etc/mayflower.conf"):
             os.unlink("%s/install_root/%s" %(self.build_dir, f))
 
-    def relabel(self):
+    def relabelSystem(self):
         # finally relabel all files
         subprocess.call(["/sbin/fixfiles", "restore"], preexec_fn=run_in_root)
         return True
@@ -575,6 +642,7 @@ def main():
         print "Unknown option %s"%o
         sys.exit(2)
 
+    ksparser = KickstartParser(makeVersion())
     if not kscfg:
         if len(packages) == 0:
             print "No packages specified."
@@ -588,7 +656,6 @@ def main():
             usage()
             sys.exit(1)
     else:
-        ksparser = KickstartParser(makeVersion())
         ksparser.readKickstart(kscfg)
 
         for repo in ksparser.handler.repo.repoList:
@@ -612,9 +679,10 @@ def main():
         if not target.installPackages(packages, epackages, groups):
             target.teardown()
             sys.exit(1)
-        target.configureSystem()
-        target.createInitramfs():
-        target.relabel()
+        target.configureSystem(ksparser)
+        target.createInitramfs()
+        if ksparser.handler.selinux.selinux:
+            target.relabelSystem()
         target.configureBootloader()
     except:
         target.teardown()
