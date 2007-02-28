@@ -74,12 +74,12 @@ class LoopbackMount:
 
     def umount(self):
         if self.mounted:
-            rc = subprocess.call(["umount", self.mountdir])
+            rc = subprocess.call(["/bin/umount", self.mountdir])
             self.mounted = False
 
     def lounsetup(self):
         if self.losetup and self.loopdev:
-            rc = subprocess.call(["losetup", "-d", self.loopdev])
+            rc = subprocess.call(["/sbin/losetup", "-d", self.loopdev])
             self.losetup = False
             self.loopdev = None
 
@@ -94,12 +94,12 @@ class LoopbackMount:
     def loopsetup(self):
         if self.losetup:
             return self.losetup
-        rc = subprocess.call(["losetup", "-f", self.lofile])
+        rc = subprocess.call(["/sbin/losetup", "-f", self.lofile])
         if rc != 0:
             return self.losetup
 
         # succeeded; figure out which loopdevice we're using
-        buf = subprocess.Popen(["losetup", "-a"],
+        buf = subprocess.Popen(["/sbin/losetup", "-a"],
                                stdout=subprocess.PIPE).communicate()[0]
         for line in buf.split("\n"):
             # loopdev: fdinfo (filename)
@@ -117,7 +117,7 @@ class LoopbackMount:
     def mount(self):
         if self.mounted or not self.loopdev:
             return self.mounted
-        args = [ "mount", self.loopdev, self.mountdir ]
+        args = [ "/bin/mount", self.loopdev, self.mountdir ]
         if self.fstype:
             args.extend(["-t", self.fstype])
         rc = subprocess.call(args)
@@ -146,11 +146,11 @@ class SparseExt3LoopbackMount(LoopbackMount):
         os.close(fd)
 
     def _formatFilesystem(self):
-        rc = subprocess.call(["mkfs.ext3", "-F", "-L", self.fslabel,
+        rc = subprocess.call(["/sbin/mkfs.ext3", "-F", "-L", self.fslabel,
                               "-m", "1", self.lofile])
         if rc != 0:
             raise OSError, "Error creating filesystem: %d" %(rc,)
-        rc = subprocess.call(["tune2fs", "-c0", "-i0", "-Odir_index",
+        rc = subprocess.call(["/sbin/tune2fs", "-c0", "-i0", "-Odir_index",
                               "-ouser_xattr,acl", self.lofile])
 
     def setup(self):
