@@ -24,6 +24,9 @@ import time
 import subprocess
 import shutil
 
+from pykickstart.parser import *
+from pykickstart.version import *
+
 class BindChrootMount:
     """Represents a bind mount of a directory into a chroot."""
     def __init__(self, src, chroot, dest = None):
@@ -586,7 +589,7 @@ def main():
             if a.startswith("@"):
                 groups.append(a[1:])
             else:
-            packages.append(a)
+                packages.append(a)
             continue
         if o in ("-e", "--exclude-package"):
             epackages.append(a)
@@ -613,9 +616,6 @@ def main():
             usage()
             sys.exit(1)
     else:
-        from pykickstart.parser import *
-        from pykickstart.version import *
-
         ksparser = KickstartParser(makeVersion())
         ksparser.readKickstart(kscfg)
 
@@ -623,7 +623,8 @@ def main():
             repos.append( (repo.name, repo.baseurl) )
 
         packages.extend(ksparser.handler.packages.packageList)
-        groups.extend(ksparser.handler.packages.groupList)
+        for g in groupList:
+            groups.append(g.name)
         epackages.extend(ksparser.handler.packages.excludedList)
 
     target = InstallationTarget()
