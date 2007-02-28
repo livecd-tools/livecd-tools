@@ -396,6 +396,7 @@ class InstallationTarget:
                 print "Error installing groups"
                 return False
 
+    def configureSystem(self):
         touch("%s/install_root/etc/shadow" %(self.build_dir,))
         touch("%s/install_root/etc/gshadow" %(self.build_dir,))        
 
@@ -406,8 +407,8 @@ class InstallationTarget:
                 subprocess.call(["/etc/livecd/%s" %(file,), "post"],
                                 preexec_fn = run_in_root)
 
+    def createInitramfs(self):
         # Create initramfs
-        #
         shutil.copy("/usr/lib/livecd-creator/mayflower",
                         "%s/install_root/sbin/mayflower" %(self.build_dir,))
         shutil.copy("/usr/lib/livecd-creator/run-init",
@@ -427,6 +428,7 @@ class InstallationTarget:
         for f in ("/sbin/mayflower", "/sbin/run-init", "/etc/mayflower.conf"):
             os.unlink("%s/install_root/%s" %(self.build_dir, f))
 
+    def relabel(self):
         # finally relabel all files
         subprocess.call(["/sbin/fixfiles", "restore"], preexec_fn=run_in_root)
         return True
@@ -610,7 +612,9 @@ def main():
         if not target.installPackages(packages, epackages, groups):
             target.teardown()
             sys.exit(1)
-            
+        target.configureSystem()
+        target.createInitramfs():
+        target.relabel()
         target.configureBootloader()
     except:
         target.teardown()
