@@ -390,8 +390,8 @@ class InstallationTarget:
             groups += " %s" %g
         if len(groups) > 0:
             if os.system("/usr/bin/yum -y -c %s/yum.conf --disablerepo=* --enablerepo=lcdr_* --installroot=%s/install_root groupinstall %s"%(self.build_dir, self.build_dir, groups)) != 0:
-            print "Error installing groups"
-            return False
+                print "Error installing groups"
+                return False
             
 
         additional_packages = []
