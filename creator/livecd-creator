@@ -461,6 +461,23 @@ class InstallationTarget:
         # FIXME: we should allow the setting of the root pass
         subprocess.call(["passwd", "-d", "root"], preexec_fn=self.run_in_root)
 
+        # enable/disable services appropriately
+        for s in ksparser.handler.services.enabled:
+            subprocess.call(["/sbin/chkconfig", s, "--level", "345", "on"],
+                            preexec_fn=self.run_in_root)
+        for s in ksparser.handler.services.disabled:
+            subprocess.call(["/sbin/chkconfig", s, "--level", "345", "off"],
+                            preexec_fn=self.run_in_root)
+
+        # x by default?
+        if ksparser.handler.xconfig.startX:
+            f = open("%s/etc/inittab" %(instroot,), "rw+")
+            buf = f.read()
+            buf = buf.replace("id:5:initdefault", "id:3:initdefault")
+            f.seek(0)
+            f.write(buf)
+            f.close()
+
         # and now, for arbitrary %post scripts
         for s in filter(lambda s: s.type == KS_SCRIPT_POST,
                         ksparser.handler.scripts):
