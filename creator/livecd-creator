@@ -475,7 +475,7 @@ class InstallationTarget:
         if ksparser.handler.xconfig.startX:
             f = open("%s/etc/inittab" %(instroot,), "rw+")
             buf = f.read()
-            buf = buf.replace("id:5:initdefault", "id:3:initdefault")
+            buf = buf.replace("id:3:initdefault", "id:5:initdefault")
             f.seek(0)
             f.write(buf)
             f.close()
