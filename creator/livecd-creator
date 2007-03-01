@@ -455,7 +455,7 @@ class InstallationTarget:
         if os.path.exists("%s/usr/sbin/lokkit" %(instroot,)):
             args = ["/usr/sbin/lokkit", "-f", "--quiet", "--nostart"]
             if ksparser.handler.selinux.selinux:
-                args.append("--selinux=enabled")
+                args.append("--selinux=enforcing")
             else:
                 args.append("--selinux=disabled")
             subprocess.call(args, preexec_fn=self.run_in_root)
