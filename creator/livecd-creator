@@ -396,6 +396,8 @@ class InstallationTarget:
                 print "Error installing groups"
                 return False
 
+        return True
+
     def configureSystem(self, ksparser):
         instroot = "%s/install_root" %(self.build_dir,)
         
