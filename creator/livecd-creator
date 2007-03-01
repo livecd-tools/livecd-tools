@@ -374,11 +374,11 @@ class InstallationTarget:
         yumconf.write("\n")
         yumconf.close()
 
+    def run_in_root(self):
+        os.chroot("%s/install_root" %(self.build_dir,))
+
     def installPackages(self, packageList, excludePackageList, groupList = []):
         """install packages into target file system"""
-        def run_in_root():
-            os.chroot("%s/install_root" %(self.build_dir,))
-
         packages = ""
         for p in packageList:
             packages += " %s"%p
@@ -397,7 +397,7 @@ class InstallationTarget:
                 return False
 
     def configureSystem(self, ksparser):
-        instroot = "%s/install_root" %(self.build_root,)
+        instroot = "%s/install_root" %(self.build_dir,)
         
         # FIXME: this is a bit ugly, but with the current pykickstart
         # API, we don't really have a lot of choice.  it'd be nice to
@@ -439,15 +439,15 @@ class InstallationTarget:
         # do any authconfig bits
         auth = ksparser.handler.authconfig.authconfig or "--useshadow --enablemd5"
         if os.path.exists("%s/usr/sbin/authconfig" %(instroot,)):
-            args = ["/usr/sbin/authconfig"]
+            args = ["/usr/sbin/authconfig", "--update", "--nostart"]
             args.extend(auth.split())
-            subprocess.call(args, preexec_fn=run_in_root)
+            subprocess.call(args, preexec_fn=self.run_in_root)
 
         # firewall.  FIXME: should handle the rest of the options
         if ksparser.handler.firewall.enabled and os.path.exists("%s/usr/sbin/lokkit" %(instroot,)):
             subprocess.call(["/usr/sbin/lokkit", "-f", "--quiet",
                              "--nostart", "--enabled"],
-                            preexec_fn=run_in_root)
+                            preexec_fn=self.run_in_root)
 
         # selinux
         if os.path.exists("%s/usr/sbin/lokkit" %(instroot,)):
@@ -471,7 +471,7 @@ class InstallationTarget:
             os.chmod(path, 0700)
 
             subprocess.call([s.interp, "/tmp/%s" %(os.path.basename(path),)],
-                            preexec_fn = run_in_root)
+                            preexec_fn = self.run_in_root)
             
 
     def createInitramfs(self):
@@ -491,13 +491,13 @@ class InstallationTarget:
 
         subprocess.call(["/sbin/mayflower", "-f", "/boot/livecd-initramfs.img",
                          get_kernel_version(self.build_dir)],
-                        preexec_fn=run_in_root)
+                        preexec_fn=self.run_in_root)
         for f in ("/sbin/mayflower", "/sbin/run-init", "/etc/mayflower.conf"):
             os.unlink("%s/install_root/%s" %(self.build_dir, f))
 
     def relabelSystem(self):
         # finally relabel all files
-        subprocess.call(["/sbin/fixfiles", "restore"], preexec_fn=run_in_root)
+        subprocess.call(["/sbin/fixfiles", "restore"], preexec_fn=self.run_in_root)
         return True
 
     def configureBootloader(self):
