@@ -456,6 +456,10 @@ class InstallationTarget:
                 args.append("--selinux=enabled")
             else:
                 args.append("--selinux=disabled")
+            subprocess.call(args, preexec_fn=self.run_in_root)
+
+        # FIXME: we should allow the setting of the root pass
+        subprocess.call(["passwd", "-d", "root"], preexec_fn=self.run_in_root)
 
         # and now, for arbitrary %post scripts
         for s in filter(lambda s: s.type == KS_SCRIPT_POST,
