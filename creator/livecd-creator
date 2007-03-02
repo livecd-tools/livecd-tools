@@ -422,7 +422,7 @@ class InstallationTarget:
     def installPackages(self, packageList, excludePackageList, groupList = []):
         """install packages into target file system"""
         for pkg in packageList:
-            self.ayum.install(pattern=p)
+            self.ayum.install(pattern=pkg)
         for grp in groupList:
             self.ayum.selectGroup(grp)
 
