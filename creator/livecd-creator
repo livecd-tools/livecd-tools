@@ -520,7 +520,8 @@ class InstallationTarget:
 
     def relabelSystem(self):
         # finally relabel all files
-        subprocess.call(["/sbin/fixfiles", "restore"], preexec_fn=self.run_in_root)
+        subprocess.call(["/sbin/fixfiles", "restore", "/"],
+                        preexec_fn=self.run_in_root)
         return True
 
     def configureBootloader(self):
