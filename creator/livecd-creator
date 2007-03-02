@@ -694,6 +694,9 @@ def main():
             continue
         if o in ("-f", "--fslabel"):
             fs_label = a
+            if len(fs_label) > 32:
+                print "CD labels are limited to 32 characters"
+                sys.exit(2)
             continue
         if o in ("-b", "--base-on"):
             base_on = a
