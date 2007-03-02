@@ -181,6 +181,39 @@ class LiveCDYum(yum.YumBase):
         self.closeRpmDB()
         self.doTsSetup()
         self.doRpmDBSetup()
+
+    def selectPackage(self, pkg):
+        """Select a given package.  Can be specified with name.arch or name*"""
+        try:
+            mbrs = self.ayum.install(pattern = pkg)
+            return len(mbrs)
+        except yum.Errors.InstallError:
+            print >> sys.stderr, "No package matching %s" %(pkg,)
+            return 0
+        
+    def deselectPackage(self, pkg):
+        """Deselect package.  Can be specified as name.arch or name*"""
+        sp = pkg.rsplit(".", 2)
+        txmbrs = []
+        if len(sp) == 2:
+            txmbrs = self.ayum.tsInfo.matchNaevr(name=sp[0], arch=sp[1])
+
+        if len(txmbrs) == 0:
+            exact, match, unmatch = yum.packages.parsePackages(self.pkgSack.returnPackages(), [pkg], casematch=1)
+            for p in exact + match:
+                txmbrs.extend(self.ayum.tsInfo.matchNaevr(name=p))
+
+        if len(txmbrs) > 0:
+            map(lambda x: self.ayum.tsInfo.remove(x.pkgtup), txmbrs)
+        else:
+            print >> sys.stderr, "No such package %s to remove" %(pkg,)
+
+    def selectGroup(self, grp, include = GROUP_DEFAULT):
+        yum.YumBase.selectGroup(grp)
+        if include == GROUP_REQUIRED:
+            map(lambda p: self.deselectPackage(p), grp.default_packages.keys())
+        elif include == GROUP_ALL:
+            map(lambda p: self.selectPackage(p), grp.optional_packages.keys())
         
     def addRepository(self, name, url = None, mirrorlist = None):
         repo = yum.yumRepo.YumRepository(name)
@@ -421,10 +454,10 @@ class InstallationTarget:
 
     def installPackages(self, packageList, excludePackageList, groupList = []):
         """install packages into target file system"""
-        for pkg in packageList:
-            self.ayum.install(pattern=pkg)
-        for grp in groupList:
-            self.ayum.selectGroup(grp)
+        map(lambda pkg: self.ayum.selectPackage(pkg), packageList)
+        for (grp, inc) in groupList:
+            self.ayum.selectGroup(grp, inc)
+        map(lambda pkg: self.ayum.deselectPackage(pkg), excludePackageList)
 
         try:
             self.ayum.runInstall()
@@ -685,7 +718,7 @@ def main():
             continue
         if o in ("-p", "--package"):
             if a.startswith("@"):
-                groups.append(a[1:])
+                groups.append((a[1:], GROUP_DEFAULT))
             else:
                 packages.append(a)
             continue
@@ -724,7 +757,7 @@ def main():
             repos.append( (repo.name, repo.baseurl) )
 
         packages.extend(ksparser.handler.packages.packageList)
-        groups.extend(map(lambda g: g.name,
+        groups.extend(map(lambda g: (g.name, g.include),
                           ksparser.handler.packages.groupList))
         epackages.extend(ksparser.handler.packages.excludedList)
 
