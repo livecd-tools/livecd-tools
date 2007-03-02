@@ -24,6 +24,9 @@ import time
 import subprocess
 import shutil
 
+from pykickstart.parser import *
+from pykickstart.version import *
+
 class BindChrootMount:
     """Represents a bind mount of a directory into a chroot."""
     def __init__(self, src, chroot, dest = None):
@@ -230,7 +233,7 @@ class InstallationTarget:
             self.teardown()
             return False
 
-        if base_on != "":
+        if base_on:
             # get backing ext3 image if we're based this build on an existing live CD ISO
             if not self.base_on_iso(base_on):
                 self.teardown()
@@ -249,7 +252,7 @@ class InstallationTarget:
             self.teardown()
             return False
 
-        if base_on == "":
+        if not base_on:
             # create a few directories needed if it's a new image
             try:
                 os.mkdir(self.build_dir + "/install_root/etc")
@@ -371,11 +374,11 @@ class InstallationTarget:
         yumconf.write("\n")
         yumconf.close()
 
-    def installPackages(self, packageList, excludePackageList):
-        """install packages into target file system"""
-        def run_in_root():
-            os.chroot("%s/install_root" %(self.build_dir,))
+    def run_in_root(self):
+        os.chroot("%s/install_root" %(self.build_dir,))
 
+    def installPackages(self, packageList, excludePackageList, groupList = []):
+        """install packages into target file system"""
         packages = ""
         for p in packageList:
             packages += " %s"%p
@@ -385,47 +388,117 @@ class InstallationTarget:
             print "Error installing packages"
             return False
 
-        additional_packages = []
-
-        # now run through all .conf files and collect packages to install
-        for root, dirs, files in os.walk("%s/install_root/etc/livecd"%(self.build_dir)):
-            files.sort()
-            for file in files:
-                f = os.popen("%s/%s pkgadd"%(root, file))
-                pkg_from_f = (f.read().strip()).splitlines()
-                f.close()
-                additional_packages += pkg_from_f
-
-        # exclude the packages given on the command line with --exclude-package
-        for e in excludePackageList:
-            keep_removing = True
-            while keep_removing:
-                try:
-                    additional_packages.remove(e)
-                except ValueError:
-                    keep_removing = False
-
-        # now install the additional packages...
-        packages = ""
-        if len(additional_packages) > 0:
-            for p in additional_packages:
-                packages += " %s"%p
-            if os.system("/usr/bin/yum -y -c %s/yum.conf --disablerepo=* --enablerepo=lcdr_* --installroot=%s/install_root install %s"%(self.build_dir, self.build_dir, packages)) != 0:
-                print "Error installing packages"
+        groups = ""
+        for g in groupList:
+            groups += " %s" %g
+        if len(groups) > 0:
+            if os.system("/usr/bin/yum -y -c %s/yum.conf --disablerepo=* --enablerepo=lcdr_* --installroot=%s/install_root groupinstall %s"%(self.build_dir, self.build_dir, groups)) != 0:
+                print "Error installing groups"
                 return False
 
-        touch("%s/install_root/etc/shadow" %(self.build_dir,))
-        touch("%s/install_root/etc/gshadow" %(self.build_dir,))        
+        return True
 
-        # now run through all the post scripts from livecd scripts
-        for root, dirs, files in os.walk("%s/install_root/etc/livecd"%(self.build_dir)):
-            files.sort()
-            for file in files:
-                subprocess.call(["/etc/livecd/%s" %(file,), "post"],
-                                preexec_fn = run_in_root)
+    def configureSystem(self, ksparser):
+        instroot = "%s/install_root" %(self.build_dir,)
+        
+        # FIXME: this is a bit ugly, but with the current pykickstart
+        # API, we don't really have a lot of choice.  it'd be nice to
+        # be able to do something different, but so it goes
 
+        # set up the language
+        lang = ksparser.handler.lang.lang or "en_US.UTF-8"
+        f = open("%s/etc/sysconfig/i18n" %(instroot,), "w+")
+        f.write("LANG=\"%s\"\n" %(lang,))
+        f.close()
+
+        # next, the keyboard
+        # FIXME: should this impact the X keyboard config too???
+        # or do we want to make X be able to do this mapping
+        import rhpl.keyboard
+        k = rhpl.keyboard.Keyboard()
+        if ksparser.handler.keyboard.keyboard:
+            k.set(ksparser.handler.keyboard.keyboard)
+        k.write(instroot)
+
+        # next up is timezone
+        tz = ksparser.handler.timezone.timezone or "America/New_York"
+        utc = ksparser.handler.timezone.isUtc
+        f = open("%s/etc/sysconfig/clock" %(instroot,), "w+")
+        f.write("ZONE=\"%s\"\n" %(tz,))
+        f.write("UTC=%s\n" %(utc,))
+        f.close()
+
+        # FIXME: we should handle network bits better
+        f = open("%s/etc/sysconfig/network" %(instroot,), "w+")
+        f.write("NETWORKING=yes\n")
+        f.write("HOSTNAME=localhost.localdomain\n")
+        f.close()
+        f = open("/%s/etc/hosts" %(instroot,), "w+")
+        f.write("127.0.0.1\t\tlocalhost.localdomain  localhost\n")
+        f.write("::1\t\tlocalhost6.localdomain6 localhost6\n")        
+        f.close()
+
+        # do any authconfig bits
+        auth = ksparser.handler.authconfig.authconfig or "--useshadow --enablemd5"
+        if os.path.exists("%s/usr/sbin/authconfig" %(instroot,)):
+            args = ["/usr/sbin/authconfig", "--update", "--nostart"]
+            args.extend(auth.split())
+            subprocess.call(args, preexec_fn=self.run_in_root)
+
+        # firewall.  FIXME: should handle the rest of the options
+        if ksparser.handler.firewall.enabled and os.path.exists("%s/usr/sbin/lokkit" %(instroot,)):
+            subprocess.call(["/usr/sbin/lokkit", "-f", "--quiet",
+                             "--nostart", "--enabled"],
+                            preexec_fn=self.run_in_root)
+
+        # selinux
+        if os.path.exists("%s/usr/sbin/lokkit" %(instroot,)):
+            args = ["/usr/sbin/lokkit", "-f", "--quiet", "--nostart"]
+            if ksparser.handler.selinux.selinux:
+                args.append("--selinux=enforcing")
+            else:
+                args.append("--selinux=disabled")
+            subprocess.call(args, preexec_fn=self.run_in_root)
+
+        # FIXME: we should allow the setting of the root pass
+        subprocess.call(["passwd", "-d", "root"], preexec_fn=self.run_in_root)
+
+        # enable/disable services appropriately
+        for s in ksparser.handler.services.enabled:
+            subprocess.call(["/sbin/chkconfig", s, "--level", "345", "on"],
+                            preexec_fn=self.run_in_root)
+        for s in ksparser.handler.services.disabled:
+            subprocess.call(["/sbin/chkconfig", s, "--level", "345", "off"],
+                            preexec_fn=self.run_in_root)
+
+        # x by default?
+        if ksparser.handler.xconfig.startX:
+            f = open("%s/etc/inittab" %(instroot,), "rw+")
+            buf = f.read()
+            buf = buf.replace("id:3:initdefault", "id:5:initdefault")
+            f.seek(0)
+            f.write(buf)
+            f.close()
+
+        # and now, for arbitrary %post scripts
+        for s in filter(lambda s: s.type == KS_SCRIPT_POST,
+                        ksparser.handler.scripts):
+            # we can only safely run scripts in the chroot
+            if not s.inChroot:
+                print >> sys.stderr, "Not running script outside of chroot"
+                continue
+
+            (fd, path) = tempfile.mkstemp("", "ks-script-", "%s/tmp" %(instroot,))
+            os.write(fd, s.script)
+            os.close(fd)
+            os.chmod(path, 0700)
+
+            subprocess.call([s.interp, "/tmp/%s" %(os.path.basename(path),)],
+                            preexec_fn = self.run_in_root)
+            
+
+    def createInitramfs(self):
         # Create initramfs
-        #
         shutil.copy("/usr/lib/livecd-creator/mayflower",
                         "%s/install_root/sbin/mayflower" %(self.build_dir,))
         shutil.copy("/usr/lib/livecd-creator/run-init",
@@ -441,12 +514,13 @@ class InstallationTarget:
 
         subprocess.call(["/sbin/mayflower", "-f", "/boot/livecd-initramfs.img",
                          get_kernel_version(self.build_dir)],
-                        preexec_fn=run_in_root)
+                        preexec_fn=self.run_in_root)
         for f in ("/sbin/mayflower", "/sbin/run-init", "/etc/mayflower.conf"):
             os.unlink("%s/install_root/%s" %(self.build_dir, f))
 
+    def relabelSystem(self):
         # finally relabel all files
-        subprocess.call(["/sbin/fixfiles", "restore"], preexec_fn=run_in_root)
+        subprocess.call(["/sbin/fixfiles", "restore"], preexec_fn=self.run_in_root)
         return True
 
     def configureBootloader(self):
@@ -544,13 +618,15 @@ def main():
 
     repos = []
     packages = []
+    groups = []
     epackages = []
     fs_label = "livecd-" + time.strftime("%Y%m%d-%H%M")
-    base_on = ""
+    base_on = None
+    kscfg = None
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hr:b:p:e:f:",
-                                   ["help", "repo=", "base-on=", "package=", "exclude-package=", "fslabel="])
+        opts, args = getopt.getopt(sys.argv[1:], "hr:b:p:e:f:c:",
+                                   ["help", "repo=", "base-on=", "package=", "exclude-package=", "fslabel=", "config="])
     except getopt.GetoptError:
         usage()
         sys.exit(2)
@@ -560,6 +636,9 @@ def main():
         if o in ("-h", "--help"):
             usage()
             sys.exit(0)
+        if o in ("-c", "--config"):
+            kscfg = a
+            continue
         if o in ("-r", "--repo"):
             (name, url) = a.split(",")
             for (n, u) in repos:
@@ -569,7 +648,10 @@ def main():
             repos.append((name, url))
             continue
         if o in ("-p", "--package"):
-            packages.append(a)
+            if a.startswith("@"):
+                groups.append(a[1:])
+            else:
+                packages.append(a)
             continue
         if o in ("-e", "--exclude-package"):
             epackages.append(a)
@@ -583,17 +665,29 @@ def main():
         print "Unknown option %s"%o
         sys.exit(2)
 
-    if len(packages) == 0:
-        print "No packages specified."
-        print ""
-        usage()
-        sys.exit(1)
+    ksparser = KickstartParser(makeVersion())
+    if not kscfg:
+        if len(packages) == 0:
+            print "No packages specified."
+            print ""
+            usage()
+            sys.exit(1)
 
-    if len(repos) == 0:
-        print "No repositories specified."
-        print ""
-        usage()
-        sys.exit(1)
+        if len(repos) == 0:
+            print "No repositories specified."
+            print ""
+            usage()
+            sys.exit(1)
+    else:
+        ksparser.readKickstart(kscfg)
+
+        for repo in ksparser.handler.repo.repoList:
+            repos.append( (repo.name, repo.baseurl) )
+
+        packages.extend(ksparser.handler.packages.packageList)
+        groups.extend(map(lambda g: g.name,
+                          ksparser.handler.packages.groupList))
+        epackages.extend(ksparser.handler.packages.excludedList)
 
     target = InstallationTarget()
 
@@ -605,10 +699,13 @@ def main():
         for (n, u) in repos:
             target.addRepository(n, u)
 
-        if not target.installPackages(packages, epackages):
+        if not target.installPackages(packages, epackages, groups):
             target.teardown()
             sys.exit(1)
-            
+        target.configureSystem(ksparser)
+        target.createInitramfs()
+        if ksparser.handler.selinux.selinux:
+            target.relabelSystem()
         target.configureBootloader()
     except:
         target.teardown()
