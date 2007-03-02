@@ -27,6 +27,8 @@ import shutil
 from pykickstart.parser import *
 from pykickstart.version import *
 
+import yum
+
 class BindChrootMount:
     """Represents a bind mount of a directory into a chroot."""
     def __init__(self, src, chroot, dest = None):
@@ -161,6 +163,67 @@ class SparseExt3LoopbackMount(LoopbackMount):
         self._formatFilesystem()
         return LoopbackMount.setup(self)
 
+class LiveCDYum(yum.YumBase):
+    def __init__(self):
+        yum.YumBase.__init__(self)
+
+    def setup(self, instroot):
+        self.installroot = instroot
+        self.doConfigSetup(root=instroot, init_plugins = False)
+        self.doGenericSetup()
+
+        self.conf.cachedir = "/var/cache/yum"
+
+        # disable the default repos and just enable ours
+        map(lambda x: x.disable(), self.repos.listEnabled())
+
+    def reset(self):
+        self.closeRpmDB()
+        self.doTsSetup()
+        self.doRpmDBSetup()
+        
+    def addRepository(self, name, url = None, mirrorlist = None):
+        repo = yum.yumRepo.YumRepository(name)
+        if url:
+            repo.baseurl.append(url)
+        if mirrorlist:
+            repo.mirrorlist = mirrorlist
+        conf = yum.config.RepoConf()
+        for k, v in conf.iteritems():
+            if v or not hasattr(repo, k):
+                repo.setAttribute(k, v)
+        repo.basecachedir = self.conf.cachedir
+        repo.metadata_expire = 0
+        # disable gpg check???
+        repo.gpgcheck = 0
+        repo.enable()
+        repo.setup(0)
+        self.repos.add(repo)
+            
+    def runInstall(self):
+        (res, resmsg) = self.buildTransaction()
+        if res != 2:
+            print "Unable to build transaction"
+            for m in resmsg:
+                print m
+            sys.exit(1)
+        
+        dlpkgs = map(lambda x: x.po, filter(lambda txmbr: txmbr.ts_state in ("i", "u"), self.tsInfo.getMembers()))
+        self.downloadPkgs(dlpkgs)
+        # FIXME: sigcheck?
+        
+        self.initActionTs()
+        self.populateTs(keepold=0)
+        self.ts.check()
+        self.ts.order()
+        # FIXME: callback should be refactored a little in yum 
+        sys.path.append('/usr/share/yum-cli')
+        import callback
+        cb = callback.RPMInstallCallback()
+        cb.tsInfo = self.tsInfo
+        cb.filelog = False
+        return self.runTransaction(cb)
+
 def touch(fn):
     f = open(fn, "w+")
     f.close()
@@ -172,6 +235,9 @@ def get_kernel_version(root):
     return kver
 
 class InstallationTarget:
+    def __init__(self):
+        self.ayum = LiveCDYum()
+        
     def base_on_iso(self, base_on):
         """helper function to extract ext3 file system from a live CD ISO"""
 
@@ -217,7 +283,7 @@ class InstallationTarget:
         try:
             os.makedirs(self.build_dir)
         except OSError:
-            print "Cannot create build directory at %s"
+            print "Cannot create build directory at %s" %(self.build_dir,)
             return False
 
         try:
@@ -303,23 +369,7 @@ class InstallationTarget:
             self.teardown()
             return False
 
-        # setup yum.conf (this file live _outside_ the intall root)
-        yumconf = open(self.build_dir + "/yum.conf", "w")
-        yumconf.write("[main]\n")
-        yumconf.write("cachedir=/var/cache/yum\n")
-        yumconf.write("debuglevel=1\n")
-        yumconf.write("logfile=/var/log/yum.log\n")
-        yumconf.write("pkgpolicy=newest\n")
-        yumconf.write("distroverpkg=redhat-release\n")
-        yumconf.write("tolerant=1\n")
-        yumconf.write("exactarch=1\n")
-        yumconf.write("retries=20\n")
-        yumconf.write("obsoletes=1\n")
-        yumconf.write("gpgcheck=0\n")
-        yumconf.write("\n")
-        yumconf.close()
-
-        self.repo_num = 0
+        self.ayum.setup("%s/install_root" %(self.build_dir,))
         return True
 
 
@@ -364,38 +414,23 @@ class InstallationTarget:
 
     def addRepository(self, name, url):
         """adds a yum repository to temporary yum.conf file used"""
-
-        yumconf = open(self.build_dir + "/yum.conf", "a")
-        yumconf.write("[lcdr_%s]\n"%name)
-        yumconf.write("name=Live CD creator repo for '%s'\n"%name)
-        yumconf.write("baseurl=%s\n"%url)
-        yumconf.write("enabled=1\n")
-        yumconf.write("gpgcheck=0\n")
-        yumconf.write("\n")
-        yumconf.close()
+        self.ayum.addRepository(name, url)
 
     def run_in_root(self):
         os.chroot("%s/install_root" %(self.build_dir,))
 
     def installPackages(self, packageList, excludePackageList, groupList = []):
         """install packages into target file system"""
-        packages = ""
-        for p in packageList:
-            packages += " %s"%p
+        for pkg in packageList:
+            self.ayum.install(pattern=p)
+        for grp in groupList:
+            self.ayum.selectGroup(grp)
 
-        touch("%s/install_root/var/log/yum.log" %(self.build_dir,))
-        if os.system("/usr/bin/yum -y -c %s/yum.conf --disablerepo=* --enablerepo=lcdr_* --installroot=%s/install_root install %s"%(self.build_dir, self.build_dir, packages)) != 0:
-            print "Error installing packages"
+        try:
+            self.ayum.runInstall()
+        except Exception, e:
+            print "Error installing packages: %s" %(e,)
             return False
-
-        groups = ""
-        for g in groupList:
-            groups += " %s" %g
-        if len(groups) > 0:
-            if os.system("/usr/bin/yum -y -c %s/yum.conf --disablerepo=* --enablerepo=lcdr_* --installroot=%s/install_root groupinstall %s"%(self.build_dir, self.build_dir, groups)) != 0:
-                print "Error installing groups"
-                return False
-
         return True
 
     def configureSystem(self, ksparser):
