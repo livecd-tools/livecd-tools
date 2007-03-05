@@ -185,7 +185,7 @@ class LiveCDYum(yum.YumBase):
     def selectPackage(self, pkg):
         """Select a given package.  Can be specified with name.arch or name*"""
         try:
-            mbrs = self.ayum.install(pattern = pkg)
+            mbrs = self.install(pattern = pkg)
             return len(mbrs)
         except yum.Errors.InstallError:
             print >> sys.stderr, "No package matching %s" %(pkg,)
@@ -196,20 +196,20 @@ class LiveCDYum(yum.YumBase):
         sp = pkg.rsplit(".", 2)
         txmbrs = []
         if len(sp) == 2:
-            txmbrs = self.ayum.tsInfo.matchNaevr(name=sp[0], arch=sp[1])
+            txmbrs = self.tsInfo.matchNaevr(name=sp[0], arch=sp[1])
 
         if len(txmbrs) == 0:
             exact, match, unmatch = yum.packages.parsePackages(self.pkgSack.returnPackages(), [pkg], casematch=1)
             for p in exact + match:
-                txmbrs.extend(self.ayum.tsInfo.matchNaevr(name=p))
+                txmbrs.append(p)
 
         if len(txmbrs) > 0:
-            map(lambda x: self.ayum.tsInfo.remove(x.pkgtup), txmbrs)
+            map(lambda x: self.tsInfo.remove(x.pkgtup), txmbrs)
         else:
             print >> sys.stderr, "No such package %s to remove" %(pkg,)
 
     def selectGroup(self, grp, include = GROUP_DEFAULT):
-        yum.YumBase.selectGroup(grp)
+        yum.YumBase.selectGroup(self, grp)
         if include == GROUP_REQUIRED:
             map(lambda p: self.deselectPackage(p), grp.default_packages.keys())
         elif include == GROUP_ALL:
