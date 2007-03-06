@@ -669,6 +669,7 @@ label runfromram
 
 def usage():
     print "usage: livecd-creator [--help] "
+    print "                      [--config=<path-to-kickstart-file>]"
     print "                      [--repo=<name1>,<url1> ...] [--repo=<name2>,<url2>]"
     print "                      --package=<p1> [--package=<p2> ...]"
     print "                      [--exclude-package=<e1>] --exclude-package=<e2> ...]"
@@ -676,6 +677,7 @@ def usage():
     print "                      [--fslabel=<label>]"
     print ""
     print " --help             : Print usage and exit"
+    print " --config           : Path to kickstart config file"
     print " --repo             : Path to yum repository"
     print " --package          : Include this package"
     print " --exclude-package  : Exclude this package"
