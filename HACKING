@@ -4,11 +4,15 @@ SOURCE CONTROL MANAGEMENT
 
 This project is stored in git and can be checked out using
 
- git clone git://people.freedesktop.org/~david/livecd-tools
+ git clone git://git.fedoraproject.org/git/hosted/livecd
 
-Change history etc. can be obtained from here
+or if you have write access you might want to use
 
- http://gitweb.freedesktop.org/?p=users/david/livecd-tools.git;a=summary
+ git clone ssh://git.fedoraproject.org/git/hosted/livecd
+
+Change history etc. can be obtained from the web interface
+
+ http://git.fedoraproject.org/?p=hosted/livecd
 
 PATCHES
 =======
