@@ -168,6 +168,11 @@ class LiveCDYum(yum.YumBase):
     def __init__(self):
         yum.YumBase.__init__(self)
 
+    def doFileLogSetup(self, uid, logfile):
+        # don't do the file log for the livecd as it can lead to open fds
+        # being left and an inability to clean up after ourself
+        pass
+
     def setup(self, instroot):
         self.installroot = instroot
         self.doConfigSetup(root=instroot, init_plugins = False)
@@ -326,7 +331,6 @@ class InstallationTarget:
             os.mkdir(self.build_dir + "/out/isolinux")
             os.mkdir(self.build_dir + "/out/sysroot")
             os.mkdir(self.build_dir + "/data")
-            os.mkdir(self.build_dir + "/data/sysroot")            
             os.mkdir(self.build_dir + "/install_root")
             os.mkdir(self.build_dir + "/yum-cache")
         except OSError:
