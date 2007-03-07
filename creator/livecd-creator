@@ -331,6 +331,7 @@ class InstallationTarget:
             os.mkdir(self.build_dir + "/out/isolinux")
             os.mkdir(self.build_dir + "/out/sysroot")
             os.mkdir(self.build_dir + "/data")
+            os.mkdir(self.build_dir + "/data/sysroot")            
             os.mkdir(self.build_dir + "/install_root")
             os.mkdir(self.build_dir + "/yum-cache")
         except OSError:
@@ -471,6 +472,7 @@ class InstallationTarget:
             print "Error installing packages"
             traceback.print_exc(file=sys.stderr)            
             return False
+        self.ayum.closeRpmDB()
         return True
 
     def configureSystem(self, ksparser):
