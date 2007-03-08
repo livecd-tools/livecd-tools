@@ -21,6 +21,7 @@ import os.path
 import sys
 import tempfile
 import time
+import traceback
 import subprocess
 import shutil
 
@@ -297,7 +298,8 @@ class InstallationTarget:
             shutil.copyfile("%s/base_on_squashfs/os.img" %(self.build_dir,),
                             "%s/data/os.img" %(self.build_dir,))
         except Exception, e:
-            print "Cannot copy os.img from squashfs from ISO to base on: %s" %(e,)
+            print "Cannot copy os.img from squashfs from ISO to base on"
+            traceback.print_exc(file=sys.stderr)
             squashloop.cleanup()
             isoloop.cleanup()
             return False
@@ -467,7 +469,8 @@ class InstallationTarget:
         try:
             self.ayum.runInstall()
         except Exception, e:
-            print "Error installing packages: %s" %(e,)
+            print "Error installing packages"
+            traceback.print_exc(file=sys.stderr)            
             return False
         self.ayum.closeRpmDB()
         return True
@@ -788,8 +791,9 @@ def main():
             target.relabelSystem()
         target.configureBootloader()
     except:
+        print "\n\nERROR during installation..."
+        traceback.print_exc(file=sys.stderr)
         target.teardown()
-        print "Error during installation..."
         sys.exit(1)
 
     #os.system("/bin/bash")
