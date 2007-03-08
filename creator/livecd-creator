@@ -538,15 +538,17 @@ class InstallationTarget:
             subprocess.call(args, preexec_fn=self.run_in_root)
 
         # FIXME: we should allow the setting of the root pass
-        subprocess.call(["passwd", "-d", "root"], preexec_fn=self.run_in_root)
+        if os.path.exists("%s/usr/bin/passwd" %(instroot,)):
+            subprocess.call(["/usr/bin/passwd", "-d", "root"], preexec_fn=self.run_in_root)
 
         # enable/disable services appropriately
-        for s in ksparser.handler.services.enabled:
-            subprocess.call(["/sbin/chkconfig", s, "--level", "345", "on"],
-                            preexec_fn=self.run_in_root)
-        for s in ksparser.handler.services.disabled:
-            subprocess.call(["/sbin/chkconfig", s, "--level", "345", "off"],
-                            preexec_fn=self.run_in_root)
+        if os.path.exists("%s/sbin/chkconfig" %(instroot,)):
+            for s in ksparser.handler.services.enabled:
+                subprocess.call(["/sbin/chkconfig", s, "--level", "345", "on"],
+                                preexec_fn=self.run_in_root)
+            for s in ksparser.handler.services.disabled:
+                subprocess.call(["/sbin/chkconfig", s, "--level", "345", "off"],
+                                preexec_fn=self.run_in_root)
 
         # x by default?
         if ksparser.handler.xconfig.startX:
@@ -597,8 +599,10 @@ class InstallationTarget:
 
     def relabelSystem(self):
         # finally relabel all files
-        subprocess.call(["/sbin/fixfiles", "restore", "/"],
-                        preexec_fn=self.run_in_root)
+        instroot = "%s/install_root" %(self.build_dir,)
+        if os.path.exists("%s/sbin/fixfiles" %(instroot,)):
+            subprocess.call(["/sbin/fixfiles", "restore", "/"],
+                            preexec_fn=self.run_in_root)
         return True
 
     def configureBootloader(self):
