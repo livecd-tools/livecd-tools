@@ -22,21 +22,23 @@ install:
 	$(INSTALL_DATA) -D README $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)/README
 	$(INSTALL_DATA) -D HACKING $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)/HACKING
 	$(INSTALL_DATA) -D TODO $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)/TODO
-	$(INSTALL_PROGRAM) -D installer/livecd-installer $(DESTDIR)/usr/libexec/livecd-installer
-	$(INSTALL_PROGRAM) -D installer/livecd-installer-tui $(DESTDIR)/usr/bin/livecd-installer-tui
-	$(INSTALL_PROGRAM) -D installer/livecd-install-daemon $(DESTDIR)/etc/rc.d/init.d/livecd-install-daemon
-	$(INSTALL_PROGRAM) -D installer/99-livecd-installer.conf $(DESTDIR)/etc/livecd/99-livecd-installer.conf
-	$(INSTALL_DATA) -D installer/livecd-installer.conf $(DESTDIR)/etc/dbus-1/system.d/livecd-installer.conf
+
+#	$(INSTALL_PROGRAM) -D installer/livecd-installer $(DESTDIR)/usr/libexec/livecd-installer
+#	$(INSTALL_PROGRAM) -D installer/livecd-installer-tui $(DESTDIR)/usr/bin/livecd-installer-tui
+#	$(INSTALL_PROGRAM) -D installer/livecd-install-daemon $(DESTDIR)/etc/rc.d/init.d/livecd-install-daemon
+#	$(INSTALL_PROGRAM) -D installer/99-livecd-installer.conf $(DESTDIR)/etc/livecd/99-livecd-installer.conf
+#	$(INSTALL_DATA) -D installer/livecd-installer.conf $(DESTDIR)/etc/dbus-1/system.d/livecd-installer.conf
 
 uninstall:
 	rm -f $(DESTDIR)/usr/bin/livecd-creator
 	rm -rf $(DESTDIR)/usr/lib/livecd-creator
 	rm -rf $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)
-	rm -f $(DESTDIR)/usr/libexec/livecd-installer
-	rm -f $(DESTDIR)/usr/bin/livecd-installer-tui
-	rm -f $(DESTDIR)/etc/rc.d/init.d/livecd-install-daemon
-	rm -f $(DESTDIR)/etc/dbus-1/system.d/livecd-installer.conf
-	rm -f $(DESTDIR)/etc/livecd/99-livecd-installer.conf
+
+#	rm -f $(DESTDIR)/usr/libexec/livecd-installer
+#	rm -f $(DESTDIR)/usr/bin/livecd-installer-tui
+#	rm -f $(DESTDIR)/etc/rc.d/init.d/livecd-install-daemon
+#	rm -f $(DESTDIR)/etc/dbus-1/system.d/livecd-installer.conf
+#	rm -f $(DESTDIR)/etc/livecd/99-livecd-installer.conf
 
 dist : all
 	git-tar-tree HEAD livecd-tools-$(VERSION) | bzip2 -9v > livecd-tools-$(VERSION).tar.bz2
