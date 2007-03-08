@@ -22,6 +22,7 @@ install:
 	$(INSTALL_DATA) -D README $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)/README
 	$(INSTALL_DATA) -D HACKING $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)/HACKING
 	$(INSTALL_DATA) -D TODO $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)/TODO
+	$(INSTALL_DATA) -D config/livecd-fedora-minimal.ks $(DESTDIR)/usr/share/livecd-tools/livecd-fedora-minimal.ks
 
 #	$(INSTALL_PROGRAM) -D installer/livecd-installer $(DESTDIR)/usr/libexec/livecd-installer
 #	$(INSTALL_PROGRAM) -D installer/livecd-installer-tui $(DESTDIR)/usr/bin/livecd-installer-tui
@@ -33,6 +34,7 @@ uninstall:
 	rm -f $(DESTDIR)/usr/bin/livecd-creator
 	rm -rf $(DESTDIR)/usr/lib/livecd-creator
 	rm -rf $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)
+	rm -rf $(DESTDIR)/usr/share/livecd-tools
 
 #	rm -f $(DESTDIR)/usr/libexec/livecd-installer
 #	rm -f $(DESTDIR)/usr/bin/livecd-installer-tui
@@ -44,4 +46,4 @@ dist : all
 	git-tar-tree HEAD livecd-tools-$(VERSION) | bzip2 -9v > livecd-tools-$(VERSION).tar.bz2
 
 clean:
-	rm -f *~ creator/*~ creator/run-init installer/*~
+	rm -f *~ creator/*~ creator/run-init installer/*~ config/*~
