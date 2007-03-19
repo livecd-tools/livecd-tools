@@ -172,7 +172,7 @@ cp /sbin/lsmod sbin
 
 
 # Copy all required shared libs
-for i in bin/* sbin/*; do 
+for i in bin/* sbin/* lib/udev/*; do 
     ldd $i | sed 's|.*=>||g' | awk '/\// { print $1 }' | while read lib ; do
         if [ "$opt_verbose" == "1" ] ; then
 	    echo "Copying DSO $l"
