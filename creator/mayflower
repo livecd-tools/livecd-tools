@@ -528,7 +528,68 @@ else
     initargs=""
 fi
 
-# Ooo, we might have an embedded ext3 on squashfs to use as rootfs (livecd)
+# live cd helper function
+do_livecd_from_loop121() {
+    # create a sparse file for the overlay
+    dd if=/dev/null of=/overlay bs=1024 count=1 seek=$((512*1024)) 2> /dev/null
+    losetup /dev/loop119 /overlay
+
+    # set up the snapshot
+    echo 0 \`blockdev --getsize /dev/loop121\` snapshot /dev/loop121 /dev/loop119 p 8 | dmsetup create livecd-rw
+
+    # set up new /dev/root symlink
+    rm -f /dev/root
+    ln -s /dev/mapper/livecd-rw /dev/root
+
+    mount -n -t ext3 /dev/mapper/livecd-rw /sysroot
+    # here you can modify the rw ext3 fs for testing if you don't want to
+    # respin the entire rootfs (which takes ages). Example
+    #
+    #  echo foo > /sysroot/etc/bar.conf
+    #
+    # We also use it to dynamically set the system locale from the boot
+    # menu on live cd's.
+    #
+    if [ "\$livecd_locale" != "" ] ; then
+        echo "LANG=\$livecd_locale" > /sysroot/etc/sysconfig/i18n
+    fi
+
+    # create rule so udev creates /dev/livecd symlink on real rootfs
+    if [ "\$livecd_ram" == "1" ] ; then
+       echo "KERNEL==\"loop118\", SYMLINK+=\"livecd\"" > /sysroot/etc/udev/rules.d/00-livecd.rules
+    else
+       echo "KERNEL==\"hd[a-z]\", BUS==\"ide\", SYSFS{removable}==\"1\", ATTRS{media}==\"cdrom\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"livecd\"" > /sysroot/etc/udev/rules.d/00-livecd.rules
+       echo "KERNEL==\"sr[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"livecd\"" >> /sysroot/etc/udev/rules.d/00-livecd.rules
+       echo "KERNEL==\"scd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"livecd\"" >> /sysroot/etc/udev/rules.d/00-livecd.rules
+       echo "KERNEL==\"pcd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"livecd\"" >> /sysroot/etc/udev/rules.d/00-livecd.rules
+    fi
+
+    mount -n -o ro,remount /sysroot
+}
+
+# we might have an uncompressed embedded ext3  to use as rootfs (uncompressed livecd)
+#
+if [ -e /sysroot/ext3fs.img ] ; then
+    if [ "\$quiet" != "1" ] ; then
+        echo "setting up embedded ext3 fs "
+    fi
+
+    mknod /dev/loop118 b 7 118
+    mknod /dev/loop119 b 7 119
+    mknod /dev/loop120 b 7 120
+    mknod /dev/loop121 b 7 121
+    mkdir -p /dev/mapper
+    mknod /dev/mapper/control c 10 63
+    modprobe loop max_loop=128
+    modprobe dm_snapshot
+
+    losetup /dev/loop121 /sysroot/ext3fs.img
+    umount -l /sysroot
+
+    do_livecd_from_loop121
+fi
+
+# we might have an embedded ext3 on squashfs to use as rootfs (compressed livecd)
 #
 if [ -e /sysroot/squashfs.img ] ; then
 
@@ -565,41 +626,7 @@ if [ -e /sysroot/squashfs.img ] ; then
     umount -l /squashfs
     umount -l /sysroot
 
-    # create a sparse file for the overlay
-    dd if=/dev/null of=/overlay bs=1024 count=1 seek=$((512*1024)) 2> /dev/null
-    losetup /dev/loop119 /overlay
-
-    # set up the snapshot
-    echo 0 \`blockdev --getsize /dev/loop121\` snapshot /dev/loop121 /dev/loop119 p 8 | dmsetup create livecd-rw
-
-    # set up new /dev/root symlink
-    rm -f /dev/root
-    ln -s /dev/mapper/livecd-rw /dev/root
-
-    mount -n -t ext3 /dev/mapper/livecd-rw /sysroot
-    # here you can modify the rw ext3 fs for testing if you don't want to
-    # respin the entire rootfs (which takes ages). Example
-    #
-    #  echo foo > /sysroot/etc/bar.conf
-    #
-    # We also use it to dynamically set the system locale from the boot
-    # menu on live cd's.
-    #
-    if [ "\$livecd_locale" != "" ] ; then
-        echo "LANG=\$livecd_locale" > /sysroot/etc/sysconfig/i18n
-    fi
-
-    # create rule so udev creates /dev/livecd symlink on real rootfs
-    if [ "\$livecd_ram" == "1" ] ; then
-       echo "KERNEL==\"loop118\", SYMLINK+=\"livecd\"" > /sysroot/etc/udev/rules.d/00-livecd.rules
-    else
-       echo "KERNEL==\"hd[a-z]\", BUS==\"ide\", SYSFS{removable}==\"1\", ATTRS{media}==\"cdrom\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"livecd\"" > /sysroot/etc/udev/rules.d/00-livecd.rules
-       echo "KERNEL==\"sr[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"livecd\"" >> /sysroot/etc/udev/rules.d/00-livecd.rules
-       echo "KERNEL==\"scd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"livecd\"" >> /sysroot/etc/udev/rules.d/00-livecd.rules
-       echo "KERNEL==\"pcd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"livecd\"" >> /sysroot/etc/udev/rules.d/00-livecd.rules
-    fi
-
-    mount -n -o ro,remount /sysroot
+    do_livecd_from_loop121
 fi
 
 if [ "\$eshell" == "1" ] ; then

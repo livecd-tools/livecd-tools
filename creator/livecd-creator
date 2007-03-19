@@ -538,15 +538,17 @@ class InstallationTarget:
             subprocess.call(args, preexec_fn=self.run_in_root)
 
         # FIXME: we should allow the setting of the root pass
-        subprocess.call(["passwd", "-d", "root"], preexec_fn=self.run_in_root)
+        if os.path.exists("%s/usr/bin/passwd" %(instroot,)):
+            subprocess.call(["/usr/bin/passwd", "-d", "root"], preexec_fn=self.run_in_root)
 
         # enable/disable services appropriately
-        for s in ksparser.handler.services.enabled:
-            subprocess.call(["/sbin/chkconfig", s, "--level", "345", "on"],
-                            preexec_fn=self.run_in_root)
-        for s in ksparser.handler.services.disabled:
-            subprocess.call(["/sbin/chkconfig", s, "--level", "345", "off"],
-                            preexec_fn=self.run_in_root)
+        if os.path.exists("%s/sbin/chkconfig" %(instroot,)):
+            for s in ksparser.handler.services.enabled:
+                subprocess.call(["/sbin/chkconfig", s, "--level", "345", "on"],
+                                preexec_fn=self.run_in_root)
+            for s in ksparser.handler.services.disabled:
+                subprocess.call(["/sbin/chkconfig", s, "--level", "345", "off"],
+                                preexec_fn=self.run_in_root)
 
         # x by default?
         if ksparser.handler.xconfig.startX:
@@ -597,8 +599,16 @@ class InstallationTarget:
 
     def relabelSystem(self):
         # finally relabel all files
-        subprocess.call(["/sbin/fixfiles", "restore", "/"],
-                        preexec_fn=self.run_in_root)
+        instroot = "%s/install_root" %(self.build_dir,)
+        if os.path.exists("%s/sbin/fixfiles" %(instroot,)):
+            subprocess.call(["/sbin/fixfiles", "restore", "/"],
+                            preexec_fn=self.run_in_root)
+        return True
+
+    def launchShell(self):
+        print "Launching shell. Exit to continue."
+        print "----------------------------------"
+        subprocess.call(["/bin/bash"], preexec_fn=self.run_in_root)
         return True
 
     def configureBootloader(self):
@@ -625,14 +635,19 @@ class InstallationTarget:
                     "%s/out/isolinux/isolinux.bin" %(self.build_dir,))
         shutil.copy("%s/install_root/usr/lib/syslinux/vesamenu.c32" %(self.build_dir,),
                     "%s/out/isolinux/vesamenu.c32" %(self.build_dir,))
-        shutil.copy("%s/install_root/usr/lib/anaconda-runtime/syslinux-vesa-splash.jpg" %(self.build_dir,),
-                    "%s/out/isolinux/splash.jpg" %(self.build_dir,))
+
+        if os.path.exists("%s/install_root/usr/lib/anaconda-runtime/syslinux-vesa-splash.jpg" %(self.build_dir,)):
+            shutil.copy("%s/install_root/usr/lib/anaconda-runtime/syslinux-vesa-splash.jpg" %(self.build_dir,),
+                        "%s/out/isolinux/splash.jpg" %(self.build_dir,))
+            have_background = "menu background splash.jpg"
+        else:
+            have_background = ""
 
         cfg = """
 default vesamenu.c32
 timeout 600
 
-menu background splash.jpg
+%(background)s
 menu title Welcome to Fedora!
 menu color border 0 #ffffffff #00000000
 menu color sel 0 #ffffffff #ff000000
@@ -651,7 +666,7 @@ label runfromram
   menu label %(label)s from RAM
   kernel vmlinuz
   append initrd=initrd.img ro quiet root=CDLABEL=%(label)s rootfstype=iso9660 livecd livecd_ram
-""" %{"label": self.fs_label}
+""" %{"label": self.fs_label, "background" : have_background}
 
         cfgf = open("%s/out/isolinux/isolinux.cfg" %(self.build_dir,), "w")
         cfgf.write(cfg)
@@ -661,6 +676,11 @@ label runfromram
 
     def createIso(self, filename):
         """write out the live CD ISO"""
+
+        # ship the ext3 image if there is no compressed image (happens during --skip-compression)
+        if not os.path.exists("%s/out/squashfs.img" %(self.build_dir,)):
+            shutil.move("%s/data/os.img" %(self.build_dir,), "%s/out/ext3fs.img" %(self.build_dir,))
+        
         subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(filename,),
                          "-b", "isolinux/isolinux.bin",
                          "-c", "isolinux/boot.cat",
@@ -677,22 +697,39 @@ label runfromram
                         env={"PWD": "%s/data" %(self.build_dir,)})
 
 def usage():
-    print "usage: livecd-creator [--help] "
-    print "                      [--config=<path-to-kickstart-file>]"
-    print "                      [--repo=<name1>,<url1> ...] [--repo=<name2>,<url2>]"
-    print "                      --package=<p1> [--package=<p2> ...]"
-    print "                      [--exclude-package=<e1>] --exclude-package=<e2> ...]"
-    print "                      [--base-on=<path-to-iso-file>]"
-    print "                      [--fslabel=<label>]"
-    print ""
-    print " --help             : Print usage and exit"
-    print " --config           : Path to kickstart config file"
-    print " --repo             : Path to yum repository"
-    print " --package          : Include this package"
-    print " --exclude-package  : Exclude this package"
-    print " --base-on          : Add packages to an existing live CD iso9660 image"
-    print " --fslabel          : File system label (default: livecd-YYYYMMDD-HHMI)"
-    print ""
+    print """
+usage: livecd-creator [--help] 
+                      [--config=<path-to-kickstart-file>]
+                      [--repo=<name1>,<url1> ...] [--repo=<name2>,<url2>]
+                      --package=<p1> [--package=<p2> ...]
+                      [--exclude-package=<e1>] --exclude-package=<e2> ...]
+                      [--base-on=<path-to-iso-file>]
+                      [--fslabel=<label>]
+                      [--skip-compression]
+                      [--uncompressed-size=<size-in-MB>]
+                      [--shell]
+
+ --help              : Print usage and exit
+ --config            : Path to kickstart config file
+ --repo              : Add / override yum repository
+ --package           : Include this package
+ --exclude-package   : Exclude this package
+ --base-on           : Add packages to an existing live CD iso9660 image
+ --fslabel           : File system label (default: livecd-YYYYMMDD-HHMI)
+ --skip-compression  : Don't compress the image
+ --uncompressed-size : Size of uncompressed fs in MB (default: 3072)
+ --shell             : Start a shell in the chroot for post-configuration
+
+ Examples:
+
+  Create minimal live cd:
+  # livecd-creator --config=/usr/share/livecd-tools/livecd-fedora-minimal.ks
+
+  Create minimal live cd and use local package repositories:
+  # livecd-creator --config=/usr/share/livecd-tools/livecd-fedora-minimal.ks \\
+                   --repo=a-dev,file:///home/user/core/RPMS             \\
+                   --repo=a-extras-dev,file:///home/user/extras/RPMS
+"""
 
 def main():
 
@@ -703,10 +740,16 @@ def main():
     fs_label = "livecd-" + time.strftime("%Y%m%d-%H%M")
     base_on = None
     kscfg = None
+    skip_compression = False
+    uncompressed_size = 3072
+    give_shell = False
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hr:b:p:e:f:c:",
-                                   ["help", "repo=", "base-on=", "package=", "exclude-package=", "fslabel=", "config="])
+        opts, args = getopt.getopt(sys.argv[1:], "hr:b:p:e:f:c:su:l",
+                                   ["help", "repo=", "base-on=", "package=",
+                                    "exclude-package=", "fslabel=", "config=",
+                                    "skip-compression", "uncompressed-size=",
+                                    "shell"])
     except getopt.GetoptError:
         usage()
         sys.exit(2)
@@ -716,6 +759,15 @@ def main():
         if o in ("-h", "--help"):
             usage()
             sys.exit(0)
+        if o in ("-l", "--shell"):
+            give_shell = True
+            continue
+        if o in ("-s", "--skip-compression"):
+            skip_compression = True
+            continue
+        if o in ("-u", "--uncompressed-size"):
+            uncompressed_size = int(a)
+            continue
         if o in ("-c", "--config"):
             kscfg = a
             continue
@@ -765,7 +817,14 @@ def main():
         ksparser.readKickstart(kscfg)
 
         for repo in ksparser.handler.repo.repoList:
-            repos.append( (repo.name, repo.baseurl) )
+            given_on_cmd_line = False
+            for cmd_name, cmd_url in repos:
+                if cmd_name == repo.name:
+                    given_on_cmd_line = True
+                    break
+
+            if not given_on_cmd_line:
+                repos.append( (repo.name, repo.baseurl) )
 
         packages.extend(ksparser.handler.packages.packageList)
         groups.extend(map(lambda g: (g.name, g.include),
@@ -774,7 +833,7 @@ def main():
 
     target = InstallationTarget()
 
-    if not target.setup(3*1024, fs_label, base_on):
+    if not target.setup(uncompressed_size, fs_label, base_on):
         print "Cannot setup installation target. Aborting."
         sys.exit(1)
 
@@ -796,10 +855,13 @@ def main():
         target.teardown()
         sys.exit(1)
 
-    #os.system("/bin/bash")
+    
+    if give_shell:
+        target.launchShell()
 
     target.unmount()
-    target.createSquashFS()
+    if not skip_compression:
+        target.createSquashFS()
     target.createIso(fs_label)
     target.teardown()
 
