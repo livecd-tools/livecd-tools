@@ -470,7 +470,8 @@ class InstallationTarget:
             self.ayum.runInstall()
         except Exception, e:
             print "Error installing packages"
-            traceback.print_exc(file=sys.stderr)            
+            traceback.print_exc(file=sys.stderr)
+            self.ayum.closeRpmDB()            
             return False
         self.ayum.closeRpmDB()
         return True
@@ -849,6 +850,8 @@ def main():
         if ksparser.handler.selinux.selinux:
             target.relabelSystem()
         target.configureBootloader()
+    except SystemExit:
+        sys.exit(1)
     except:
         print "\n\nERROR during installation..."
         traceback.print_exc(file=sys.stderr)
