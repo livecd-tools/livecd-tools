@@ -180,8 +180,8 @@ class LiveCDYum(yum.YumBase):
 
         self.conf.cachedir = "/var/cache/yum"
 
-        # disable the default repos and just enable ours
-        map(lambda x: x.disable(), self.repos.listEnabled())
+        # don't look at the default repos from the host config
+        map(lambda x: self.repos.delete(x), self.repos.repos.keys())
 
     def reset(self):
         self.closeRpmDB()
