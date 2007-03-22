@@ -1,8 +1,9 @@
 
                        The Fedora live CD tools
                     David Zeuthen <davidz@redhat.com>
+ 		    Jeremy Katz <katzj@redhat.com>
 
-                    Last updated: Dec 22 2006 (v0.1)
+                    Last updated: Dec 22 2006 (v0.2)
 
 This project concerns tools to generate live CD's on Fedora based
 systems including derived distributions such as RHEL, CentOS and
@@ -56,17 +57,14 @@ In a nutshell, the livecd-creator program
  o Bind mounts certain kernel file systems (/dev, /dev/pts, /proc,
    /sys, /selinux) inside the installation root
 
+ o Uses a configuration file to define the requested packages and
+   default configuration options.  The format of this file is the same
+   as is used for installing a system via kickstart.
+
  o Installs, using yum, the requested packages into the installation
    using the given repositories
 
- o Looks at live CD configuration files dropped in the directory
-   /etc/livecd/ inside the installation root
-
- o Optionally installs more packages as specified by the live CD
-   configuration files in /etc/livecd/ inside the installation root
-
- o Optionally runs scripts as specified by the live CD configuration 
-   files in /etc/livecd/ inside the installation root
+ o Optionally runs scripts as specified by the live CD configuration file. 
 
  o Relabels the entire installation root (for SELinux)
 
@@ -88,8 +86,7 @@ In a nutshell, the livecd-creator program
 The command
 
 # livecd-creator \
-  --repo=c6,http://download.fedora.redhat.com/pub/fedora/linux/core/6/i386/os \
-  --package=bash --package=kernel --package=grub
+  --config=/usr/share/livecd-tools/livecd-fedora-minimal.ks
 
 will create a live CD that will boot to a login prompt. Not that since
 no configuration is done the user will not be able to login to the
@@ -97,96 +94,50 @@ system as the root password is not set / cleared.
 
 2.3 LIVE CD CONFIGURATION FILES
 
-These are files that packages to be included on the live CD can
-install in /etc/livecd. They need to be bash scripts and is used to
-both specify additional packages to install as well as what system
-configuration (such as enabling NetworkManager by default) to do at
-build time. The live cd configurations in /etc/livecd/ are processed
-in alphabetical order (using the C local).
+The configuration of the live CD is defined by a file that uses the
+same format as installing a system via kickstart.  They can include
+some basic system configuration items, the package manifest and a
+script to be run at the end of the build process.
 
-The rationale behind moving the package manifest + system
-configuration into live cd configuration files is that maintainers of
-a certain live cd flavor (say "Acme Music Live CD") can keep all the
-relevant bits in an RPM (say acme-livecd-music) and use existing SCM
-mechanism to manage it.
+For the Fedora project, there are currently two different live CD
+configuration files; they are
+ 
+ livecd-fedora-minimal.ks  : the base livecd system
 
-For the Fedora project, there are current three different live CD
-RPM's that contain live CD configuration files; they are
-
- fedora-livecd         : the base livecd system
-
- fedora-livecd-gnome   : a stock GNOME desktop; suitable for basing
-                         other more targeted live CD's on such as
-                         flavors for Eclipse, Music and so forth
-
- fedora-livecd-desktop : complete desktop with applications and
-                         input/output support for all supported locales 
-                         in Fedora
-
-See the RPM's for details on what configuration they do.
-
-(NOTE: these are currently available 
-
-   from http://people.redhat.com/davidz/livecd/
-
-but will be proposed for inclusion in Fedora Extras)
+ livecd-fedora-desktop.ks  : complete desktop with applications and
+ 			     input/output support for all supported 
+			     locales in Fedora
 
 2.4 EXAMPLE: SPINNING THE FEDORA DESKTOP LIVE CD
 
-Assuming that 
-
- o /home/davidz/Fedora/os contains a yum repository for the FC6 release
- o /home/davidz/Fedora/i386 contains a yum repository for the FC6 updates
- o /home/davidz/Hacking/livecd_rpms contains a yum repository for the
-   fedora-livecd-* RPMs
-
+Assuming that you use the livecd-fedora-desktop.ks configuration file,
 then the following command
 
 # livecd-creator \
-  --repo=c6,file:///home/davidz/Fedora/os \
-  --repo=c6_upd,file:///home/davidz/Fedora/i386 \
-  --repo=lcd6,file:///home/davidz/Hacking/livecd_rpms \
-  --repo=e6,http://download.fedora.redhat.com/pub/fedora/linux/extras/6/i386 \
-  --package=fedora-livecd-desktop \
-  --fslabel=Fedora-6-Zod-LiveCD-1-foo
+  --config=/usr/share/livecd-tools/livecd-fedora-desktop.ks \
+  --fslabel=Fedora-7-Test3-LiveCD-1-foo
 
-will create a live CD called "Fedora-6-Zod-LiveCD-1-foo". The name
+will create a live CD called "Fedora-7-Test3-LiveCD-1-foo". The name
 given by --fs-label is used. 
 
  o as a file system label on the ext3 and iso960 file systems
    (as such it's visible on the desktop as the CD name)
 
- o in the GRUB boot loader
+ o in the isolinux boot loader
 
-If you don't have the repositories available locally and don't mind waiting
-for the download of packages, the command is
-
-# livecd-creator \
- --repo=c6,http://download.fedora.redhat.com/pub/fedora/linux/core/6/i386/os/ \
- --repo=c6_upd,http://download.fedora.redhat.com/pub/fedora/linux/core/updates/6/i386/ \
- --repo=lcd6,http://people.redhat.com/davidz/livecd/i386/ \
- --repo=e6,http://download.fedora.redhat.com/pub/fedora/linux/extras/6/i386/ \
- --package=fedora-livecd-desktop \
- --fslabel=Fedora-6-Zod-LiveCD-1-foo2
-
-and this should work on any FC6 system.
+If you have the repositories available locally and don't want to wait
+for the download of packages, just substitute the URLs listed in the
+configuration file to point to your local repositories.
 
 3. LIVE CD INSTALLS
 
-Currently there is only a textual live CD installer. It is a bit
-wonky; to use it first you have to disable SELinux's enforcing
-mode. From a root terminal (open a terminal and type 'su -') on the
-live CD do
+As of Fedora 7 Test 1, anaconda has support for doing an installation
+from a live CD.  
 
- # setenforce 0
- # service livecd-install-daemon start
+To use it, you currently need to disable automounting; go into 
+"System -> Preferences -> Removable Drives and Media" and unclick all 
+check boxes under the tab "Storage", heading " Removable Storage". 
 
-Then disable automounting; go into "System -> Preferences -> Removable
-Drives and Media" and unclick all check boxes under the tab "Storage",
-heading " Removable Storage". Now open a terminal and run (not as
-root)
-
- $ livecd-installer-tui
-
-and answer the questions. At any time you can hit Ctrl+C to cancel the
-installation. See the TODO file for planned work to make this easier.
+Then, double click on the "Install to Hard Drive" item on the
+desktop.  There are a few weird things with the UI at present, but
+they are scheduled to be fixed prior to the Fedora 7 final release.

@@ -1,0 +1,50 @@
+Summary: Tools for building live CD's
+Name: livecd-tools
+Version: 002
+Release: 1%{?dist}
+License: GPL
+Group: System Environment/Base
+URL: http://git.fedoraproject.org/?p=hosted/livecd
+Source0: %{name}-%{version}.tar.bz2
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
+Requires: util-linux
+Requires: coreutils
+Requires: e2fsprogs
+Requires: yum >= 3.0.0
+Requires: mkisofs
+Requires: squashfs-tools
+Requires: pykickstart >= 0.96
+BuildArch: noarch
+
+%description 
+Tools for generating live CD's on Fedora based systems including
+derived distributions such as RHEL, CentOS and others. See
+http://fedoraproject.org/wiki/FedoraLiveCD for more details.
+
+%prep
+%setup -q
+
+%build
+make
+
+%install
+rm -rf $RPM_BUILD_ROOT
+make install DESTDIR=$RPM_BUILD_ROOT
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+%files
+%defattr(-,root,root,-)
+%doc AUTHORS COPYING README HACKING
+%doc config/livecd-fedora-minimal.ks livecd-fedora-desktop.ks
+%{_bindir}/livecd-creator
+%{_libdir}/livecd-creator/mayflower
+
+%changelog
+* Thu Mar 22 2007 Jeremy Katz <katzj@redhat.com> - 002-1
+- update for new version
+
+* Fri Dec 22 2006 David Zeuthen <davidz@redhat.com> - 001-1%{?dist}
+- Initial build.
+
