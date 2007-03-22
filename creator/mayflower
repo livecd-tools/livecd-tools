@@ -155,7 +155,7 @@ cp /sbin/insmod sbin
 cp /sbin/modprobe sbin
 cp /sbin/pidof sbin
 cp /sbin/killall5 sbin
-cp /sbin/run-init sbin
+cp /sbin/nash sbin
 
 cp /lib/udev/vol_id lib/udev
 
@@ -180,6 +180,13 @@ for i in bin/* sbin/* lib/udev/*; do
         cp --parents $lib .
     done
 done
+
+cat > sbin/run-init <<EOF
+#!/sbin/nash
+setuproot
+switchroot
+EOF
+chmod 755 sbin/run-init
 
 # Write out init
 cat > init <<EOF
@@ -639,21 +646,14 @@ fi
 if [ -x /sysroot\$init ] ; then
 
     # Leave initramfs and transition to rootfs
-    #
-
     kill \`pidof udevd\`
-    echo "" > /etc/mtab
-    umount -n /proc
-    umount -n /sys
-    mount -n --move /dev /sysroot/dev
-
     if [ "\$quiet" != "1" ] ; then
         echo "transfering control to \$init"
     fi
 
-    exec /sbin/run-init -c ./dev/console /sysroot \$init \$initargs
+    exec /sbin/run-init
     echo "---------------------------------"
-    echo "WARNING: Error running run-init!"
+    echo "WARNING: Error switching to real rootfs!"
     echo "---------------------------------"
     echo
     echo "Dropping to a shell. Good luck!"
