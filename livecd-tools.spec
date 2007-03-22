@@ -38,7 +38,7 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root,-)
 %doc AUTHORS COPYING README HACKING
 %{_bindir}/livecd-creator
-/usr/lib/livecd-creator
+%dir /usr/lib/livecd-creator
 /usr/lib/livecd-creator/mayflower
 %dir %{_datadir}/livecd-tools
 %{_datadir}/livecd-tools/*
