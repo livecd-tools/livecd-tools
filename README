@@ -3,7 +3,7 @@
                     David Zeuthen <davidz@redhat.com>
  		    Jeremy Katz <katzj@redhat.com>
 
-                    Last updated: Dec 22 2006 (v0.2)
+                    Last updated: March 22 2007 (v0.2)
 
 This project concerns tools to generate live CD's on Fedora based
 systems including derived distributions such as RHEL, CentOS and
