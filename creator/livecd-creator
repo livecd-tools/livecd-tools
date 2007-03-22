@@ -263,10 +263,6 @@ class LiveCDYum(yum.YumBase):
         cb.filelog = False
         return self.runTransaction(cb)
 
-def touch(fn):
-    f = open(fn, "w+")
-    f.close()
-
 def get_kernel_version(root):
     # FIXME: this doesn't handle multiple kernels being installed
     kdir = os.listdir("%s/install_root/lib/modules" %(root,))
@@ -575,6 +571,7 @@ class InstallationTarget:
 
             subprocess.call([s.interp, "/tmp/%s" %(os.path.basename(path),)],
                             preexec_fn = self.run_in_root)
+            os.unlink(path)
             
 
     def createInitramfs(self):
@@ -601,8 +598,8 @@ class InstallationTarget:
     def relabelSystem(self):
         # finally relabel all files
         instroot = "%s/install_root" %(self.build_dir,)
-        if os.path.exists("%s/sbin/fixfiles" %(instroot,)):
-            subprocess.call(["/sbin/fixfiles", "restore", "/"],
+        if os.path.exists("%s/sbin/restorecon" %(instroot,)):
+            subprocess.call(["/sbin/restorecon", "-v", "-r", "/"],
                             preexec_fn=self.run_in_root)
         return True
 
