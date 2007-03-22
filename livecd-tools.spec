@@ -37,9 +37,9 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(-,root,root,-)
 %doc AUTHORS COPYING README HACKING
-%doc config/livecd-fedora-minimal.ks livecd-fedora-desktop.ks
 %{_bindir}/livecd-creator
-%{_libdir}/livecd-creator/mayflower
+%dir %{_datadir}/livecd-tools
+%{_datadir}/livecd-tools/*
 
 %changelog
 * Thu Mar 22 2007 Jeremy Katz <katzj@redhat.com> - 002-1
