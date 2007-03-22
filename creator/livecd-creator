@@ -578,8 +578,6 @@ class InstallationTarget:
         # Create initramfs
         shutil.copy("/usr/lib/livecd-creator/mayflower",
                         "%s/install_root/sbin/mayflower" %(self.build_dir,))
-        shutil.copy("/usr/lib/livecd-creator/run-init",
-                        "%s/install_root/sbin/run-init" %(self.build_dir,))
         # modules needed for booting (this is butt ugly and we need to retrieve this from elsewhere, e.g. the kernel)
         mayflowerconf = open(self.build_dir + "/install_root/etc/mayflower.conf", "w")
         mayflowerconf.write('MODULES+="cdrom ide-cd ahci loop dm_snapshot squashfs ext3 ehci_hcd uhci_hcd ohci_hcd usb_storage sd_mod sr_mod usbhid ata_piix "\n')
@@ -592,7 +590,7 @@ class InstallationTarget:
         subprocess.call(["/sbin/mayflower", "-f", "/boot/livecd-initramfs.img",
                          get_kernel_version(self.build_dir)],
                         preexec_fn=self.run_in_root)
-        for f in ("/sbin/mayflower", "/sbin/run-init", "/etc/mayflower.conf"):
+        for f in ("/sbin/mayflower", "/etc/mayflower.conf"):
             os.unlink("%s/install_root/%s" %(self.build_dir, f))
 
     def relabelSystem(self):
