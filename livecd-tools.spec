@@ -1,6 +1,6 @@
 Summary: Tools for building live CD's
 Name: livecd-tools
-Version: 002
+Version: 003
 Release: 1%{?dist}
 License: GPL
 Group: System Environment/Base
@@ -44,6 +44,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_datadir}/livecd-tools/*
 
 %changelog
+* Fri Mar 23 2007 Jeremy Katz <katzj@redhat.com> - 003-1
+- fix remaining reference to run-init
+
 * Thu Mar 22 2007 Jeremy Katz <katzj@redhat.com> - 002-1
 - update for new version
 
