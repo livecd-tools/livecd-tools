@@ -576,7 +576,13 @@ do_livecd_from_loop121() {
 
 # we might have an uncompressed embedded ext3  to use as rootfs (uncompressed livecd)
 #
-if [ -e /sysroot/ext3fs.img ] ; then
+if [ -e /sysroot/live/ext3fs.img ]; then
+  EXT3FS="/sysroot/live/ext3fs.img"
+elif [ -e /sysroot/ext3fs.img ] ; then
+  EXT3FS="/sysroot/ext3fs.img"
+fi
+
+if [ -n "$EXT3FS" ] ; then
     if [ "\$quiet" != "1" ] ; then
         echo "setting up embedded ext3 fs "
     fi
@@ -590,7 +596,7 @@ if [ -e /sysroot/ext3fs.img ] ; then
     modprobe loop max_loop=128
     modprobe dm_snapshot
 
-    losetup /dev/loop121 /sysroot/ext3fs.img
+    losetup /dev/loop121 $EXT3FS
     umount -l /sysroot
 
     do_livecd_from_loop121
@@ -598,7 +604,13 @@ fi
 
 # we might have an embedded ext3 on squashfs to use as rootfs (compressed livecd)
 #
-if [ -e /sysroot/squashfs.img ] ; then
+if [ -e /sysroot/live/squashfs.img ]; then
+  SQUASHED="/sysroot/live/squashfs.img"
+elif [ -e /sysroot/squashfs.img ]; then
+  SQUASHED="/sysroot/squashfs.img"
+fi
+
+if [ -n "$SQUASHED" ] ; then
 
     if [ "\$quiet" != "1" ] ; then
         echo "setting up embedded squash -> ext3 fs "
@@ -624,7 +636,7 @@ if [ -e /sysroot/squashfs.img ] ; then
         mount -n -t iso9660 /dev/loop118 /sysroot
     fi
 
-    losetup /dev/loop120 /sysroot/squashfs.img
+    losetup /dev/loop120 $SQUASHED
     mkdir -p /squashfs
     mount -n -t squashfs -o ro /dev/loop120 /squashfs
 
