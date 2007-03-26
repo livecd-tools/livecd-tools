@@ -80,7 +80,7 @@ if [ -d $USBMNT/syslinux -o -d $USBMNT/LiveOS ]; then
     echo "Already set up as live image.  Deleting old in fifteen seconds..."
     sleep 15
 
-    rm -rf $USBMNT/syslinux $USBMNT/live
+    rm -rf $USBMNT/syslinux $USBMNT/LiveOS
 fi
 
 echo "Copying live image to USB stick"
