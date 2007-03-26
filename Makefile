@@ -1,5 +1,5 @@
 
-VERSION = 003
+VERSION = 004
 
 INSTALL = /usr/bin/install -c
 INSTALL_PROGRAM = ${INSTALL}

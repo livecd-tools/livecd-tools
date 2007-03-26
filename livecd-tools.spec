@@ -1,6 +1,6 @@
 Summary: Tools for building live CD's
 Name: livecd-tools
-Version: 003
+Version: 004
 Release: 1%{?dist}
 License: GPL
 Group: System Environment/Base
@@ -38,12 +38,17 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root,-)
 %doc AUTHORS COPYING README HACKING
 %{_bindir}/livecd-creator
+%{_bindir}/livecd-iso-to-disk
 %dir /usr/lib/livecd-creator
 /usr/lib/livecd-creator/mayflower
 %dir %{_datadir}/livecd-tools
 %{_datadir}/livecd-tools/*
 
 %changelog
+* Mon Mar 26 2007 Jeremy Katz <katzj@redhat.com> - 004-1
+- add livecd-iso-to-disk for setting up the live CD iso image onto a usb 
+  stick or similar
+
 * Fri Mar 23 2007 Jeremy Katz <katzj@redhat.com> - 003-1
 - fix remaining reference to run-init
 
