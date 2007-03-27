@@ -61,13 +61,19 @@ mount -o loop $ISO $CDMNT || exitclean
 USBMNT=$(mktemp -d /media/usbdev.XXXXXX)
 mount $USBDEV $USBMNT || exitclean
 
-USBLABEL=$(/lib/udev/vol_id -l $USBDEV)
-if [ -z "$USBLABEL" ]; then
-    echo "Need to have a filesystem label on your USB device"
-    exitclean
+USBLABEL=$(/lib/udev/vol_id -u $USBDEV)
+if [ -n "$USBLABEL" ]; then 
+    USBLABEL="UUID=$USBLABEL" ; 
+else
+    USBLABEL=$(/lib/udev/vol_id -l $USBDEV)
+    if [ -n "$USBLABEL" ]; then 
+	USBLABEL="LABEL=$USBLABEL" 
+    else
+	echo "Need to have a filesystem label or UUID for your USB device"
+	exitclean
+    fi
 fi
-# FIXME: determining the filesystem type could be cleaner..
-USBFS=$(mount | grep $USBMNT |awk {'print $5'};)
+USBFS=$(/lib/udev/vol_id -t $USBDEV)
 if [ "$USBFS" != "vfat" -a "$USBFS" != "msdos" -a "$USBFS" != "ext2" -a "$USBFS" != "ext3" ]; then
     echo "USB filesystem must be vfat or ext[23]"
     exitclean
@@ -90,7 +96,7 @@ cp $CDMNT/isolinux/* $USBMNT/syslinux/
 
 echo "Updating boot config file"
 # adjust label and fstype
-sed -i -e "s/CDLABEL=[^ ]*/LABEL=$USBLABEL/" -e "s/rootfstype=[^ ]*/rootfstype=$USBFS/" $USBMNT/syslinux/isolinux.cfg
+sed -i -e "s/CDLABEL=[^ ]*/$USBLABEL/" -e "s/rootfstype=[^ ]*/rootfstype=$USBFS/" $USBMNT/syslinux/isolinux.cfg
 
 echo "Installing boot loader"
 if [ "$USBFS" = "vfat" -o "$USBFS" = "msdos" ]; then
