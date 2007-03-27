@@ -596,7 +596,7 @@ if [ -n "\$EXT3FS" ] ; then
     modprobe loop max_loop=128
     modprobe dm_snapshot
 
-    losetup /dev/loop121 $EXT3FS
+    losetup /dev/loop121 \$EXT3FS
     umount -l /sysroot
 
     do_livecd_from_loop121
@@ -636,7 +636,7 @@ if [ -n "\$SQUASHED" ] ; then
         mount -n -t iso9660 /dev/loop118 /sysroot
     fi
 
-    losetup /dev/loop120 $SQUASHED
+    losetup /dev/loop120 \$SQUASHED
     mkdir -p /squashfs
     mount -n -t squashfs -o ro /dev/loop120 /squashfs
 
