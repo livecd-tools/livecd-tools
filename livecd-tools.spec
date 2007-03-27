@@ -14,6 +14,7 @@ Requires: yum >= 3.0.0
 Requires: mkisofs
 Requires: squashfs-tools
 Requires: pykickstart >= 0.96
+Requires: syslinux
 BuildArch: noarch
 
 %description 
