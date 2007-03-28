@@ -1,6 +1,6 @@
 Summary: Tools for building live CD's
 Name: livecd-tools
-Version: 004
+Version: 005
 Release: 1%{?dist}
 License: GPL
 Group: System Environment/Base
@@ -46,6 +46,11 @@ rm -rf $RPM_BUILD_ROOT
 %{_datadir}/livecd-tools/*
 
 %changelog
+* Wed Mar 28 2007 Jeremy Katz <katzj@redhat.com> - 005-1
+- some shell quoting fixes
+- allow using UUID or LABEL for the fs label of a usb stick
+- work with ext2 formated usb stick
+
 * Mon Mar 26 2007 Jeremy Katz <katzj@redhat.com> - 004-1
 - add livecd-iso-to-disk for setting up the live CD iso image onto a usb 
   stick or similar
