@@ -580,7 +580,7 @@ class InstallationTarget:
                         "%s/install_root/sbin/mayflower" %(self.build_dir,))
         # modules needed for booting (this is butt ugly and we need to retrieve this from elsewhere, e.g. the kernel)
         mayflowerconf = open(self.build_dir + "/install_root/etc/mayflower.conf", "w")
-        mayflowerconf.write('MODULES+="cdrom ide-cd ahci loop dm_snapshot squashfs ext3 ehci_hcd uhci_hcd ohci_hcd usb_storage sd_mod sr_mod usbhid ata_piix vfat msdos "\n')
+        mayflowerconf.write('MODULES+="cdrom ide-cd ahci loop dm_snapshot squashfs ext3 ext2 ehci_hcd uhci_hcd ohci_hcd usb_storage sd_mod sr_mod usbhid ata_piix vfat msdos "\n')
         mayflowerconf.write('MODULES+="sata_mv sata_qstor sata_sis sata_uli "\n')
         mayflowerconf.write('MODULES+="sata_nv sata_sil24 sata_svw sata_via "\n')
         mayflowerconf.write('MODULES+="sata_promise sata_sil sata_sx4 sata_vsc "\n')
