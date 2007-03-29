@@ -5,7 +5,7 @@ auth --useshadow --enablemd5
 selinux --enforcing
 firewall --disabled
 repo --name=d7 --baseurl=http://download.fedora.redhat.com/pub/fedora/linux/core/development/i386/os
-repo --name=e7 --baseurl=http://download.fedora.devel.redhat.com/pub/fedora/linux/extras/development/i386 
+repo --name=e7 --baseurl=http://download.fedora.redhat.com/pub/fedora/linux/extras/development/i386 
 xconfig --startxonboot
 services --enabled=NetworkManager,dhcdbd --disabled=network,sshd
 
@@ -90,6 +90,12 @@ fonts-telugu
 -coolkey
 -ccid
 
+# duplicate functionality
+-pinfo
+-vorbis-tools
+-wget
+
+
 # scanning takes quite a bit of space :/
 -xsane
 -xsane-gimp
@@ -167,6 +173,3 @@ EOF
 chmod 755 /etc/rc.d/init.d/fedora-livecd
 /sbin/restorecon /etc/rc.d/init.d/fedora-livecd
 /sbin/chkconfig --add fedora-livecd
-
-# big  hack, but how else can we fit?
-rm -rf /usr/share/doc/*
