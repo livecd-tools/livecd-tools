@@ -19,38 +19,44 @@ import getopt
 import os
 import os.path
 import sys
+import errno
 import tempfile
 import time
 import traceback
 import subprocess
 import shutil
-
-from pykickstart.parser import *
-from pykickstart.version import *
-
 import yum
+import pykickstart.parser
+import pykickstart.version
+
+class MountError(Exception):
+    def __init__(self, msg):
+        Exception.__init__(self, msg)
+
+class InstallationError(Exception):
+    def __init__(self, msg):
+        Exception.__init__(self, msg)
 
 class BindChrootMount:
     """Represents a bind mount of a directory into a chroot."""
     def __init__(self, src, chroot, dest = None):
         self.src = src
         self.root = chroot
-        if dest:
-            self.dest = dest
-        else:
-            self.dest = src
+
+        if not dest:
+            dest = src
+        self.dest = self.root + "/" + dest
 
         self.mounted = False
 
     def mount(self):
         if not self.mounted:
-            if not os.path.exists("%s/%s" %(self.root, self.dest)):
-                os.makedirs("%s/%s" %(self.root, self.dest))
-            rc = subprocess.call(["/bin/mount", "--bind", self.src,
-                                  "%s/%s" %(self.root, self.dest)])
-            if rc == 0:
-                self.mounted = True
-        return self.mounted
+            if not os.path.exists(self.dest):
+                os.makedirs(self.dest)
+            rc = subprocess.call(["/bin/mount", "--bind", self.src, self.dest])
+            if rc != 0:
+                raise MountError("Bind-mounting '%s' to '%s' failed" % (self.src, self.dest))
+            self.mounted = True
 
     def umount(self):
         if self.mounted:
@@ -67,42 +73,38 @@ class LoopbackMount:
 
         self.mounted = False
         self.losetup = False
+        self.rmdir   = False
         self.loopdev = None
 
-    def cleanup(self, rmdir = True):
+    def cleanup(self):
         self.umount()
         self.lounsetup()
-        if rmdir:
-            try:
-                os.rmdir(self.mountdir)
-            except OSError, e:
-                pass
 
     def umount(self):
         if self.mounted:
             rc = subprocess.call(["/bin/umount", self.mountdir])
             self.mounted = False
 
+        if self.rmdir:
+            try:
+                os.rmdir(self.mountdir)
+            except OSError, e:
+                pass
+            self.rmdir = False
+
     def lounsetup(self):
-        if self.losetup and self.loopdev:
+        if self.losetup:
             rc = subprocess.call(["/sbin/losetup", "-d", self.loopdev])
             self.losetup = False
             self.loopdev = None
 
-    def setup(self):
-        if not os.path.exists(self.mountdir):
-            os.makedirs(self.mountdir)
-        if self.loopsetup():
-            if self.mount():
-                return True
-        return False
-
     def loopsetup(self):
         if self.losetup:
-            return self.losetup
+            return
+
         rc = subprocess.call(["/sbin/losetup", "-f", self.lofile])
         if rc != 0:
-            return self.losetup
+            raise MountError("Failed to allocate loop device for '%s'" % self.lofile)
 
         # succeeded; figure out which loopdevice we're using
         buf = subprocess.Popen(["/sbin/losetup", "-a"],
@@ -116,32 +118,40 @@ class LoopbackMount:
                 self.loopdev = fields[0][:-1]
                 break
 
-        if self.loopdev:
-            self.losetup = True
-        return self.losetup
+        if not self.loopdev:
+            raise MountError("Failed to find loop device associated with '%s' from '/sbin/losetup -a'" % self.lofile)
+
+        self.losetup = True
 
     def mount(self):
-        if self.mounted or not self.loopdev:
-            return self.mounted
+        if self.mounted:
+            return
+
+        self.loopsetup()
+
+        if not os.path.isdir(self.mountdir):
+            os.makedirs(self.mountdir)
+            self.rmdir = True
+
         args = [ "/bin/mount", self.loopdev, self.mountdir ]
         if self.fstype:
             args.extend(["-t", self.fstype])
+
         rc = subprocess.call(args)
-        if rc == 0:
-            self.mounted = True
-        return self.mounted
+        if rc != 0:
+            raise MountError("Failed to mount '%s' to '%s'" % (self.loopdev, self.mountdir))
+
+        self.mounted = True
 
 class SparseExt3LoopbackMount(LoopbackMount):
-    def __init__(self, lofile, mountdir, size, fslabel = None):
+    def __init__(self, lofile, mountdir, size, fslabel):
         LoopbackMount.__init__(self, lofile, mountdir, fstype = "ext3")
         self.size = size
         self.fslabel = fslabel
-        if not self.fslabel:
-            self.fslabel = "livecd-" + time.strftime("%Y%m%d-%H%M")
 
     def _createSparseFile(self):
         dir = os.path.dirname(self.lofile)
-        if not dir:
+        if not os.path.isdir(dir):
             os.makedirs(dir)
 
         # create the sparse file
@@ -155,14 +165,14 @@ class SparseExt3LoopbackMount(LoopbackMount):
         rc = subprocess.call(["/sbin/mkfs.ext3", "-F", "-L", self.fslabel,
                               "-m", "1", self.lofile])
         if rc != 0:
-            raise OSError, "Error creating filesystem: %d" %(rc,)
+            raise MountError("Error creating ext3 filesystem")
         rc = subprocess.call(["/sbin/tune2fs", "-c0", "-i0", "-Odir_index",
                               "-ouser_xattr,acl", self.lofile])
 
-    def setup(self):
+    def mount(self):
         self._createSparseFile()
         self._formatFilesystem()
-        return LoopbackMount.setup(self)
+        return LoopbackMount.mount(self)
 
 class LiveCDYum(yum.YumBase):
     def __init__(self):
@@ -191,11 +201,9 @@ class LiveCDYum(yum.YumBase):
     def selectPackage(self, pkg):
         """Select a given package.  Can be specified with name.arch or name*"""
         try:
-            mbrs = self.install(pattern = pkg)
-            return len(mbrs)
-        except yum.Errors.InstallError:
-            print >> sys.stderr, "No package matching %s" %(pkg,)
-            return 0
+            self.install(pattern = pkg)
+        except yum.Errors.InstallError, e:
+            raise InstallationError("Failed to find package '%s' : %s" % (pkg, e))
         
     def deselectPackage(self, pkg):
         """Deselect package.  Can be specified as name.arch or name*"""
@@ -214,11 +222,14 @@ class LiveCDYum(yum.YumBase):
         else:
             print >> sys.stderr, "No such package %s to remove" %(pkg,)
 
-    def selectGroup(self, grp, include = GROUP_DEFAULT):
-        yum.YumBase.selectGroup(self, grp)
-        if include == GROUP_REQUIRED:
+    def selectGroup(self, grp, include = pykickstart.parser.GROUP_DEFAULT):
+        try:
+            yum.YumBase.selectGroup(self, grp)
+        except (yum.Errors.InstallError, yum.Errors.GroupsError), e:
+            raise InstallationError("Failed to find group '%s' : %s" % (grp, e))
+        if include == pykickstart.parser.GROUP_REQUIRED:
             map(lambda p: self.deselectPackage(p), grp.default_packages.keys())
-        elif include == GROUP_ALL:
+        elif include == pykickstart.parser.GROUP_ALL:
             map(lambda p: self.selectPackage(p), grp.optional_packages.keys())
         
     def addRepository(self, name, url = None, mirrorlist = None):
@@ -242,10 +253,7 @@ class LiveCDYum(yum.YumBase):
     def runInstall(self):
         (res, resmsg) = self.buildTransaction()
         if res != 2:
-            print "Unable to build transaction"
-            for m in resmsg:
-                print m
-            sys.exit(1)
+            raise InstallationError("Failed to build transaction : %s" % str.join("\n", resmsg))
         
         dlpkgs = map(lambda x: x.po, filter(lambda txmbr: txmbr.ts_state in ("i", "u"), self.tsInfo.getMembers()))
         self.downloadPkgs(dlpkgs)
@@ -263,130 +271,88 @@ class LiveCDYum(yum.YumBase):
         cb.filelog = False
         return self.runTransaction(cb)
 
-def get_kernel_version(root):
-    # FIXME: this doesn't handle multiple kernels being installed
-    kdir = os.listdir("%s/install_root/lib/modules" %(root,))
-    kver = os.path.basename(kdir[0])
-    return kver
-
 class InstallationTarget:
-    def __init__(self):
+    def __init__(self, repos, packages, epackages, groups, fs_label, skip_compression):
         self.ayum = LiveCDYum()
+        self.repos = repos
+        self.packages = packages
+        self.epackages = epackages
+        self.groups = groups
+        self.fs_label = fs_label
+        self.skip_compression = skip_compression
+
+        self.build_dir = None
+        self.instloop = None
+        self.bindmounts = []
+        self.ksparser = None
         
+    def parse(self, kscfg):
+        ksversion = pykickstart.version.makeVersion()
+        self.ksparser = pykickstart.parser.KickstartParser(ksversion)
+        if kscfg:
+            try:
+                self.ksparser.readKickstart(kscfg)
+            except IOError, (err, msg):
+                raise InstallationError("Failed to read kickstart file '%s' : %s" % (kscfg, msg))
+            except pykickstart.errors.KickstartError, e:
+                raise InstallationError("Failed to parse kickstart file '%s' : %s" % (kscfg, e))
+
+            for repo in self.ksparser.handler.repo.repoList:
+                already_given = False
+                for cmd_name, cmd_url in self.repos:
+                    if cmd_name == repo.name:
+                        already_given = True
+                        break
+
+                if not already_given:
+                    self.repos.append( (repo.name, repo.baseurl) )
+
+            self.packages.extend(self.ksparser.handler.packages.packageList)
+            self.groups.extend(map(lambda g: (g.name, g.include),
+                                   self.ksparser.handler.packages.groupList))
+            self.epackages.extend(self.ksparser.handler.packages.excludedList)
+
+        if not self.packages and not self.groups:
+            raise InstallationError("No packages or groups specified")
+
+        if not self.repos:
+            raise InstallationError("No repositories specified")
+
     def base_on_iso(self, base_on):
         """helper function to extract ext3 file system from a live CD ISO"""
 
         isoloop = LoopbackMount(base_on, "%s/base_on_iso" %(self.build_dir,))
-        if not isoloop.setup():
-            isoloop.cleanup()
-            return False
 
         squashloop = LoopbackMount("%s/squashfs.img" %(isoloop.mountdir,),
                                    "%s/base_on_squashfs" %(self.build_dir,),
                                    "squashfs")
-        if not squashloop.setup():
-            squashloop.cleanup()
-            isoloop.cleanup()
-            return False
-
-        # copy the ext3 fs out
-        try:
-            shutil.copyfile("%s/base_on_squashfs/os.img" %(self.build_dir,),
-                            "%s/data/os.img" %(self.build_dir,))
-        except Exception, e:
-            print "Cannot copy os.img from squashfs from ISO to base on"
-            traceback.print_exc(file=sys.stderr)
-            squashloop.cleanup()
-            isoloop.cleanup()
-            return False
-
-        # unmount and tear down the mount points and loop devices used
-        squashloop.cleanup()
-        isoloop.cleanup()
-        return True
-
-
-    def setup(self, image_size, fs_label, base_on):
-        """setup target ext3 file system in preparation for an install"""
-
-        # global variables needed
-        self.fs_label = fs_label
-        self.instloop = None
-        self.bindmounts = []
-
-        # setup temporary build dirs
-        self.build_dir = "/var/tmp/livecd-creator/build-" + os.path.basename(tempfile.mktemp())
-        try:
-            os.makedirs(self.build_dir)
-        except OSError:
-            print "Cannot create build directory at %s" %(self.build_dir,)
-            return False
 
         try:
-            os.mkdir(self.build_dir + "/out")
-            os.mkdir(self.build_dir + "/out/isolinux")
-            os.mkdir(self.build_dir + "/out/sysroot")
-            os.mkdir(self.build_dir + "/data")
-            os.mkdir(self.build_dir + "/data/sysroot")            
-            os.mkdir(self.build_dir + "/install_root")
-            os.mkdir(self.build_dir + "/yum-cache")
-        except OSError:
-            print "Cannot create directory"
-            self.teardown()
-            return False
-
-        if base_on:
-            # get backing ext3 image if we're based this build on an existing live CD ISO
-            if not self.base_on_iso(base_on):
-                self.teardown()
-                return False
-            self.instloop = LoopbackMount("%s/data/os.img" %(self.build_dir,),
-                                          "%s/install_root" %(self.build_dir,))
-        else:
-            self.instloop = SparseExt3LoopbackMount("%s/data/os.img"
-                                                    %(self.build_dir,),
-                                                    "%s/install_root"
-                                                    %(self.build_dir,),
-                                                    image_size)
-            
-
-        if not self.instloop.setup():
-            self.teardown()
-            return False
-
-        if not base_on:
-            # create a few directories needed if it's a new image
             try:
-                os.mkdir(self.build_dir + "/install_root/etc")
-                os.mkdir(self.build_dir + "/install_root/boot")
-                os.mkdir(self.build_dir + "/install_root/var")
-                os.mkdir(self.build_dir + "/install_root/var/log")
-                os.mkdir(self.build_dir + "/install_root/var/cache")
-                os.mkdir(self.build_dir + "/install_root/var/cache/yum")
-            except OSError:
-                print "Cannot create directory"
-                self.teardown()
-                return False
+                isoloop.mount()
+            except MountError, e:
+                raise InstallationError("Failed to loopback mount '%s' : %s" % (base_on, e))
 
-        # bind mount system directories into install_root/
-        for f in ["/sys", "/proc", "/dev", "/dev/pts", "/selinux"]:
-            b = BindChrootMount(f, "%s/install_root" %(self.build_dir,))
-            if b.mount():
-                self.bindmounts.append(b)
-            else:
-                print "Cannot mount special file system %s"%f
-                self.teardown()
-                return False
+            if not os.path.exists(squashloop.lofile):
+                raise InstallationError("'%s' is not a valid live CD ISO : squashfs.img doesn't exist" % base_on)
 
-        # make sure /etc/mtab is current inside install_root
-        try:
-            os.symlink("../proc/mounts", self.build_dir + "/install_root/etc/mtab")
-        except OSError:
-            print "Cannot create symlink %s/etc/mtab -> ../proc/mounts"%(self.build_dir)
-            self.teardown()
-            return False
+            try:
+                squashloop.mount()
+            except MountError, e:
+                raise InstallationError("Failed to loopback mount squashfs.img from '%s' : %s" % (base_on, e))
 
-        # write an /etc/fstab file
+            os_image = self.build_dir + "/base_on_squashfs/os.img"
+
+            if not os.path.exists(os_image):
+                raise InstallationError("'%s' is not a valid live CD ISO : os.img doesn't exist" % base_on)
+
+            shutil.copyfile(os_image, self.build_dir + "/data/os.img")
+        finally:
+            # unmount and tear down the mount points and loop devices used
+            squashloop.cleanup()
+            isoloop.cleanup()
+
+    def write_fstab(self):
         fstab = open(self.build_dir + "/install_root/etc/fstab", "w")
         fstab.write("/dev/mapper/livecd-rw   /                       ext3    defaults,noatime 0 0\n")
         fstab.write("devpts                  /dev/pts                devpts  gid=5,mode=620  0 0\n")
@@ -395,58 +361,82 @@ class InstallationTarget:
         fstab.write("sysfs                   /sys                    sysfs   defaults        0 0\n")
         fstab.close()
 
-        b = BindChrootMount("%s/yum-cache" %(self.build_dir,),
-                            "%s/install_root" %(self.build_dir,),
-                            "/var/cache/yum")
-        if b.mount():
-            self.bindmounts.append(b)
+    def setup(self, image_size, base_on = None):
+        """setup target ext3 file system in preparation for an install"""
+
+        # setup temporary build dirs
+        try:
+            self.build_dir = tempfile.mkdtemp(dir="/var/tmp", prefix="livecd-creator-")
+        except OSError, (err, msg):
+            raise InstallationError("Failed create build directory in /var/tmp: %s" % msg)
+
+        os.makedirs(self.build_dir + "/out/isolinux")
+        os.makedirs(self.build_dir + "/out/sysroot")
+        os.makedirs(self.build_dir + "/data/sysroot")
+        os.makedirs(self.build_dir + "/install_root")
+        os.makedirs(self.build_dir + "/yum-cache")
+
+        if base_on:
+            # get backing ext3 image if we're based this build on an existing live CD ISO
+            self.base_on_iso(base_on)
+
+            self.instloop = LoopbackMount("%s/data/os.img" %(self.build_dir,),
+                                          "%s/install_root" %(self.build_dir,))
         else:
-            print "Cannot bind mount /var/cache/yum"
-            self.teardown()
-            return False
+            self.instloop = SparseExt3LoopbackMount("%s/data/os.img"
+                                                    %(self.build_dir,),
+                                                    "%s/install_root"
+                                                    %(self.build_dir,),
+                                                    image_size,
+                                                    self.fs_label)
+            
+
+        try:
+            self.instloop.mount()
+        except MountError, e:
+            raise InstallationError("Failed to loopback mount '%s' : %s" % (self.instloop.lofile, e))
+
+        if not base_on:
+            # create a few directories needed if it's a new image
+            os.makedirs(self.build_dir + "/install_root/etc")
+            os.makedirs(self.build_dir + "/install_root/boot")
+            os.makedirs(self.build_dir + "/install_root/var/log")
+            os.makedirs(self.build_dir + "/install_root/var/cache/yum")
+
+        # bind mount system directories into install_root/
+        for (f, dest) in [("/sys", None), ("/proc", None), ("/dev", None),
+                          ("/dev/pts", None), ("/selinux", None),
+                          (self.build_dir + "/yum-cache", "/var/cache/yum")]:
+            self.bindmounts.append(BindChrootMount(f, self.build_dir + "/install_root", dest))
+
+        # make sure /etc/mtab is current inside install_root
+        os.symlink("../proc/mounts", self.build_dir + "/install_root/etc/mtab")
+
+        self.write_fstab()
 
         self.ayum.setup("%s/install_root" %(self.build_dir,))
-        return True
-
 
     def unmount(self):
         """detaches system bind mounts and install_root for the file system and tears down loop devices used"""
+        shutil.rmtree(self.build_dir + "/yum-cache", ignore_errors=True)
         
         try:
             os.unlink(self.build_dir + "/install_root/etc/mtab")
         except OSError:
             pass
 
-        # TODO: need to handle when unmount fails because of lingering
-        # processes that has open files
-        if self.instloop:
-            self.bindmounts.reverse()
-            for b in self.bindmounts:
-                b.umount()
-            self.instloop.cleanup()
-            try:
-                os.unlink(self.build_dir + "/yum.conf")
-            except OSError:
-                pass
-            shutil.rmtree("%s/yum-cache" %(self.build_dir,), ignore_errors=True)
+        self.bindmounts.reverse()
+        for b in self.bindmounts:
+            b.umount()
 
+        if self.instloop:
+            self.instloop.cleanup()
             self.instloop = None
 
     def teardown(self):
-        """releases all resources and removes all temporary files"""
-
-        # ensure we've detached the install_root
-        self.unmount()
-
-        # this removes all data used in the temporary build directory
-        try:
-            os.unlink(self.build_dir + "/data/os.img")
-            os.rmdir(self.build_dir + "/data")
-        except OSError:
-            pass
-        shutil.rmtree("%s/out" %(self.build_dir,), ignore_errors=True)
-        if "/var/tmp/livecd-creator/build-" in self.build_dir:
-            shutil.rmtree(self.build_dir, ignore_errors=True)
+        if self.build_dir:
+            self.unmount()
+            shutil.rmtree(self.build_dir, ignore_errors = True)
 
     def addRepository(self, name, url):
         """adds a yum repository to temporary yum.conf file used"""
@@ -457,22 +447,16 @@ class InstallationTarget:
 
     def installPackages(self, packageList, excludePackageList, groupList = []):
         """install packages into target file system"""
-        map(lambda pkg: self.ayum.selectPackage(pkg), packageList)
-        for (grp, inc) in groupList:
-            self.ayum.selectGroup(grp, inc)
-        map(lambda pkg: self.ayum.deselectPackage(pkg), excludePackageList)
-
         try:
-            self.ayum.runInstall()
-        except Exception, e:
-            print "Error installing packages"
-            traceback.print_exc(file=sys.stderr)
-            self.ayum.closeRpmDB()            
-            return False
-        self.ayum.closeRpmDB()
-        return True
+            map(lambda pkg: self.ayum.selectPackage(pkg), packageList)
+            map(lambda grp: self.ayum.selectGroup(grp[0], grp[1]), groupList)
+            map(lambda pkg: self.ayum.deselectPackage(pkg), excludePackageList)
 
-    def configureSystem(self, ksparser):
+            self.ayum.runInstall()
+        finally:
+            self.ayum.closeRpmDB()
+
+    def configureSystem(self):
         instroot = "%s/install_root" %(self.build_dir,)
         
         # FIXME: this is a bit ugly, but with the current pykickstart
@@ -480,7 +464,7 @@ class InstallationTarget:
         # be able to do something different, but so it goes
 
         # set up the language
-        lang = ksparser.handler.lang.lang or "en_US.UTF-8"
+        lang = self.ksparser.handler.lang.lang or "en_US.UTF-8"
         f = open("%s/etc/sysconfig/i18n" %(instroot,), "w+")
         f.write("LANG=\"%s\"\n" %(lang,))
         f.close()
@@ -490,13 +474,13 @@ class InstallationTarget:
         # or do we want to make X be able to do this mapping
         import rhpl.keyboard
         k = rhpl.keyboard.Keyboard()
-        if ksparser.handler.keyboard.keyboard:
-            k.set(ksparser.handler.keyboard.keyboard)
+        if self.ksparser.handler.keyboard.keyboard:
+            k.set(self.ksparser.handler.keyboard.keyboard)
         k.write(instroot)
 
         # next up is timezone
-        tz = ksparser.handler.timezone.timezone or "America/New_York"
-        utc = ksparser.handler.timezone.isUtc
+        tz = self.ksparser.handler.timezone.timezone or "America/New_York"
+        utc = self.ksparser.handler.timezone.isUtc
         f = open("%s/etc/sysconfig/clock" %(instroot,), "w+")
         f.write("ZONE=\"%s\"\n" %(tz,))
         f.write("UTC=%s\n" %(utc,))
@@ -513,14 +497,14 @@ class InstallationTarget:
         f.close()
 
         # do any authconfig bits
-        auth = ksparser.handler.authconfig.authconfig or "--useshadow --enablemd5"
+        auth = self.ksparser.handler.authconfig.authconfig or "--useshadow --enablemd5"
         if os.path.exists("%s/usr/sbin/authconfig" %(instroot,)):
             args = ["/usr/sbin/authconfig", "--update", "--nostart"]
             args.extend(auth.split())
             subprocess.call(args, preexec_fn=self.run_in_root)
 
         # firewall.  FIXME: should handle the rest of the options
-        if ksparser.handler.firewall.enabled and os.path.exists("%s/usr/sbin/lokkit" %(instroot,)):
+        if self.ksparser.handler.firewall.enabled and os.path.exists("%s/usr/sbin/lokkit" %(instroot,)):
             subprocess.call(["/usr/sbin/lokkit", "-f", "--quiet",
                              "--nostart", "--enabled"],
                             preexec_fn=self.run_in_root)
@@ -528,7 +512,7 @@ class InstallationTarget:
         # selinux
         if os.path.exists("%s/usr/sbin/lokkit" %(instroot,)):
             args = ["/usr/sbin/lokkit", "-f", "--quiet", "--nostart"]
-            if ksparser.handler.selinux.selinux:
+            if self.ksparser.handler.selinux.selinux:
                 args.append("--selinux=enforcing")
             else:
                 args.append("--selinux=disabled")
@@ -540,15 +524,15 @@ class InstallationTarget:
 
         # enable/disable services appropriately
         if os.path.exists("%s/sbin/chkconfig" %(instroot,)):
-            for s in ksparser.handler.services.enabled:
+            for s in self.ksparser.handler.services.enabled:
                 subprocess.call(["/sbin/chkconfig", s, "--level", "345", "on"],
                                 preexec_fn=self.run_in_root)
-            for s in ksparser.handler.services.disabled:
+            for s in self.ksparser.handler.services.disabled:
                 subprocess.call(["/sbin/chkconfig", s, "--level", "345", "off"],
                                 preexec_fn=self.run_in_root)
 
         # x by default?
-        if ksparser.handler.xconfig.startX:
+        if self.ksparser.handler.xconfig.startX:
             f = open("%s/etc/inittab" %(instroot,), "rw+")
             buf = f.read()
             buf = buf.replace("id:3:initdefault", "id:5:initdefault")
@@ -557,8 +541,8 @@ class InstallationTarget:
             f.close()
 
         # and now, for arbitrary %post scripts
-        for s in filter(lambda s: s.type == KS_SCRIPT_POST,
-                        ksparser.handler.scripts):
+        for s in filter(lambda s: s.type == pykickstart.parser.KS_SCRIPT_POST,
+                        self.ksparser.handler.scripts):
             # we can only safely run scripts in the chroot
             if not s.inChroot:
                 print >> sys.stderr, "Not running script outside of chroot"
@@ -569,13 +553,35 @@ class InstallationTarget:
             os.close(fd)
             os.chmod(path, 0700)
 
-            subprocess.call([s.interp, "/tmp/%s" %(os.path.basename(path),)],
-                            preexec_fn = self.run_in_root)
-            os.unlink(path)
-            
+            try:
+                subprocess.call([s.interp, "/tmp/%s" %(os.path.basename(path),)],
+                                preexec_fn = self.run_in_root)
+            except OSError, (err, msg):
+                raise InstallationError("Failed to execute %%post script with '%s' : %s" % (s.interp, msg))
+            finally:
+                os.unlink(path)
+
+    def get_kernel_version(self):
+        #
+        # FIXME: this doesn't handle multiple kernels - we should list
+        #        them all in the isolinux menu
+        #
+        kernels = []
+        modules_dir = "%s/install_root/lib/modules" % self.build_dir
+
+        if os.path.isdir(modules_dir):
+            kernels = os.listdir(modules_dir)
+
+        if not kernels:
+            raise InstallationError("No kernels installed: /lib/modules is empty")
+
+        return kernels[0]
 
     def createInitramfs(self):
         # Create initramfs
+        if not os.path.isfile("/usr/lib/livecd-creator/mayflower"):
+            raise InstallationError("livecd-creator not correctly installed : "+
+                                    "/usr/lib/livecd-creator/mayflower not found")
         shutil.copy("/usr/lib/livecd-creator/mayflower",
                         "%s/install_root/sbin/mayflower" %(self.build_dir,))
         # modules needed for booting (this is butt ugly and we need to retrieve this from elsewhere, e.g. the kernel)
@@ -588,24 +594,21 @@ class InstallationTarget:
         mayflowerconf.close()
 
         subprocess.call(["/sbin/mayflower", "-f", "/boot/livecd-initramfs.img",
-                         get_kernel_version(self.build_dir)],
+                        self.get_kernel_version()],
                         preexec_fn=self.run_in_root)
         for f in ("/sbin/mayflower", "/etc/mayflower.conf"):
             os.unlink("%s/install_root/%s" %(self.build_dir, f))
 
     def relabelSystem(self):
         # finally relabel all files
-        instroot = "%s/install_root" %(self.build_dir,)
-        if os.path.exists("%s/sbin/restorecon" %(instroot,)):
-            subprocess.call(["/sbin/restorecon", "-v", "-r", "/"],
-                            preexec_fn=self.run_in_root)
-        return True
+        if self.ksparser.handler.selinux.selinux:
+            instroot = "%s/install_root" %(self.build_dir,)
+            if os.path.exists("%s/sbin/restorecon" %(instroot,)):
+                subprocess.call(["/sbin/restorecon", "-v", "-r", "/"],
+                                preexec_fn=self.run_in_root)
 
     def launchShell(self):
-        print "Launching shell. Exit to continue."
-        print "----------------------------------"
         subprocess.call(["/bin/bash"], preexec_fn=self.run_in_root)
-        return True
 
     def configureBootloader(self):
         """configure the boot loader"""
@@ -618,7 +621,7 @@ class InstallationTarget:
         #  - error handling
         #
         shutil.copyfile("%s/install_root/boot/vmlinuz-%s"
-                        %(self.build_dir, get_kernel_version(self.build_dir,)),
+                        %(self.build_dir, self.get_kernel_version()),
                         "%s/out/isolinux/vmlinuz" %(self.build_dir,))
 
         shutil.copyfile("%s/install_root/boot/livecd-initramfs.img"
@@ -627,10 +630,13 @@ class InstallationTarget:
         os.unlink("%s/install_root/boot/livecd-initramfs.img"
                   %(self.build_dir,))
 
-        shutil.copy("%s/install_root/usr/lib/syslinux/isolinux.bin" %(self.build_dir,),
-                    "%s/out/isolinux/isolinux.bin" %(self.build_dir,))
-        shutil.copy("%s/install_root/usr/lib/syslinux/vesamenu.c32" %(self.build_dir,),
-                    "%s/out/isolinux/vesamenu.c32" %(self.build_dir,))
+        for p in ["isolinux.bin", "vesamenu.c32"]:
+            path = "%s/install_root/usr/lib/syslinux/%s" % (self.build_dir, p)
+
+            if not os.path.isfile(path):
+                raise InstallationError("syslinux not installed : %s not found" % path)
+
+            shutil.copy(path, "%s/out/isolinux/%s" % (self.build_dir, p))
 
         if os.path.exists("%s/install_root/usr/lib/anaconda-runtime/syslinux-vesa-splash.jpg" %(self.build_dir,)):
             shutil.copy("%s/install_root/usr/lib/anaconda-runtime/syslinux-vesa-splash.jpg" %(self.build_dir,),
@@ -670,35 +676,48 @@ label runfromram
         
         # TODO: enable external entitity to partipate in adding boot entries
 
-    def createIso(self, filename):
-        """write out the live CD ISO"""
+    def install(self):
+        for (name, url) in self.repos:
+            self.ayum.addRepository(name, url)
 
-        # ship the ext3 image if there is no compressed image (happens during --skip-compression)
-        if not os.path.exists("%s/out/squashfs.img" %(self.build_dir,)):
-            shutil.move("%s/data/os.img" %(self.build_dir,), "%s/out/ext3fs.img" %(self.build_dir,))
-        
-        subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(filename,),
+        self.installPackages(self.packages, self.epackages, self.groups)
+        self.configureSystem()
+        self.relabelSystem()
+        self.createInitramfs()
+        self.configureBootloader()
+
+    def createIso(self):
+        """write out the live CD ISO"""
+        subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(self.fs_label,),
                          "-b", "isolinux/isolinux.bin",
                          "-c", "isolinux/boot.cat",
                          "-no-emul-boot", "-boot-load-size", "4",
                          "-boot-info-table", "-J", "-r", "-hide-rr-moved",
-                         "-V", "%s" %(filename,), "%s/out" %(self.build_dir)])
+                         "-V", "%s" %(self.fs_label,), "%s/out" %(self.build_dir)])
 
     def createSquashFS(self):
         """create compressed squashfs file system"""
-        # FIXME: mksquashfs segfaults if PWD isn't set in the environment
-        subprocess.call(["/sbin/mksquashfs", "os.img", "sysroot",
-                         "../out/squashfs.img"],
-                        cwd="%s/data" %(self.build_dir,),
-                        env={"PWD": "%s/data" %(self.build_dir,)})
+        if not self.skip_compression:
+            # FIXME: mksquashfs segfaults if PWD isn't set in the environment
+            subprocess.call(["/sbin/mksquashfs", "os.img", "sysroot",
+                             "../out/squashfs.img"],
+                            cwd="%s/data" %(self.build_dir,),
+                            env={"PWD": "%s/data" %(self.build_dir,)})
+        else:
+            shutil.move("%s/data/os.img" %(self.build_dir,),
+                        "%s/out/ext3fs.img" %(self.build_dir,))
 
-def usage():
-    print """
+    def package(self):
+        self.createSquashFS()
+        self.createIso()
+
+def usage(out):
+    print >> out, """
 usage: livecd-creator [--help] 
-                      [--config=<path-to-kickstart-file>]
-                      [--repo=<name1>,<url1> ...] [--repo=<name2>,<url2>]
-                      --package=<p1> [--package=<p2> ...]
-                      [--exclude-package=<e1>] --exclude-package=<e2> ...]
+                      [--config=<path-to-kickstart-file> | --repo=<name>,<url> --package=<p>]
+                      [--repo=<name1>,<url1>] [--repo=<name2>,<url2> ...]
+                      [--package=<p1>] [--package=<p2> ...]
+                      [--exclude-package=<e1>] [--exclude-package=<e2> ...]
                       [--base-on=<path-to-iso-file>]
                       [--fslabel=<label>]
                       [--skip-compression]
@@ -727,141 +746,136 @@ usage: livecd-creator [--help]
                    --repo=a-extras-dev,file:///home/user/extras/RPMS
 """
 
-def main():
+class Usage(Exception):
+    def __init__(self, msg = None, no_error = False):
+        Exception.__init__(self, msg, no_error)
 
-    repos = []
-    packages = []
-    groups = []
-    epackages = []
-    fs_label = "livecd-" + time.strftime("%Y%m%d-%H%M")
-    base_on = None
-    kscfg = None
-    skip_compression = False
-    uncompressed_size = 3072
-    give_shell = False
+class Options:
+    def __init__(self):
+        self.repos = []
+        self.packages = []
+        self.groups = []
+        self.epackages = []
+        self.fs_label = "livecd-" + time.strftime("%Y%m%d-%H%M")
+        self.base_on = None
+        self.kscfg = None
+        self.skip_compression = False
+        self.uncompressed_size = 3072
+        self.give_shell = False
 
+def parse_options(args):
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hr:b:p:e:f:c:su:l",
+        opts, args = getopt.getopt(args, "hr:b:p:e:f:c:su:l",
                                    ["help", "repo=", "base-on=", "package=",
                                     "exclude-package=", "fslabel=", "config=",
                                     "skip-compression", "uncompressed-size=",
                                     "shell"])
-    except getopt.GetoptError:
-        usage()
-        sys.exit(2)
-    output = None
-    verbose = False
+    except getopt.GetoptError, msg:
+        raise Usage(msg)
+
+    options = Options()
+
     for o, a in opts:
         if o in ("-h", "--help"):
-            usage()
-            sys.exit(0)
+            raise Usage(no_error = True)
         if o in ("-l", "--shell"):
-            give_shell = True
+            options.give_shell = True
             continue
         if o in ("-s", "--skip-compression"):
-            skip_compression = True
+            options.skip_compression = True
             continue
         if o in ("-u", "--uncompressed-size"):
-            uncompressed_size = int(a)
+            options.uncompressed_size = int(a)
             continue
         if o in ("-c", "--config"):
-            kscfg = a
+            options.kscfg = a
+            if not os.path.isfile(options.kscfg):
+                raise Usage("Kickstart config '%s' does not exist" % options.kscfg)
             continue
         if o in ("-r", "--repo"):
             (name, url) = a.split(",")
-            for (n, u) in repos:
+            for (n, u) in options.repos:
                 if n == name:
-                    print "Repo name '%s' is already in use"%n
-                    sys.exit(2)
-            repos.append((name, url))
+                    raise Usage("Repo name '%s' is already in use" % n)
+            options.repos.append((name, url))
             continue
         if o in ("-p", "--package"):
             if a.startswith("@"):
-                groups.append((a[1:], GROUP_DEFAULT))
+                options.groups.append((a[1:], pykickstart.parser.GROUP_DEFAULT))
             else:
-                packages.append(a)
+                options.packages.append(a)
             continue
         if o in ("-e", "--exclude-package"):
-            epackages.append(a)
+            options.epackages.append(a)
             continue
         if o in ("-f", "--fslabel"):
-            fs_label = a
-            if len(fs_label) > 32:
-                print "CD labels are limited to 32 characters"
-                sys.exit(2)
+            options.fs_label = a
+            if len(options.fs_label) > 32:
+                raise Usage("CD labels are limited to 32 characters")
             continue
         if o in ("-b", "--base-on"):
-            base_on = a
+            options.base_on = a
+            if not os.path.isfile(options.base_on):
+                raise Usage("Live CD ISO '%s' does not exist" % options.base_on)
             continue
-        print "Unknown option %s"%o
-        sys.exit(2)
+        raise Usage("Unknown option %s" % o)
 
-    ksparser = KickstartParser(makeVersion())
-    if not kscfg:
-        if len(packages) == 0:
-            print "No packages specified."
-            print ""
-            usage()
-            sys.exit(1)
+    if not options.kscfg and not (options.packages or options.groups):
+        raise Usage("No packages or groups specified")
 
-        if len(repos) == 0:
-            print "No repositories specified."
-            print ""
-            usage()
-            sys.exit(1)
-    else:
-        ksparser.readKickstart(kscfg)
+    if not options.kscfg and not options.repos:
+        raise Usage("No repositories specified")
 
-        for repo in ksparser.handler.repo.repoList:
-            given_on_cmd_line = False
-            for cmd_name, cmd_url in repos:
-                if cmd_name == repo.name:
-                    given_on_cmd_line = True
-                    break
+    return options
 
-            if not given_on_cmd_line:
-                repos.append( (repo.name, repo.baseurl) )
+def main():
+    try:
+        options = parse_options(sys.argv[1:])
+    except Usage, (msg, no_error):
+        if no_error:
+            out = sys.stdout
+            ret = 0
+        else:
+            out = sys.stderr
+            ret = 2
+        if msg:
+            print >> out, msg
+        usage(out)
+        return ret
 
-        packages.extend(ksparser.handler.packages.packageList)
-        groups.extend(map(lambda g: (g.name, g.include),
-                          ksparser.handler.packages.groupList))
-        epackages.extend(ksparser.handler.packages.excludedList)
+    if os.geteuid () != 0:
+        print >> sys.stderr, "You must run livecd-creator as root"
+        return 1
 
-    target = InstallationTarget()
-
-    if not target.setup(uncompressed_size, fs_label, base_on):
-        print "Cannot setup installation target. Aborting."
-        sys.exit(1)
+    target = InstallationTarget(options.repos,
+                                options.packages,
+                                options.epackages,
+                                options.groups,
+                                options.fs_label,
+                                options.skip_compression)
 
     try:
-        for (n, u) in repos:
-            target.addRepository(n, u)
+        target.parse(options.kscfg)
 
-        if not target.installPackages(packages, epackages, groups):
-            target.teardown()
-            sys.exit(1)
-        target.configureSystem(ksparser)
-        target.createInitramfs()
-        if ksparser.handler.selinux.selinux:
-            target.relabelSystem()
-        target.configureBootloader()
-    except SystemExit:
-        sys.exit(1)
-    except:
-        print "\n\nERROR during installation..."
-        traceback.print_exc(file=sys.stderr)
+        target.setup(options.uncompressed_size, options.base_on)
+
+        target.install()
+
+        if options.give_shell:
+            print "Launching shell. Exit to continue."
+            print "----------------------------------"
+            target.launchShell()
+
+        target.unmount()
+
+        target.package()
+    except InstallationError, e:
+        print >> sys.stderr, "Error creating Live CD : %s" % e
+        return 1
+    finally:
         target.teardown()
-        sys.exit(1)
 
-    
-    if give_shell:
-        target.launchShell()
-
-    target.unmount()
-    if not skip_compression:
-        target.createSquashFS()
-    target.createIso(fs_label)
-    target.teardown()
+    return 0
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
