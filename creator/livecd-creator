@@ -315,11 +315,10 @@ class InstallationTarget:
         self.bindmounts = []
 
         # setup temporary build dirs
-        self.build_dir = "/var/tmp/livecd-creator/build-" + os.path.basename(tempfile.mktemp())
         try:
-            os.makedirs(self.build_dir)
-        except OSError:
-            print "Cannot create build directory at %s" %(self.build_dir,)
+            self.build_dir = tempfile.mkdtemp(dir="/var/tmp", prefix="livecd-creator-")
+        except OSError, e:
+            print "Cannot create build directory in /var/tmp: %s" % e
             return False
 
         try:
@@ -445,8 +444,7 @@ class InstallationTarget:
         except OSError:
             pass
         shutil.rmtree("%s/out" %(self.build_dir,), ignore_errors=True)
-        if "/var/tmp/livecd-creator/build-" in self.build_dir:
-            shutil.rmtree(self.build_dir, ignore_errors=True)
+        shutil.rmtree(self.build_dir, ignore_errors=True)
 
     def addRepository(self, name, url):
         """adds a yum repository to temporary yum.conf file used"""
