@@ -193,11 +193,9 @@ class LiveCDYum(yum.YumBase):
     def selectPackage(self, pkg):
         """Select a given package.  Can be specified with name.arch or name*"""
         try:
-            mbrs = self.install(pattern = pkg)
-            return len(mbrs)
-        except yum.Errors.InstallError:
-            print >> sys.stderr, "No package matching %s" %(pkg,)
-            return 0
+            self.install(pattern = pkg)
+        except yum.Errors.InstallError, e:
+            raise InstallationError("Failed to find package '%s' : %s" % (pkg, e))
         
     def deselectPackage(self, pkg):
         """Deselect package.  Can be specified as name.arch or name*"""
@@ -217,7 +215,10 @@ class LiveCDYum(yum.YumBase):
             print >> sys.stderr, "No such package %s to remove" %(pkg,)
 
     def selectGroup(self, grp, include = pykickstart.parser.GROUP_DEFAULT):
-        yum.YumBase.selectGroup(self, grp)
+        try:
+            yum.YumBase.selectGroup(self, grp)
+        except (yum.Errors.InstallError, yum.Errors.GroupsError), e:
+            raise InstallationError("Failed to find group '%s' : %s" % (grp, e))
         if include == pykickstart.parser.GROUP_REQUIRED:
             map(lambda p: self.deselectPackage(p), grp.default_packages.keys())
         elif include == pykickstart.parser.GROUP_ALL:
@@ -244,10 +245,7 @@ class LiveCDYum(yum.YumBase):
     def runInstall(self):
         (res, resmsg) = self.buildTransaction()
         if res != 2:
-            print "Unable to build transaction"
-            for m in resmsg:
-                print m
-            sys.exit(1)
+            raise InstallationError("Failed to build transaction : %s" % str.join("\n", resmsg))
         
         dlpkgs = map(lambda x: x.po, filter(lambda txmbr: txmbr.ts_state in ("i", "u"), self.tsInfo.getMembers()))
         self.downloadPkgs(dlpkgs)
@@ -439,11 +437,11 @@ class InstallationTarget:
 
     def installPackages(self, packageList, excludePackageList, groupList = []):
         """install packages into target file system"""
-        map(lambda pkg: self.ayum.selectPackage(pkg), packageList)
-        map(lambda grp: self.ayum.selectGroup(grp[0], grp[1]), groupList)
-        map(lambda pkg: self.ayum.deselectPackage(pkg), excludePackageList)
-
         try:
+            map(lambda pkg: self.ayum.selectPackage(pkg), packageList)
+            map(lambda grp: self.ayum.selectGroup(grp[0], grp[1]), groupList)
+            map(lambda pkg: self.ayum.deselectPackage(pkg), excludePackageList)
+
             self.ayum.runInstall()
         finally:
             self.ayum.closeRpmDB()
