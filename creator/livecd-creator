@@ -268,9 +268,41 @@ def get_kernel_version(root):
     return kver
 
 class InstallationTarget:
-    def __init__(self):
+    def __init__(self, repos, packages, epackages, groups, fs_label, skip_compression):
         self.ayum = LiveCDYum()
+        self.repos = repos
+        self.packages = packages
+        self.epackages = epackages
+        self.groups = groups
+        self.fs_label = fs_label
+        self.skip_compression = skip_compression
+
+        self.build_dir = None
+        self.instloop = None
+        self.bindmounts = []
+        self.ksparser = None
         
+    def parse(self, kscfg):
+        ksversion = pykickstart.version.makeVersion()
+        self.ksparser = pykickstart.parser.KickstartParser(ksversion)
+        if kscfg:
+            self.ksparser.readKickstart(kscfg)
+
+            for repo in self.ksparser.handler.repo.repoList:
+                already_given = False
+                for cmd_name, cmd_url in self.repos:
+                    if cmd_name == repo.name:
+                        already_given = True
+                        break
+
+                if not already_given:
+                    self.repos.append( (repo.name, repo.baseurl) )
+
+            self.packages.extend(self.ksparser.handler.packages.packageList)
+            self.groups.extend(map(lambda g: (g.name, g.include),
+                                   self.ksparser.handler.packages.groupList))
+            self.epackages.extend(self.ksparser.handler.packages.excludedList)
+
     def base_on_iso(self, base_on):
         """helper function to extract ext3 file system from a live CD ISO"""
 
@@ -299,13 +331,8 @@ class InstallationTarget:
         return success
 
 
-    def setup(self, image_size, fs_label, base_on):
+    def setup(self, image_size, base_on = None):
         """setup target ext3 file system in preparation for an install"""
-
-        # global variables needed
-        self.fs_label = fs_label
-        self.instloop = None
-        self.bindmounts = []
 
         # setup temporary build dirs
         try:
@@ -569,11 +596,11 @@ class InstallationTarget:
 
     def relabelSystem(self):
         # finally relabel all files
-        instroot = "%s/install_root" %(self.build_dir,)
-        if os.path.exists("%s/sbin/restorecon" %(instroot,)):
-            subprocess.call(["/sbin/restorecon", "-v", "-r", "/"],
-                            preexec_fn=self.run_in_root)
-        return True
+        if self.ksparser.handler.selinux.selinux:
+            instroot = "%s/install_root" %(self.build_dir,)
+            if os.path.exists("%s/sbin/restorecon" %(instroot,)):
+                subprocess.call(["/sbin/restorecon", "-v", "-r", "/"],
+                                preexec_fn=self.run_in_root)
 
     def launchShell(self):
         print "Launching shell. Exit to continue."
@@ -644,13 +671,21 @@ label runfromram
         
         # TODO: enable external entitity to partipate in adding boot entries
 
+    def install(self):
+        for (name, url) in self.repos:
+            self.ayum.addRepository(name, url)
+
+        if not self.installPackages(self.packages, self.epackages, self.groups):
+            self.teardown()
+            sys.exit(1)
+
+        self.configureSystem(self.ksparser)
+        self.relabelSystem()
+        self.createInitramfs()
+        self.configureBootloader()
+
     def createIso(self, filename):
         """write out the live CD ISO"""
-
-        # ship the ext3 image if there is no compressed image (happens during --skip-compression)
-        if not os.path.exists("%s/out/squashfs.img" %(self.build_dir,)):
-            shutil.move("%s/data/os.img" %(self.build_dir,), "%s/out/ext3fs.img" %(self.build_dir,))
-        
         subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(filename,),
                          "-b", "isolinux/isolinux.bin",
                          "-c", "isolinux/boot.cat",
@@ -660,11 +695,19 @@ label runfromram
 
     def createSquashFS(self):
         """create compressed squashfs file system"""
-        # FIXME: mksquashfs segfaults if PWD isn't set in the environment
-        subprocess.call(["/sbin/mksquashfs", "os.img", "sysroot",
-                         "../out/squashfs.img"],
-                        cwd="%s/data" %(self.build_dir,),
-                        env={"PWD": "%s/data" %(self.build_dir,)})
+        if not self.skip_compression:
+            # FIXME: mksquashfs segfaults if PWD isn't set in the environment
+            subprocess.call(["/sbin/mksquashfs", "os.img", "sysroot",
+                             "../out/squashfs.img"],
+                            cwd="%s/data" %(self.build_dir,),
+                            env={"PWD": "%s/data" %(self.build_dir,)})
+        else:
+            shutil.move("%s/data/os.img" %(self.build_dir,),
+                        "%s/out/ext3fs.img" %(self.build_dir,))
+
+    def package(self):
+        self.createSquashFS()
+        self.createIso(self.fs_label)
 
 def usage():
     print """
@@ -770,56 +813,28 @@ def main():
         print "Unknown option %s"%o
         sys.exit(2)
 
-    ksversion = pykickstart.version.makeVersion()
-    ksparser = pykickstart.parser.KickstartParser(ksversion)
-    if not kscfg:
-        if len(packages) == 0:
-            print "No packages specified."
-            print ""
-            usage()
-            sys.exit(1)
+    if not kscfg and not (packages or groups):
+        print "No packages or groups specified."
+        print ""
+        usage()
+        sys.exit(1)
 
-        if len(repos) == 0:
-            print "No repositories specified."
-            print ""
-            usage()
-            sys.exit(1)
-    else:
-        ksparser.readKickstart(kscfg)
+    if not kscfg and not repos:
+        print "No repositories specified."
+        print ""
+        usage()
+        sys.exit(1)
 
-        for repo in ksparser.handler.repo.repoList:
-            given_on_cmd_line = False
-            for cmd_name, cmd_url in repos:
-                if cmd_name == repo.name:
-                    given_on_cmd_line = True
-                    break
+    target = InstallationTarget(repos, packages, epackages, groups, fs_label, skip_compression)
 
-            if not given_on_cmd_line:
-                repos.append( (repo.name, repo.baseurl) )
+    target.parse(kscfg)
 
-        packages.extend(ksparser.handler.packages.packageList)
-        groups.extend(map(lambda g: (g.name, g.include),
-                          ksparser.handler.packages.groupList))
-        epackages.extend(ksparser.handler.packages.excludedList)
-
-    target = InstallationTarget()
-
-    if not target.setup(uncompressed_size, fs_label, base_on):
+    if not target.setup(uncompressed_size, base_on):
         print "Cannot setup installation target. Aborting."
         sys.exit(1)
 
     try:
-        for (n, u) in repos:
-            target.addRepository(n, u)
-
-        if not target.installPackages(packages, epackages, groups):
-            target.teardown()
-            sys.exit(1)
-        target.configureSystem(ksparser)
-        target.createInitramfs()
-        if ksparser.handler.selinux.selinux:
-            target.relabelSystem()
-        target.configureBootloader()
+        target.install()
     except SystemExit:
         sys.exit(1)
     except:
@@ -833,9 +848,7 @@ def main():
         target.launchShell()
 
     target.unmount()
-    if not skip_compression:
-        target.createSquashFS()
-    target.createIso(fs_label)
+    target.package()
     target.teardown()
 
 if __name__ == "__main__":
