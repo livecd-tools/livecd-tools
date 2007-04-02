@@ -29,6 +29,10 @@ import yum
 import pykickstart.parser
 import pykickstart.version
 
+class MountError(Exception):
+    def __init__(self, msg):
+        Exception.__init__(self, msg)
+
 class InstallationError(Exception):
     def __init__(self, msg):
         Exception.__init__(self, msg)
@@ -38,22 +42,21 @@ class BindChrootMount:
     def __init__(self, src, chroot, dest = None):
         self.src = src
         self.root = chroot
-        if dest:
-            self.dest = dest
-        else:
-            self.dest = src
+
+        if not dest:
+            dest = src
+        self.dest = self.root + "/" + dest
 
         self.mounted = False
 
     def mount(self):
         if not self.mounted:
-            if not os.path.exists("%s/%s" %(self.root, self.dest)):
-                os.makedirs("%s/%s" %(self.root, self.dest))
-            rc = subprocess.call(["/bin/mount", "--bind", self.src,
-                                  "%s/%s" %(self.root, self.dest)])
-            if rc == 0:
-                self.mounted = True
-        return self.mounted
+            if not os.path.exists(self.dest):
+                os.makedirs(self.dest)
+            rc = subprocess.call(["/bin/mount", "--bind", self.src, self.dest])
+            if rc != 0:
+                raise MountError("Bind-mounting '%s' to '%s' failed" % (self.src, self.dest))
+            self.mounted = True
 
     def umount(self):
         if self.mounted:
@@ -70,42 +73,38 @@ class LoopbackMount:
 
         self.mounted = False
         self.losetup = False
+        self.rmdir   = False
         self.loopdev = None
 
-    def cleanup(self, rmdir = True):
+    def cleanup(self):
         self.umount()
         self.lounsetup()
-        if rmdir:
-            try:
-                os.rmdir(self.mountdir)
-            except OSError, e:
-                pass
 
     def umount(self):
         if self.mounted:
             rc = subprocess.call(["/bin/umount", self.mountdir])
             self.mounted = False
 
+        if self.rmdir:
+            try:
+                os.rmdir(self.mountdir)
+            except OSError, e:
+                pass
+            self.rmdir = False
+
     def lounsetup(self):
-        if self.losetup and self.loopdev:
+        if self.losetup:
             rc = subprocess.call(["/sbin/losetup", "-d", self.loopdev])
             self.losetup = False
             self.loopdev = None
 
-    def setup(self):
-        if not os.path.exists(self.mountdir):
-            os.makedirs(self.mountdir)
-        if self.loopsetup():
-            if self.mount():
-                return True
-        return False
-
     def loopsetup(self):
         if self.losetup:
-            return self.losetup
+            return
+
         rc = subprocess.call(["/sbin/losetup", "-f", self.lofile])
         if rc != 0:
-            return self.losetup
+            raise MountError("Failed to allocate loop device for '%s'" % self.lofile)
 
         # succeeded; figure out which loopdevice we're using
         buf = subprocess.Popen(["/sbin/losetup", "-a"],
@@ -119,32 +118,40 @@ class LoopbackMount:
                 self.loopdev = fields[0][:-1]
                 break
 
-        if self.loopdev:
-            self.losetup = True
-        return self.losetup
+        if not self.loopdev:
+            raise MountError("Failed to find loop device associated with '%s' from '/sbin/losetup -a'" % self.lofile)
+
+        self.losetup = True
 
     def mount(self):
-        if self.mounted or not self.loopdev:
-            return self.mounted
+        if self.mounted:
+            return
+
+        self.loopsetup()
+
+        if not os.path.isdir(self.mountdir):
+            os.makedirs(self.mountdir)
+            self.rmdir = True
+
         args = [ "/bin/mount", self.loopdev, self.mountdir ]
         if self.fstype:
             args.extend(["-t", self.fstype])
+
         rc = subprocess.call(args)
-        if rc == 0:
-            self.mounted = True
-        return self.mounted
+        if rc != 0:
+            raise MountError("Failed to mount '%s' to '%s'" % (self.loopdev, self.mountdir))
+
+        self.mounted = True
 
 class SparseExt3LoopbackMount(LoopbackMount):
-    def __init__(self, lofile, mountdir, size, fslabel = None):
+    def __init__(self, lofile, mountdir, size, fslabel):
         LoopbackMount.__init__(self, lofile, mountdir, fstype = "ext3")
         self.size = size
         self.fslabel = fslabel
-        if not self.fslabel:
-            self.fslabel = "livecd-" + time.strftime("%Y%m%d-%H%M")
 
     def _createSparseFile(self):
         dir = os.path.dirname(self.lofile)
-        if not dir:
+        if not os.path.isdir(dir):
             os.makedirs(dir)
 
         # create the sparse file
@@ -158,14 +165,14 @@ class SparseExt3LoopbackMount(LoopbackMount):
         rc = subprocess.call(["/sbin/mkfs.ext3", "-F", "-L", self.fslabel,
                               "-m", "1", self.lofile])
         if rc != 0:
-            raise OSError, "Error creating filesystem: %d" %(rc,)
+            raise MountError("Error creating ext3 filesystem")
         rc = subprocess.call(["/sbin/tune2fs", "-c0", "-i0", "-Odir_index",
                               "-ouser_xattr,acl", self.lofile])
 
-    def setup(self):
+    def mount(self):
         self._createSparseFile()
         self._formatFilesystem()
-        return LoopbackMount.setup(self)
+        return LoopbackMount.mount(self)
 
 class LiveCDYum(yum.YumBase):
     def __init__(self):
@@ -321,14 +328,18 @@ class InstallationTarget:
                                    "squashfs")
 
         try:
-            if not isoloop.setup():
-                raise InstallationError("Failed to loopback mount '%s'" % base_on)
+            try:
+                isoloop.mount()
+            except MountError, e:
+                raise InstallationError("Failed to loopback mount '%s' : %s" % (base_on, e))
 
             if not os.path.exists(squashloop.lofile):
                 raise InstallationError("'%s' is not a valid live CD ISO : squashfs.img doesn't exist" % base_on)
 
-            if not squashloop.setup():
-                raise InstallationError("Failed to loopback mount squashfs.img from '%s'" % base_on)
+            try:
+                squashloop.mount()
+            except MountError, e:
+                raise InstallationError("Failed to loopback mount squashfs.img from '%s' : %s" % (base_on, e))
 
             os_image = self.build_dir + "/base_on_squashfs/os.img"
 
@@ -376,11 +387,14 @@ class InstallationTarget:
                                                     %(self.build_dir,),
                                                     "%s/install_root"
                                                     %(self.build_dir,),
-                                                    image_size)
+                                                    image_size,
+                                                    self.fs_label)
             
 
-        if not self.instloop.setup():
-            raise InstallationError("Failed to loopback mount '%s'" % self.instloop.lofile)
+        try:
+            self.instloop.mount()
+        except MountError, e:
+            raise InstallationError("Failed to loopback mount '%s' : %s" % (self.instloop.lofile, e))
 
         if not base_on:
             # create a few directories needed if it's a new image
@@ -393,12 +407,7 @@ class InstallationTarget:
         for (f, dest) in [("/sys", None), ("/proc", None), ("/dev", None),
                           ("/dev/pts", None), ("/selinux", None),
                           (self.build_dir + "/yum-cache", "/var/cache/yum")]:
-            b = BindChrootMount(f, self.build_dir + "/install_root", dest)
-
-            if not b.mount():
-                raise InstallationError("Cannot mount special file system '%s'" % f)
-
-            self.bindmounts.append(b)
+            self.bindmounts.append(BindChrootMount(f, self.build_dir + "/install_root", dest))
 
         # make sure /etc/mtab is current inside install_root
         os.symlink("../proc/mounts", self.build_dir + "/install_root/etc/mtab")
