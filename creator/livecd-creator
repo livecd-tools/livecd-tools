@@ -451,8 +451,7 @@ class InstallationTarget:
     def installPackages(self, packageList, excludePackageList, groupList = []):
         """install packages into target file system"""
         map(lambda pkg: self.ayum.selectPackage(pkg), packageList)
-        for (grp, inc) in groupList:
-            self.ayum.selectGroup(grp, inc)
+        map(lambda grp: self.ayum.selectGroup(grp[0], grp[1]), groupList)
         map(lambda pkg: self.ayum.deselectPackage(pkg), excludePackageList)
 
         try:
