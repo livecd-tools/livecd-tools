@@ -673,8 +673,8 @@ label runfromram
         self.createSquashFS()
         self.createIso()
 
-def usage():
-    print """
+def usage(out):
+    print >> out, """
 usage: livecd-creator [--help] 
                       [--config=<path-to-kickstart-file> | --repo=<name>,<url> --package=<p>]
                       [--repo=<name1>,<url1>] [--repo=<name2>,<url2> ...]
@@ -708,97 +708,118 @@ usage: livecd-creator [--help]
                    --repo=a-extras-dev,file:///home/user/extras/RPMS
 """
 
-def main():
+class Usage(Exception):
+    def __init__(self, msg = None, no_error = False):
+        Exception.__init__(self, msg, no_error)
 
-    repos = []
-    packages = []
-    groups = []
-    epackages = []
-    fs_label = "livecd-" + time.strftime("%Y%m%d-%H%M")
-    base_on = None
-    kscfg = None
-    skip_compression = False
-    uncompressed_size = 3072
-    give_shell = False
+class Options:
+    def __init__(self):
+        self.repos = []
+        self.packages = []
+        self.groups = []
+        self.epackages = []
+        self.fs_label = "livecd-" + time.strftime("%Y%m%d-%H%M")
+        self.base_on = None
+        self.kscfg = None
+        self.skip_compression = False
+        self.uncompressed_size = 3072
+        self.give_shell = False
 
+def parse_options(args):
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hr:b:p:e:f:c:su:l",
+        opts, args = getopt.getopt(args, "hr:b:p:e:f:c:su:l",
                                    ["help", "repo=", "base-on=", "package=",
                                     "exclude-package=", "fslabel=", "config=",
                                     "skip-compression", "uncompressed-size=",
                                     "shell"])
-    except getopt.GetoptError:
-        usage()
-        sys.exit(2)
-    output = None
-    verbose = False
+    except getopt.GetoptError, msg:
+        raise Usage(msg)
+
+    options = Options()
+
     for o, a in opts:
         if o in ("-h", "--help"):
-            usage()
-            sys.exit(0)
+            raise Usage(no_error = True)
         if o in ("-l", "--shell"):
-            give_shell = True
+            options.give_shell = True
             continue
         if o in ("-s", "--skip-compression"):
-            skip_compression = True
+            options.skip_compression = True
             continue
         if o in ("-u", "--uncompressed-size"):
-            uncompressed_size = int(a)
+            options.uncompressed_size = int(a)
             continue
         if o in ("-c", "--config"):
-            kscfg = a
+            options.kscfg = a
+            if not os.path.isfile(options.kscfg):
+                raise Usage("Kickstart config '%s' does not exist" % options.kscfg)
             continue
         if o in ("-r", "--repo"):
             (name, url) = a.split(",")
-            for (n, u) in repos:
+            for (n, u) in options.repos:
                 if n == name:
-                    print "Repo name '%s' is already in use"%n
-                    sys.exit(2)
-            repos.append((name, url))
+                    raise Usage("Repo name '%s' is already in use" % n)
+            options.repos.append((name, url))
             continue
         if o in ("-p", "--package"):
             if a.startswith("@"):
-                groups.append((a[1:], pykickstart.parser.GROUP_DEFAULT))
+                options.groups.append((a[1:], pykickstart.parser.GROUP_DEFAULT))
             else:
-                packages.append(a)
+                options.packages.append(a)
             continue
         if o in ("-e", "--exclude-package"):
-            epackages.append(a)
+            options.epackages.append(a)
             continue
         if o in ("-f", "--fslabel"):
-            fs_label = a
-            if len(fs_label) > 32:
-                print "CD labels are limited to 32 characters"
-                sys.exit(2)
+            options.fs_label = a
+            if len(options.fs_label) > 32:
+                raise Usage("CD labels are limited to 32 characters")
             continue
         if o in ("-b", "--base-on"):
-            base_on = a
+            options.base_on = a
+            if not os.path.isfile(options.base_on):
+                raise Usage("Live CD ISO '%s' does not exist" % options.base_on)
             continue
-        print "Unknown option %s"%o
-        sys.exit(2)
+        raise Usage("Unknown option %s" % o)
 
-    if not kscfg and not (packages or groups):
-        print "No packages or groups specified."
-        print ""
-        usage()
-        sys.exit(1)
+    if not options.kscfg and not (options.packages or options.groups):
+        raise Usage("No packages or groups specified")
 
-    if not kscfg and not repos:
-        print "No repositories specified."
-        print ""
-        usage()
-        sys.exit(1)
+    if not options.kscfg and not options.repos:
+        raise Usage("No repositories specified")
 
-    target = InstallationTarget(repos, packages, epackages, groups, fs_label, skip_compression)
+    return options
+
+def main():
+    try:
+        options = parse_options(sys.argv[1:])
+    except Usage, (msg, no_error):
+        if no_error:
+            out = sys.stdout
+            ret = 0
+        else:
+            out = sys.stderr
+            ret = 2
+        if msg:
+            print >> out, msg
+        usage(out)
+        return ret
+
+    target = InstallationTarget(options.repos,
+                                options.packages,
+                                options.epackages,
+                                options.groups,
+                                options.fs_label,
+                                options.skip_compression)
 
     try:
-        target.parse(kscfg)
+        target.parse(options.kscfg)
 
-        target.setup(uncompressed_size, base_on)
+        target.setup(options.uncompressed_size, options.base_on)
 
         target.install()
 
-        if give_shell:
+        if options.give_shell:
             print "Launching shell. Exit to continue."
             print "----------------------------------"
             target.launchShell()
@@ -808,9 +829,11 @@ def main():
         target.package()
     except InstallationError, e:
         print >> sys.stderr, "Error creating Live CD : %s" % e
-        sys.exit(1)
+        return 1
     finally:
         target.teardown()
 
+    return 0
+
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
