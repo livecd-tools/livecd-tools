@@ -388,8 +388,10 @@ class InstallationTarget:
                 return False
 
         # bind mount system directories into install_root/
-        for f in ["/sys", "/proc", "/dev", "/dev/pts", "/selinux"]:
-            b = BindChrootMount(f, "%s/install_root" %(self.build_dir,))
+        for (f, dest) in [("/sys", None), ("/proc", None), ("/dev", None),
+                          ("/dev/pts", None), ("/selinux", None),
+                          (self.build_dir + "/yum-cache", "/var/cache/yum")]:
+            b = BindChrootMount(f, self.build_dir + "/install_root", dest)
             if b.mount():
                 self.bindmounts.append(b)
             else:
@@ -413,16 +415,6 @@ class InstallationTarget:
         fstab.write("proc                    /proc                   proc    defaults        0 0\n")
         fstab.write("sysfs                   /sys                    sysfs   defaults        0 0\n")
         fstab.close()
-
-        b = BindChrootMount("%s/yum-cache" %(self.build_dir,),
-                            "%s/install_root" %(self.build_dir,),
-                            "/var/cache/yum")
-        if b.mount():
-            self.bindmounts.append(b)
-        else:
-            print "Cannot bind mount /var/cache/yum"
-            self.teardown()
-            return False
 
         self.ayum.setup("%s/install_root" %(self.build_dir,))
         return True
