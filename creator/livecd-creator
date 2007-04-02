@@ -684,14 +684,14 @@ label runfromram
         self.createInitramfs()
         self.configureBootloader()
 
-    def createIso(self, filename):
+    def createIso(self):
         """write out the live CD ISO"""
-        subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(filename,),
+        subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(self.fs_label,),
                          "-b", "isolinux/isolinux.bin",
                          "-c", "isolinux/boot.cat",
                          "-no-emul-boot", "-boot-load-size", "4",
                          "-boot-info-table", "-J", "-r", "-hide-rr-moved",
-                         "-V", "%s" %(filename,), "%s/out" %(self.build_dir)])
+                         "-V", "%s" %(self.fs_label,), "%s/out" %(self.build_dir)])
 
     def createSquashFS(self):
         """create compressed squashfs file system"""
@@ -707,7 +707,7 @@ label runfromram
 
     def package(self):
         self.createSquashFS()
-        self.createIso(self.fs_label)
+        self.createIso()
 
 def usage():
     print """
