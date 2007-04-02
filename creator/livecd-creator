@@ -277,33 +277,28 @@ class InstallationTarget:
         """helper function to extract ext3 file system from a live CD ISO"""
 
         isoloop = LoopbackMount(base_on, "%s/base_on_iso" %(self.build_dir,))
-        if not isoloop.setup():
-            isoloop.cleanup()
-            return False
 
         squashloop = LoopbackMount("%s/squashfs.img" %(isoloop.mountdir,),
                                    "%s/base_on_squashfs" %(self.build_dir,),
                                    "squashfs")
-        if not squashloop.setup():
-            squashloop.cleanup()
-            isoloop.cleanup()
-            return False
 
-        # copy the ext3 fs out
+        success = False
         try:
-            shutil.copyfile("%s/base_on_squashfs/os.img" %(self.build_dir,),
-                            "%s/data/os.img" %(self.build_dir,))
-        except Exception, e:
-            print "Cannot copy os.img from squashfs from ISO to base on"
-            traceback.print_exc(file=sys.stderr)
+            if isoloop.setup() and squashloop.setup():
+                # copy the ext3 fs out
+                try:
+                    shutil.copyfile("%s/base_on_squashfs/os.img" %(self.build_dir,),
+                                    "%s/data/os.img" %(self.build_dir,))
+                    success = True
+                except Exception, e:
+                    print "Cannot copy os.img from squashfs from ISO to base on"
+                    traceback.print_exc(file=sys.stderr)
+        finally:
+            # unmount and tear down the mount points and loop devices used
             squashloop.cleanup()
             isoloop.cleanup()
-            return False
 
-        # unmount and tear down the mount points and loop devices used
-        squashloop.cleanup()
-        isoloop.cleanup()
-        return True
+        return success
 
 
     def setup(self, image_size, fs_label, base_on):
