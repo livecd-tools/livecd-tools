@@ -19,6 +19,7 @@ import getopt
 import os
 import os.path
 import sys
+import errno
 import tempfile
 import time
 import traceback
@@ -543,10 +544,13 @@ class InstallationTarget:
             os.close(fd)
             os.chmod(path, 0700)
 
-            subprocess.call([s.interp, "/tmp/%s" %(os.path.basename(path),)],
-                            preexec_fn = self.run_in_root)
-            os.unlink(path)
-            
+            try:
+                subprocess.call([s.interp, "/tmp/%s" %(os.path.basename(path),)],
+                                preexec_fn = self.run_in_root)
+            except OSError, (err, msg):
+                raise InstallationError("Failed to execute %%post script with '%s' : %s" % (s.interp, msg))
+            finally:
+                os.unlink(path)
 
     def get_kernel_version(self):
         #
