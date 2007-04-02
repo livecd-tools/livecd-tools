@@ -265,12 +265,6 @@ class LiveCDYum(yum.YumBase):
         cb.filelog = False
         return self.runTransaction(cb)
 
-def get_kernel_version(root):
-    # FIXME: this doesn't handle multiple kernels being installed
-    kdir = os.listdir("%s/install_root/lib/modules" %(root,))
-    kver = os.path.basename(kdir[0])
-    return kver
-
 class InstallationTarget:
     def __init__(self, repos, packages, epackages, groups, fs_label, skip_compression):
         self.ayum = LiveCDYum()
@@ -556,8 +550,27 @@ class InstallationTarget:
             os.unlink(path)
             
 
+    def get_kernel_version(self):
+        #
+        # FIXME: this doesn't handle multiple kernels - we should list
+        #        them all in the isolinux menu
+        #
+        kernels = []
+        modules_dir = "%s/install_root/lib/modules" % self.build_dir
+
+        if os.path.isdir(modules_dir):
+            kernels = os.listdir(modules_dir)
+
+        if not kernels:
+            raise InstallationError("No kernels installed: /lib/modules is empty")
+
+        return kernels[0]
+
     def createInitramfs(self):
         # Create initramfs
+        if not os.path.isfile("/usr/lib/livecd-creator/mayflower"):
+            raise InstallationError("livecd-creator not correctly installed : "+
+                                    "/usr/lib/livecd-creator/mayflower not found")
         shutil.copy("/usr/lib/livecd-creator/mayflower",
                         "%s/install_root/sbin/mayflower" %(self.build_dir,))
         # modules needed for booting (this is butt ugly and we need to retrieve this from elsewhere, e.g. the kernel)
@@ -570,7 +583,7 @@ class InstallationTarget:
         mayflowerconf.close()
 
         subprocess.call(["/sbin/mayflower", "-f", "/boot/livecd-initramfs.img",
-                         get_kernel_version(self.build_dir)],
+                        self.get_kernel_version()],
                         preexec_fn=self.run_in_root)
         for f in ("/sbin/mayflower", "/etc/mayflower.conf"):
             os.unlink("%s/install_root/%s" %(self.build_dir, f))
@@ -597,7 +610,7 @@ class InstallationTarget:
         #  - error handling
         #
         shutil.copyfile("%s/install_root/boot/vmlinuz-%s"
-                        %(self.build_dir, get_kernel_version(self.build_dir,)),
+                        %(self.build_dir, self.get_kernel_version()),
                         "%s/out/isolinux/vmlinuz" %(self.build_dir,))
 
         shutil.copyfile("%s/install_root/boot/livecd-initramfs.img"
@@ -606,10 +619,13 @@ class InstallationTarget:
         os.unlink("%s/install_root/boot/livecd-initramfs.img"
                   %(self.build_dir,))
 
-        shutil.copy("%s/install_root/usr/lib/syslinux/isolinux.bin" %(self.build_dir,),
-                    "%s/out/isolinux/isolinux.bin" %(self.build_dir,))
-        shutil.copy("%s/install_root/usr/lib/syslinux/vesamenu.c32" %(self.build_dir,),
-                    "%s/out/isolinux/vesamenu.c32" %(self.build_dir,))
+        for p in ["isolinux.bin", "vesamenu.c32"]:
+            path = "%s/install_root/usr/lib/syslinux/%s" % (self.build_dir, p)
+
+            if not os.path.isfile(path):
+                raise InstallationError("syslinux not installed : %s not found" % path)
+
+            shutil.copy(path, "%s/out/isolinux/%s" % (self.build_dir, p))
 
         if os.path.exists("%s/install_root/usr/lib/anaconda-runtime/syslinux-vesa-splash.jpg" %(self.build_dir,)):
             shutil.copy("%s/install_root/usr/lib/anaconda-runtime/syslinux-vesa-splash.jpg" %(self.build_dir,),
