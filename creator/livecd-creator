@@ -28,6 +28,10 @@ import yum
 import pykickstart.parser
 import pykickstart.version
 
+class InstallationError(Exception):
+    def __init__(self, msg):
+        Exception.__init__(self, msg)
+
 class BindChrootMount:
     """Represents a bind mount of a directory into a chroot."""
     def __init__(self, src, chroot, dest = None):
@@ -312,24 +316,26 @@ class InstallationTarget:
                                    "%s/base_on_squashfs" %(self.build_dir,),
                                    "squashfs")
 
-        success = False
         try:
-            if isoloop.setup() and squashloop.setup():
-                # copy the ext3 fs out
-                try:
-                    shutil.copyfile("%s/base_on_squashfs/os.img" %(self.build_dir,),
-                                    "%s/data/os.img" %(self.build_dir,))
-                    success = True
-                except Exception, e:
-                    print "Cannot copy os.img from squashfs from ISO to base on"
-                    traceback.print_exc(file=sys.stderr)
+            if not isoloop.setup():
+                raise InstallationError("Failed to loopback mount '%s'" % base_on)
+
+            if not os.path.exists(squashloop.lofile):
+                raise InstallationError("'%s' is not a valid live CD ISO : squashfs.img doesn't exist" % base_on)
+
+            if not squashloop.setup():
+                raise InstallationError("Failed to loopback mount squashfs.img from '%s'" % base_on)
+
+            os_image = self.build_dir + "/base_on_squashfs/os.img"
+
+            if not os.path.exists(os_image):
+                raise InstallationError("'%s' is not a valid live CD ISO : os.img doesn't exist" % base_on)
+
+            shutil.copyfile(os_image, self.build_dir + "/data/os.img")
         finally:
             # unmount and tear down the mount points and loop devices used
             squashloop.cleanup()
             isoloop.cleanup()
-
-        return success
-
 
     def write_fstab(self):
         fstab = open(self.build_dir + "/install_root/etc/fstab", "w")
@@ -346,28 +352,19 @@ class InstallationTarget:
         # setup temporary build dirs
         try:
             self.build_dir = tempfile.mkdtemp(dir="/var/tmp", prefix="livecd-creator-")
-        except OSError, e:
-            print "Cannot create build directory in /var/tmp: %s" % e
-            return False
+        except OSError, (err, msg):
+            raise InstallationError("Failed create build directory in /var/tmp: %s" % msg)
 
-        try:
-            os.mkdir(self.build_dir + "/out")
-            os.mkdir(self.build_dir + "/out/isolinux")
-            os.mkdir(self.build_dir + "/out/sysroot")
-            os.mkdir(self.build_dir + "/data")
-            os.mkdir(self.build_dir + "/data/sysroot")            
-            os.mkdir(self.build_dir + "/install_root")
-            os.mkdir(self.build_dir + "/yum-cache")
-        except OSError:
-            print "Cannot create directory"
-            self.teardown()
-            return False
+        os.makedirs(self.build_dir + "/out/isolinux")
+        os.makedirs(self.build_dir + "/out/sysroot")
+        os.makedirs(self.build_dir + "/data/sysroot")
+        os.makedirs(self.build_dir + "/install_root")
+        os.makedirs(self.build_dir + "/yum-cache")
 
         if base_on:
             # get backing ext3 image if we're based this build on an existing live CD ISO
-            if not self.base_on_iso(base_on):
-                self.teardown()
-                return False
+            self.base_on_iso(base_on)
+
             self.instloop = LoopbackMount("%s/data/os.img" %(self.build_dir,),
                                           "%s/install_root" %(self.build_dir,))
         else:
@@ -379,48 +376,32 @@ class InstallationTarget:
             
 
         if not self.instloop.setup():
-            self.teardown()
-            return False
+            raise InstallationError("Failed to loopback mount '%s'" % self.instloop.lofile)
 
         if not base_on:
             # create a few directories needed if it's a new image
-            try:
-                os.mkdir(self.build_dir + "/install_root/etc")
-                os.mkdir(self.build_dir + "/install_root/boot")
-                os.mkdir(self.build_dir + "/install_root/var")
-                os.mkdir(self.build_dir + "/install_root/var/log")
-                os.mkdir(self.build_dir + "/install_root/var/cache")
-                os.mkdir(self.build_dir + "/install_root/var/cache/yum")
-            except OSError:
-                print "Cannot create directory"
-                self.teardown()
-                return False
+            os.makedirs(self.build_dir + "/install_root/etc")
+            os.makedirs(self.build_dir + "/install_root/boot")
+            os.makedirs(self.build_dir + "/install_root/var/log")
+            os.makedirs(self.build_dir + "/install_root/var/cache/yum")
 
         # bind mount system directories into install_root/
         for (f, dest) in [("/sys", None), ("/proc", None), ("/dev", None),
                           ("/dev/pts", None), ("/selinux", None),
                           (self.build_dir + "/yum-cache", "/var/cache/yum")]:
             b = BindChrootMount(f, self.build_dir + "/install_root", dest)
-            if b.mount():
-                self.bindmounts.append(b)
-            else:
-                print "Cannot mount special file system %s"%f
-                self.teardown()
-                return False
+
+            if not b.mount():
+                raise InstallationError("Cannot mount special file system '%s'" % f)
+
+            self.bindmounts.append(b)
 
         # make sure /etc/mtab is current inside install_root
-        try:
-            os.symlink("../proc/mounts", self.build_dir + "/install_root/etc/mtab")
-        except OSError:
-            print "Cannot create symlink %s/etc/mtab -> ../proc/mounts"%(self.build_dir)
-            self.teardown()
-            return False
+        os.symlink("../proc/mounts", self.build_dir + "/install_root/etc/mtab")
 
         self.write_fstab()
 
         self.ayum.setup("%s/install_root" %(self.build_dir,))
-        return True
-
 
     def unmount(self):
         """detaches system bind mounts and install_root for the file system and tears down loop devices used"""
@@ -459,13 +440,8 @@ class InstallationTarget:
 
         try:
             self.ayum.runInstall()
-        except Exception, e:
-            print "Error installing packages"
-            traceback.print_exc(file=sys.stderr)
-            self.ayum.closeRpmDB()            
-            return False
-        self.ayum.closeRpmDB()
-        return True
+        finally:
+            self.ayum.closeRpmDB()
 
     def configureSystem(self):
         instroot = "%s/install_root" %(self.build_dir,)
@@ -597,10 +573,7 @@ class InstallationTarget:
                                 preexec_fn=self.run_in_root)
 
     def launchShell(self):
-        print "Launching shell. Exit to continue."
-        print "----------------------------------"
         subprocess.call(["/bin/bash"], preexec_fn=self.run_in_root)
-        return True
 
     def configureBootloader(self):
         """configure the boot loader"""
@@ -669,10 +642,7 @@ label runfromram
         for (name, url) in self.repos:
             self.ayum.addRepository(name, url)
 
-        if not self.installPackages(self.packages, self.epackages, self.groups):
-            self.teardown()
-            sys.exit(1)
-
+        self.installPackages(self.packages, self.epackages, self.groups)
         self.configureSystem()
         self.relabelSystem()
         self.createInitramfs()
@@ -821,29 +791,26 @@ def main():
 
     target = InstallationTarget(repos, packages, epackages, groups, fs_label, skip_compression)
 
-    target.parse(kscfg)
-
-    if not target.setup(uncompressed_size, base_on):
-        print "Cannot setup installation target. Aborting."
-        sys.exit(1)
-
     try:
+        target.parse(kscfg)
+
+        target.setup(uncompressed_size, base_on)
+
         target.install()
-    except SystemExit:
+
+        if give_shell:
+            print "Launching shell. Exit to continue."
+            print "----------------------------------"
+            target.launchShell()
+
+        target.unmount()
+
+        target.package()
+    except InstallationError, e:
+        print >> sys.stderr, "Error creating Live CD : %s" % e
         sys.exit(1)
-    except:
-        print "\n\nERROR during installation..."
-        traceback.print_exc(file=sys.stderr)
+    finally:
         target.teardown()
-        sys.exit(1)
-
-    
-    if give_shell:
-        target.launchShell()
-
-    target.unmount()
-    target.package()
-    target.teardown()
 
 if __name__ == "__main__":
     main()
