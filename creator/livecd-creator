@@ -403,41 +403,25 @@ class InstallationTarget:
 
     def unmount(self):
         """detaches system bind mounts and install_root for the file system and tears down loop devices used"""
+        shutil.rmtree(self.build_dir + "/yum-cache", ignore_errors=True)
         
         try:
             os.unlink(self.build_dir + "/install_root/etc/mtab")
         except OSError:
             pass
 
-        # TODO: need to handle when unmount fails because of lingering
-        # processes that has open files
-        if self.instloop:
-            self.bindmounts.reverse()
-            for b in self.bindmounts:
-                b.umount()
-            self.instloop.cleanup()
-            try:
-                os.unlink(self.build_dir + "/yum.conf")
-            except OSError:
-                pass
-            shutil.rmtree("%s/yum-cache" %(self.build_dir,), ignore_errors=True)
+        self.bindmounts.reverse()
+        for b in self.bindmounts:
+            b.umount()
 
+        if self.instloop:
+            self.instloop.cleanup()
             self.instloop = None
 
     def teardown(self):
-        """releases all resources and removes all temporary files"""
-
-        # ensure we've detached the install_root
-        self.unmount()
-
-        # this removes all data used in the temporary build directory
-        try:
-            os.unlink(self.build_dir + "/data/os.img")
-            os.rmdir(self.build_dir + "/data")
-        except OSError:
-            pass
-        shutil.rmtree("%s/out" %(self.build_dir,), ignore_errors=True)
-        shutil.rmtree(self.build_dir, ignore_errors=True)
+        if self.build_dir:
+            self.unmount()
+            shutil.rmtree(self.build_dir, ignore_errors = True)
 
     def addRepository(self, name, url):
         """adds a yum repository to temporary yum.conf file used"""
