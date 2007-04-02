@@ -290,7 +290,12 @@ class InstallationTarget:
         ksversion = pykickstart.version.makeVersion()
         self.ksparser = pykickstart.parser.KickstartParser(ksversion)
         if kscfg:
-            self.ksparser.readKickstart(kscfg)
+            try:
+                self.ksparser.readKickstart(kscfg)
+            except IOError, (err, msg):
+                raise InstallationError("Failed to read kickstart file '%s' : %s" % (kscfg, msg))
+            except pykickstart.errors.KickstartError, e:
+                raise InstallationError("Failed to parse kickstart file '%s' : %s" % (kscfg, e))
 
             for repo in self.ksparser.handler.repo.repoList:
                 already_given = False
