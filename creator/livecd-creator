@@ -331,6 +331,15 @@ class InstallationTarget:
         return success
 
 
+    def write_fstab(self):
+        fstab = open(self.build_dir + "/install_root/etc/fstab", "w")
+        fstab.write("/dev/mapper/livecd-rw   /                       ext3    defaults,noatime 0 0\n")
+        fstab.write("devpts                  /dev/pts                devpts  gid=5,mode=620  0 0\n")
+        fstab.write("tmpfs                   /dev/shm                tmpfs   defaults        0 0\n")
+        fstab.write("proc                    /proc                   proc    defaults        0 0\n")
+        fstab.write("sysfs                   /sys                    sysfs   defaults        0 0\n")
+        fstab.close()
+
     def setup(self, image_size, base_on = None):
         """setup target ext3 file system in preparation for an install"""
 
@@ -407,14 +416,7 @@ class InstallationTarget:
             self.teardown()
             return False
 
-        # write an /etc/fstab file
-        fstab = open(self.build_dir + "/install_root/etc/fstab", "w")
-        fstab.write("/dev/mapper/livecd-rw   /                       ext3    defaults,noatime 0 0\n")
-        fstab.write("devpts                  /dev/pts                devpts  gid=5,mode=620  0 0\n")
-        fstab.write("tmpfs                   /dev/shm                tmpfs   defaults        0 0\n")
-        fstab.write("proc                    /proc                   proc    defaults        0 0\n")
-        fstab.write("sysfs                   /sys                    sysfs   defaults        0 0\n")
-        fstab.close()
+        self.write_fstab()
 
         self.ayum.setup("%s/install_root" %(self.build_dir,))
         return True
