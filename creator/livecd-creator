@@ -695,10 +695,10 @@ label runfromram
 def usage():
     print """
 usage: livecd-creator [--help] 
-                      [--config=<path-to-kickstart-file>]
-                      [--repo=<name1>,<url1> ...] [--repo=<name2>,<url2>]
-                      --package=<p1> [--package=<p2> ...]
-                      [--exclude-package=<e1>] --exclude-package=<e2> ...]
+                      [--config=<path-to-kickstart-file> | --repo=<name>,<url> --package=<p>]
+                      [--repo=<name1>,<url1>] [--repo=<name2>,<url2> ...]
+                      [--package=<p1>] [--package=<p2> ...]
+                      [--exclude-package=<e1>] [--exclude-package=<e2> ...]
                       [--base-on=<path-to-iso-file>]
                       [--fslabel=<label>]
                       [--skip-compression]
