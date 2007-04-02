@@ -467,7 +467,7 @@ class InstallationTarget:
         self.ayum.closeRpmDB()
         return True
 
-    def configureSystem(self, ksparser):
+    def configureSystem(self):
         instroot = "%s/install_root" %(self.build_dir,)
         
         # FIXME: this is a bit ugly, but with the current pykickstart
@@ -475,7 +475,7 @@ class InstallationTarget:
         # be able to do something different, but so it goes
 
         # set up the language
-        lang = ksparser.handler.lang.lang or "en_US.UTF-8"
+        lang = self.ksparser.handler.lang.lang or "en_US.UTF-8"
         f = open("%s/etc/sysconfig/i18n" %(instroot,), "w+")
         f.write("LANG=\"%s\"\n" %(lang,))
         f.close()
@@ -485,13 +485,13 @@ class InstallationTarget:
         # or do we want to make X be able to do this mapping
         import rhpl.keyboard
         k = rhpl.keyboard.Keyboard()
-        if ksparser.handler.keyboard.keyboard:
-            k.set(ksparser.handler.keyboard.keyboard)
+        if self.ksparser.handler.keyboard.keyboard:
+            k.set(self.ksparser.handler.keyboard.keyboard)
         k.write(instroot)
 
         # next up is timezone
-        tz = ksparser.handler.timezone.timezone or "America/New_York"
-        utc = ksparser.handler.timezone.isUtc
+        tz = self.ksparser.handler.timezone.timezone or "America/New_York"
+        utc = self.ksparser.handler.timezone.isUtc
         f = open("%s/etc/sysconfig/clock" %(instroot,), "w+")
         f.write("ZONE=\"%s\"\n" %(tz,))
         f.write("UTC=%s\n" %(utc,))
@@ -508,14 +508,14 @@ class InstallationTarget:
         f.close()
 
         # do any authconfig bits
-        auth = ksparser.handler.authconfig.authconfig or "--useshadow --enablemd5"
+        auth = self.ksparser.handler.authconfig.authconfig or "--useshadow --enablemd5"
         if os.path.exists("%s/usr/sbin/authconfig" %(instroot,)):
             args = ["/usr/sbin/authconfig", "--update", "--nostart"]
             args.extend(auth.split())
             subprocess.call(args, preexec_fn=self.run_in_root)
 
         # firewall.  FIXME: should handle the rest of the options
-        if ksparser.handler.firewall.enabled and os.path.exists("%s/usr/sbin/lokkit" %(instroot,)):
+        if self.ksparser.handler.firewall.enabled and os.path.exists("%s/usr/sbin/lokkit" %(instroot,)):
             subprocess.call(["/usr/sbin/lokkit", "-f", "--quiet",
                              "--nostart", "--enabled"],
                             preexec_fn=self.run_in_root)
@@ -523,7 +523,7 @@ class InstallationTarget:
         # selinux
         if os.path.exists("%s/usr/sbin/lokkit" %(instroot,)):
             args = ["/usr/sbin/lokkit", "-f", "--quiet", "--nostart"]
-            if ksparser.handler.selinux.selinux:
+            if self.ksparser.handler.selinux.selinux:
                 args.append("--selinux=enforcing")
             else:
                 args.append("--selinux=disabled")
@@ -535,15 +535,15 @@ class InstallationTarget:
 
         # enable/disable services appropriately
         if os.path.exists("%s/sbin/chkconfig" %(instroot,)):
-            for s in ksparser.handler.services.enabled:
+            for s in self.ksparser.handler.services.enabled:
                 subprocess.call(["/sbin/chkconfig", s, "--level", "345", "on"],
                                 preexec_fn=self.run_in_root)
-            for s in ksparser.handler.services.disabled:
+            for s in self.ksparser.handler.services.disabled:
                 subprocess.call(["/sbin/chkconfig", s, "--level", "345", "off"],
                                 preexec_fn=self.run_in_root)
 
         # x by default?
-        if ksparser.handler.xconfig.startX:
+        if self.ksparser.handler.xconfig.startX:
             f = open("%s/etc/inittab" %(instroot,), "rw+")
             buf = f.read()
             buf = buf.replace("id:3:initdefault", "id:5:initdefault")
@@ -553,7 +553,7 @@ class InstallationTarget:
 
         # and now, for arbitrary %post scripts
         for s in filter(lambda s: s.type == pykickstart.parser.KS_SCRIPT_POST,
-                        ksparser.handler.scripts):
+                        self.ksparser.handler.scripts):
             # we can only safely run scripts in the chroot
             if not s.inChroot:
                 print >> sys.stderr, "Not running script outside of chroot"
@@ -673,7 +673,7 @@ label runfromram
             self.teardown()
             sys.exit(1)
 
-        self.configureSystem(self.ksparser)
+        self.configureSystem()
         self.relabelSystem()
         self.createInitramfs()
         self.configureBootloader()
