@@ -312,6 +312,12 @@ class InstallationTarget:
                                    self.ksparser.handler.packages.groupList))
             self.epackages.extend(self.ksparser.handler.packages.excludedList)
 
+        if not self.packages and not self.groups:
+            raise InstallationError("No packages or groups specified")
+
+        if not self.repos:
+            raise InstallationError("No repositories specified")
+
     def base_on_iso(self, base_on):
         """helper function to extract ext3 file system from a live CD ISO"""
 
