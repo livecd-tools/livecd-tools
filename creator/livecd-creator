@@ -409,6 +409,9 @@ class InstallationTarget:
                           (self.build_dir + "/yum-cache", "/var/cache/yum")]:
             self.bindmounts.append(BindChrootMount(f, self.build_dir + "/install_root", dest))
 
+        for b in self.bindmounts:
+            b.mount()
+
         # make sure /etc/mtab is current inside install_root
         os.symlink("../proc/mounts", self.build_dir + "/install_root/etc/mtab")
 
