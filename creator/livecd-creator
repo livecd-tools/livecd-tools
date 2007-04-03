@@ -272,7 +272,7 @@ class LiveCDYum(yum.YumBase):
         return self.runTransaction(cb)
 
 class InstallationTarget:
-    def __init__(self, repos, packages, epackages, groups, fs_label, skip_compression):
+    def __init__(self, repos, packages, epackages, groups, fs_label, skip_compression, skip_prelink):
         self.ayum = LiveCDYum()
         self.repos = repos
         self.packages = packages
@@ -280,6 +280,7 @@ class InstallationTarget:
         self.groups = groups
         self.fs_label = fs_label
         self.skip_compression = skip_compression
+        self.skip_prelink = skip_prelink
 
         self.build_dir = None
         self.instloop = None
@@ -610,6 +611,14 @@ class InstallationTarget:
                 subprocess.call(["/sbin/restorecon", "-v", "-r", "/"],
                                 preexec_fn=self.run_in_root)
 
+    def prelinkSystem(self):
+        # prelink the system
+        instroot = "%s/install_root" %(self.build_dir,)
+        if os.path.exists("%s/usr/sbin/prelink" %(instroot,)):
+            subprocess.call(["/usr/sbin/prelink", "-mRaN"],
+                            preexec_fn=self.run_in_root)
+        return True
+
     def launchShell(self):
         subprocess.call(["/bin/bash"], preexec_fn=self.run_in_root)
 
@@ -686,6 +695,8 @@ label runfromram
         self.installPackages(self.packages, self.epackages, self.groups)
         self.configureSystem()
         self.relabelSystem()
+        if not self.skip_prelink:
+            self.prelinkSystem()
         self.createInitramfs()
         self.configureBootloader()
 
@@ -763,6 +774,7 @@ class Options:
         self.base_on = None
         self.kscfg = None
         self.skip_compression = False
+        self.skip_prelink = False
         self.uncompressed_size = 3072
         self.give_shell = False
 
@@ -772,7 +784,7 @@ def parse_options(args):
                                    ["help", "repo=", "base-on=", "package=",
                                     "exclude-package=", "fslabel=", "config=",
                                     "skip-compression", "uncompressed-size=",
-                                    "shell"])
+                                    "shell", "no-prelink"])
     except getopt.GetoptError, msg:
         raise Usage(msg)
 
@@ -786,6 +798,9 @@ def parse_options(args):
             continue
         if o in ("-s", "--skip-compression"):
             options.skip_compression = True
+            continue
+        if o in ("--no-prelink",):
+            options.skip_prelink = True
             continue
         if o in ("-u", "--uncompressed-size"):
             options.uncompressed_size = int(a)
@@ -855,7 +870,8 @@ def main():
                                 options.epackages,
                                 options.groups,
                                 options.fs_label,
-                                options.skip_compression)
+                                options.skip_compression,
+                                options.skip_prelink)
 
     try:
         target.parse(options.kscfg)
