@@ -60,8 +60,7 @@ class BindChrootMount:
 
     def umount(self):
         if self.mounted:
-            rc = subprocess.call(["/bin/umount",
-                                  "%s/%s" %(self.root, self.dest)])
+            rc = subprocess.call(["/bin/umount", self.dest])
             self.mounted = False
         
 
