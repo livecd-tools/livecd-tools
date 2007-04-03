@@ -447,6 +447,7 @@ class InstallationTarget:
 
     def run_in_root(self):
         os.chroot("%s/install_root" %(self.build_dir,))
+        os.chdir("/")
 
     def installPackages(self, packageList, excludePackageList, groupList = []):
         """install packages into target file system"""
