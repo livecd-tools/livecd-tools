@@ -1,7 +1,7 @@
 Summary: Tools for building live CD's
 Name: livecd-tools
 Version: 005
-Release: 1%{?dist}
+Release: 3%{?dist}
 License: GPL
 Group: System Environment/Base
 URL: http://git.fedoraproject.org/?p=hosted/livecd
@@ -16,6 +16,7 @@ Requires: squashfs-tools
 Requires: pykickstart >= 0.96
 Requires: syslinux
 BuildArch: noarch
+ExcludeArch: ppc pp64
 
 %description 
 Tools for generating live CD's on Fedora based systems including
@@ -46,6 +47,12 @@ rm -rf $RPM_BUILD_ROOT
 %{_datadir}/livecd-tools/*
 
 %changelog
+* Thu Mar 29 2007 Jeremy Katz <katzj@redhat.com> - 005-3
+- have to use excludearch, not exclusivearch
+
+* Thu Mar 29 2007 Jeremy Katz <katzj@redhat.com> - 005-2
+- exclusivearch since it only works on x86 and x86_64 for now
+
 * Wed Mar 28 2007 Jeremy Katz <katzj@redhat.com> - 005-1
 - some shell quoting fixes
 - allow using UUID or LABEL for the fs label of a usb stick
