@@ -677,7 +677,7 @@ label linux
   append initrd=initrd.img  ro quiet root=CDLABEL=%(label)s rootfstype=iso9660 liveimg
 
 label runfromram
-  menu label %(label)s from RAM
+  menu label %(label)s (run from RAM - requires 1GB+)
   kernel vmlinuz
   append initrd=initrd.img ro quiet root=CDLABEL=%(label)s rootfstype=iso9660 liveimg live_ram
 """ %{"label": self.fs_label, "background" : have_background}
