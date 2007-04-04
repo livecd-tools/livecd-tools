@@ -1,5 +1,5 @@
 
-VERSION = 005
+VERSION = 006
 
 INSTALL = /usr/bin/install -c
 INSTALL_PROGRAM = ${INSTALL}
@@ -19,6 +19,7 @@ install:
 	$(INSTALL_DATA) -D TODO $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)/TODO
 	$(INSTALL_DATA) -D config/livecd-fedora-minimal.ks $(DESTDIR)/usr/share/livecd-tools/livecd-fedora-minimal.ks
 	$(INSTALL_DATA) -D config/livecd-fedora-desktop.ks $(DESTDIR)/usr/share/livecd-tools/livecd-fedora-desktop.ks
+	$(INSTALL_DATA) -D config/livecd-fedora-kde.ks $(DESTDIR)/usr/share/livecd-tools/livecd-fedora-kde.ks
 
 #	$(INSTALL_PROGRAM) -D installer/livecd-installer $(DESTDIR)/usr/libexec/livecd-installer
 #	$(INSTALL_PROGRAM) -D installer/livecd-installer-tui $(DESTDIR)/usr/bin/livecd-installer-tui
@@ -39,7 +40,7 @@ uninstall:
 #	rm -f $(DESTDIR)/etc/livecd/99-livecd-installer.conf
 
 dist : all
-	git-tar-tree HEAD livecd-tools-$(VERSION) | bzip2 -9v > livecd-tools-$(VERSION).tar.bz2
+	git-archive --format=tar --prefix=livecd-tools-$(VERSION)/ HEAD | bzip2 -9v > livecd-tools-$(VERSION).tar.bz2
 
 clean:
 	rm -f *~ creator/*~ installer/*~ config/*~

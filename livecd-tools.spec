@@ -1,7 +1,7 @@
 Summary: Tools for building live CD's
 Name: livecd-tools
-Version: 005
-Release: 3%{?dist}
+Version: 006
+Release: 1%{?dist}
 License: GPL
 Group: System Environment/Base
 URL: http://git.fedoraproject.org/?p=hosted/livecd
@@ -14,7 +14,8 @@ Requires: yum >= 3.0.0
 Requires: mkisofs
 Requires: squashfs-tools
 Requires: pykickstart >= 0.96
-Requires: syslinux
+Requires: syslinux >= 3.30
+Requires: dosfstools >= 2.11-8
 BuildArch: noarch
 ExcludeArch: ppc pp64
 
@@ -47,6 +48,13 @@ rm -rf $RPM_BUILD_ROOT
 %{_datadir}/livecd-tools/*
 
 %changelog
+* Wed Apr  4 2007 Jeremy Katz <katzj@redhat.com> - 006-1
+- Many fixes to error handling from Mark McLoughlin
+- Add the KDE config
+- Add support for prelinking
+- Fixes for installing when running from RAM or usb stick
+- Add sanity checking to better ensure that USB stick is bootable
+
 * Thu Mar 29 2007 Jeremy Katz <katzj@redhat.com> - 005-3
 - have to use excludearch, not exclusivearch
 
