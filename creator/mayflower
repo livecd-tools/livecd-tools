@@ -234,8 +234,8 @@ rootfstype=""
 quiet=0
 shell=0
 eshell=0
-livecd_ram=0
-livecd_locale=""
+live_ram=0
+live_locale=""
 
 # Parse kernel commandline options
 #
@@ -259,11 +259,11 @@ for o in \`cat /proc/cmdline\` ; do
     eshell)
         eshell=1
         ;;
-    livecd_ram)
-        livecd_ram=1
+    live_ram)
+        live_ram=1
         ;;
-    livecd_locale=*)
-        livecd_locale=\${o#livecd_locale=}
+    live_locale=*)
+        live_locale=\${o#live_locale=}
         ;;
     esac
 done
@@ -536,19 +536,19 @@ else
 fi
 
 # live cd helper function
-do_livecd_from_loop121() {
+do_live_from_loop121() {
     # create a sparse file for the overlay
     dd if=/dev/null of=/overlay bs=1024 count=1 seek=$((512*1024)) 2> /dev/null
     losetup /dev/loop119 /overlay
 
     # set up the snapshot
-    echo 0 \`blockdev --getsize /dev/loop121\` snapshot /dev/loop121 /dev/loop119 p 8 | dmsetup create livecd-rw
+    echo 0 \`blockdev --getsize /dev/loop121\` snapshot /dev/loop121 /dev/loop119 p 8 | dmsetup create live-rw
 
     # set up new /dev/root symlink
     rm -f /dev/root
-    ln -s /dev/mapper/livecd-rw /dev/root
+    ln -s /dev/mapper/live-rw /dev/root
 
-    mount -n -t ext3 /dev/mapper/livecd-rw /sysroot
+    mount -n -t ext3 /dev/mapper/live-rw /sysroot
     # here you can modify the rw ext3 fs for testing if you don't want to
     # respin the entire rootfs (which takes ages). Example
     #
@@ -557,24 +557,36 @@ do_livecd_from_loop121() {
     # We also use it to dynamically set the system locale from the boot
     # menu on live cd's.
     #
-    if [ "\$livecd_locale" != "" ] ; then
-        echo "LANG=\$livecd_locale" > /sysroot/etc/sysconfig/i18n
+    if [ "\$live_locale" != "" ] ; then
+        echo "LANG=\$live_locale" > /sysroot/etc/sysconfig/i18n
     fi
 
-    # create rule so udev creates /dev/livecd symlink on real rootfs
-    if [ "\$livecd_ram" == "1" ] ; then
-       echo "KERNEL==\"loop118\", SYMLINK+=\"livecd\"" >> /sysroot/etc/udev/rules.d/50-udev.rules
-    else
-       echo "KERNEL==\"hd[a-z]\", BUS==\"ide\", SYSFS{removable}==\"1\", ATTRS{media}==\"cdrom\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"livecd\"" >> /sysroot/etc/udev/rules.d/50-udev.rules
-       echo "KERNEL==\"sr[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"livecd\"" >> /sysroot/etc/udev/rules.d/50-udev.rules
-       echo "KERNEL==\"scd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"livecd\"" >> /sysroot/etc/udev/rules.d/50-udev.rules
-       echo "KERNEL==\"pcd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"livecd\"" >> /sysroot/etc/udev/rules.d/50-udev.rules
+    # create rule so udev creates /dev/live symlink on real rootfs
+    if [ -n "\$CDLABEL" ]; then
+       echo "KERNEL==\"hd[a-z]\", BUS==\"ide\", SYSFS{removable}==\"1\", ATTRS{media}==\"cdrom\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev.rules
+       echo "KERNEL==\"sr[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev.rules
+       echo "KERNEL==\"scd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev.rules
+       echo "KERNEL==\"pcd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev.rules
+    elif [ -n "\$LABEL" ]; then
+       echo "KERNEL==\"hd[a-z]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$LABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev.rules        
+       echo "KERNEL==\"hd[a-z][0-9]*\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$LABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev.rules        
+       echo "KERNEL==\"sd[a-z]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$LABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev.rules        
+       echo "KERNEL==\"sd[a-z][0-9]*\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$LABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev.rules        
+    elif [ -n "\$UUID" ]; then
+       echo "KERNEL==\"hd[a-z]\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"\$UUID\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev.rules        
+       echo "KERNEL==\"hd[a-z][0-9]*\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"\$UUID\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev.rules        
+       echo "KERNEL==\"sd[a-z]\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"\$UUID\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev.rules        
+       echo "KERNEL==\"sd[a-z][0-9]*\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"\$UUID\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev.rules        
     fi
+
+    # add rules for /dev/live-squashed and /dev/live-osimg
+    echo "KERNEL==\"loop120\" SYMLINK+=\"live-squashed\"" >> /sysroot/etc/udev/rules.d/50-udev.rules
+    echo "KERNEL==\"loop121\" SYMLINK+=\"live-osimg\"" >> /sysroot/etc/udev/rules.d/50-udev.rules
 
     mount -n -o ro,remount /sysroot
 }
 
-# we might have an uncompressed embedded ext3  to use as rootfs (uncompressed livecd)
+# we might have an uncompressed embedded ext3  to use as rootfs (uncompressed live)
 #
 if [ -e /sysroot/LiveOS/ext3fs.img ]; then
   EXT3FS="/sysroot/LiveOS/ext3fs.img"
@@ -599,10 +611,10 @@ if [ -n "\$EXT3FS" ] ; then
     losetup /dev/loop121 \$EXT3FS
     umount -l /sysroot
 
-    do_livecd_from_loop121
+    do_live_from_loop121
 fi
 
-# we might have an embedded ext3 on squashfs to use as rootfs (compressed livecd)
+# we might have an embedded ext3 on squashfs to use as rootfs (compressed live)
 #
 if [ -e /sysroot/LiveOS/squashfs.img ]; then
   SQUASHED="/sysroot/LiveOS/squashfs.img"
@@ -625,15 +637,14 @@ if [ -n "\$SQUASHED" ] ; then
     modprobe loop max_loop=128
     modprobe dm_snapshot
 
-    if [ "\$livecd_ram" == "1" ] ; then
-        echo "Copying livecd to RAM..."
-        echo "(this may take a few minutes. CD will be ejected upon completion.)"
-        dd if=/dev/root of=/livecd.iso bs=512 2> /dev/null
+    if [ "\$live_ram" == "1" ] ; then
+        echo "Copying live image to RAM..."
+        echo "(this may take a few minutes)"
+        dd if=\$SQUASHED of=/squashed.img bs=512 2> /dev/null
         umount -n /sysroot
-        echo "Done copying livecd to RAM."
+        echo "Done copying live image to RAM."
         eject -p /dev/root
-        losetup /dev/loop118 /livecd.iso
-        mount -n -t iso9660 /dev/loop118 /sysroot
+        SQUASHED="/squashed.img"
     fi
 
     losetup /dev/loop120 \$SQUASHED
@@ -643,9 +654,11 @@ if [ -n "\$SQUASHED" ] ; then
     losetup /dev/loop121 /squashfs/os.img
     
     umount -l /squashfs
-    umount -l /sysroot
+    if [ "\$live_ram" == "0" ] ; then
+        umount -l /sysroot
+    fi
 
-    do_livecd_from_loop121
+    do_live_from_loop121
 fi
 
 if [ "\$eshell" == "1" ] ; then

@@ -674,12 +674,12 @@ menu color hotkey 0 #ffffffff #ff000000
 label linux
   menu label %(label)s
   kernel vmlinuz
-  append initrd=initrd.img  ro quiet root=CDLABEL=%(label)s rootfstype=iso9660 livecd
+  append initrd=initrd.img  ro quiet root=CDLABEL=%(label)s rootfstype=iso9660 liveimg
 
 label runfromram
   menu label %(label)s from RAM
   kernel vmlinuz
-  append initrd=initrd.img ro quiet root=CDLABEL=%(label)s rootfstype=iso9660 livecd livecd_ram
+  append initrd=initrd.img ro quiet root=CDLABEL=%(label)s rootfstype=iso9660 liveimg live_ram
 """ %{"label": self.fs_label, "background" : have_background}
 
         cfgf = open("%s/out/isolinux/isolinux.cfg" %(self.build_dir,), "w")
