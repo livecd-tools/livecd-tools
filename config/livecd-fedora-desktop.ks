@@ -121,17 +121,17 @@ anaconda
 
 %post
 # FIXME: it'd be better to get this installed from a package
-cat > /etc/rc.d/init.d/fedora-livecd << EOF
+cat > /etc/rc.d/init.d/fedora-live << EOF
 #!/bin/bash
 #
-# livecd: Init script for live cd
+# live: Init script for live image
 #
 # chkconfig: 345 00 99
-# description: Init script for live cd.
+# description: Init script for live image.
 
 . /etc/init.d/functions
 
-if ! strstr "\`cat /proc/cmdline\`" livecd || [ "\$1" != "start" ] || [ -e /.livecd-configured ] ; then
+if ! strstr "\`cat /proc/cmdline\`" liveimg || [ "\$1" != "start" ] || [ -e /.liveimg-configured ] ; then
     exit 0
 fi
 
@@ -140,11 +140,13 @@ exists() {
     \$*
 }
 
-touch /.livecd-configured
+touch /.liveimg-configured
 
-# mount livecd
-mkdir -p /mnt/livecd
-mount -o ro -t iso9660 /dev/livecd /mnt/livecd
+# mount live image
+if [ -b /dev/live ]; then
+   mkdir -p /mnt/live
+   mount -o ro /dev/live /mnt/live
+fi
 
 # configure X
 exists system-config-display --noui --reconfig --set-depth=24
@@ -153,7 +155,7 @@ exists system-config-display --noui --reconfig --set-depth=24
 exists alsaunmute 0 2> /dev/null
 
 # add fedora user with no passwd
-useradd -c "Fedora live CD" fedora
+useradd -c "Fedora Live" fedora
 passwd -d fedora > /dev/null
 if [ -e /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png ] ; then
     cp /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png /home/fedora/.face
@@ -170,6 +172,6 @@ chkconfig --levels 345 yum-updatesd off
 # Stopgap fix for RH #217966; should be fixed in HAL instead
 touch /media/.hal-mtab
 EOF
-chmod 755 /etc/rc.d/init.d/fedora-livecd
-/sbin/restorecon /etc/rc.d/init.d/fedora-livecd
-/sbin/chkconfig --add fedora-livecd
+chmod 755 /etc/rc.d/init.d/fedora-live
+/sbin/restorecon /etc/rc.d/init.d/fedora-live
+/sbin/chkconfig --add fedora-live

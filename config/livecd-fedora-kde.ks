@@ -93,17 +93,17 @@ EOF
 
 # add initscript
 # FIXME: it'd be better to get this installed from a package
-cat > /etc/rc.d/init.d/fedora-livecd-kde << EOF
+cat > /etc/rc.d/init.d/fedora-live-kde << EOF
 #!/bin/bash
 #
-# livecd: Init script for live cd
+# live: Init script for live image
 #
 # chkconfig: 345 00 99
-# description: Init script for live cd.
+# description: Init script for live image.
 
 . /etc/init.d/functions
 
-if ! strstr "\`cat /proc/cmdline\`" livecd || [ "\$1" != "start" ] || [ -e /.livecd-configured ] ; then
+if ! strstr "\`cat /proc/cmdline\`" liveimg || [ "\$1" != "start" ] || [ -e /.liveimg-configured ] ; then
     exit 0
 fi
 
@@ -112,11 +112,13 @@ exists() {
     \$*
 }
 
-touch /.livecd-configured
+touch /.liveimg-configured
 
-# mount livecd
-mkdir -p /mnt/livecd
-mount -o ro -t iso9660 /dev/livecd /mnt/livecd
+# mount live image
+if [ -b /dev/live ]; then
+   mkdir -p /mnt/live
+   mount -o ro /dev/live /mnt/live
+fi
 
 # configure X
 exists system-config-display --noui --reconfig --set-depth=24
@@ -125,7 +127,7 @@ exists system-config-display --noui --reconfig --set-depth=24
 exists alsaunmute 0 2> /dev/null
 
 # add fedora user with no passwd
-useradd -c "Fedora live CD" fedora
+useradd -c "Fedora Live" fedora
 passwd -d fedora > /dev/null
 
 if [ -e /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png ] ; then
@@ -192,6 +194,6 @@ chkconfig --levels 345 yum-updatesd off
 
 EOF
 
-chmod 755 /etc/rc.d/init.d/fedora-livecd-kde
-/sbin/restorecon /etc/rc.d/init.d/fedora-livecd-kde
-/sbin/chkconfig --add fedora-livecd-kde
+chmod 755 /etc/rc.d/init.d/fedora-live-kde
+/sbin/restorecon /etc/rc.d/init.d/fedora-live-kde
+/sbin/chkconfig --add fedora-live-kde
