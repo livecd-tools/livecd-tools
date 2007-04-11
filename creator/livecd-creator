@@ -747,7 +747,7 @@ usage: livecd-creator [--help]
  --fslabel           : File system label (default: livecd-YYYYMMDD-HHMI)
  --skip-compression  : Don't compress the image
  --prelink           : Prelink the image
- --uncompressed-size : Size of uncompressed fs in MB (default: 3072)
+ --uncompressed-size : Size of uncompressed fs in MB (default: 4096)
  --shell             : Start a shell in the chroot for post-configuration
 
  Examples:
@@ -776,7 +776,7 @@ class Options:
         self.kscfg = None
         self.skip_compression = False
         self.skip_prelink = True
-        self.uncompressed_size = 3072
+        self.uncompressed_size = 4096
         self.give_shell = False
 
 def parse_options(args):
