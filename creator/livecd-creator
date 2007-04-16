@@ -20,6 +20,7 @@ import os
 import os.path
 import sys
 import errno
+import string
 import tempfile
 import time
 import traceback
@@ -460,6 +461,156 @@ class InstallationTarget:
         finally:
             self.ayum.closeRpmDB()
 
+    def writeNetworkIfCfg(self, instroot, network):
+        path = instroot + "/etc/sysconfig/network-scripts/ifcfg-" + network.device
+
+        f = file(path, "w+")
+        os.chmod(path, 0644)
+
+        f.write("DEVICE=%s\n" % network.device)
+        f.write("BOOTPROTO=%s\n" % network.bootProto)
+
+        if network.bootProto.lower() == "static":
+            if network.ip:
+                f.write("IPADDR=%s\n" % network.ip)
+            if network.netmask:
+                f.write("NETMASK=%s\n" % network.netmask)
+
+        if network.onboot:
+            f.write("ONBOOT=on\n")
+        else:
+            f.write("ONBOOT=off\n")
+
+        if network.essid:
+            f.write("ESSID=%s\n" % network.essid)
+
+        if network.ethtool:
+            if network.ethtool.find("autoneg") == -1:
+                network.ethtool = "autoneg off " + network.ethtool
+            f.write("ETHTOOL_OPTS=%s\n" % network.ethtool)
+
+        if network.bootProto.lower() == "dhcp":
+            if network.hostname:
+                f.write("DHCP_HOSTNAME=%s\n" % network.hostname)
+            if network.dhcpclass:
+                f.write("DHCP_CLASSID=%s\n" % network.dhcpclass)
+
+        if network.mtu:
+            f.write("MTU=%s\n" % network.mtu)
+
+        f.close()
+
+    def writeNetworkKey(self, instroot, network):
+        if not network.wepkey:
+            return
+
+        path = instroot + "/etc/sysconfig/network-scripts/keys-" + network.device
+        f = file(path, "w+")
+        os.chmod(path, 0600)
+        f.write("KEY=%s\n" % network.wepkey)
+        f.close()
+
+    def writeNetworkConfig(self, instroot, useipv6, hostname, gateway):
+        path = instroot + "/etc/sysconfig/network"
+        f = file(path, "w+")
+        os.chmod(path, 0644)
+
+        f.write("NETWORKING=yes\n")
+
+        if useipv6:
+            f.write("NETWORKING_IPV6=yes\n")
+        else:
+            f.write("NETWORKING_IPV6=no\n")
+
+        if hostname:
+            f.write("HOSTNAME=%s\n" % hostname)
+        else:
+            f.write("HOSTNAME=localhost.localdomain\n")
+
+        if gateway:
+            f.write("GATEWAY=%s\n" % gateway)
+
+        f.close()
+
+    def writeNetworkHosts(self, instroot, hostname):
+        localline = ""
+        if hostname and hostname != "localhost.localdomain":
+            localline += hostname + " "
+            l = string.split(hostname, ".")
+            if len(l) > 1:
+                localline += l[0] + " "
+        localline += "localhost.localdomain localhost"
+
+        path = instroot + "/etc/hosts"
+        f = file(path, "w+")
+        os.chmod(path, 0644)
+        f.write("127.0.0.1\t\t%s\n" % localline)
+        f.write("::1\t\tlocalhost6.localdomain6 localhost6\n")
+        f.close()
+
+    def writeNetworkResolv(self, instroot, nodns, primaryns, secondaryns):
+        if nodns or not primaryns:
+            return
+
+        path = instroot + "/etc/resolv.conf"
+        f = file(path, "w+")
+        os.chmod(path, 0644)
+
+        for ns in (primaryns, secondaryns):
+            if ns:
+                f.write("nameserver %s\n" % ns)
+
+        f.close()
+
+    def configureNetwork(self):
+        instroot = self.build_dir + "/install_root"
+
+        try:
+            os.makedirs(instroot + "/etc/sysconfig/network-scripts")
+        except OSError, (err, msg):
+            if err != errno.EEXIST:
+                raise
+
+        useipv6 = False
+        nodns = False
+        hostname = None
+        gateway = None
+        primaryns = None
+        secondaryns = None
+
+        for network in self.ksparser.handler.network.network:
+            if not network.device:
+                raise InstallationError("No --device specified with network kickstart command")
+
+            if network.onboot and network.bootProto.lower() != "dhcp" and \
+               not (network.ip and network.netmask):
+                raise InstallationError("No IP address and/or netmask specified with static " +
+                                        "configuration for '%s'" % network.device)
+
+            self.writeNetworkIfCfg(instroot, network)
+            self.writeNetworkKey(instroot, network)
+
+            if network.ipv6:
+                useipv6 = True
+            if network.nodns:
+                nodns = True
+
+            if network.hostname:
+                hostname = network.hostname
+            if network.gateway:
+                gateway = network.gateway
+
+            if network.nameserver:
+                nameservers = string.split(network.nameserver, ",")
+                if len(nameservers) >= 1:
+                    primaryns = nameservers[0]
+                if len(nameservers) >= 2:
+                    secondayns = nameservers[0]
+
+        self.writeNetworkConfig(instroot, useipv6, hostname, gateway)
+        self.writeNetworkHosts(instroot, hostname)
+        self.writeNetworkResolv(instroot, nodns, primaryns, secondaryns)
+
     def configureSystem(self):
         instroot = "%s/install_root" %(self.build_dir,)
         
@@ -488,16 +639,6 @@ class InstallationTarget:
         f = open("%s/etc/sysconfig/clock" %(instroot,), "w+")
         f.write("ZONE=\"%s\"\n" %(tz,))
         f.write("UTC=%s\n" %(utc,))
-        f.close()
-
-        # FIXME: we should handle network bits better
-        f = open("%s/etc/sysconfig/network" %(instroot,), "w+")
-        f.write("NETWORKING=yes\n")
-        f.write("HOSTNAME=localhost.localdomain\n")
-        f.close()
-        f = open("/%s/etc/hosts" %(instroot,), "w+")
-        f.write("127.0.0.1\t\tlocalhost.localdomain  localhost\n")
-        f.write("::1\t\tlocalhost6.localdomain6 localhost6\n")        
         f.close()
 
         # do any authconfig bits
@@ -694,6 +835,7 @@ label runfromram
 
         self.installPackages(self.packages, self.epackages, self.groups)
         self.configureSystem()
+        self.configureNetwork()
         self.relabelSystem()
         if not self.skip_prelink:
             self.prelinkSystem()
