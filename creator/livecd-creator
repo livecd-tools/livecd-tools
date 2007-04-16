@@ -663,9 +663,17 @@ class InstallationTarget:
                 args.append("--selinux=disabled")
             subprocess.call(args, preexec_fn=self.run_in_root)
 
-        # FIXME: we should allow the setting of the root pass
-        if os.path.exists("%s/usr/bin/passwd" %(instroot,)):
+        # Set the root password
+        if self.ksparser.handler.rootpw.isCrypted:
+            subprocess.call(["/usr/sbin/usermod", "-p", self.ksparser.handler.rootpw.password, "root"], preexec_fn=self.run_in_root)
+        elif self.ksparser.handler.rootpw.password == "":
+            # Root password is not set and not crypted, empty it
             subprocess.call(["/usr/bin/passwd", "-d", "root"], preexec_fn=self.run_in_root)
+        else:
+            # Root password is set and not crypted
+            p1 = subprocess.Popen(["/bin/echo", self.ksparser.handler.rootpw.password], stdout=subprocess.PIPE, preexec_fn=self.run_in_root)
+            p2 = subprocess.Popen(["/usr/bin/passwd", "--stdin", "root"], stdin=p1.stdout, stdout=subprocess.PIPE, preexec_fn=self.run_in_root)
+            output = p2.communicate()[0]
 
         # enable/disable services appropriately
         if os.path.exists("%s/sbin/chkconfig" %(instroot,)):
