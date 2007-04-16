@@ -8,18 +8,17 @@ firewall --disabled
 xconfig --startxonboot
 services --enabled=NetworkManager,dhcdbd,lisa --disabled=network,sshd
 
-repo --name=kde-d7 --baseurl=http://download.fedora.redhat.com/pub/fedora/linux/core/development/i386/os
-repo --name=kde-e7 --baseurl=http://download.fedora.redhat.com/pub/fedora/linux/extras/development/i386
+repo --name=d7 --baseurl=http://download.fedora.redhat.com/pub/fedora/linux/core/development/i386/os
+repo --name=e7 --baseurl=http://download.fedora.redhat.com/pub/fedora/linux/extras/development/i386
 
 %packages
 # Basic packages
 @core
 @base
-@admin-tools
 @dial-up
+@admin-tools
 @hardware-support
 kernel
-syslinux
 
 dejavu-lgc-fonts
 setroubleshoot
@@ -33,50 +32,24 @@ anaconda
 
 # KDE basic packages
 @kde-desktop
--kdeaddons
 kdegames
-#kdeedu
-#kdetoys
 
 # additional KDE packages
-amarok
 beryl-kde
-digikam
 k3b
-kaffeine
-knetworkmanager
-konversation
-kpowersave
-ktorrent
-twinkle
-
-# we don't want to pull in krita, but want the rest of the koffice stuff
 koffice-kword
 koffice-kspread
 koffice-kpresenter
-koffice-kivio
-koffice-karbon
-koffice-kugar
-koffice-kexi
-koffice-kexi-driver-mysql
-koffice-kexi-driver-pgsql
-koffice-kchart
-koffice-kformula
 koffice-filters
-koffice-kplato
+twinkle
 
 #some changes that we don't want...
--apollon
--kerry
--basket
--gift-gnutella
--gift-openft
--gpgme
--rss-glx-kde
 -specspo
--koffice-krita
--koffice-suite
-
+-scribus
+-kdemultimedia-extras
+-kdeartwork-extras
+-kmymoney2
+-basket
 
 # some other extra packages
 gnupg
@@ -122,13 +95,13 @@ if [ -b /dev/live ]; then
 fi
 
 # configure X
-exists system-config-display --noui --reconfig --set-depth=24
+#exists system-config-display --noui --reconfig --set-depth=24
 
 # unmute sound card
 exists alsaunmute 0 2> /dev/null
 
 # add fedora user with no passwd
-useradd -c "Fedora Live" fedora
+useradd -c "Fedora live CD" fedora
 passwd -d fedora > /dev/null
 
 if [ -e /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png ] ; then
@@ -163,27 +136,17 @@ sed -i 's/BlueCurve/Echo/' /usr/share/config/ksplashrc
 # workaround to put liveinst on desktop (should not be needed but 
 # /etc/X11/xinit/xinitrc.d/zz-liveinst from anaconda doesn't do this atm)
 mkdir -p /home/fedora/.kde/env
-
 cat > /home/fedora/.kde/env/liveinst.sh <<END
 #! /bin/bash
-
-( until test -d /home/fedora/Desktop ; do sleep 1; done
-cp /usr/share/applications/liveinst.desktop /home/fedora/Desktop/
 sed -i 's/NoDisplay=true/NoDisplay=false/' /home/fedora/Desktop/liveinst.desktop
-) &
 END
 chmod +x /home/fedora/.kde/env/liveinst.sh
-
 
 # turn off firstboot for livecd boots
 echo "RUN_FIRSTBOOT=NO" > /etc/sysconfig/firstboot
 
 # Stopgap fix for RH #217966; should be fixed in HAL instead
 touch /media/.hal-mtab
-
-# /etc/X11/xinit/xinitrc.d/zz-liveinst.sh is confusing kde on login
-# so remove it for now
-rm -f /etc/X11/xinit/xinitrc.d/zz-liveinst.sh
 
 # some cleanups
 
@@ -193,10 +156,6 @@ rm -f /usr/share/applications/gnome-theme-installer.desktop
 # don't start yum-updatesd for livecd boots
 chkconfig --levels 345 yum-updatesd off
 
-# don't start cron/at as they tend to spawn things which are
-# disk intensive that are painful on a live image
-chkconfig --level 345 crond off
-chkconfig --level 345 atd off
 EOF
 
 chmod 755 /etc/rc.d/init.d/fedora-live-kde
