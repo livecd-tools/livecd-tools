@@ -95,7 +95,7 @@ if [ -b /dev/live ]; then
 fi
 
 # configure X
-#exists system-config-display --noui --reconfig --set-depth=24
+exists system-config-display --noui --reconfig --set-depth=24
 
 # unmute sound card
 exists alsaunmute 0 2> /dev/null
