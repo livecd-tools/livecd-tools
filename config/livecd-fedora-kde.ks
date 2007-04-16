@@ -101,7 +101,7 @@ fi
 exists alsaunmute 0 2> /dev/null
 
 # add fedora user with no passwd
-useradd -c "Fedora live CD" fedora
+useradd -c "Fedora Live" fedora
 passwd -d fedora > /dev/null
 
 if [ -e /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png ] ; then
@@ -155,6 +155,11 @@ rm -f /usr/share/applications/gnome-theme-installer.desktop
 
 # don't start yum-updatesd for livecd boots
 chkconfig --levels 345 yum-updatesd off
+
+# don't start cron/at as they tend to spawn things which are
+# disk intensive that are painful on a live image
+chkconfig --level 345 crond off
+chkconfig --level 345 atd off
 
 EOF
 
