@@ -5,7 +5,7 @@ auth --useshadow --enablemd5
 selinux --enforcing
 firewall --disabled
 repo --name=d7 --baseurl=http://download.fedora.redhat.com/pub/fedora/linux/core/development/i386/os
-repo --name=e7 --baseurl=http://download.fedora.redhat.com/pub/fedora/linux/extras/development/i386 
+repo --name=e7 --baseurl=http://download.fedora.redhat.com/pub/fedora/linux/extras/development/i386
 xconfig --startxonboot
 services --enabled=NetworkManager,dhcdbd --disabled=network,sshd
 
@@ -23,6 +23,7 @@ services --enabled=NetworkManager,dhcdbd --disabled=network,sshd
 @dial-up
 @hardware-support
 @printing
+syslinux
 kernel
 
 scim*
@@ -114,6 +115,11 @@ gnumeric
 #planner
 evince
 gnome-blog
+
+# lots of people want...
+gparted
+ntfs-3g
+ntfsprogs
 
 # livecd bits to set up the livecd and be able to install
 anaconda

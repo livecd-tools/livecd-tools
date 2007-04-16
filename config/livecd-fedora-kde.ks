@@ -19,6 +19,7 @@ repo --name=kde-e7 --baseurl=http://download.fedora.redhat.com/pub/fedora/linux/
 @dial-up
 @hardware-support
 kernel
+syslinux
 
 dejavu-lgc-fonts
 setroubleshoot
