@@ -173,7 +173,12 @@ fi
 echo "RUN_FIRSTBOOT=NO" > /etc/sysconfig/firstboot
 
 # don't start yum-updatesd for livecd boots
-chkconfig --levels 345 yum-updatesd off
+chkconfig --level 345 yum-updatesd off
+
+# don't start cron/at as they tend to spawn things which are
+# disk intensive that are painful on a live image
+chkconfig --level 345 crond off
+chkconfig --level 345 atd off
 
 # Stopgap fix for RH #217966; should be fixed in HAL instead
 touch /media/.hal-mtab

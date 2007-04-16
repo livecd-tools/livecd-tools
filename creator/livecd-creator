@@ -746,7 +746,8 @@ usage: livecd-creator [--help]
  --base-on           : Add packages to an existing live CD iso9660 image
  --fslabel           : File system label (default: livecd-YYYYMMDD-HHMI)
  --skip-compression  : Don't compress the image
- --uncompressed-size : Size of uncompressed fs in MB (default: 3072)
+ --prelink           : Prelink the image
+ --uncompressed-size : Size of uncompressed fs in MB (default: 4096)
  --shell             : Start a shell in the chroot for post-configuration
 
  Examples:
@@ -774,8 +775,8 @@ class Options:
         self.base_on = None
         self.kscfg = None
         self.skip_compression = False
-        self.skip_prelink = False
-        self.uncompressed_size = 3072
+        self.skip_prelink = True
+        self.uncompressed_size = 4096
         self.give_shell = False
 
 def parse_options(args):
@@ -784,7 +785,7 @@ def parse_options(args):
                                    ["help", "repo=", "base-on=", "package=",
                                     "exclude-package=", "fslabel=", "config=",
                                     "skip-compression", "uncompressed-size=",
-                                    "shell", "no-prelink"])
+                                    "shell", "no-prelink", "prelink"])
     except getopt.GetoptError, msg:
         raise Usage(msg)
 
@@ -801,6 +802,9 @@ def parse_options(args):
             continue
         if o in ("--no-prelink",):
             options.skip_prelink = True
+            continue
+        if o in ("--prelink",):
+            options.skip_prelink = False
             continue
         if o in ("-u", "--uncompressed-size"):
             options.uncompressed_size = int(a)
