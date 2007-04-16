@@ -183,20 +183,26 @@ class LiveCDYum(yum.YumBase):
         # being left and an inability to clean up after ourself
         pass
 
-    def setup(self, instroot):
-        self.installroot = instroot
-        self.doConfigSetup(root=instroot, init_plugins = False)
+    def _writeConf(self, datadir, installroot):
+        conf  = "[main]\n"
+        conf += "installroot=%s\n" % installroot
+        conf += "cachedir=/var/cache/yum\n"
+        conf += "plugins=0\n"
+        conf += "reposdir=\n"
+
+        path = datadir + "/yum.conf"
+
+        f = file(path, "w+")
+        f.write(conf)
+        f.close()
+
+        os.chmod(path, 0644)
+
+        return path
+
+    def setup(self, datadir, installroot):
+        self.doConfigSetup(fn = self._writeConf(datadir, installroot))
         self.doGenericSetup()
-
-        self.conf.cachedir = "/var/cache/yum"
-
-        # don't look at the default repos from the host config
-        map(lambda x: self.repos.delete(x), self.repos.repos.keys())
-
-    def reset(self):
-        self.closeRpmDB()
-        self.doTsSetup()
-        self.doRpmDBSetup()
 
     def selectPackage(self, pkg):
         """Select a given package.  Can be specified with name.arch or name*"""
@@ -273,7 +279,7 @@ class LiveCDYum(yum.YumBase):
 
 class InstallationTarget:
     def __init__(self, repos, packages, epackages, groups, fs_label, skip_compression, skip_prelink):
-        self.ayum = LiveCDYum()
+        self.ayum = None
         self.repos = repos
         self.packages = packages
         self.epackages = epackages
@@ -418,11 +424,13 @@ class InstallationTarget:
 
         self.write_fstab()
 
-        self.ayum.setup("%s/install_root" %(self.build_dir,))
+        self.ayum = LiveCDYum()
+        self.ayum.setup(self.build_dir + "/data",
+                        self.build_dir + "/install_root")
 
     def unmount(self):
         """detaches system bind mounts and install_root for the file system and tears down loop devices used"""
-        shutil.rmtree(self.build_dir + "/yum-cache", ignore_errors=True)
+        self.ayum = None
         
         try:
             os.unlink(self.build_dir + "/install_root/etc/mtab")
