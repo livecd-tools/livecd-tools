@@ -55,6 +55,12 @@ twinkle
 gnupg
 samba-client
 xine-lib-extras
+ntfsprogs
+ntfs-3g
+gparted
+
+# kdm is broken atm
+gdm
 
 
 %post
@@ -62,7 +68,7 @@ xine-lib-extras
 # create /etc/sysconfig/desktop (needed for installation)
 cat > /etc/sysconfig/desktop <<EOF
 DESKTOP="KDE"
-DISPLAYMANAGER="KDE"
+#DISPLAYMANAGER="KDE"
 EOF
 
 # add initscript
