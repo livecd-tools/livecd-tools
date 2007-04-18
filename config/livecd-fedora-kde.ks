@@ -59,6 +59,26 @@ ntfsprogs
 ntfs-3g
 gparted
 
+#fonts
+fonts-*
+# work around yum API bug with specifying wildcards for now 
+fonts-arabic
+fonts-bengali
+fonts-chinese
+fonts-gujarati
+fonts-hebrew
+fonts-hindi
+fonts-japanese
+fonts-kannada
+fonts-korean
+fonts-malayalam
+fonts-oriya
+fonts-punjabi
+fonts-sinhala
+fonts-tamil
+fonts-telugu
+
+
 # kdm is broken atm
 gdm
 
