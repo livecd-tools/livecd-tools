@@ -98,7 +98,7 @@ fi
 rm -f modules
 
 for m in $MODULES ; do
-    /sbin/modprobe --set-version $KERNEL --show-depends $m >> modules
+    /sbin/modprobe --set-version $KERNEL --show-depends $m >> modules 2/dev/null
 done
 
 cat modules | awk '{ print $2 }' | sort -u > modules2
@@ -138,7 +138,7 @@ cp /bin/sleep bin
 cp /bin/bash bin
 cp /bin/mount bin
 cp /bin/umount bin
-cp /usr/sbin/eject sbin
+[ -x /usr/sbin/eject ] && cp /usr/sbin/eject sbin
 cp /bin/ls bin
 cp /bin/mknod bin
 cp /bin/mkdir bin
@@ -163,8 +163,8 @@ cp /lib/udev/vol_id lib/udev
 ln -s bash bin/sh
 
 # Not really required but nice
-cp /usr/bin/tree bin
-cp /usr/bin/less bin
+[ -x /usr/bin/tree ] && cp /usr/bin/tree bin
+[ -x /usr/bin/less ] && cp /usr/bin/less bin
 cp /bin/env bin
 cp /bin/grep bin
 cp /bin/dmesg bin
