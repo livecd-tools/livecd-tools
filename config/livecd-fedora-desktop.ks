@@ -75,9 +75,6 @@ fonts-telugu
 -compat*
 
 # space sucks
--festival
--gok
--gnome-speech
 -ekiga
 -gnome-user-docs
 -specspo
@@ -112,7 +109,7 @@ fonts-telugu
 #inkscape
 abiword
 gnumeric
-#planner
+planner
 evince
 gnome-blog
 
@@ -186,3 +183,6 @@ EOF
 chmod 755 /etc/rc.d/init.d/fedora-live
 /sbin/restorecon /etc/rc.d/init.d/fedora-live
 /sbin/chkconfig --add fedora-live
+
+# save a little bit of space at least...
+rm -f /boot/initrd*
