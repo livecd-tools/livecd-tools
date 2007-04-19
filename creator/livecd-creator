@@ -877,6 +877,13 @@ label runfromram
                          "-boot-info-table", "-J", "-r", "-hide-rr-moved",
                          "-V", "%s" %(self.fs_label,), "%s/out" %(self.build_dir)])
 
+        # implant an isomd5sum
+        if os.path.exists("/usr/lib/anaconda-runtime/implantisomd5"):
+            subprocess.call(["/usr/lib/anaconda-runtime/implantisomd5",
+                             "%s.iso" %(self.fs_label,)])
+        else:
+            print >> sys.stderr, "anaconda-runtime not installed; not setting up mediacheck"
+
     def createSquashFS(self):
         """create compressed squashfs file system"""
         if not self.skip_compression:

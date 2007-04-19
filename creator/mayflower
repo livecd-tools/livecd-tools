@@ -170,6 +170,8 @@ cp /bin/grep bin
 cp /bin/dmesg bin
 cp /sbin/lsmod sbin
 
+# if we have the iso checker, we want it
+[ -x /usr/lib/anaconda-runtime/checkisomd5 ] && cp /usr/lib/anaconda-runtime/checkisomd5 bin
 
 # Copy all required shared libs
 for i in bin/* sbin/* lib/udev/*; do 
@@ -235,6 +237,7 @@ quiet=0
 shell=0
 eshell=0
 live_ram=0
+check_iso=0
 live_locale=""
 
 # Parse kernel commandline options
@@ -264,6 +267,9 @@ for o in \`cat /proc/cmdline\` ; do
         ;;
     live_locale=*)
         live_locale=\${o#live_locale=}
+        ;;
+    check)
+        check_iso=1
         ;;
     esac
 done
@@ -488,6 +494,15 @@ if [ "\$root" != "mtd0" ] ; then
     fi
 
 fi
+
+if [ "x\$check_iso" == "x1" -a -x /bin/checkisomd5 -a "x\$rootfstype" == "xiso9660" ]; then
+   /bin/checkisomd5 --verbose /dev/root
+   if [ \$? <= 0 ]; then
+       echo "Are you SURE you want to continue?"
+       echo "Press Enter to continue or ctrl-alt-del to reboot."
+       read
+   fi
+fi 
 
 if [ "x\$root_ro" == "x1" ] ; then
    if [ -z \$rootflags ] ; then
