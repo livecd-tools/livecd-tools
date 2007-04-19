@@ -829,7 +829,7 @@ default vesamenu.c32
 timeout 600
 
 %(background)s
-menu title Welcome to Fedora!
+menu title Welcome to %(label)s!
 menu color border 0 #ffffffff #00000000
 menu color sel 0 #ffffffff #ff000000
 menu color title 0 #ffffffff #00000000
@@ -837,17 +837,20 @@ menu color tabmsg 0 #ffffffff #00000000
 menu color unsel 0 #ffffffff #00000000
 menu color hotsel 0 #ff000000 #ffffffff
 menu color hotkey 0 #ffffffff #ff000000
-
-label linux
-  menu label %(label)s
-  kernel vmlinuz
-  append initrd=initrd.img  ro quiet root=CDLABEL=%(label)s rootfstype=iso9660 liveimg
-
-label runfromram
-  menu label %(label)s (run from RAM - requires 1GB+)
-  kernel vmlinuz
-  append initrd=initrd.img ro quiet root=CDLABEL=%(label)s rootfstype=iso9660 liveimg live_ram
 """ %{"label": self.fs_label, "background" : have_background}
+
+        stanzas = [("linux", "Run from image", ""),
+                   ("runfromram", "Run from RAM - requires 1 GB+", "live_ram")]
+        if os.path.exists("%s/install_root/usr/lib/anaconda-runtime/checkisomd5" %(self.build_dir,)):
+            stanzas.append( ("check", "Verify and run from image", "check") )
+
+        for (short, long, extra) in stanzas:
+            cfg += """label %(short)s
+  menu label %(long)s
+  kernel vmlinuz
+  append initrd=initrd.img  ro quiet root=CDLABEL=%(label)s rootfstype=iso9660 liveimg %(extra)s
+""" %{"label": self.fs_label, "background" : have_background,
+      "short": short, "long": long, "extra": extra}
 
         cfgf = open("%s/out/isolinux/isolinux.cfg" %(self.build_dir,), "w")
         cfgf.write(cfg)
