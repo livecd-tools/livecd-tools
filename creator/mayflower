@@ -496,6 +496,7 @@ if [ "\$root" != "mtd0" ] ; then
 fi
 
 if [ "x\$check_iso" == "x1" -a -x /bin/checkisomd5 -a "x\$rootfstype" == "xiso9660" ]; then
+   echo "Verifying ISO image..."
    /bin/checkisomd5 --verbose /dev/root
    if [ \$? <= 0 ]; then
        echo "Are you SURE you want to continue?"
