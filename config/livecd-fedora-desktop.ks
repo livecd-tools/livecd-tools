@@ -83,6 +83,7 @@ fonts-telugu
 -a2ps
 -vino
 -redhat-lsb
+-sox
 
 # smartcards won't really work on the livecd.  and we _need_ space
 -coolkey
@@ -106,10 +107,8 @@ fonts-telugu
 #ppracer
 
 # we don't include @office so that we don't get OOo.  but some nice bits
-#inkscape
 abiword
 gnumeric
-planner
 evince
 gnome-blog
 
@@ -120,6 +119,7 @@ ntfsprogs
 
 # livecd bits to set up the livecd and be able to install
 anaconda
+anaconda-runtime
 
 
 %post
@@ -176,6 +176,8 @@ chkconfig --level 345 yum-updatesd off
 # disk intensive that are painful on a live image
 chkconfig --level 345 crond off
 chkconfig --level 345 atd off
+chkconfig --level 345 readahead_early off
+chkconfig --level 345 readahead_later off
 
 # Stopgap fix for RH #217966; should be fixed in HAL instead
 touch /media/.hal-mtab

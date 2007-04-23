@@ -29,6 +29,7 @@ xorg-x11-drivers
 
 # to make the cd installable
 anaconda
+anaconda-runtime
 
 # KDE basic packages
 @kde-desktop
@@ -51,9 +52,14 @@ twinkle
 -kmymoney2
 -basket
 
+# some stuff we don't want to save space
+-samba-client
+-redhat-lsb
+-ccid
+-coolkey
+
 # some other extra packages
 gnupg
-samba-client
 xine-lib-extras
 ntfsprogs
 ntfs-3g
