@@ -20,24 +20,13 @@ install:
 	$(INSTALL_DATA) -D config/livecd-fedora-minimal.ks $(DESTDIR)/usr/share/livecd-tools/livecd-fedora-minimal.ks
 	$(INSTALL_DATA) -D config/livecd-fedora-desktop.ks $(DESTDIR)/usr/share/livecd-tools/livecd-fedora-desktop.ks
 	$(INSTALL_DATA) -D config/livecd-fedora-kde.ks $(DESTDIR)/usr/share/livecd-tools/livecd-fedora-kde.ks
-
-#	$(INSTALL_PROGRAM) -D installer/livecd-installer $(DESTDIR)/usr/libexec/livecd-installer
-#	$(INSTALL_PROGRAM) -D installer/livecd-installer-tui $(DESTDIR)/usr/bin/livecd-installer-tui
-#	$(INSTALL_PROGRAM) -D installer/livecd-install-daemon $(DESTDIR)/etc/rc.d/init.d/livecd-install-daemon
-#	$(INSTALL_PROGRAM) -D installer/99-livecd-installer.conf $(DESTDIR)/etc/livecd/99-livecd-installer.conf
-#	$(INSTALL_DATA) -D installer/livecd-installer.conf $(DESTDIR)/etc/dbus-1/system.d/livecd-installer.conf
+	$(INSTALL_DATA) -D config/livedvd-fedora-kde.ks $(DESTDIR)/usr/share/livecd-tools/livedvd-fedora-kde.ks
 
 uninstall:
 	rm -f $(DESTDIR)/usr/bin/livecd-creator
 	rm -rf $(DESTDIR)/usr/lib/livecd-creator
 	rm -rf $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)
 	rm -rf $(DESTDIR)/usr/share/livecd-tools
-
-#	rm -f $(DESTDIR)/usr/libexec/livecd-installer
-#	rm -f $(DESTDIR)/usr/bin/livecd-installer-tui
-#	rm -f $(DESTDIR)/etc/rc.d/init.d/livecd-install-daemon
-#	rm -f $(DESTDIR)/etc/dbus-1/system.d/livecd-installer.conf
-#	rm -f $(DESTDIR)/etc/livecd/99-livecd-installer.conf
 
 dist : all
 	git-archive --format=tar --prefix=livecd-tools-$(VERSION)/ HEAD | bzip2 -9v > livecd-tools-$(VERSION).tar.bz2
