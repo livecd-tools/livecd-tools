@@ -159,8 +159,8 @@ sed -i 's/#DefaultUser=ethel/DefaultUser=fedora/' /etc/kde/kdm/kdmrc
 sed -i 's/redhat-web.desktop/konqbrowser.desktop/' /usr/share/config/kickerrc
 sed -i 's/redhat-email.desktop/kmail.desktop/' /usr/share/config/kickerrc
 
-# adding some autostarted applications
-cp /usr/share/applications/fedora-knetworkmanager.desktop /usr/share/autostart/
+# adding some autostarted applications 
+#cp /usr/share/applications/fedora-knetworkmanager.desktop /usr/share/autostart/
 
 # workaround for #233881
 sed -i 's/BlueCurve/Echo/' /usr/share/config/ksplashrc
