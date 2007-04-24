@@ -3,7 +3,7 @@
                     David Zeuthen <davidz@redhat.com>
  		    Jeremy Katz <katzj@redhat.com>
 
-                    Last updated: March 22 2007 (v0.2)
+                    Last updated: April 24 2007 (v0.3)
 
 This project concerns tools to generate live CD's on Fedora based
 systems including derived distributions such as RHEL, CentOS and
@@ -115,9 +115,9 @@ then the following command
 
 # livecd-creator \
   --config=/usr/share/livecd-tools/livecd-fedora-desktop.ks \
-  --fslabel=Fedora-7-Test3-LiveCD-1-foo
+  --fslabel=Fedora-7-LiveCD-1-foo
 
-will create a live CD called "Fedora-7-Test3-LiveCD-1-foo". The name
+will create a live CD called "Fedora-7-LiveCD-1-foo". The name
 given by --fs-label is used. 
 
  o as a file system label on the ext3 and iso960 file systems
@@ -131,13 +131,33 @@ configuration file to point to your local repositories.
 
 3. LIVE CD INSTALLS
 
-As of Fedora 7 Test 1, anaconda has support for doing an installation
-from a live CD.  
+As of Fedora 7, anaconda has support for doing an installation
+from a live CD.  To use this, double click on the "Install to Hard
+Drive" item on the desktop or run /usr/bin/liveinst if you don't have
+such an icon.
 
-To use it, you currently need to disable automounting; go into 
-"System -> Preferences -> Removable Drives and Media" and unclick all 
-check boxes under the tab "Storage", heading " Removable Storage". 
+4. LIVE CD MEDIA VERIFICATION
 
-Then, double click on the "Install to Hard Drive" item on the
-desktop.  There are a few weird things with the UI at present, but
-they are scheduled to be fixed prior to the Fedora 7 final release.
+The live CD can incorporate functionality to verify itself.  To do so,
+you need to have anaconda-runtime installed both on the system used
+for creating the image and installed into the image.  This is so that
+the implantisomd5 and checkisomd5 utilities can be used.  These
+utilities take advantage of embedding an md5sum into the application
+area of the iso9660 image.  This then gets verified before mounting
+the real root filesystem.
+
+In a future release, the isomd5 utilities will probably be split out
+of anaconda.
+
+5. USING LIVE IMAGES FROM USB MEDIA 
+
+USB sticks are becoming increasingly prevalent and are a nice way to
+use live images.  You can take a live CD iso image and transform it so
+that it can be used on a USB stick.  To do so, use the
+livecd-iso-to-disk script.
+   /usr/bin/livecd-iso-to-stick /path/to/live.iso /dev/sdb1 
+
+Replace /dev/sdb1 with the (unmounted) partition where you wish to put
+the live image.  This is not a destructive process; any data you 
+currently have on your USB stick will be preserved.
+
