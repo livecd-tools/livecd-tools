@@ -51,6 +51,7 @@ twinkle
 -kdeartwork-extras
 -kmymoney2
 -basket
+-speedcrunch
 
 # some stuff we don't want to save space
 -samba-client
@@ -67,22 +68,6 @@ gparted
 
 #fonts
 fonts-*
-# work around yum API bug with specifying wildcards for now 
-fonts-arabic
-fonts-bengali
-fonts-chinese
-fonts-gujarati
-fonts-hebrew
-fonts-hindi
-fonts-japanese
-fonts-kannada
-fonts-korean
-fonts-malayalam
-fonts-oriya
-fonts-punjabi
-fonts-sinhala
-fonts-tamil
-fonts-telugu
 
 
 # kdm is broken atm
@@ -198,3 +183,6 @@ EOF
 chmod 755 /etc/rc.d/init.d/fedora-live-kde
 /sbin/restorecon /etc/rc.d/init.d/fedora-live-kde
 /sbin/chkconfig --add fedora-live-kde
+
+# save a little bit of space at least...
+rm -f /boot/initrd*

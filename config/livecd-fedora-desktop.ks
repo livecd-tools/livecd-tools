@@ -29,41 +29,17 @@ kernel
 scim*
 -scim-devel
 -scim-doc
--scim-qt
-# work around yum API bug with specifying wildcards for now 
-scim-tables
-scim-tables-*
-scim-sinhala
-scim-libs
-scim-bridge
-scim-bridge-gtk
-scim-anthy
-scim-hangul
-scim-pinyin
-scim-chewing
-scim-m17n
+-scim-qtimm
+-scim-bridge-qt
+-scim-skk
+-scim-tomoe
+-scim-tables-chinese
 
 m17n-lib
 m17n-db
 #m17n-db-*
 
 fonts-*
-# work around yum API bug with specifying wildcards for now 
-fonts-arabic
-fonts-bengali
-fonts-chinese
-fonts-gujarati
-fonts-hebrew
-fonts-hindi
-fonts-japanese
-fonts-kannada
-fonts-korean
-fonts-malayalam
-fonts-oriya
-fonts-punjabi
-fonts-sinhala
-fonts-tamil
-fonts-telugu
 
 # dictionaries are big
 -aspell-*
@@ -111,6 +87,7 @@ abiword
 gnumeric
 evince
 gnome-blog
+-planner
 
 # lots of people want...
 gparted
