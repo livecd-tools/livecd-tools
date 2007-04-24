@@ -1,6 +1,6 @@
 Summary: Tools for building live CD's
 Name: livecd-tools
-Version: 006
+Version: 007
 Release: 1%{?dist}
 License: GPL
 Group: System Environment/Base
@@ -48,6 +48,15 @@ rm -rf $RPM_BUILD_ROOT
 %{_datadir}/livecd-tools/*
 
 %changelog
+* Tue Apr 24 2007 Jeremy Katz <katzj@redhat.com> - 007-1
+- Disable prelinking by default
+- Disable some things that slow down the live boot substantially
+- Lots of tweaks to the default package manifests
+- Allow setting the root password (Jeroen van Meeuwen)
+- Allow more specific network line setting (Mark McLoughlin)
+- Don't pollute the host yum cache (Mark McLoughlin)
+- Add support for mediachecking
+
 * Wed Apr  4 2007 Jeremy Katz <katzj@redhat.com> - 006-1
 - Many fixes to error handling from Mark McLoughlin
 - Add the KDE config
