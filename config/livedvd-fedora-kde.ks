@@ -29,6 +29,7 @@ xorg-x11-drivers
 
 # to make the cd installable
 anaconda
+anaconda-runtime
 
 # KDE basic packages
 @kde-desktop
@@ -50,132 +51,40 @@ twinkle
 -kdeartwork-extras
 -kmymoney2
 -basket
+-speedcrunch
+
+# some stuff we don't want to save space
+-samba-client
+-redhat-lsb
+-ccid
+-coolkey
 
 # some other extra packages
 gnupg
-samba-client
 xine-lib-extras
 ntfsprogs
 ntfs-3g
 gparted
 
-# kdm is broken atm
-gdm
-
 # language support
-kde-i18n-Arabic
-kde-i18n-Bengali
-kde-i18n-Brazil
-kde-i18n-British
-kde-i18n-Bulgarian
-kde-i18n-Catalan
-kde-i18n-Chinese
-kde-i18n-Chinese
-kde-i18n-Czech
-kde-i18n-Danish
-kde-i18n-Dutch
-kde-i18n-Estonian
-kde-i18n-Finnish
-kde-i18n-French
-kde-i18n-German
-kde-i18n-Greek
-kde-i18n-Hebrew
-kde-i18n-Hindi
-kde-i18n-Hungarian
-kde-i18n-Icelandic
-kde-i18n-Italian
-kde-i18n-Japanese
-kde-i18n-Korean
-kde-i18n-Lithuanian
-kde-i18n-Norwegian
-kde-i18n-Norwegian
-kde-i18n-Polish
-kde-i18n-Portuguese
-kde-i18n-Punjabi
-kde-i18n-Romanian
-kde-i18n-Russian
-kde-i18n-Serbian
-kde-i18n-Slovak
-kde-i18n-Slovenian
-kde-i18n-Spanish
-kde-i18n-Swedish
-kde-i18n-Tamil
-kde-i18n-Turkish
-kde-i18n-Ukrainian
-koffice-langpack-ca
-koffice-langpack-cs
-koffice-langpack-cy
-koffice-langpack-de
-koffice-langpack-el
-koffice-langpack-en_GB
-koffice-langpack-es
-koffice-langpack-et
-koffice-langpack-eu
-koffice-langpack-fa
-koffice-langpack-fi
-koffice-langpack-fr
-koffice-langpack-ga
-koffice-langpack-gl
-koffice-langpack-hu
-koffice-langpack-it
-koffice-langpack-ja
-koffice-langpack-km
-koffice-langpack-lv
-koffice-langpack-ms
-koffice-langpack-nb
-koffice-langpack-nl
-koffice-langpack-pl
-koffice-langpack-pt
-koffice-langpack-pt_BR
-koffice-langpack-ru
-koffice-langpack-sk
-koffice-langpack-sl
-koffice-langpack-sr
-koffice-langpack-sr
-koffice-langpack-sv
-koffice-langpack-tr
-koffice-langpack-uk
-koffice-langpack-zh_CN
-koffice-langpack-zh_TW
+kde-i18n-*
+koffice-langpack-*
 
 scim*
 -scim-devel
--scim-doc
--scim-qt
-# work around yum API bug with specifying wildcards for now 
-scim-tables
-scim-tables-*
-scim-sinhala
-scim-libs
-scim-bridge
-scim-bridge-gtk
-scim-anthy
-scim-hangul
-scim-pinyin
-scim-chewing
-scim-m17n
 
 m17n-lib
 m17n-db
 #m17n-db-*
 
+# fonts
 fonts-*
-# work around yum API bug with specifying wildcards for now 
-fonts-arabic
-fonts-bengali
-fonts-chinese
-fonts-gujarati
-fonts-hebrew
-fonts-hindi
-fonts-japanese
-fonts-kannada
-fonts-korean
-fonts-malayalam
-fonts-oriya
-fonts-punjabi
-fonts-sinhala
-fonts-tamil
-fonts-telugu
+
+# ignore comps.xml and make sure these packages are included
+knetworkmanager
+
+# kdm is broken atm
+gdm
 
 
 %post
@@ -244,7 +153,7 @@ sed -i 's/#AutoLoginUser=fred/AutoLoginUser=fedora/' /etc/kde/kdm/kdmrc
 sed -i 's/PreselectUser=None/PreselectUser=Default/' /etc/kde/kdm/kdmrc
 sed -i 's/#DefaultUser=ethel/DefaultUser=fedora/' /etc/kde/kdm/kdmrc
 
-# replace htmlview and launchmail in kicker
+# replace htmlview and launchmail in kicker (#230023)
 sed -i 's/redhat-web.desktop/konqbrowser.desktop/' /usr/share/config/kickerrc
 sed -i 's/redhat-email.desktop/kmail.desktop/' /usr/share/config/kickerrc
 
@@ -281,9 +190,14 @@ chkconfig --levels 345 yum-updatesd off
 # disk intensive that are painful on a live image
 chkconfig --level 345 crond off
 chkconfig --level 345 atd off
+chkconfig --level 345 readahead_early off
+chkconfig --level 345 readahead_later off
 
 EOF
 
 chmod 755 /etc/rc.d/init.d/fedora-live-kde
 /sbin/restorecon /etc/rc.d/init.d/fedora-live-kde
 /sbin/chkconfig --add fedora-live-kde
+
+# save a little bit of space at least...
+rm -f /boot/initrd*
