@@ -66,9 +66,11 @@ ntfsprogs
 ntfs-3g
 gparted
 
-#fonts
+# fonts
 fonts-*
 
+# ignore comps.xml and make sure these packages are included
+knetworkmanager
 
 # kdm is broken atm
 gdm
@@ -140,12 +142,12 @@ sed -i 's/#AutoLoginUser=fred/AutoLoginUser=fedora/' /etc/kde/kdm/kdmrc
 sed -i 's/PreselectUser=None/PreselectUser=Default/' /etc/kde/kdm/kdmrc
 sed -i 's/#DefaultUser=ethel/DefaultUser=fedora/' /etc/kde/kdm/kdmrc
 
-# replace htmlview and launchmail in kicker
+# replace htmlview and launchmail in kicker (#230023)
 sed -i 's/redhat-web.desktop/konqbrowser.desktop/' /usr/share/config/kickerrc
 sed -i 's/redhat-email.desktop/kmail.desktop/' /usr/share/config/kickerrc
 
-# adding some autostarted applications 
-#cp /usr/share/applications/fedora-knetworkmanager.desktop /usr/share/autostart/
+# adding some autostarted applications
+cp /usr/share/applications/fedora-knetworkmanager.desktop /usr/share/autostart/
 
 # workaround for #233881
 sed -i 's/BlueCurve/Echo/' /usr/share/config/ksplashrc
@@ -177,6 +179,8 @@ chkconfig --levels 345 yum-updatesd off
 # disk intensive that are painful on a live image
 chkconfig --level 345 crond off
 chkconfig --level 345 atd off
+chkconfig --level 345 readahead_early off
+chkconfig --level 345 readahead_later off
 
 EOF
 
