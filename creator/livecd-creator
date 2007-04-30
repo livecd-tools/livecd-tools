@@ -201,8 +201,13 @@ class LiveCDYum(yum.YumBase):
         return path
 
     def setup(self, datadir, installroot):
-        self.doConfigSetup(fn = self._writeConf(datadir, installroot))
-        self.doGenericSetup()
+        self.doConfigSetup(fn = self._writeConf(datadir, installroot),
+                           root = installroot)
+        self.conf.cache = 0
+        self.doTsSetup()
+        self.doRpmDBSetup()
+        self.doRepoSetup()
+        self.doSackSetup()
 
     def selectPackage(self, pkg):
         """Select a given package.  Can be specified with name.arch or name*"""
@@ -728,9 +733,9 @@ class InstallationTarget:
                 subprocess.call([s.interp, "/tmp/%s" %(os.path.basename(path),)],
                                 preexec_fn = self.run_in_root)
             except OSError, (err, msg):
-                raise InstallationError("Failed to execute %%post script with '%s' : %s" % (s.interp, msg))
-            finally:
                 os.unlink(path)
+                raise InstallationError("Failed to execute %%post script with '%s' : %s" % (s.interp, msg))
+            os.unlink(path)
 
     def get_kernel_version(self):
         #
@@ -1073,9 +1078,9 @@ def main():
         target.package()
     except InstallationError, e:
         print >> sys.stderr, "Error creating Live CD : %s" % e
-        return 1
-    finally:
         target.teardown()
+        return 1
+    target.teardown()
 
     return 0
 
