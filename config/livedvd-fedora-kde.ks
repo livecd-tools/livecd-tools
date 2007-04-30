@@ -190,6 +190,7 @@ chkconfig --levels 345 yum-updatesd off
 # disk intensive that are painful on a live image
 chkconfig --level 345 crond off
 chkconfig --level 345 atd off
+chkconfig --level 345 anacron off
 chkconfig --level 345 readahead_early off
 chkconfig --level 345 readahead_later off
 
