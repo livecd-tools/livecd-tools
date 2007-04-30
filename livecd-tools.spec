@@ -17,7 +17,7 @@ Requires: pykickstart >= 0.96
 Requires: syslinux >= 3.30
 Requires: dosfstools >= 2.11-8
 BuildArch: noarch
-ExcludeArch: ppc pp64
+ExcludeArch: ppc ppc64
 
 %description 
 Tools for generating live CD's on Fedora based systems including
