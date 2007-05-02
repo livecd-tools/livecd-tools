@@ -82,17 +82,15 @@ fonts-*
 
 # ignore comps.xml and make sure these packages are included
 knetworkmanager
-
-# kdm is broken atm
-gdm
-
+kpowersave
+redhat-artwork-kde
 
 %post
 
 # create /etc/sysconfig/desktop (needed for installation)
 cat > /etc/sysconfig/desktop <<EOF
 DESKTOP="KDE"
-#DISPLAYMANAGER="KDE"
+DISPLAYMANAGER="KDE"
 EOF
 
 # add initscript
@@ -163,25 +161,14 @@ cp /usr/share/applications/fedora-knetworkmanager.desktop /usr/share/autostart/
 # workaround for #233881
 sed -i 's/BlueCurve/Echo/' /usr/share/config/ksplashrc
 
-# workaround to put liveinst on desktop (should not be needed but 
-# /etc/X11/xinit/xinitrc.d/zz-liveinst from anaconda doesn't do this atm)
-mkdir -p /home/fedora/.kde/env
-cat > /home/fedora/.kde/env/liveinst.sh <<END
-#! /bin/bash
-sed -i 's/NoDisplay=true/NoDisplay=false/' /home/fedora/Desktop/liveinst.desktop
-END
-chmod +x /home/fedora/.kde/env/liveinst.sh
+# workaround to put liveinst on desktop and in menu
+sed -i 's/NoDisplay=true/NoDisplay=false/' /usr/share/applications/liveinst.desktop
 
 # turn off firstboot for livecd boots
 echo "RUN_FIRSTBOOT=NO" > /etc/sysconfig/firstboot
 
 # Stopgap fix for RH #217966; should be fixed in HAL instead
 touch /media/.hal-mtab
-
-# some cleanups
-
-# remove non-working gnome-theme-installer from menu
-rm -f /usr/share/applications/gnome-theme-installer.desktop
 
 # don't start yum-updatesd for livecd boots
 chkconfig --levels 345 yum-updatesd off
