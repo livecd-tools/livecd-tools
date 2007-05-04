@@ -1,6 +1,6 @@
 Summary: Tools for building live CD's
 Name: livecd-tools
-Version: 007
+Version: 008
 Release: 1%{?dist}
 License: GPL
 Group: System Environment/Base
@@ -13,8 +13,8 @@ Requires: e2fsprogs
 Requires: yum >= 3.0.0
 Requires: mkisofs
 Requires: squashfs-tools
-Requires: pykickstart >= 0.96
-Requires: syslinux >= 3.30
+Requires: pykickstart
+Requires: syslinux
 Requires: dosfstools >= 2.11-8
 BuildArch: noarch
 ExcludeArch: ppc ppc64
@@ -48,6 +48,12 @@ rm -rf $RPM_BUILD_ROOT
 %{_datadir}/livecd-tools/*
 
 %changelog
+* Fri May  4 2007 Jeremy Katz <katzj@redhat.com> - 008-1
+- disable screensaver with default config
+- add aic7xxx and sym53c8xx drivers to default initramfs
+- fixes from johnp for FC6 support in the creator
+- fix iso-to-stick to work on FC6
+
 * Tue Apr 24 2007 Jeremy Katz <katzj@redhat.com> - 007-1
 - Disable prelinking by default
 - Disable some things that slow down the live boot substantially
