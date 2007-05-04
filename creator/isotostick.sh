@@ -38,7 +38,7 @@ exitclean() {
 getdisk() {
     DEV=$1
 
-    p=$(udevinfo --query=path --name=$DEV)
+    p=$(udevinfo -q path -n $DEV)
     if [ -e /sys/$p/device ]; then
 	device=$(basename /sys/$p)
     else
@@ -85,6 +85,7 @@ checkPartActive() {
 	echo "You can mark the partition as bootable with "
         echo "    # /sbin/parted $device"
 	echo "    (parted) toggle N boot"
+	echo "    (parted) quit"
 	exitclean
     fi
 }
@@ -118,9 +119,14 @@ checkFilesystem() {
 }
 
 checkSyslinuxVersion() {
+    if [ ! -x /usr/bin/syslinux ]; then
+	echo "You need to have syslinux installed to run this script"
+	exit 1
+    fi
     if ! syslinux 2>&1 | grep -qe -d; then
-	echo "Your syslinux is too old for this."
-	exitclean
+	SYSLINUXPATH=""
+    else
+	SYSLINUXPATH="syslinux"
     fi
 }
 
@@ -158,33 +164,38 @@ checkMBR $USBDEV
 
 trap exitclean SIGINT SIGTERM
 
-if [ -d $USBMNT/syslinux -o -d $USBMNT/LiveOS ]; then
+if [ -d $USBMNT/LiveOS ]; then
     echo "Already set up as live image.  Deleting old in fifteen seconds..."
     sleep 15
 
-    rm -rf $USBMNT/syslinux $USBMNT/LiveOS
+    rm -rf $USBMNT/LiveOS
 fi
 
 echo "Copying live image to USB stick"
-mkdir $USBMNT/syslinux $USBMNT/LiveOS
+if [ ! -d $USBMNT/$SYSLINUXPATH ]; then mkdir $USBMNT/$SYSLINUXPATH ; fi
+if [ ! -d $USBMNT/LiveOS ]; then mkdir $USBMNT/LiveOS ; fi
 cp $CDMNT/squashfs.img $USBMNT/LiveOS/squashfs.img || exitclean 
-cp $CDMNT/isolinux/* $USBMNT/syslinux/
+cp $CDMNT/isolinux/* $USBMNT/$SYSLINUXPATH
 
 echo "Updating boot config file"
 # adjust label and fstype
-sed -i -e "s/CDLABEL=[^ ]*/$USBLABEL/" -e "s/rootfstype=[^ ]*/rootfstype=$USBFS/" $USBMNT/syslinux/isolinux.cfg
+sed -i -e "s/CDLABEL=[^ ]*/$USBLABEL/" -e "s/rootfstype=[^ ]*/rootfstype=$USBFS/" $USBMNT/$SYSLINUXPATH/isolinux.cfg
 
 echo "Installing boot loader"
 if [ "$USBFS" = "vfat" -o "$USBFS" = "msdos" ]; then
     # syslinux expects the config to be named syslinux.cfg 
     # and has to run with the file system unmounted
-    mv $USBMNT/syslinux/isolinux.cfg $USBMNT/syslinux/syslinux.cfg
+    mv $USBMNT/$SYSLINUXPATH/isolinux.cfg $USBMNT/$SYSLINUXPATH/syslinux.cfg
     cleanup
-    syslinux -d syslinux $USBDEV
+    if [ -n "$SYSLINUXPATH" ]; then
+	syslinux -d $SYSLINUXPATH $USBDEV
+    else
+	syslinux $USBDEV
+    fi
 elif [ "$USBFS" = "ext2" -o "$USBFS" = "ext3" ]; then
     # extlinux expects the config to be named extlinux.conf
     # and has to be run with the file system mounted
-    mv $USBMNT/syslinux/isolinux.cfg $USBMNT/syslinux/extlinux.conf
+    mv $USBMNT/$SYSLINUXPATH/isolinux.cfg $USBMNT/$SYSLINUXPATH/extlinux.conf
     extlinux -i $USBMNT/syslinux
     cleanup
 fi
