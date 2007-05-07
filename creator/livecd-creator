@@ -837,12 +837,12 @@ timeout 600
 %(background)s
 menu title Welcome to %(label)s!
 menu color border 0 #ffffffff #00000000
-menu color sel 0 #ffffffff #ff000000
+menu color sel 7 #ffffffff #ff000000
 menu color title 0 #ffffffff #00000000
 menu color tabmsg 0 #ffffffff #00000000
 menu color unsel 0 #ffffffff #00000000
 menu color hotsel 0 #ff000000 #ffffffff
-menu color hotkey 0 #ffffffff #ff000000
+menu color hotkey 7 #ffffffff #ff000000
 """ %{"label": self.fs_label, "background" : have_background}
 
         stanzas = [("linux", "Run from image", ""),
