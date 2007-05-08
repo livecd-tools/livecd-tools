@@ -23,8 +23,10 @@ kernel
 dejavu-lgc-fonts
 setroubleshoot
 smolt
+smolt-firstboot
 syslinux
 system-config-display
+system-config-services
 xorg-x11-drivers
 
 # to make the cd installable
@@ -54,7 +56,6 @@ twinkle
 -speedcrunch
 
 # some stuff we don't want to save space
--samba-client
 -redhat-lsb
 -ccid
 -coolkey
@@ -73,7 +74,7 @@ fonts-*
 knetworkmanager
 kpowersave
 redhat-artwork-kde
-
+samba-client
 
 %post
 
@@ -149,7 +150,7 @@ sed -i 's/redhat-email.desktop/kmail.desktop/' /usr/share/config/kickerrc
 cp /usr/share/applications/fedora-knetworkmanager.desktop /usr/share/autostart/
 
 # workaround for #233881
-sed -i 's/BlueCurve/Echo/' /usr/share/config/ksplashrc
+#sed -i 's/BlueCurve/Echo/' /usr/share/config/ksplashrc
 
 # workaround to put liveinst on desktop and in menu
 sed -i 's/NoDisplay=true/NoDisplay=false/' /usr/share/applications/liveinst.desktop
