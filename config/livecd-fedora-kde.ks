@@ -56,6 +56,7 @@ twinkle
 -speedcrunch
 
 # some stuff we don't want to save space
+-samba-client
 -redhat-lsb
 -ccid
 -coolkey
@@ -74,7 +75,6 @@ fonts-*
 knetworkmanager
 kpowersave
 redhat-artwork-kde
-samba-client
 
 %post
 
