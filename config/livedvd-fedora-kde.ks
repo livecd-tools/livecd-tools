@@ -6,7 +6,7 @@ selinux --enforcing
 firewall --disabled
 
 xconfig --startxonboot
-services --enabled=NetworkManager,dhcdbd,lisa --disabled=network,sshd
+services --enabled=NetworkManager,dhcdbd --disabled=network,sshd
 
 repo --name=d7 --baseurl=http://download.fedora.redhat.com/pub/fedora/linux/core/development/i386/os
 repo --name=e7 --baseurl=http://download.fedora.redhat.com/pub/fedora/linux/extras/development/i386
