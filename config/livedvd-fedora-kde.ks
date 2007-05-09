@@ -67,7 +67,10 @@ ntfsprogs
 ntfs-3g
 gparted
 
-# language support
+# use gdm on dvd to select language
+gdm
+
+# language support (only for dvd version)
 kde-i18n-*
 koffice-langpack-*
 aspell-*
@@ -93,7 +96,7 @@ samba-client
 # create /etc/sysconfig/desktop (needed for installation)
 cat > /etc/sysconfig/desktop <<EOF
 DESKTOP="KDE"
-DISPLAYMANAGER="KDE"
+#DISPLAYMANAGER="KDE"
 EOF
 
 # add initscript
