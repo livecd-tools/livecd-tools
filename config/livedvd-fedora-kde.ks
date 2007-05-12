@@ -53,7 +53,6 @@ twinkle
 -kdeartwork-extras
 -kmymoney2
 -basket
--speedcrunch
 
 # some stuff we don't want to save space
 -samba-client
@@ -142,6 +141,11 @@ if [ -e /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png ] ; then
     cp /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png /home/fedora/.face
     chown fedora:fedora /home/fedora/.face
     # TODO: would be nice to get e-d-s to pick this one up too... but how?
+
+    # use image also for kdm
+    mkdir -p /usr/share/apps/kdm/faces
+    cp /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png /usr/share/apps/kdm/faces/fedora.face.icon
+
 fi
 
 # make fedora user use KDE
@@ -156,10 +160,6 @@ sed -i 's/#AutoLoginUser=fred/AutoLoginUser=fedora/' /etc/kde/kdm/kdmrc
 # set up user fedora as default user and preselected user
 sed -i 's/PreselectUser=None/PreselectUser=Default/' /etc/kde/kdm/kdmrc
 sed -i 's/#DefaultUser=ethel/DefaultUser=fedora/' /etc/kde/kdm/kdmrc
-
-# replace htmlview and launchmail in kicker (#230023)
-sed -i 's/redhat-web.desktop/konqbrowser.desktop/' /usr/share/config/kickerrc
-sed -i 's/redhat-email.desktop/kmail.desktop/' /usr/share/config/kickerrc
 
 # adding some autostarted applications
 cp /usr/share/applications/fedora-knetworkmanager.desktop /usr/share/autostart/
