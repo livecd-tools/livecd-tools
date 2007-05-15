@@ -49,6 +49,7 @@ twinkle
 #some changes that we don't want...
 -specspo
 -scribus
+-kdeaddons
 -kdemultimedia-extras
 -kdeartwork-extras
 -kmymoney2
