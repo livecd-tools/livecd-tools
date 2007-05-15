@@ -66,6 +66,7 @@ xine-lib-extras
 ntfsprogs
 ntfs-3g
 gparted
+synaptics
 
 # fonts
 fonts-*
@@ -148,9 +149,6 @@ sed -i 's/#DefaultUser=ethel/DefaultUser=fedora/' /etc/kde/kdm/kdmrc
 
 # adding some autostarted applications
 cp /usr/share/applications/fedora-knetworkmanager.desktop /usr/share/autostart/
-
-# workaround for #233881
-#sed -i 's/BlueCurve/Echo/' /usr/share/config/ksplashrc
 
 # workaround to put liveinst on desktop and in menu
 sed -i 's/NoDisplay=true/NoDisplay=false/' /usr/share/applications/liveinst.desktop
