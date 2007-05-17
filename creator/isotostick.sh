@@ -142,7 +142,7 @@ fi
 ISO=$1
 USBDEV=$2
 
-if [ ! -f $ISO ]; then
+if [ ! -e $ISO ]; then
     usage
 fi
 

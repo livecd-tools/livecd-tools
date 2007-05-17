@@ -6,7 +6,7 @@ selinux --enforcing
 firewall --disabled
 
 xconfig --startxonboot
-services --enabled=NetworkManager,dhcdbd,lisa --disabled=network,sshd
+services --enabled=NetworkManager,dhcdbd --disabled=network,sshd
 
 repo --name=d7 --baseurl=http://download.fedora.redhat.com/pub/fedora/linux/core/development/i386/os
 repo --name=e7 --baseurl=http://download.fedora.redhat.com/pub/fedora/linux/extras/development/i386
@@ -23,8 +23,10 @@ kernel
 dejavu-lgc-fonts
 setroubleshoot
 smolt
+smolt-firstboot
 syslinux
 system-config-display
+system-config-services
 xorg-x11-drivers
 
 # to make the cd installable
@@ -47,11 +49,11 @@ twinkle
 #some changes that we don't want...
 -specspo
 -scribus
+-kdeaddons
 -kdemultimedia-extras
 -kdeartwork-extras
 -kmymoney2
 -basket
--speedcrunch
 
 # some stuff we don't want to save space
 -samba-client
@@ -65,6 +67,7 @@ xine-lib-extras
 ntfsprogs
 ntfs-3g
 gparted
+synaptics
 
 # fonts
 fonts-*
@@ -73,7 +76,6 @@ fonts-*
 knetworkmanager
 kpowersave
 redhat-artwork-kde
-
 
 %post
 
@@ -126,6 +128,11 @@ if [ -e /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png ] ; then
     cp /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png /home/fedora/.face
     chown fedora:fedora /home/fedora/.face
     # TODO: would be nice to get e-d-s to pick this one up too... but how?
+
+    # use image also for kdm
+    mkdir -p /usr/share/apps/kdm/faces
+    cp /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png /usr/share/apps/kdm/faces/fedora.face.icon
+
 fi
 
 # make fedora user use KDE
@@ -141,15 +148,8 @@ sed -i 's/#AutoLoginUser=fred/AutoLoginUser=fedora/' /etc/kde/kdm/kdmrc
 sed -i 's/PreselectUser=None/PreselectUser=Default/' /etc/kde/kdm/kdmrc
 sed -i 's/#DefaultUser=ethel/DefaultUser=fedora/' /etc/kde/kdm/kdmrc
 
-# replace htmlview and launchmail in kicker (#230023)
-sed -i 's/redhat-web.desktop/konqbrowser.desktop/' /usr/share/config/kickerrc
-sed -i 's/redhat-email.desktop/kmail.desktop/' /usr/share/config/kickerrc
-
 # adding some autostarted applications
 cp /usr/share/applications/fedora-knetworkmanager.desktop /usr/share/autostart/
-
-# workaround for #233881
-sed -i 's/BlueCurve/Echo/' /usr/share/config/ksplashrc
 
 # workaround to put liveinst on desktop and in menu
 sed -i 's/NoDisplay=true/NoDisplay=false/' /usr/share/applications/liveinst.desktop
