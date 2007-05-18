@@ -34,6 +34,9 @@ scim*
 -scim-skk
 -scim-tomoe
 -scim-tables-chinese
+-scim-fcitx*
+-scim-tables-additional
+-scim-skk
 
 m17n-lib
 m17n-db
@@ -51,7 +54,6 @@ fonts-*
 -compat*
 
 # space sucks
--ekiga
 -gnome-user-docs
 -specspo
 -esc
@@ -87,7 +89,7 @@ abiword
 gnumeric
 evince
 gnome-blog
--planner
+planner
 
 # lots of people want...
 gparted
@@ -98,6 +100,8 @@ ntfsprogs
 anaconda
 anaconda-runtime
 
+# make sure debuginfo doesn't end up on the live image
+-*debuginfo
 
 %post
 # FIXME: it'd be better to get this installed from a package
@@ -139,6 +143,8 @@ useradd -c "Fedora Live" fedora
 passwd -d fedora > /dev/null
 # disable screensaver locking
 gconftool-2 --direct --config-source=xml:readwrite:/etc/gconf/gconf.xml.defaults -s -t bool /apps/gnome-screensaver/lock_enabled false >/dev/null
+# set up timed auto-login for after 60 seconds
+sed -i -e 's/\[daemon\]/[daemon]\nTimedLoginEnable=true\nTimedLogin=fedora\nTimedLoginDelay=60/' /etc/gdm/custom.conf
 if [ -e /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png ] ; then
     cp /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png /home/fedora/.face
     chown fedora:fedora /home/fedora/.face
