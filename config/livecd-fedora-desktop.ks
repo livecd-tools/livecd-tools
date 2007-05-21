@@ -62,6 +62,7 @@ fonts-*
 -vino
 -redhat-lsb
 -sox
+-tomboy
 
 # smartcards won't really work on the livecd.  and we _need_ space
 -coolkey
