@@ -410,6 +410,9 @@ echo "ACTION==\"add\", SUBSYSTEM==\"scsi_device\", SYSFS{type}==\"[45]\", RUN+=\
 #
 echo "KERNEL==\"msr[0-9]*\", NAME=\"cpu/%n/msr\"" > /etc/udev/rules.d/20-cpu.rules
 
+# FIXME: hack since sr_mod seems to fail to get loaded sometimes (#239657)
+/sbin/modprobe sr_mod
+
 if [ "\$quiet" != "1" ] ; then
     echo "starting udevd"
 fi
