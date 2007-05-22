@@ -132,7 +132,6 @@ if [ -e /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png ] ; then
     # use image also for kdm
     mkdir -p /usr/share/apps/kdm/faces
     cp /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png /usr/share/apps/kdm/faces/fedora.face.icon
-
 fi
 
 # make fedora user use KDE
@@ -145,8 +144,11 @@ sed -i 's/#AutoLoginEnable=true/AutoLoginEnable=true/' /etc/kde/kdm/kdmrc
 sed -i 's/#AutoLoginUser=fred/AutoLoginUser=fedora/' /etc/kde/kdm/kdmrc
 
 # set up user fedora as default user and preselected user
-sed -i 's/PreselectUser=None/PreselectUser=Default/' /etc/kde/kdm/kdmrc
-sed -i 's/#DefaultUser=ethel/DefaultUser=fedora/' /etc/kde/kdm/kdmrc
+sed -i 's/#PreselectUser=Default/PreselectUser=Default/' /etc/kde/kdm/kdmrc
+sed -i 's/#DefaultUser=johndoe/DefaultUser=fedora/' /etc/kde/kdm/kdmrc
+
+# disable screensaver
+sed -i 's/Enabled=true/Enabled=false/' /usr/share/kde-settings/kde-profile/default/share/config/kdesktoprc
 
 # adding some autostarted applications
 cp /usr/share/applications/fedora-knetworkmanager.desktop /usr/share/autostart/
