@@ -89,8 +89,8 @@ fonts-*
 abiword
 gnumeric
 evince
-gnome-blog
-planner
+#gnome-blog
+#planner
 
 # lots of people want...
 gparted
