@@ -1,6 +1,6 @@
 Summary: Tools for building live CD's
 Name: livecd-tools
-Version: 008
+Version: 009
 Release: 1%{?dist}
 License: GPL
 Group: System Environment/Base
@@ -48,6 +48,10 @@ rm -rf $RPM_BUILD_ROOT
 %{_datadir}/livecd-tools/*
 
 %changelog
+* Wed May 30 2007 Jeremy Katz <katzj@redhat.com> - 009-1
+- miscellaneous live config changes
+- fix isomd5 checking syntax error
+
 * Fri May  4 2007 Jeremy Katz <katzj@redhat.com> - 008-1
 - disable screensaver with default config
 - add aic7xxx and sym53c8xx drivers to default initramfs
