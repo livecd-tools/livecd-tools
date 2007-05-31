@@ -571,15 +571,15 @@ class InstallationTarget:
         f.write("::1\t\tlocalhost6.localdomain6 localhost6\n")
         f.close()
 
-    def writeNetworkResolv(self, instroot, nodns, primaryns, secondaryns):
-        if nodns or not primaryns:
+    def writeNetworkResolv(self, instroot, nodns, nameservers):
+        if nodns or not nameservers:
             return
 
         path = instroot + "/etc/resolv.conf"
         f = file(path, "w+")
         os.chmod(path, 0644)
 
-        for ns in (primaryns, secondaryns):
+        for ns in (nameservers):
             if ns:
                 f.write("nameserver %s\n" % ns)
 
@@ -598,8 +598,6 @@ class InstallationTarget:
         nodns = False
         hostname = None
         gateway = None
-        primaryns = None
-        secondaryns = None
 
         for network in self.ksparser.handler.network.network:
             if not network.device:
@@ -625,14 +623,10 @@ class InstallationTarget:
 
             if network.nameserver:
                 nameservers = string.split(network.nameserver, ",")
-                if len(nameservers) >= 1:
-                    primaryns = nameservers[0]
-                if len(nameservers) >= 2:
-                    secondayns = nameservers[0]
 
         self.writeNetworkConfig(instroot, useipv6, hostname, gateway)
         self.writeNetworkHosts(instroot, hostname)
-        self.writeNetworkResolv(instroot, nodns, primaryns, secondaryns)
+        self.writeNetworkResolv(instroot, nodns, nameservers)
 
     def configureSystem(self):
         instroot = "%s/install_root" %(self.build_dir,)
