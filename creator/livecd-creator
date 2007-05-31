@@ -598,6 +598,7 @@ class InstallationTarget:
         nodns = False
         hostname = None
         gateway = None
+        nameservers = None
 
         for network in self.ksparser.handler.network.network:
             if not network.device:
