@@ -144,7 +144,7 @@ class LoopbackMount:
         self.mounted = True
 
 class SparseExt3LoopbackMount(LoopbackMount):
-    def __init__(self, lofile, mountdir, size, fslabel):
+    def __init__(self, lofile, mountdir, size, fslabel, tmpdir):
         LoopbackMount.__init__(self, lofile, mountdir, fstype = "ext3")
         self.size = size
         self.fslabel = fslabel
@@ -283,7 +283,7 @@ class LiveCDYum(yum.YumBase):
         return self.runTransaction(cb)
 
 class InstallationTarget:
-    def __init__(self, repos, packages, epackages, groups, fs_label, skip_compression, skip_prelink):
+    def __init__(self, repos, packages, epackages, groups, fs_label, skip_compression, skip_prelink,tmpdir):
         self.ayum = None
         self.repos = repos
         self.packages = packages
@@ -292,6 +292,7 @@ class InstallationTarget:
         self.fs_label = fs_label
         self.skip_compression = skip_compression
         self.skip_prelink = skip_prelink
+        self.tmpdir = tmpdir
 
         self.build_dir = None
         self.instloop = None
@@ -378,9 +379,9 @@ class InstallationTarget:
 
         # setup temporary build dirs
         try:
-            self.build_dir = tempfile.mkdtemp(dir="/var/tmp", prefix="livecd-creator-")
+            self.build_dir = tempfile.mkdtemp(dir=self.tmpdir, prefix="livecd-creator-")
         except OSError, (err, msg):
-            raise InstallationError("Failed create build directory in /var/tmp: %s" % msg)
+            raise InstallationError("Failed create build directory in %s: %s" % (self.tmpdir, msg))
 
         os.makedirs(self.build_dir + "/out/isolinux")
         os.makedirs(self.build_dir + "/out/sysroot")
@@ -400,7 +401,8 @@ class InstallationTarget:
                                                     "%s/install_root"
                                                     %(self.build_dir,),
                                                     image_size,
-                                                    self.fs_label)
+                                                    self.fs_label,
+                                                    self.tmpdir)
             
 
         try:
@@ -916,6 +918,7 @@ usage: livecd-creator [--help]
                       [--skip-compression]
                       [--uncompressed-size=<size-in-MB>]
                       [--shell]
+                      [--tmpdir=<tmpdir>]
 
  --help              : Print usage and exit
  --config            : Path to kickstart config file
@@ -928,6 +931,7 @@ usage: livecd-creator [--help]
  --prelink           : Prelink the image
  --uncompressed-size : Size of uncompressed fs in MB (default: 4096)
  --shell             : Start a shell in the chroot for post-configuration
+ --tmpdir            : Temporary directory to use (default: /var/tmp)
 
  Examples:
 
@@ -957,14 +961,15 @@ class Options:
         self.skip_prelink = True
         self.uncompressed_size = 4096
         self.give_shell = False
+        self.tmpdir = "/var/tmp"
 
 def parse_options(args):
     try:
-        opts, args = getopt.getopt(args, "hr:b:p:e:f:c:su:l",
+        opts, args = getopt.getopt(args, "hr:b:p:e:f:c:su:lt:",
                                    ["help", "repo=", "base-on=", "package=",
                                     "exclude-package=", "fslabel=", "config=",
                                     "skip-compression", "uncompressed-size=",
-                                    "shell", "no-prelink", "prelink"])
+                                    "shell", "no-prelink", "prelink","tmpdir="])
     except getopt.GetoptError, msg:
         raise Usage(msg)
 
@@ -1019,6 +1024,9 @@ def parse_options(args):
             if not os.path.isfile(options.base_on):
                 raise Usage("Live CD ISO '%s' does not exist" % options.base_on)
             continue
+        if o in ("-t", "--tmpdir"):
+            options.tmpdir = a
+            continue
         raise Usage("Unknown option %s" % o)
 
     if not options.kscfg and not (options.packages or options.groups):
@@ -1054,7 +1062,8 @@ def main():
                                 options.groups,
                                 options.fs_label,
                                 options.skip_compression,
-                                options.skip_prelink)
+                                options.skip_prelink,
+                                options.tmpdir)
 
     try:
         target.parse(options.kscfg)
