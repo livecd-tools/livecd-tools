@@ -262,8 +262,11 @@ class LiveCDYum(yum.YumBase):
         self.repos.add(repo)
             
     def runInstall(self):
-        (res, resmsg) = self.buildTransaction()
-        if res != 2:
+        try:
+            (res, resmsg) = self.buildTransaction()
+        except yum.Errors.RepoError, e:
+            raise InstallationError("Unable to download from repo : %s" %(e,))
+        if res != 2 and False:
             raise InstallationError("Failed to build transaction : %s" % str.join("\n", resmsg))
         
         dlpkgs = map(lambda x: x.po, filter(lambda txmbr: txmbr.ts_state in ("i", "u"), self.tsInfo.getMembers()))
