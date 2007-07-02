@@ -486,6 +486,8 @@ class InstallationTarget:
             map(lambda pkg: self.ayum.deselectPackage(pkg), excludePackageList)
 
             self.ayum.runInstall()
+        except yum.Errors.RepoError, e:
+            raise InstallationError("Unable to download from repo : %s" %(e,))
         finally:
             self.ayum.closeRpmDB()
 
@@ -869,7 +871,10 @@ menu color hotkey 7 #ffffffff #ff000000
             self.ayum.addRepository(name, url)
 
         self.installPackages(self.packages, self.epackages, self.groups)
-        self.configureSystem()
+        try:
+            self.configureSystem()
+        except Exception, e: #FIXME: we should be a little bit more fine-grained
+            raise InstallationError("Error configuring live image: %s" %(e,))
         self.configureNetwork()
         self.relabelSystem()
         if not self.skip_prelink:
