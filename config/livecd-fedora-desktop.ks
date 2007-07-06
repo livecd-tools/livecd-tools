@@ -33,9 +33,8 @@ scim*
 -scim-bridge-qt
 -scim-skk
 -scim-tomoe
--scim-tables-chinese
+-scim-tables*
 -scim-fcitx*
--scim-tables-additional
 -scim-skk
 
 m17n-lib
