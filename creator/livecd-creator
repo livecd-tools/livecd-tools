@@ -334,6 +334,11 @@ class InstallationTarget:
         if not self.repos:
             raise InstallationError("No repositories specified")
 
+        # more sanity checks
+        if self.ksparser.handler.selinux.selinux and not \
+               os.path.exists("/selinux/enforce"):
+            raise InstallationError("SELinux requested but not enabled on host system")
+
     def base_on_iso(self, base_on):
         """helper function to extract ext3 file system from a live CD ISO"""
 
