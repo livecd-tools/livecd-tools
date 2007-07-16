@@ -8,8 +8,7 @@ firewall --disabled
 xconfig --startxonboot
 services --enabled=NetworkManager,dhcdbd --disabled=network,sshd
 
-repo --name=d7 --baseurl=http://download.fedora.redhat.com/pub/fedora/linux/core/development/i386/os
-repo --name=e7 --baseurl=http://download.fedora.redhat.com/pub/fedora/linux/extras/development/i386
+repo --name=development --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=rawhide&arch=i386
 
 %packages
 # Basic packages
