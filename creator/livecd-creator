@@ -703,10 +703,10 @@ class InstallationTarget:
         # enable/disable services appropriately
         if os.path.exists("%s/sbin/chkconfig" %(instroot,)):
             for s in self.ksparser.handler.services.enabled:
-                subprocess.call(["/sbin/chkconfig", s, "--level", "345", "on"],
+                subprocess.call(["/sbin/chkconfig", s, "on"],
                                 preexec_fn=self.run_in_root)
             for s in self.ksparser.handler.services.disabled:
-                subprocess.call(["/sbin/chkconfig", s, "--level", "345", "off"],
+                subprocess.call(["/sbin/chkconfig", s, "off"],
                                 preexec_fn=self.run_in_root)
 
         # x by default?
