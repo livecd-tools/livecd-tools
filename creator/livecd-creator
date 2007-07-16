@@ -321,7 +321,8 @@ class InstallationTarget:
                         break
 
                 if not already_given:
-                    self.repos.append( (repo.name, repo.baseurl) )
+                    self.repos.append( (repo.name, repo.baseurl,
+                                        repo.mirrorlist) )
 
             self.packages.extend(self.ksparser.handler.packages.packageList)
             self.groups.extend(map(lambda g: (g.name, g.include),
@@ -872,8 +873,8 @@ menu color hotkey 7 #ffffffff #ff000000
         # TODO: enable external entitity to partipate in adding boot entries
 
     def install(self):
-        for (name, url) in self.repos:
-            self.ayum.addRepository(name, url)
+        for (name, url, mirrorlist) in self.repos:
+            self.ayum.addRepository(name, url, mirrorlist)
 
         self.installPackages(self.packages, self.epackages, self.groups)
         try:
