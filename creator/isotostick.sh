@@ -174,7 +174,11 @@ fi
 echo "Copying live image to USB stick"
 if [ ! -d $USBMNT/$SYSLINUXPATH ]; then mkdir $USBMNT/$SYSLINUXPATH ; fi
 if [ ! -d $USBMNT/LiveOS ]; then mkdir $USBMNT/LiveOS ; fi
-cp $CDMNT/squashfs.img $USBMNT/LiveOS/squashfs.img || exitclean 
+if [ -f $CDMNT/squashfs.img ]; then
+    cp $CDMNT/squashfs.img $USBMNT/LiveOS/squashfs.img || exitclean 
+elif [ -f $CDMNT/ext3fs.img ]; then
+    cp $CDMNT/ext3fs.img $USBMNT/LiveOS/ext3fs.img || exitclean 
+fi
 cp $CDMNT/isolinux/* $USBMNT/$SYSLINUXPATH
 
 echo "Updating boot config file"
