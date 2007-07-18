@@ -315,7 +315,7 @@ class InstallationTarget:
 
             for repo in self.ksparser.handler.repo.repoList:
                 already_given = False
-                for cmd_name, cmd_url in self.repos:
+                for cmd_name, cmd_url, cmd_mirrorlist in self.repos:
                     if cmd_name == repo.name:
                         already_given = True
                         break
