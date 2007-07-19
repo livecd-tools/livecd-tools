@@ -30,9 +30,11 @@ scim*
 -scim-doc
 -scim-qtimm
 -scim-bridge-qt
+-scim-bridge-qt4
 -scim-skk
 -scim-tomoe
 -scim-tables*
+-scim-tables-chinese
 -scim-fcitx*
 -scim-skk
 
@@ -75,9 +77,11 @@ fonts-*
 # scanning takes quite a bit of space :/
 -xsane
 -xsane-gimp
+-sane-backends
 
 # while hplip requires pyqt, it has to go
 -hplip
+-hpijs
 
 # added games
 #monkey-bubble
@@ -101,6 +105,9 @@ anaconda-runtime
 
 # make sure debuginfo doesn't end up on the live image
 -*debuginfo
+
+# hopefully temporary removals
+-ekiga
 
 %post
 # FIXME: it'd be better to get this installed from a package
