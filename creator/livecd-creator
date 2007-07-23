@@ -823,9 +823,21 @@ class InstallationTarget:
         os.unlink("%s/install_root/boot/livecd-initramfs.img"
                   %(self.build_dir,))
 
-        for p in ["isolinux.bin", "vesamenu.c32"]:
-            path = "%s/install_root/usr/lib/syslinux/%s" % (self.build_dir, p)
+        syslinuxfiles = ["isolinux.bin"]
+        menus = ["vesamenu.c32", "menu.c32"]
+        syslinuxMenu = None
 
+        for m in menus:
+            path = "%s/install_root/usr/lib/syslinux/%s" % (self.build_dir, m)
+            if os.path.isfile(path):
+                syslinuxfiles.append(m)
+                syslinuxMenu=m
+                break
+        if syslinuxMenu is None:
+            raise InstallationError("syslinux not installed : no suitable *menu.c32 found")
+
+        for p in syslinuxfiles:
+            path = "%s/install_root/usr/lib/syslinux/%s" % (self.build_dir, p)
             if not os.path.isfile(path):
                 raise InstallationError("syslinux not installed : %s not found" % path)
 
@@ -839,7 +851,7 @@ class InstallationTarget:
             have_background = ""
 
         cfg = """
-default vesamenu.c32
+default %(menu)s
 timeout 600
 
 %(background)s
@@ -851,7 +863,7 @@ menu color tabmsg 0 #ffffffff #00000000
 menu color unsel 0 #ffffffff #00000000
 menu color hotsel 0 #ff000000 #ffffffff
 menu color hotkey 7 #ffffffff #ff000000
-""" %{"label": self.fs_label, "background" : have_background}
+""" %{"menu" : syslinuxMenu, "label": self.fs_label, "background" : have_background}
 
         stanzas = [("linux", "Run from image", ""),
                    ("runfromram", "Run from RAM - requires 1 GB+", "live_ram")]
