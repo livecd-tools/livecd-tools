@@ -34,9 +34,10 @@ scim*
 -scim-skk
 -scim-tomoe
 -scim-tables*
--scim-tables-chinese
+-scim-tables
 -scim-fcitx*
 -scim-skk
+-scim-lang*
 
 m17n-lib
 m17n-db
@@ -105,9 +106,6 @@ anaconda-runtime
 
 # make sure debuginfo doesn't end up on the live image
 -*debuginfo
-
-# hopefully temporary removals
--ekiga
 
 %post
 # FIXME: it'd be better to get this installed from a package
