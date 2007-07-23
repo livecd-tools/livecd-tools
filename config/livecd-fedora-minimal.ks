@@ -10,6 +10,7 @@ repo --name=development --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist
 
 
 %packages
+@core
 bash
 kernel
 syslinux
