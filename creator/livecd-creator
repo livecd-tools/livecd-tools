@@ -163,7 +163,8 @@ class SparseExt3LoopbackMount(LoopbackMount):
 
     def _formatFilesystem(self):
         rc = subprocess.call(["/sbin/mkfs.ext3", "-F", "-L", self.fslabel,
-                              "-m", "1", self.lofile])
+                              "-m", "1", "-b", "4096", self.lofile,
+                              "%d" % ( self.size *  1024L * 1024L / 4096L )])
         if rc != 0:
             raise MountError("Error creating ext3 filesystem")
         rc = subprocess.call(["/sbin/tune2fs", "-c0", "-i0", "-Odir_index",
@@ -468,6 +469,10 @@ class InstallationTarget:
             b.umount()
 
         if self.instloop:
+            (xxbsize, xxfrsize, xxblocks, xxbfree,
+             xxbavail, xxfiles, xxffree, xxfavail,
+             xxflag, xxnamemax) = os.statvfs(self.build_dir + "/install_root")
+            print >> sys.stderr, "Installation target uncompressed data size is %d MB" % ( ( xxfrsize * xxblocks - xxbsize * xxbfree ) / ( 1024L * 1024L ) )
             self.instloop.cleanup()
             self.instloop = None
 
@@ -928,6 +933,58 @@ menu color hotkey 7 #ffffffff #ff000000
             shutil.move("%s/data/os.img" %(self.build_dir,),
                         "%s/out/ext3fs.img" %(self.build_dir,))
 
+    #
+    # cleanupDeleted removes unused data from the sparse ext3 os image file.
+    # The process involves: resize2fs-to-minimal, truncation,
+    # resize2fs-to-uncompressed-size (with implicit resparsification)
+    #
+    def cleanupDeleted(self):
+        # e2fsck -f -y is required by resize2fs
+        subprocess.call(["/sbin/e2fsck", "-f", "-y", "os.img"],
+                        cwd="%s/data" %(self.build_dir,),
+                        env={"PWD": "%s/data" %(self.build_dir,)})
+
+
+        (xxmode,xxino,xxdev,xxnlink,xxuid,xxgid,xxsize,xxatime,
+         xxmtime,xxctime) = os.stat(self.build_dir + "/data/os.img")
+        kbsize = xxsize / 1024L
+
+        # resize2fs doesn't have any kind of minimal setting, so use
+        # a binary search to get it to minimal size.
+        # TODO: if a --verbose/debug flag exists, don't devnull the output
+        FNULL = os.open('/dev/null', os.O_WRONLY)
+        size_top = kbsize / 4L
+        size_bot = 0
+        while size_top != (size_bot + 1):
+            trysize = (size_bot + ((size_top - size_bot) / 2)) * 4
+            resize2fs_retval = subprocess.call(["/sbin/resize2fs", "os.img",
+                                                "%dK" %(trysize,)],
+                                               cwd="%s/data" %(self.build_dir,),
+                                               env={"PWD": "%s/data" %(self.build_dir,)},
+                                               stdout=FNULL,
+                                               stderr=FNULL)
+
+            if not resize2fs_retval:
+                size_top = (size_bot + ((size_top - size_bot) / 2))
+            else:
+                size_bot = (size_bot + ((size_top - size_bot) / 2))
+
+
+        os.close(FNULL)
+
+        print >> sys.stderr, "Installation target minimized to %dK" % (size_top * 4)
+
+        # truncate the unused excess portion of the sparse file
+        fd = os.open("%s/data/os.img" %(self.build_dir,), os.O_WRONLY )
+        os.ftruncate(fd, size_top * 4096L)
+        os.close(fd)
+
+        # resize back to uncompressed-size
+        resize2fs_retval = subprocess.call(["/sbin/resize2fs", "os.img",
+                                            "%dK" %(kbsize,)],
+                                           cwd="%s/data" %(self.build_dir,),
+                                           env={"PWD": "%s/data" %(self.build_dir,)})
+
     def package(self):
         self.createSquashFS()
         self.createIso()
@@ -943,6 +1000,7 @@ usage: livecd-creator [--help]
                       [--fslabel=<label>]
                       [--skip-compression]
                       [--uncompressed-size=<size-in-MB>]
+                      [--ignore-deleted]
                       [--shell]
                       [--tmpdir=<tmpdir>]
 
@@ -956,6 +1014,7 @@ usage: livecd-creator [--help]
  --skip-compression  : Don't compress the image
  --prelink           : Prelink the image
  --uncompressed-size : Size of uncompressed fs in MB (default: 4096)
+ --ignore-deleted    : Don't run resize2fs to clean up wasted blocks
  --shell             : Start a shell in the chroot for post-configuration
  --tmpdir            : Temporary directory to use (default: /var/tmp)
 
@@ -986,6 +1045,7 @@ class Options:
         self.skip_compression = False
         self.skip_prelink = True
         self.uncompressed_size = 4096
+        self.ignore_deleted = False
         self.give_shell = False
         self.tmpdir = "/var/tmp"
 
@@ -995,7 +1055,9 @@ def parse_options(args):
                                    ["help", "repo=", "base-on=", "package=",
                                     "exclude-package=", "fslabel=", "config=",
                                     "skip-compression", "uncompressed-size=",
-                                    "shell", "no-prelink", "prelink","tmpdir="])
+                                    "ignore-deleted", "shell", "no-prelink",
+                                    "prelink", "tmpdir="])
+
     except getopt.GetoptError, msg:
         raise Usage(msg)
 
@@ -1018,6 +1080,9 @@ def parse_options(args):
             continue
         if o in ("-u", "--uncompressed-size"):
             options.uncompressed_size = int(a)
+            continue
+        if o in ("--ignore-deleted",):
+            options.ignore_deleted = True
             continue
         if o in ("-c", "--config"):
             options.kscfg = a
@@ -1104,6 +1169,9 @@ def main():
             target.launchShell()
 
         target.unmount()
+
+        if not options.ignore_deleted:
+            target.cleanupDeleted()
 
         target.package()
     except InstallationError, e:
