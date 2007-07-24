@@ -21,6 +21,8 @@ install:
 	$(INSTALL_DATA) -D config/livecd-fedora-desktop.ks $(DESTDIR)/usr/share/livecd-tools/livecd-fedora-desktop.ks
 	$(INSTALL_DATA) -D config/livecd-fedora-kde.ks $(DESTDIR)/usr/share/livecd-tools/livecd-fedora-kde.ks
 	$(INSTALL_DATA) -D config/livedvd-fedora-kde.ks $(DESTDIR)/usr/share/livecd-tools/livedvd-fedora-kde.ks
+	$(INSTALL_DATA) -D config/livecd-fedora-7-desktop.ks $(DESTDIR)/usr/share/livecd-tools/livecd-fedora-7-desktop.ks
+	$(INSTALL_DATA) -D config/livecd-fedora-7-kde.ks $(DESTDIR)/usr/share/livecd-tools/livecd-fedora-7-kde.ks
 
 uninstall:
 	rm -f $(DESTDIR)/usr/bin/livecd-creator
