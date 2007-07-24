@@ -92,8 +92,9 @@ fonts-*
 abiword
 gnumeric
 evince
-#gnome-blog
+gnome-blog
 #planner
+#inkscape
 
 # lots of people want...
 gparted
