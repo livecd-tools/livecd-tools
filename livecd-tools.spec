@@ -1,6 +1,6 @@
 Summary: Tools for building live CD's
 Name: livecd-tools
-Version: 009
+Version: 010
 Release: 1%{?dist}
 License: GPL
 Group: System Environment/Base
@@ -48,6 +48,18 @@ rm -rf $RPM_BUILD_ROOT
 %{_datadir}/livecd-tools/*
 
 %changelog
+* Wed Jul 25 2007 Jeremy Katz <katzj@redhat.com> - 010-1
+- Separate out configs used for Fedora 7
+- Add patch from Douglas McClendon to make images smaller
+- Add patch from Matt Domsch to work with older syslinux without vesamenu
+- Add support for using mirrorlists; use them
+- Let livecd-iso-to-disk work with uncompressed images (#248081)
+- Raise error if SELinux requested without being enabled (#248080)
+- Set service defaults on level 2 also (#246350)
+- Catch some failure cases
+- Allow specifying tmpdir
+- Add patch from nameserver specification from Elias Hunt
+
 * Wed May 30 2007 Jeremy Katz <katzj@redhat.com> - 009-1
 - miscellaneous live config changes
 - fix isomd5 checking syntax error
