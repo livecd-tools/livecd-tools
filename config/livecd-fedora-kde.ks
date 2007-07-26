@@ -8,7 +8,8 @@ firewall --disabled
 xconfig --startxonboot
 services --enabled=NetworkManager,dhcdbd --disabled=network,sshd
 
-repo --name=development --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=rawhide&arch=i386
+#repo --name=development --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=rawhide&arch=i386
+repo --name=development --baseurl=file:///daten/LIVECD/RAWHIDE/20070726/ 
 
 %packages
 # Basic packages
@@ -44,6 +45,8 @@ koffice-kspread
 koffice-kpresenter
 koffice-filters
 twinkle
+# if it is enough space include koffice-krita (~40 megs)
+koffice-krita
 
 #some changes that we don't want...
 -specspo

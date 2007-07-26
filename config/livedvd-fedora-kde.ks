@@ -44,6 +44,8 @@ koffice-kspread
 koffice-kpresenter
 koffice-filters
 twinkle
+# if it is enough space include koffice-krita (~40 megs)
+koffice-krita
 
 #some changes that we don't want...
 -specspo
