@@ -851,6 +851,13 @@ class InstallationTarget:
         if syslinuxMenu is None:
             raise InstallationError("syslinux not installed : no suitable *menu.c32 found")
 
+        isXen = False
+        xen = glob.glob("%s/install_root/boot/xen.gz-*" %(self.build_dir,))
+        if len(xen) > 0:
+            shutil.copyfile(xen[0], "%s/out/isolinux/xen.gz" %(self.build_dir,))
+            syslinuxfiles.append("mboot.c32")
+            isXen = True
+
         for p in syslinuxfiles:
             path = "%s/install_root/usr/lib/syslinux/%s" % (self.build_dir, p)
             if not os.path.isfile(path):
@@ -886,12 +893,21 @@ menu color hotkey 7 #ffffffff #ff000000
             stanzas.append( ("check", "Verify and run from image", "check") )
 
         for (short, long, extra) in stanzas:
-            cfg += """label %(short)s
+            if not isXen:
+                cfg += """label %(short)s
   menu label %(long)s
   kernel vmlinuz
   append initrd=initrd.img  ro quiet root=CDLABEL=%(label)s rootfstype=iso9660 liveimg %(extra)s
 """ %{"label": self.fs_label, "background" : have_background,
       "short": short, "long": long, "extra": extra}
+            else:
+                cfg += """label %(short)s
+  menu label %(long)s
+  kernel mboot.c32
+  append xen.gz --- vmlinuz --- initrd.img  ro quiet root=CDLABEL=%(label)s rootfstype=iso9660 liveimg %(extra)s
+""" %{"label": self.fs_label, "background" : have_background,
+      "short": short, "long": long, "extra": extra}
+
 
         memtest = glob.glob("%s/install_root/boot/memtest86*" %(self.build_dir,))
         if len(memtest) > 0:
