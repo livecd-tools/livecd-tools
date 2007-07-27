@@ -20,6 +20,7 @@
 import getopt
 import os
 import os.path
+import glob
 import sys
 import errno
 import string
@@ -891,6 +892,13 @@ menu color hotkey 7 #ffffffff #ff000000
   append initrd=initrd.img  ro quiet root=CDLABEL=%(label)s rootfstype=iso9660 liveimg %(extra)s
 """ %{"label": self.fs_label, "background" : have_background,
       "short": short, "long": long, "extra": extra}
+
+        memtest = glob.glob("%s/install_root/boot/memtest86*" %(self.build_dir,))
+        if len(memtest) > 0:
+            shutil.copy(memtest[0], "%s/out/isolinux/memtest" %(self.build_dir,))
+            cfg += """label memtest
+  menu label Memory Test
+  kernel memtest"""
 
         cfgf = open("%s/out/isolinux/isolinux.cfg" %(self.build_dir,), "w")
         cfgf.write(cfg)
