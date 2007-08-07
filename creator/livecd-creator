@@ -1072,7 +1072,7 @@ class Options:
         self.packages = []
         self.groups = []
         self.epackages = []
-        self.fs_label = "livecd-" + time.strftime("%Y%m%d-%H%M")
+        self.fs_label = None
         self.base_on = None
         self.kscfg = None
         self.skip_compression = False
@@ -1180,11 +1180,34 @@ def main():
         print >> sys.stderr, "You must run livecd-creator as root"
         return 1
 
+    if options.fs_label:
+        fs_label = options.fs_label
+    else:
+        fs_label_prefix = 'livecd-'
+        fs_label_suffix = time.strftime("%Y%m%d%H%M")
+        name = ''
+        if options.kscfg:
+            name = os.path.basename(options.kscfg)
+            idx = name.rfind('.')
+            if idx >= 0:
+                name = name[:idx]
+        if name.startswith(fs_label_prefix):
+            name = name[len(fs_label_prefix):]
+        fs_label = fs_label_prefix + name + fs_label_suffix
+        if len(fs_label) > 32:
+            if name.startswith("livecd-"):
+                name = name[len("livecd-"):]
+            fs_label = name + fs_label_suffix
+        if len(fs_label) > 32:
+            name = name[:(32 - len(fs_label_suffix))]
+            fs_label = name + fs_label_suffix
+        print "Using label %s" % (fs_label,)
+
     target = InstallationTarget(options.repos,
                                 options.packages,
                                 options.epackages,
                                 options.groups,
-                                options.fs_label,
+                                fs_label,
                                 options.skip_compression,
                                 options.skip_prelink,
                                 options.tmpdir)
