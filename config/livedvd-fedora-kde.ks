@@ -92,6 +92,7 @@ fonts-*
 knetworkmanager
 kpowersave
 redhat-artwork-kde
+rhgb
 
 %post
 
