@@ -19,6 +19,7 @@ services --enabled=NetworkManager,dhcdbd --disabled=network,sshd
 @base
 @core
 @admin-tools
+@system-tools
 @dial-up
 @hardware-support
 @printing
