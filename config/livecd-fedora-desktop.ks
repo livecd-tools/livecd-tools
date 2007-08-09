@@ -25,6 +25,7 @@ services --enabled=NetworkManager,dhcdbd --disabled=network,sshd
 @printing
 syslinux
 kernel
+memtest86+
 
 scim*
 -scim-devel
