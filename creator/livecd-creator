@@ -17,7 +17,6 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
-import getopt
 import os
 import os.path
 import glob
@@ -29,6 +28,8 @@ import time
 import traceback
 import subprocess
 import shutil
+from optparse import OptionParser
+
 import yum
 import rpmUtils.arch
 import pykickstart.parser
@@ -1054,46 +1055,6 @@ menu hiddenrow 5
         self.createSquashFS()
         self.createIso()
 
-def usage(out):
-    print >> out, """
-usage: livecd-creator [--help] 
-                      [--config=<path-to-kickstart-file> | --repo=<name>,<url> --package=<p>]
-                      [--repo=<name1>,<url1>] [--repo=<name2>,<url2> ...]
-                      [--package=<p1>] [--package=<p2> ...]
-                      [--exclude-package=<e1>] [--exclude-package=<e2> ...]
-                      [--base-on=<path-to-iso-file>]
-                      [--fslabel=<label>]
-                      [--skip-compression]
-                      [--uncompressed-size=<size-in-MB>]
-                      [--ignore-deleted]
-                      [--shell]
-                      [--tmpdir=<tmpdir>]
-
- --help              : Print usage and exit
- --config            : Path to kickstart config file
- --repo              : Add / override yum repository
- --package           : Include this package
- --exclude-package   : Exclude this package
- --base-on           : Add packages to an existing live CD iso9660 image
- --fslabel           : File system label (default: livecd-YYYYMMDD-HHMI)
- --skip-compression  : Don't compress the image
- --prelink           : Prelink the image
- --uncompressed-size : Size of uncompressed fs in MB (default: 4096)
- --ignore-deleted    : Don't run resize2fs to clean up wasted blocks
- --shell             : Start a shell in the chroot for post-configuration
- --tmpdir            : Temporary directory to use (default: /var/tmp)
-
- Examples:
-
-  Create minimal live cd:
-  # livecd-creator --config=/usr/share/livecd-tools/livecd-fedora-minimal.ks
-
-  Create minimal live cd and use local package repositories:
-  # livecd-creator --config=/usr/share/livecd-tools/livecd-fedora-minimal.ks \\
-                   --repo=a-dev,file:///home/user/core/RPMS             \\
-                   --repo=a-extras-dev,file:///home/user/extras/RPMS
-"""
-
 class Usage(Exception):
     def __init__(self, msg = None, no_error = False):
         Exception.__init__(self, msg, no_error)
@@ -1115,75 +1076,79 @@ class Options:
         self.tmpdir = "/var/tmp"
 
 def parse_options(args):
-    try:
-        opts, args = getopt.getopt(args, "hr:b:p:e:f:c:su:lt:",
-                                   ["help", "repo=", "base-on=", "package=",
-                                    "exclude-package=", "fslabel=", "config=",
-                                    "skip-compression", "uncompressed-size=",
-                                    "ignore-deleted", "shell", "no-prelink",
-                                    "prelink", "tmpdir="])
+    parser = OptionParser()
 
-    except getopt.GetoptError, msg:
-        raise Usage(msg)
+    parser.add_option("-c", "--config", type="string", dest="kscfg",
+                      help="Path to kickstart config file")
+    parser.add_option("-f", "--fslabel", type="string", dest="fs_label",
+                      help="File system label (default based on config name)")
+    parser.add_option("-b", "--base-on", type="string", dest="base_on",
+                      help="Add packages to an existing live CD iso9660 image.")
 
-    options = Options()
+    # options related to the config of your system
+    parser.add_option("-t", "--tmpdir", type="string",
+                      dest="tmpdir", default="/var/tmp",
+                      help="Temporary directory to use (default: /var/tmp)")
 
-    for o, a in opts:
-        if o in ("-h", "--help"):
-            raise Usage(no_error = True)
-        if o in ("-l", "--shell"):
-            options.give_shell = True
-            continue
-        if o in ("-s", "--skip-compression"):
-            options.skip_compression = True
-            continue
-        if o in ("--no-prelink",):
-            options.skip_prelink = True
-            continue
-        if o in ("--prelink",):
-            options.skip_prelink = False
-            continue
-        if o in ("-u", "--uncompressed-size"):
-            options.uncompressed_size = int(a)
-            continue
-        if o in ("--ignore-deleted",):
-            options.ignore_deleted = True
-            continue
-        if o in ("-c", "--config"):
-            options.kscfg = a
-            if not os.path.isfile(options.kscfg):
-                raise Usage("Kickstart config '%s' does not exist" % options.kscfg)
-            continue
-        if o in ("-r", "--repo"):
-            (name, url) = a.split(",")
-            for (n, u) in options.repos:
-                if n == name:
-                    raise Usage("Repo name '%s' is already in use" % n)
-            options.repos.append((name, url))
-            continue
-        if o in ("-p", "--package"):
-            if a.startswith("@"):
-                options.groups.append((a[1:], pykickstart.parser.GROUP_DEFAULT))
-            else:
-                options.packages.append(a)
-            continue
-        if o in ("-e", "--exclude-package"):
-            options.epackages.append(a)
-            continue
-        if o in ("-f", "--fslabel"):
-            options.fs_label = a
-            if len(options.fs_label) > 32:
-                raise Usage("CD labels are limited to 32 characters")
-            continue
-        if o in ("-b", "--base-on"):
-            options.base_on = a
-            if not os.path.isfile(options.base_on):
-                raise Usage("Live CD ISO '%s' does not exist" % options.base_on)
-            continue
-        if o in ("-t", "--tmpdir"):
-            options.tmpdir = a
-            continue
-        raise Usage("Unknown option %s" % o)
+    # need to handle these in the config file so they can go away
+    parser.add_option("-u", "--uncompressed-size", type="int",
+                      dest="uncompressed_size", default=4096,
+                      help="Size of uncompressed fs in MiB (default: 4096)")
+
+    # debug options not recommended for "production" images
+    parser.add_option("-l", "--shell", action="store_true", dest="give_shell",
+                      help="Start a shell in the chroot for post-configuration.")
+    parser.add_option("-s", "--skip-compression", action="store_true", dest="skip_compression",
+                      help="Don't compress the image.")
+    parser.add_option("", "--ignore-deleted", action="store_true", dest="ignore_deleted",
+                      help="Don't run resize2fs to clean up wasted blocks")
+
+
+    # debug options that will be going away real soon now.
+    parser.add_option("-r", "--repo", type="string", action="append",
+                      dest="repos", help="Add/override yum repository")
+    parser.add_option("-p", "--package", type="string", action="append",
+                      dest="packages", help="Include this package")
+    parser.add_option("-g", "--group", type="string", action="append",
+                      dest="groups", help="Include this group")
+    parser.add_option("-e", "--exclude-package", type="string", action="append",
+                      dest="epackages", help="Exclude this package")
+    parser.add_option("", "--no-prelink", action="store_true", dest="skip_prelink",
+                      help="Don't prelink the image")
+    parser.add_option("", "--prelink", action="store_false", dest="skip_prelink", help="Prelink the image")
+
+
+    (options, args) = parser.parse_args()
+    if not options.kscfg or not os.path.isfile(options.kscfg):
+        raise Usage("Kickstart config '%s' does nto exist" %(options.kscfg,))
+    if options.base_on and not os.path.isfile(options.base_on):
+        raise Usage("Live CD ISO '%s' does not exist" %(options.base_on,))
+    if options.fs_label and len(options.fs_label) > 32:
+        raise Usage("CD labels are limited to 32 characters")
+
+    # parse repos ==> list.  icky.
+    repos = []
+    if options.repos:
+        for r in options.repos:
+            (name, url) = r.split(",")
+            repos.append((name, url))
+    options.repos = repos
+
+    if options.groups:
+        # parse packages/groups.  also icky.
+        groups = map(lambda g: (g, pykickstart.parser.GROUP_DEFAULT), options.groups)
+    else:
+        groups = []
+    if options.packages:
+        for p in options.packages:
+            if p.startswith("@"):
+                groups.append((p[1:], pykickstart.parser.GROUP_DEFAULT))
+                options.packages.remove(p)
+    else:
+        options.packages = []
+    options.groups = groups
+    if options.epackages is None:
+        options.epackages = []
 
     if not options.kscfg and not (options.packages or options.groups):
         raise Usage("No packages or groups specified")
@@ -1205,7 +1170,6 @@ def main():
             ret = 2
         if msg:
             print >> out, msg
-        usage(out)
         return ret
 
     if os.geteuid () != 0:
