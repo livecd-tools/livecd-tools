@@ -582,25 +582,25 @@ do_live_from_loop121() {
 
     # create rule so udev creates /dev/live symlink on real rootfs
     if [ -n "\$CDLABEL" ]; then
-       echo "KERNEL==\"hd[a-z]\", BUS==\"ide\", SYSFS{removable}==\"1\", ATTRS{media}==\"cdrom\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev.rules
-       echo "KERNEL==\"sr[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev.rules
-       echo "KERNEL==\"scd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev.rules
-       echo "KERNEL==\"pcd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev.rules
+       echo "KERNEL==\"hd[a-z]\", BUS==\"ide\", SYSFS{removable}==\"1\", ATTRS{media}==\"cdrom\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*
+       echo "KERNEL==\"sr[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*
+       echo "KERNEL==\"scd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*
+       echo "KERNEL==\"pcd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*
     elif [ -n "\$LABEL" ]; then
-       echo "KERNEL==\"hd[a-z]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$LABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev.rules        
-       echo "KERNEL==\"hd[a-z][0-9]*\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$LABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev.rules        
-       echo "KERNEL==\"sd[a-z]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$LABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev.rules        
-       echo "KERNEL==\"sd[a-z][0-9]*\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$LABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev.rules        
+       echo "KERNEL==\"hd[a-z]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$LABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*        
+       echo "KERNEL==\"hd[a-z][0-9]*\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$LABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*        
+       echo "KERNEL==\"sd[a-z]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$LABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*        
+       echo "KERNEL==\"sd[a-z][0-9]*\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$LABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*        
     elif [ -n "\$UUID" ]; then
-       echo "KERNEL==\"hd[a-z]\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"\$UUID\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev.rules        
-       echo "KERNEL==\"hd[a-z][0-9]*\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"\$UUID\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev.rules        
-       echo "KERNEL==\"sd[a-z]\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"\$UUID\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev.rules        
-       echo "KERNEL==\"sd[a-z][0-9]*\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"\$UUID\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev.rules        
+       echo "KERNEL==\"hd[a-z]\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"\$UUID\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*        
+       echo "KERNEL==\"hd[a-z][0-9]*\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"\$UUID\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*        
+       echo "KERNEL==\"sd[a-z]\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"\$UUID\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*        
+       echo "KERNEL==\"sd[a-z][0-9]*\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"\$UUID\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*        
     fi
 
     # add rules for /dev/live-squashed and /dev/live-osimg
-    echo "KERNEL==\"loop120\" SYMLINK+=\"live-squashed\"" >> /sysroot/etc/udev/rules.d/50-udev.rules
-    echo "KERNEL==\"loop121\" SYMLINK+=\"live-osimg\"" >> /sysroot/etc/udev/rules.d/50-udev.rules
+    echo "KERNEL==\"loop120\" SYMLINK+=\"live-squashed\"" >> /sysroot/etc/udev/rules.d/50-udev*
+    echo "KERNEL==\"loop121\" SYMLINK+=\"live-osimg\"" >> /sysroot/etc/udev/rules.d/50-udev*
 
     mount -n -o ro,remount /sysroot
 }
