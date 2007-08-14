@@ -907,6 +907,11 @@ menu color tabmsg 0 #ffffffff #00000000
 menu color unsel 0 #ffffffff #00000000
 menu color hotsel 0 #ff000000 #ffffffff
 menu color hotkey 7 #ffffffff #ff000000
+menu color timeout_msg 0 #ffffffff #00000000
+menu color timeout 0 #ffffffff #00000000
+menu color cmdline 0 #ffffffff #00000000
+menu hidden
+menu hiddenrow 5
 """ %{"menu" : syslinuxMenu, "label": self.fs_label, "background" : have_background}
 
         stanzas = [("linux", "Run from image", ""),
