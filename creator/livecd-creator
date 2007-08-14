@@ -1215,14 +1215,14 @@ def main():
                 name = name[:idx]
         if name.startswith(fs_label_prefix):
             name = name[len(fs_label_prefix):]
-        fs_label = fs_label_prefix + name + fs_label_suffix
+        fs_label = fs_label_prefix + name + "-" + fs_label_suffix
         if len(fs_label) > 32:
             if name.startswith("livecd-"):
                 name = name[len("livecd-"):]
-            fs_label = name + fs_label_suffix
+            fs_label = name + "-" + fs_label_suffix
         if len(fs_label) > 32:
             name = name[:(32 - len(fs_label_suffix))]
-            fs_label = name + fs_label_suffix
+            fs_label = name + "-" + fs_label_suffix
         print "Using label %s" % (fs_label,)
 
     target = InstallationTarget(options.repos,
