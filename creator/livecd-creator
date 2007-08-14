@@ -938,6 +938,11 @@ menu color hotkey 7 #ffffffff #ff000000
   menu label Memory Test
   kernel memtest"""
 
+        # add local boot
+        cfg += """label local
+  menu label Boot from local drive
+  localboot 0xffff"""
+
         cfgf = open("%s/out/isolinux/isolinux.cfg" %(self.build_dir,), "w")
         cfgf.write(cfg)
         cfgf.close()
