@@ -1048,21 +1048,6 @@ class Usage(Exception):
     def __init__(self, msg = None, no_error = False):
         Exception.__init__(self, msg, no_error)
 
-class Options:
-    def __init__(self):
-        self.repos = []
-        self.packages = []
-        self.groups = []
-        self.epackages = []
-        self.fs_label = None
-        self.base_on = None
-        self.kscfg = None
-        self.skip_compression = False
-        self.uncompressed_size = 4096
-        self.ignore_deleted = False
-        self.give_shell = False
-        self.tmpdir = "/var/tmp"
-
 def parse_options(args):
     parser = OptionParser()
 
