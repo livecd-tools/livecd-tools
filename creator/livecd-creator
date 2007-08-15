@@ -1064,10 +1064,102 @@ menu hiddenrow 5
         ret.extend(ImageCreator._getRequiredPackages(self))
         return ret
 
+class ppcImageCreator(ImageCreator):
+    def createIso(self):
+        """write out the live CD ISO"""
+        subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(self.fs_label,),
+                         "-hfs", "-hfs-bless", "%s/out/ppc/mac" %(self.build_dir),
+                         "-hfs-volid", "%s" %(self.fs_label,), "-part",
+                         "-map", "/usr/lib/anaconda-runtime/boot/mapping",
+                         "-J", "-r", "-hide-rr-moved", "-no-desktop",
+                         "-V", "%s" %(self.fs_label,), "%s/out" %(self.build_dir)])
+
+    def configureBootloader(self):
+        """configure the boot loader"""
+
+        # Copy yaboot and ofboot.b in to mac directory
+        os.makedirs(self.build_dir + "/out/ppc/mac")
+        shutil.copyfile("%s/install_root/usr/lib/anaconda-runtime/boot/ofboot.b" %(self.build_dir),
+                        "%s/out/ppc/mac/ofboot.b" %(self.build_dir,))
+        shutil.copyfile("%s/install_root/usr/lib/yaboot/yaboot" %(self.build_dir),
+                        "%s/out/ppc/mac/yaboot" %(self.build_dir,))
+
+        # Copy yaboot and ofboot.b in to mac directory
+        os.makedirs(self.build_dir + "/out/ppc/chrp")
+        shutil.copyfile("%s/install_root/usr/lib/anaconda-runtime/boot/bootinfo.txt" %(self.build_dir),
+                        "%s/out/ppc/bootinfo.txt" %(self.build_dir,))
+        shutil.copyfile("%s/install_root/usr/lib/yaboot/yaboot" %(self.build_dir),
+                        "%s/out/ppc/chrp/yaboot" %(self.build_dir,))
+        subprocess.call(["/usr/sbin/addnote", "%s/out/ppc/chrp/yaboot" %(self.build_dir,)])
+
+        os.makedirs(self.build_dir + "/out/ppc/ppc32")
+        shutil.copyfile("%s/install_root/boot/vmlinuz-%s"
+                        %(self.build_dir, self.get_kernel_version()),
+                        "%s/out/ppc/ppc32/vmlinuz" %(self.build_dir,))
+        shutil.copyfile("%s/install_root/boot/livecd-initramfs.img"
+                        %(self.build_dir,),
+                        "%s/out/ppc/ppc32/initrd.img" %(self.build_dir,))
+        os.unlink("%s/install_root/boot/livecd-initramfs.img"
+                  %(self.build_dir,))
+
+        os.makedirs(self.build_dir + "/out/ppc/ppc64")
+        # FIXME: Need 64-bit kernel and initrd
+
+        cfg32 = """
+init-message = "Welcome to the Fedora %(label)s LiveCD"
+timeout=6000
+
+""" %{"label": self.fs_label}
+
+        stanzas = [("linux", "Run from image", ""),
+                   ("runfromram", "Run from RAM - requires 1 GiB+", "live_ram")]
+        if os.path.exists("%s/install_root/usr/lib/anaconda-runtime/checkisomd5" %(self.build_dir,)):
+            stanzas.append( ("check", "Verify and run from image", "check") )
+
+        for (short, long, extra) in stanzas:
+            cfg32 += """
+
+image=/ppc/ppc32/vmlinuz
+  label=%(short)s
+  initrd=/ppc/ppc32/initrd.img
+  read-only
+  append="ro quiet root=CDLABEL=%(label)s rootfstype=iso9660 %(extra)s"
+""" %{"label": self.fs_label,
+      "short": short, "long": long, "extra": extra}
+
+        cfgf = open("%s/out/ppc/ppc32/yaboot.conf" %(self.build_dir,), "w")
+        cfgf.write(cfg32)
+        cfgf.close()
+        os.makedirs(self.build_dir + "/out/etc")
+        cfgf = open("%s/out/etc/yaboot.conf" %(self.build_dir,), "w")
+        cfgf.write(cfg32)
+        cfgf.close()
+
+        # FIXME. Obviously
+        cfg64 = """
+init-message = "Sorry, this LiveCD only supports 32-bit hardware"
+"""
+        cfgf = open("%s/out/ppc/ppc64/yaboot.conf" %(self.build_dir,), "w")
+        cfgf.write(cfg64)
+        cfgf.close()
+
+        # TODO: build 'netboot' images with kernel+initrd, like mk-images.ppc
+
+    def _getRequiredPackages(self):
+        # For now we need anaconda-runtime, for bits like ofboot.b and
+        # mapping files.
+        ret = ["yaboot", "anaconda-runtime"]
+        ret.extend(ImageCreator._getRequiredPackages(self))
+        return ret
+
 def getImageCreator(repos, packages, epackages, groups, fs_label, skip_compression, tmpdir):
     arch = rpmUtils.arch.getBaseArch()
     if arch in ("i386", "x86_64"):
         return x86ImageCreator(repos, packages, epackages, groups, fs_label, skip_compression, tmpdir)
+    elif arch in ("ppc", "ppc64"):
+        return ppcImageCreator(repos, packages, epackages, groups, fs_label, skip_compression, tmpdir)
+
+    raise InstallationError("Architecture not supported!")
 
 class Usage(Exception):
     def __init__(self, msg = None, no_error = False):
