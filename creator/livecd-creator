@@ -1083,12 +1083,17 @@ class ppcImageCreator(ImageCreator):
         subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(self.fs_label,),
                          "-hfs", "-hfs-bless", "%s/out/ppc/mac" %(self.build_dir),
                          "-hfs-volid", "%s" %(self.fs_label,), "-part",
-                         "-map", "/usr/lib/anaconda-runtime/boot/mapping",
+                         "-map", "%s/out/ppc/mapping" %(self.build_dir,),
                          "-J", "-r", "-hide-rr-moved", "-no-desktop",
                          "-V", "%s" %(self.fs_label,), "%s/out" %(self.build_dir)])
 
     def configureBootloader(self):
         """configure the boot loader"""
+        os.makedirs(self.build_dir + "/out/ppc")
+
+        # copy the mapping file to somewhere we can get to it later
+        shutil.copyfile("%s/install_root/usr/lib/anaconda-runtime/boot/mapping" %(self.build_dir,),
+                        "%s/out/ppc/mapping" %(self.build_dir,))
 
         # Copy yaboot and ofboot.b in to mac directory
         os.makedirs(self.build_dir + "/out/ppc/mac")
