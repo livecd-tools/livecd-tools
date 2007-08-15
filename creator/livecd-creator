@@ -334,6 +334,9 @@ class ImageCreator(object):
         self.instloop = None
         self.bindmounts = []
         self.ksparser = None
+
+    def _getRequiredPackages(self):
+        return []
         
     def parse(self, kscfg):
         ksversion = pykickstart.version.makeVersion()
@@ -361,6 +364,8 @@ class ImageCreator(object):
             self.groups.extend(map(lambda g: (g.name, g.include),
                                    self.ksparser.handler.packages.groupList))
             self.epackages.extend(self.ksparser.handler.packages.excludedList)
+
+            self.packages.extend(self._getRequiredPackages())
 
         if not self.packages and not self.groups:
             raise InstallationError("No packages or groups specified")
@@ -1053,6 +1058,11 @@ menu hiddenrow 5
                          "-J", "-r", "-hide-rr-moved", "-hide-joliet-trans-tbl",
                          "-V", "%s" %(self.fs_label,),
                          "%s/out" %(self.build_dir)])
+
+    def _getRequiredPackages(self):
+        ret = ["syslinux"]
+        ret.extend(ImageCreator._getRequiredPackages(self))
+        return ret
 
 def getImageCreator(repos, packages, epackages, groups, fs_label, skip_compression, tmpdir):
     arch = rpmUtils.arch.getBaseArch()
