@@ -18,7 +18,6 @@ repo --name=development --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist
 @dial-up
 @hardware-support
 @printing
-syslinux
 kernel
 memtest86+
 

@@ -12,7 +12,6 @@ repo --name=development --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist
 @core
 bash
 kernel
-syslinux
 passwd
 policycoreutils
 chkconfig
