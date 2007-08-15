@@ -425,7 +425,6 @@ class ImageCreator(object):
         except OSError, (err, msg):
             raise InstallationError("Failed create build directory in %s: %s" % (self.tmpdir, msg))
 
-        os.makedirs(self.build_dir + "/out/isolinux")
         os.makedirs(self.build_dir + "/out/sysroot")
         os.makedirs(self.build_dir + "/data/sysroot")
         os.makedirs(self.build_dir + "/install_root")
@@ -842,6 +841,8 @@ class ImageCreator(object):
         #  - fix for non-i386
         #  - error handling
         #
+        os.makedirs(self.build_dir + "/out/isolinux")
+
         shutil.copyfile("%s/install_root/boot/vmlinuz-%s"
                         %(self.build_dir, self.get_kernel_version()),
                         "%s/out/isolinux/vmlinuz" %(self.build_dir,))
