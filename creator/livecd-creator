@@ -533,9 +533,9 @@ class ImageCreator(object):
                     else:
                         print >> sys.stderr, "Unable to find package '%s'; skipping" %(pkg,)
 
-            for grp in self.groups:
+            for (grp, inc) in self.groups:
                 try:
-                    self.ayum.selectGroup(grp)
+                    self.ayum.selectGroup(grp, inc)
                 except (yum.Errors.InstallError, yum.Errors.GroupsError), e:
                     if self.ksparser.handler.packages.handleMissing != \
                            pykickstart.constants.KS_MISSING_IGNORE:
