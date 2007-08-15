@@ -888,10 +888,12 @@ class ImageCreator(object):
         """create compressed squashfs file system"""
         if not self.skip_compression:
             # FIXME: mksquashfs segfaults if PWD isn't set in the environment
-            subprocess.call(["/sbin/mksquashfs", "os.img", "sysroot",
-                             "../out/squashfs.img"],
-                            cwd="%s/data" %(self.build_dir,),
-                            env={"PWD": "%s/data" %(self.build_dir,)})
+            ret = subprocess.call(["/sbin/mksquashfs", "os.img", "sysroot",
+                                   "../out/squashfs.img"],
+                                  cwd="%s/data" %(self.build_dir,),
+                                  env={"PWD": "%s/data" %(self.build_dir,)})
+            if ret != 0:
+                raise InstallationError("mksquashfs exited with error (%d)" %(ret,))
         else:
             shutil.move("%s/data/os.img" %(self.build_dir,),
                         "%s/out/ext3fs.img" %(self.build_dir,))
