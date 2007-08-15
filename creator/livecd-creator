@@ -325,6 +325,8 @@ class ImageCreator(object):
         self.skip_compression = skip_compression
         self.tmpdir = tmpdir
 
+        self._checkIsoMD5 = False
+
         self.build_dir = None
         self.instloop = None
         self.bindmounts = []
@@ -947,6 +949,8 @@ class ImageCreator(object):
                                            env={"PWD": "%s/data" %(self.build_dir,)})
 
     def package(self):
+        if os.path.exists("%s/install_root/usr/lib/anaconda-runtime/checkisomd5" %(self.build_dir,)):        
+            self._checkIsoMD5 = True
         self.createSquashFS()
         self.createIso()
         self.implantIsoMD5()
@@ -1023,7 +1027,7 @@ menu hiddenrow 5
 
         stanzas = [("linux", "Run from image", ""),
                    ("runfromram", "Run from RAM - requires 1 GB+", "live_ram")]
-        if os.path.exists("%s/install_root/usr/lib/anaconda-runtime/checkisomd5" %(self.build_dir,)):
+        if self._checkIsoMD5:
             stanzas.append( ("check", "Verify and run from image", "check") )
 
         for (short, long, extra) in stanzas:
@@ -1102,7 +1106,7 @@ class ppcImageCreator(ImageCreator):
         shutil.copyfile("%s/install_root/usr/lib/yaboot/yaboot" %(self.build_dir),
                         "%s/out/ppc/mac/yaboot" %(self.build_dir,))
 
-        # Copy yaboot and ofboot.b in to mac directory
+        # Copy yaboot and ofboot.b in to chrp directory
         os.makedirs(self.build_dir + "/out/ppc/chrp")
         shutil.copyfile("%s/install_root/usr/lib/anaconda-runtime/boot/bootinfo.txt" %(self.build_dir),
                         "%s/out/ppc/bootinfo.txt" %(self.build_dir,))
@@ -1131,7 +1135,7 @@ timeout=6000
 
         stanzas = [("linux", "Run from image", ""),
                    ("runfromram", "Run from RAM - requires 1 GiB+", "live_ram")]
-        if os.path.exists("%s/install_root/usr/lib/anaconda-runtime/checkisomd5" %(self.build_dir,)):
+        if self._checkIsoMD5:
             stanzas.append( ("check", "Verify and run from image", "check") )
 
         for (short, long, extra) in stanzas:
