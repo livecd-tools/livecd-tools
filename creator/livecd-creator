@@ -32,6 +32,7 @@ from optparse import OptionParser
 
 import yum
 import rpmUtils.arch
+import pykickstart
 import pykickstart.parser
 import pykickstart.version
 
@@ -239,10 +240,7 @@ class LiveCDYum(yum.YumBase):
 
     def selectPackage(self, pkg):
         """Select a given package.  Can be specified with name.arch or name*"""
-        try:
-            self.install(pattern = pkg)
-        except yum.Errors.InstallError, e:
-            raise InstallationError("Failed to find package '%s' : %s" % (pkg, e))
+        return self.install(pattern = pkg)
         
     def deselectPackage(self, pkg):
         """Deselect package.  Can be specified as name.arch or name*"""
@@ -262,10 +260,7 @@ class LiveCDYum(yum.YumBase):
             print >> sys.stderr, "No such package %s to remove" %(pkg,)
 
     def selectGroup(self, grp, include = pykickstart.parser.GROUP_DEFAULT):
-        try:
-            yum.YumBase.selectGroup(self, grp)
-        except (yum.Errors.InstallError, yum.Errors.GroupsError), e:
-            raise InstallationError("Failed to find group '%s' : %s" % (grp, e))
+        yum.YumBase.selectGroup(self, grp)
         if include == pykickstart.parser.GROUP_REQUIRED:
             map(lambda p: self.deselectPackage(p), grp.default_packages.keys())
         elif include == pykickstart.parser.GROUP_ALL:
@@ -525,12 +520,30 @@ class ImageCreator(object):
         os.chroot("%s/install_root" %(self.build_dir,))
         os.chdir("/")
 
-    def installPackages(self, packageList, excludePackageList, groupList = []):
+    def installPackages(self):
         """install packages into target file system"""
         try:
-            map(lambda pkg: self.ayum.selectPackage(pkg), packageList)
-            map(lambda grp: self.ayum.selectGroup(grp[0], grp[1]), groupList)
-            map(lambda pkg: self.ayum.deselectPackage(pkg), excludePackageList)
+            for pkg in self.packages:
+                try:
+                    self.ayum.selectPackage(pkg)
+                except yum.Errors.InstallError, e:
+                    if self.ksparser.handler.packages.handleMissing != \
+                           pykickstart.constants.KS_MISSING_IGNORE:
+                        raise InstallationError("Failed to find package '%s' : %s" % (pkg, e))
+                    else:
+                        print >> sys.stderr, "Unable to find package '%s'; skipping" %(pkg,)
+
+            for grp in self.groups:
+                try:
+                    self.ayum.selectGroup(grp)
+                except (yum.Errors.InstallError, yum.Errors.GroupsError), e:
+                    if self.ksparser.handler.packages.handleMissing != \
+                           pykickstart.constants.KS_MISSING_IGNORE:
+                        raise InstallationError("Failed to find group '%s' : %s" % (grp, e))
+                    else:
+                        print >> sys.stderr, "Unable to find group '%s'; skipping" %(grp,)
+
+            map(lambda pkg: self.ayum.deselectPackage(pkg), self.epackages)
 
             self.ayum.runInstall()
         except yum.Errors.RepoError, e:
@@ -840,7 +853,7 @@ class ImageCreator(object):
         for (name, url, mirrorlist) in self.repos:
             self.ayum.addRepository(name, url, mirrorlist)
 
-        self.installPackages(self.packages, self.epackages, self.groups)
+        self.installPackages()
         try:
             self.configureSystem()
         except Exception, e: #FIXME: we should be a little bit more fine-grained
