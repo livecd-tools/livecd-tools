@@ -320,7 +320,7 @@ class LiveCDYum(yum.YumBase):
         return self.runTransaction(cb)
 
 class InstallationTarget:
-    def __init__(self, repos, packages, epackages, groups, fs_label, skip_compression, skip_prelink,tmpdir):
+    def __init__(self, repos, packages, epackages, groups, fs_label, skip_compression, tmpdir):
         self.ayum = None
         self.repos = repos
         self.packages = packages
@@ -328,7 +328,6 @@ class InstallationTarget:
         self.groups = groups
         self.fs_label = fs_label
         self.skip_compression = skip_compression
-        self.skip_prelink = skip_prelink
         self.tmpdir = tmpdir
 
         self.build_dir = None
@@ -830,14 +829,6 @@ class InstallationTarget:
                 subprocess.call(["/sbin/restorecon", "-v", "-r", "/"],
                                 preexec_fn=self.run_in_root)
 
-    def prelinkSystem(self):
-        # prelink the system
-        instroot = "%s/install_root" %(self.build_dir,)
-        if os.path.exists("%s/usr/sbin/prelink" %(instroot,)):
-            subprocess.call(["/usr/sbin/prelink", "-mRaN"],
-                            preexec_fn=self.run_in_root)
-        return True
-
     def launchShell(self):
         subprocess.call(["/bin/bash"], preexec_fn=self.run_in_root)
 
@@ -966,8 +957,6 @@ menu hiddenrow 5
             raise InstallationError("Error configuring live image: %s" %(e,))
         self.configureNetwork()
         self.relabelSystem()
-        if not self.skip_prelink:
-            self.prelinkSystem()
         self.createInitramfs()
         self.configureBootloader()
 
@@ -1069,7 +1058,6 @@ class Options:
         self.base_on = None
         self.kscfg = None
         self.skip_compression = False
-        self.skip_prelink = True
         self.uncompressed_size = 4096
         self.ignore_deleted = False
         self.give_shell = False
@@ -1113,10 +1101,6 @@ def parse_options(args):
                       dest="groups", help="Include this group")
     parser.add_option("-e", "--exclude-package", type="string", action="append",
                       dest="epackages", help="Exclude this package")
-    parser.add_option("", "--no-prelink", action="store_true", dest="skip_prelink",
-                      help="Don't prelink the image")
-    parser.add_option("", "--prelink", action="store_false", dest="skip_prelink", help="Prelink the image")
-
 
     (options, args) = parser.parse_args()
     if not options.kscfg or not os.path.isfile(options.kscfg):
@@ -1205,7 +1189,6 @@ def main():
                                 options.groups,
                                 fs_label,
                                 options.skip_compression,
-                                options.skip_prelink,
                                 options.tmpdir)
 
     try:
