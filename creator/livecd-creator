@@ -1093,6 +1093,8 @@ class ppcImageCreator(ImageCreator):
 
     def configureBootloader(self):
         """configure the boot loader"""
+        havekernel = { 32: False, 64: False }
+
         os.makedirs(self.build_dir + "/out/ppc")
 
         # copy the mapping file to somewhere we can get to it later
@@ -1115,55 +1117,89 @@ class ppcImageCreator(ImageCreator):
         subprocess.call(["/usr/sbin/addnote", "%s/out/ppc/chrp/yaboot" %(self.build_dir,)])
 
         os.makedirs(self.build_dir + "/out/ppc/ppc32")
-        shutil.copyfile("%s/install_root/boot/vmlinuz-%s"
-                        %(self.build_dir, self.get_kernel_version()),
-                        "%s/out/ppc/ppc32/vmlinuz" %(self.build_dir,))
-        shutil.copyfile("%s/install_root/boot/livecd-initramfs.img"
-                        %(self.build_dir,),
-                        "%s/out/ppc/ppc32/initrd.img" %(self.build_dir,))
-        os.unlink("%s/install_root/boot/livecd-initramfs.img"
-                  %(self.build_dir,))
+        if not os.path.exists("%s/install_root/lib/modules/%s/kernel/arch/powerpc/platforms" %(self.build_dir, self.get_kernel_version())):
+            havekernel[32] = True
+            shutil.copyfile("%s/install_root/boot/vmlinuz-%s"
+                            %(self.build_dir, self.get_kernel_version()),
+                            "%s/out/ppc/ppc32/vmlinuz" %(self.build_dir,))
+            shutil.copyfile("%s/install_root/boot/livecd-initramfs.img"
+                            %(self.build_dir,),
+                            "%s/out/ppc/ppc32/initrd.img" %(self.build_dir,))
+            os.unlink("%s/install_root/boot/livecd-initramfs.img"
+                      %(self.build_dir,))
 
         os.makedirs(self.build_dir + "/out/ppc/ppc64")
-        # FIXME: Need 64-bit kernel and initrd
+        if os.path.exists("%s/install_root/lib/modules/%s/kernel/arch/powerpc/platforms" %(self.build_dir, self.get_kernel_version())):
+            havekernel[64] = True
+            shutil.copyfile("%s/install_root/boot/vmlinuz-%s"
+                            %(self.build_dir, self.get_kernel_version()),
+                            "%s/out/ppc/ppc64/vmlinuz" %(self.build_dir,))
+            shutil.copyfile("%s/install_root/boot/livecd-initramfs.img"
+                            %(self.build_dir,),
+                            "%s/out/ppc/ppc64/initrd.img" %(self.build_dir,))
+            os.unlink("%s/install_root/boot/livecd-initramfs.img"
+                      %(self.build_dir,))
 
-        cfg32 = """
-init-message = "Welcome to the Fedora %(label)s LiveCD"
+        for bit in havekernel.keys():
+            cfg = """
+init-message = "Welcome to %(label)s"
 timeout=6000
 
 """ %{"label": self.fs_label}
 
-        stanzas = [("linux", "Run from image", ""),
-                   ("runfromram", "Run from RAM - requires 1 GiB+", "live_ram")]
-        if self._checkIsoMD5:
-            stanzas.append( ("check", "Verify and run from image", "check") )
+            stanzas = [("linux", "Run from image", ""),
+                       ("runfromram", "Run from RAM - requires 1 GiB+", "live_ram")]
+            if self._checkIsoMD5:
+                stanzas.append( ("check", "Verify and run from image", "check") )
 
-        for (short, long, extra) in stanzas:
-            cfg32 += """
+            for (short, long, extra) in stanzas:
+                cfg += """
 
-image=/ppc/ppc32/vmlinuz
+image=/ppc/ppc%(bit)s/vmlinuz
   label=%(short)s
-  initrd=/ppc/ppc32/initrd.img
+  initrd=/ppc/ppc%(bit)s/initrd.img
   read-only
   append="ro quiet root=CDLABEL=%(label)s rootfstype=iso9660 %(extra)s"
-""" %{"label": self.fs_label,
-      "short": short, "long": long, "extra": extra}
+""" %{"label": self.fs_label, "short": short, "long": long, "extra": extra, "bit": bit}
 
-        cfgf = open("%s/out/ppc/ppc32/yaboot.conf" %(self.build_dir,), "w")
-        cfgf.write(cfg32)
-        cfgf.close()
+                if havekernel[bit]:
+                    cfgf = open("%s/out/ppc/ppc%d/yaboot.conf" %(self.build_dir, bit), "w")
+                    cfgf.write(cfg)
+                    cfgf.close()
+                else:
+                    cfgf = open("%s/out/ppc/ppc%d/yaboot.conf" %(self.build_dir, bit), "w")
+                    cfgf.write('init-message = "Sorry, this LiveCD does not support your hardware"')
+                    cfgf.close()
+
+
         os.makedirs(self.build_dir + "/out/etc")
-        cfgf = open("%s/out/etc/yaboot.conf" %(self.build_dir,), "w")
-        cfgf.write(cfg32)
-        cfgf.close()
+        if havekernel[32] and not havekernel[64]:
+            shutil.copyfile("%s/out/ppc/ppc32/yaboot.conf" %(self.build_dir,),
+                            "%s/out/etc/yaboot.conf" %(self.build_dir,))
+        elif havekernel[64] and not havekernel[32]:
+            shutil.copyfile("%s/out/ppc/ppc64/yaboot.conf" %(self.build_dir,),
+                            "%s/out/etc/yaboot.conf" %(self.build_dir,))
+        else:
+            cfg = """
+init-message = "\nWelcome to %(label)s!\nUse 'linux32' for 32-bit kernel.\n\n"
+timeout=6000
+default=linux
 
-        # FIXME. Obviously
-        cfg64 = """
-init-message = "Sorry, this LiveCD only supports 32-bit hardware"
-"""
-        cfgf = open("%s/out/ppc/ppc64/yaboot.conf" %(self.build_dir,), "w")
-        cfgf.write(cfg64)
-        cfgf.close()
+image=/ppc/ppc64/vmlinuz
+	label=linux64
+	alias=linux
+	initrd=/ppc/ppc64/initrd.img
+	read-only
+
+image=/ppc/ppc32/vmlinuz
+	label=linux32
+	initrd=/ppc/ppc32/initrd.img
+	read-only
+""" %{"label": self.fs_label,}
+
+            cfgf = open("%s/out/etc/yaboot.conf" %(self.build_dir,), "w")
+            cfgf.write(cfg)
+            cfgf.close()
 
         # TODO: build 'netboot' images with kernel+initrd, like mk-images.ppc
 
