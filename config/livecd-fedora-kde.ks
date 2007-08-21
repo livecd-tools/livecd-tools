@@ -10,8 +10,24 @@ koffice-kspread
 koffice-kpresenter
 koffice-filters
 twinkle
+filelight
+
+# some other extra packages
+gnupg
+xine-lib-extras
+synaptics
+fonts-*
+hal-cups-utils
+
 # if it is enough space include koffice-krita (~40 megs)
-koffice-krita
+#koffice-krita
+
+# ignore comps.xml and make sure these packages are included
+knetworkmanager
+kpowersave
+redhat-artwork-kde
+rhgb
+man-pages
 
 #some changes that we don't want...
 -specspo
@@ -22,15 +38,34 @@ koffice-krita
 -kmymoney2
 -basket
 
-# some other extra packages
-gnupg
-xine-lib-extras
-synaptics
+# remove some packages from livecd-fedora-base-desktop.ks
+-scim*
+-system-config-printer*
+-gdm
+-authconfig-gtk
+-m17n*
+-xorg-x11-fonts-*
+-xorg-x11-twm
+-PolicyKit-gnome
+-libbeagle
+-yelp
+-firefox
+-desktop-backgrounds-basic
+-gnome-doc-utils-stylesheets
+-yelp
+-zenity
+-anthy
+-kasumi
+-pygtkglext
+-python-devel
+-libchewing
+-gnome-games
+-system-config-printer-libs
+-hal-cups-utils
+#bitmap-fonts
+#kipi-plugins
+#gutenprint-foomatic
 
-# ignore comps.xml and make sure these packages are included
-knetworkmanager
-kpowersave
-redhat-artwork-kde
 
 %post
 
@@ -41,7 +76,8 @@ DISPLAYMANAGER="KDE"
 EOF
 
 # add initscript
-cat >> /etc/rc.d/init.d/fedora-live-kde << EOF
+cat >> /etc/rc.d/init.d/fedora-live << EOF
+
 if [ -e /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png ] ; then
     # use image also for kdm
     mkdir -p /usr/share/apps/kdm/faces
