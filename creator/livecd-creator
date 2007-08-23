@@ -334,6 +334,12 @@ class ImageCreator(object):
 
     def _getRequiredPackages(self):
         return []
+
+    def _getKernelOptions(self):
+        r = "ro quiet liveimg"
+        if os.path.exists("%s/install_root/usr/bin/rhgb" %(self.build_dir,)):
+            r += " rhgb"
+        return r
         
     def parse(self, kscfg):
         ksversion = pykickstart.version.makeVersion()
@@ -1037,16 +1043,18 @@ menu hiddenrow 5
                 cfg += """label %(short)s
   menu label %(long)s
   kernel vmlinuz
-  append initrd=initrd.img  ro quiet root=CDLABEL=%(label)s rootfstype=iso9660 liveimg %(extra)s
+  append initrd=initrd.img root=CDLABEL=%(label)s rootfstype=iso9660 %(liveargs)s %(extra)s
 """ %{"label": self.fs_label, "background" : have_background,
-      "short": short, "long": long, "extra": extra}
+      "short": short, "long": long, "extra": extra,
+      "liveargs": self._getKernelOptions()}
             else:
                 cfg += """label %(short)s
   menu label %(long)s
   kernel mboot.c32
-  append xen.gz --- vmlinuz --- initrd.img  ro quiet root=CDLABEL=%(label)s rootfstype=iso9660 liveimg %(extra)s
+  append xen.gz --- vmlinuz --- initrd.img  root=CDLABEL=%(label)s rootfstype=iso9660 %(liveargs)s %(extra)s
 """ %{"label": self.fs_label, "background" : have_background,
-      "short": short, "long": long, "extra": extra}
+      "short": short, "long": long, "extra": extra,
+      "liveargs": self._getKernelOptions()}
 
 
         memtest = glob.glob("%s/install_root/boot/memtest86*" %(self.build_dir,))
@@ -1161,8 +1169,8 @@ image=/ppc/ppc%(bit)s/vmlinuz
   label=%(short)s
   initrd=/ppc/ppc%(bit)s/initrd.img
   read-only
-  append="ro quiet root=CDLABEL=%(label)s rootfstype=iso9660 %(extra)s"
-""" %{"label": self.fs_label, "short": short, "long": long, "extra": extra, "bit": bit}
+  append="root=CDLABEL=%(label)s rootfstype=iso9660 %(liveargs)s %(extra)s"
+""" %{"label": self.fs_label, "short": short, "long": long, "extra": extra, "bit": bit, "liveargs": self._getKernelOptions()}
 
                 if havekernel[bit]:
                     cfgf = open("%s/out/ppc/ppc%d/yaboot.conf" %(self.build_dir, bit), "w")
