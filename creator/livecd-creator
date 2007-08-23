@@ -329,10 +329,6 @@ class ImageCreator(object):
         self.ksparser = None
 
         self.image_size = 4096
-        self.packages = []
-        self.epackages = []
-        self.groups = []
-        self.repos = []
 
     def _getRequiredPackages(self):
         return []
@@ -354,32 +350,14 @@ class ImageCreator(object):
             except pykickstart.errors.KickstartError, e:
                 raise InstallationError("Failed to parse kickstart file '%s' : %s" % (kscfg, e))
 
-            for repo in self.ksparser.handler.repo.repoList:
-                already_given = False
-                for cmd_name, cmd_url, cmd_mirrorlist in self.repos:
-                    if cmd_name == repo.name:
-                        already_given = True
-                        break
+        for p in self.ksparser.handler.partition.partitions:
+            if p.mountpoint == "/" and p.size:
+                self.image_size = int(p.size)
 
-                if not already_given:
-                    self.repos.append( (repo.name, repo.baseurl,
-                                        repo.mirrorlist) )
-
-            self.packages.extend(self.ksparser.handler.packages.packageList)
-            self.groups.extend(map(lambda g: (g.name, g.include),
-                                   self.ksparser.handler.packages.groupList))
-            self.epackages.extend(self.ksparser.handler.packages.excludedList)
-
-            self.packages.extend(self._getRequiredPackages())
-
-            for p in self.ksparser.handler.partition.partitions:
-                if p.mountpoint == "/" and p.size:
-                    self.image_size = int(p.size)
-
-        if not self.packages and not self.groups:
+        if len(self.ksparser.handler.packages.packageList) == 0 and len(self.ksparser.handler.packages.groupList) == 0:
             raise InstallationError("No packages or groups specified")
 
-        if not self.repos:
+        if not self.ksparser.handler.repo.repoList:
             raise InstallationError("No repositories specified")
 
         # more sanity checks
@@ -537,7 +515,8 @@ class ImageCreator(object):
     def installPackages(self):
         """install packages into target file system"""
         try:
-            for pkg in self.packages:
+            for pkg in (self.ksparser.handler.packages.packageList + 
+                        self._getRequiredPackages()):
                 try:
                     self.ayum.selectPackage(pkg)
                 except yum.Errors.InstallError, e:
@@ -547,17 +526,18 @@ class ImageCreator(object):
                     else:
                         print >> sys.stderr, "Unable to find package '%s'; skipping" %(pkg,)
 
-            for (grp, inc) in self.groups:
+            for group in self.ksparser.handler.packages.groupList:
                 try:
-                    self.ayum.selectGroup(grp, inc)
+                    self.ayum.selectGroup(group.name, group.inc)
                 except (yum.Errors.InstallError, yum.Errors.GroupsError), e:
                     if self.ksparser.handler.packages.handleMissing != \
                            pykickstart.constants.KS_MISSING_IGNORE:
-                        raise InstallationError("Failed to find group '%s' : %s" % (grp, e))
+                        raise InstallationError("Failed to find group '%s' : %s" % (group.name, e))
                     else:
-                        print >> sys.stderr, "Unable to find group '%s'; skipping" %(grp,)
+                        print >> sys.stderr, "Unable to find group '%s'; skipping" %(group.name,)
 
-            map(lambda pkg: self.ayum.deselectPackage(pkg), self.epackages)
+            map(lambda pkg: self.ayum.deselectPackage(pkg),
+                self.ksparser.handler.packages.excludedList)
 
             self.ayum.runInstall()
         except yum.Errors.RepoError, e:
@@ -864,8 +844,8 @@ class ImageCreator(object):
         subprocess.call(["/bin/bash"], preexec_fn=self.run_in_root)
 
     def install(self):
-        for (name, url, mirrorlist) in self.repos:
-            self.ayum.addRepository(name, url, mirrorlist)
+        for repo in self.ksparser.handler.repo.repoList:
+            self.ayum.addRepository(repo.name, repo.baseurl, repo.mirrorlist)
 
         self.installPackages()
         try:
