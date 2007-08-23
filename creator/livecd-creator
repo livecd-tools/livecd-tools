@@ -289,6 +289,7 @@ class LiveCDYum(yum.YumBase):
         repo.enable()
         repo.setup(0)
         self.repos.add(repo)
+        return repo
             
     def runInstall(self):
         try:
@@ -845,7 +846,11 @@ class ImageCreator(object):
 
     def install(self):
         for repo in self.ksparser.handler.repo.repoList:
-            self.ayum.addRepository(repo.name, repo.baseurl, repo.mirrorlist)
+            yr = self.ayum.addRepository(repo.name, repo.baseurl, repo.mirrorlist)
+            if hasattr(repo, "includepkgs"):
+                yr.includepkgs = repo.includepkgs
+            if hasattr(repo, "excludepkgs"):
+                yr.exclude = repo.excludepkgs
 
         self.installPackages()
         try:
