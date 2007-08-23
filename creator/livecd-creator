@@ -332,6 +332,8 @@ class ImageCreator(object):
         self.bindmounts = []
         self.ksparser = None
 
+        self.image_size = 4096
+
     def _getRequiredPackages(self):
         return []
 
@@ -369,6 +371,10 @@ class ImageCreator(object):
             self.epackages.extend(self.ksparser.handler.packages.excludedList)
 
             self.packages.extend(self._getRequiredPackages())
+
+            for p in self.ksparser.handler.partition.partitions:
+                if p.mountpoint == "/" and p.size:
+                    self.image_size = int(p.size)
 
         if not self.packages and not self.groups:
             raise InstallationError("No packages or groups specified")
@@ -424,7 +430,7 @@ class ImageCreator(object):
         fstab.write("sysfs                   /sys                    sysfs   defaults        0 0\n")
         fstab.close()
 
-    def setup(self, image_size, base_on = None):
+    def setup(self, base_on = None):
         """setup target ext3 file system in preparation for an install"""
 
         # setup temporary build dirs
@@ -449,7 +455,7 @@ class ImageCreator(object):
                                                     %(self.build_dir,),
                                                     "%s/install_root"
                                                     %(self.build_dir,),
-                                                    image_size,
+                                                    self.image_size,
                                                     self.fs_label,
                                                     self.tmpdir)
             
@@ -1248,11 +1254,6 @@ def parse_options(args):
                       dest="tmpdir", default="/var/tmp",
                       help="Temporary directory to use (default: /var/tmp)")
 
-    # need to handle these in the config file so they can go away
-    parser.add_option("-u", "--uncompressed-size", type="int",
-                      dest="uncompressed_size", default=4096,
-                      help="Size of uncompressed fs in MiB (default: 4096)")
-
     # debug options not recommended for "production" images
     parser.add_option("-l", "--shell", action="store_true", dest="give_shell",
                       help="Start a shell in the chroot for post-configuration.")
@@ -1364,7 +1365,7 @@ def main():
     try:
         target.parse(options.kscfg)
 
-        target.setup(options.uncompressed_size, options.base_on)
+        target.setup(options.base_on)
 
         target.install()
 
