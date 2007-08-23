@@ -315,15 +315,11 @@ class LiveCDYum(yum.YumBase):
         return self.runTransaction(cb)
 
 class ImageCreator(object):
-    def __init__(self, repos, packages, epackages, groups, fs_label, skip_compression, tmpdir):
+    def __init__(self, fs_label):
         self.ayum = None
-        self.repos = repos
-        self.packages = packages
-        self.epackages = epackages
-        self.groups = groups
         self.fs_label = fs_label
-        self.skip_compression = skip_compression
-        self.tmpdir = tmpdir
+        self.skip_compression = False
+        self.tmpdir = "/var/tmp"
 
         self._checkIsoMD5 = False
 
@@ -333,6 +329,10 @@ class ImageCreator(object):
         self.ksparser = None
 
         self.image_size = 4096
+        self.packages = []
+        self.epackages = []
+        self.groups = []
+        self.repos = []
 
     def _getRequiredPackages(self):
         return []
@@ -883,10 +883,13 @@ class ImageCreator(object):
     def createIso(self):
         # WARNING: if you don't override this, your CD probably won't be
         # bootable
-        subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(self.fs_label,),
+        rc = subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(self.fs_label,),
                          "-J", "-r", "-hide-rr-moved", "-hide-joliet-trans-tbl",
                          "-V", "%s" %(self.fs_label,),
                          "%s/out" %(self.build_dir)])
+        if rc != 0:
+            import pdb; pdb.set_trace()
+        import pdb; pdb.set_trace()
 
     def implantIsoMD5(self):
         """Implant an isomd5sum."""
@@ -1083,7 +1086,7 @@ menu hiddenrow 5
 
     def createIso(self):
         """Write out the live CD ISO."""
-        subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(self.fs_label,),
+        rc = subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(self.fs_label,),
                          "-b", "isolinux/isolinux.bin",
                          "-c", "isolinux/boot.cat",
                          "-no-emul-boot", "-boot-load-size", "4",
@@ -1091,6 +1094,8 @@ menu hiddenrow 5
                          "-J", "-r", "-hide-rr-moved", "-hide-joliet-trans-tbl",
                          "-V", "%s" %(self.fs_label,),
                          "%s/out" %(self.build_dir)])
+        if rc != 0:
+            raise InstallationError("ISO creation failed!")
 
     def _getRequiredPackages(self):
         ret = ["syslinux"]
@@ -1100,12 +1105,14 @@ menu hiddenrow 5
 class ppcImageCreator(ImageCreator):
     def createIso(self):
         """write out the live CD ISO"""
-        subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(self.fs_label,),
+        rc = subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(self.fs_label,),
                          "-hfs", "-hfs-bless", "%s/out/ppc/mac" %(self.build_dir),
                          "-hfs-volid", "%s" %(self.fs_label,), "-part",
                          "-map", "%s/out/ppc/mapping" %(self.build_dir,),
                          "-J", "-r", "-hide-rr-moved", "-no-desktop",
                          "-V", "%s" %(self.fs_label,), "%s/out" %(self.build_dir)])
+        if rc != 0:
+            raise InstallationError("ISO creation failed!")
 
     def configureBootloader(self):
         """configure the boot loader"""
@@ -1226,12 +1233,12 @@ image=/ppc/ppc32/vmlinuz
         ret.extend(ImageCreator._getRequiredPackages(self))
         return ret
 
-def getImageCreator(repos, packages, epackages, groups, fs_label, skip_compression, tmpdir):
+def getImageCreator(fs_label):
     arch = rpmUtils.arch.getBaseArch()
     if arch in ("i386", "x86_64"):
-        return x86ImageCreator(repos, packages, epackages, groups, fs_label, skip_compression, tmpdir)
+        return x86ImageCreator(fs_label)
     elif arch in ("ppc", "ppc64"):
-        return ppcImageCreator(repos, packages, epackages, groups, fs_label, skip_compression, tmpdir)
+        return ppcImageCreator(fs_label)
 
     raise InstallationError("Architecture not supported!")
 
@@ -1263,53 +1270,13 @@ def parse_options(args):
                       help="Don't run resize2fs to clean up wasted blocks")
 
 
-    # debug options that will be going away real soon now.
-    parser.add_option("-r", "--repo", type="string", action="append",
-                      dest="repos", help="Add/override yum repository")
-    parser.add_option("-p", "--package", type="string", action="append",
-                      dest="packages", help="Include this package")
-    parser.add_option("-g", "--group", type="string", action="append",
-                      dest="groups", help="Include this group")
-    parser.add_option("-e", "--exclude-package", type="string", action="append",
-                      dest="epackages", help="Exclude this package")
-
     (options, args) = parser.parse_args()
     if not options.kscfg or not os.path.isfile(options.kscfg):
-        raise Usage("Kickstart config '%s' does nto exist" %(options.kscfg,))
+        raise Usage("Kickstart config '%s' does not exist" %(options.kscfg,))
     if options.base_on and not os.path.isfile(options.base_on):
         raise Usage("Live CD ISO '%s' does not exist" %(options.base_on,))
     if options.fs_label and len(options.fs_label) > 32:
         raise Usage("CD labels are limited to 32 characters")
-
-    # parse repos ==> list.  icky.
-    repos = []
-    if options.repos:
-        for r in options.repos:
-            (name, url) = r.split(",")
-            repos.append((name, url))
-    options.repos = repos
-
-    if options.groups:
-        # parse packages/groups.  also icky.
-        groups = map(lambda g: (g, pykickstart.parser.GROUP_DEFAULT), options.groups)
-    else:
-        groups = []
-    if options.packages:
-        for p in options.packages:
-            if p.startswith("@"):
-                groups.append((p[1:], pykickstart.parser.GROUP_DEFAULT))
-                options.packages.remove(p)
-    else:
-        options.packages = []
-    options.groups = groups
-    if options.epackages is None:
-        options.epackages = []
-
-    if not options.kscfg and not (options.packages or options.groups):
-        raise Usage("No packages or groups specified")
-
-    if not options.kscfg and not options.repos:
-        raise Usage("No repositories specified")
 
     return options
 
@@ -1354,13 +1321,9 @@ def main():
             fs_label = name + "-" + fs_label_suffix
         print "Using label %s" % (fs_label,)
 
-    target = getImageCreator(options.repos,
-                             options.packages,
-                             options.epackages,
-                             options.groups,
-                             fs_label,
-                             options.skip_compression,
-                             options.tmpdir)
+    target = getImageCreator(fs_label)
+    target.skip_compression = True
+    target.tmpdir = options.tmpdir
 
     try:
         target.parse(options.kscfg)
