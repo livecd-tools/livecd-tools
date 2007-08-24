@@ -766,6 +766,7 @@ class ImageCreator(object):
             f.close()
 
     def runPost(self):
+        instroot = "%s/install_root" %(self.build_dir,)        
         # and now, for arbitrary %post scripts
         for s in filter(lambda s: s.type == pykickstart.parser.KS_SCRIPT_POST,
                         self.ksparser.handler.scripts):
