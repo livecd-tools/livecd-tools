@@ -1326,6 +1326,10 @@ def main():
         print >> sys.stderr, "Error creating Live CD : %s" % e
         target.teardown()
         return 1
+    except:
+        exc = sys.exc_info()
+        target.teardown()
+        raise exc[0], exc[1], exc[2]
     target.teardown()
 
     return 0
