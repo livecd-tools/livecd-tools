@@ -773,6 +773,7 @@ class ImageCreator(object):
             f.write(buf)
             f.close()
 
+    def runPost(self):
         # and now, for arbitrary %post scripts
         for s in filter(lambda s: s.type == pykickstart.parser.KS_SCRIPT_POST,
                         self.ksparser.handler.scripts):
@@ -861,6 +862,7 @@ class ImageCreator(object):
         self.relabelSystem()
         self.createInitramfs()
         self.configureBootloader()
+        self.runPost()
 
     def configureBootloader(self):
         raise InstallationError("Bootloader configuration is arch-specific, but not implemented for this arch!")
