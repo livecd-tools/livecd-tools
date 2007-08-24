@@ -471,17 +471,8 @@ class ImageCreator(object):
 
     def unmount(self):
         """detaches system bind mounts and install_root for the file system and tears down loop devices used"""
+        self.ayum.close()
         self.ayum = None
-
-        # FIXME: Make one last ditch effort to close fds still open
-        # in the install root; this is only needed because
-        # there's no way to ask yum to close its sqlite dbs,
-        # though. See https://bugzilla.redhat.com/236409
-        for i in range(3, os.sysconf("SC_OPEN_MAX")):
-            try:
-                os.close(i)
-            except:
-                pass
 
         try:
             os.unlink(self.build_dir + "/install_root/etc/mtab")
