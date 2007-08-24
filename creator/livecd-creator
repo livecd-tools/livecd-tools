@@ -521,7 +521,7 @@ class ImageCreator(object):
 
             for group in self.ksparser.handler.packages.groupList:
                 try:
-                    self.ayum.selectGroup(group.name, group.inc)
+                    self.ayum.selectGroup(group.name, group.include)
                 except (yum.Errors.InstallError, yum.Errors.GroupsError), e:
                     if self.ksparser.handler.packages.handleMissing != \
                            pykickstart.constants.KS_MISSING_IGNORE:
