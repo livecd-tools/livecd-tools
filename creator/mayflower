@@ -79,7 +79,8 @@ cp /sbin/blockdev sbin
 cp /sbin/dmsetup sbin
 cp /bin/dd bin
 
-MODULES=
+# we explicitly load these, so should be sure they're present
+MODULES="loop dm_snapshot "
 
 if [ -e /etc/mayflower.conf ] ; then
     source /etc/mayflower.conf
@@ -98,6 +99,20 @@ fi
 rm -f modules
 
 for m in $MODULES ; do
+    char=$(echo $m | cut -c1)
+    if [ $char = '=' ]; then
+	NAME=$(echo $m | cut -c2-)
+	if [ "$NAME" = "ata" ]; then
+	    MODS="$MODS $(cat /lib/modules/$KERNEL/modules.block |egrep '(ata|ahci)' |sed -e 's/.ko//')"
+	else
+	    MODS="$MODS $(cat /lib/modules/$KERNEL/modules.$NAME |sed -e 's/.ko//')"
+	fi
+    else
+	MODS="$MODS $m"
+    fi
+done
+
+for m in $MODS ; do
     /sbin/modprobe --set-version $KERNEL --show-depends $m >> modules 2/dev/null
 done
 
