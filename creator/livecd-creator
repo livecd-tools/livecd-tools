@@ -28,7 +28,7 @@ import time
 import traceback
 import subprocess
 import shutil
-from optparse import OptionParser
+import optparse
 
 import yum
 import rpmUtils.arch
@@ -880,7 +880,6 @@ class ImageCreator(object):
     def createSquashFS(self):
         """create compressed squashfs file system"""
         if not self.skip_compression:
-            # FIXME: mksquashfs segfaults if PWD isn't set in the environment
             ret = subprocess.call(["/sbin/mksquashfs", "os.img", "sysroot",
                                    "../out/squashfs.img"],
                                   cwd="%s/data" %(self.build_dir,),
@@ -1225,7 +1224,7 @@ class Usage(Exception):
         Exception.__init__(self, msg, no_error)
 
 def parse_options(args):
-    parser = OptionParser()
+    parser = optparse.OptionParser()
 
     parser.add_option("-c", "--config", type="string", dest="kscfg",
                       help="Path to kickstart config file")
@@ -1300,7 +1299,7 @@ def main():
         print "Using label %s" % (fs_label,)
 
     target = getImageCreator(fs_label)
-    target.skip_compression = True
+    target.skip_compression = options.skip_compression
     target.tmpdir = options.tmpdir
 
     try:
