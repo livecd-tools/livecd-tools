@@ -16,7 +16,6 @@ install:
 	$(INSTALL_DATA) -D COPYING $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)/COPYING
 	$(INSTALL_DATA) -D README $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)/README
 	$(INSTALL_DATA) -D HACKING $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)/HACKING
-	$(INSTALL_DATA) -D TODO $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)/TODO
 	$(INSTALL_DATA) -D config/livecd-fedora-minimal.ks $(DESTDIR)/usr/share/livecd-tools/livecd-fedora-minimal.ks
 	$(INSTALL_DATA) -D config/livecd-fedora-desktop.ks $(DESTDIR)/usr/share/livecd-tools/livecd-fedora-desktop.ks
 	$(INSTALL_DATA) -D config/livecd-fedora-kde.ks $(DESTDIR)/usr/share/livecd-tools/livecd-fedora-kde.ks
