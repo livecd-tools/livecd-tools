@@ -11,6 +11,7 @@ koffice-kpresenter
 koffice-filters
 twinkle
 filelight
+kdeutils-extras
 
 # some other extra packages
 gnupg
@@ -20,7 +21,7 @@ fonts-*
 hal-cups-utils
 
 # if it is enough space include koffice-krita (~40 megs)
-#koffice-krita
+koffice-krita
 
 # ignore comps.xml and make sure these packages are included
 knetworkmanager
@@ -37,6 +38,8 @@ man-pages
 -kdeartwork-extras
 -kmymoney2
 -basket
+-speedcrunch
+
 
 # remove some packages from livecd-fedora-base-desktop.ks
 -scim*
@@ -47,22 +50,20 @@ man-pages
 -xorg-x11-fonts-*
 -xorg-x11-twm
 -PolicyKit-gnome
--libbeagle
--yelp
--firefox
+#-libbeagle
+#-yelp
+#-firefox
 -desktop-backgrounds-basic
 -gnome-doc-utils-stylesheets
--yelp
--zenity
+#-yelp
+#-zenity
 -anthy
 -kasumi
 -pygtkglext
 -python-devel
 -libchewing
--gnome-games
 -system-config-printer-libs
--hal-cups-utils
-#bitmap-fonts
+#-hal-cups-utils
 #kipi-plugins
 #gutenprint-foomatic
 
