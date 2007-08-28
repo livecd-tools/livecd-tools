@@ -187,6 +187,7 @@ cp /sbin/lsmod sbin
 
 # if we have the iso checker, we want it
 [ -x /usr/lib/anaconda-runtime/checkisomd5 ] && cp /usr/lib/anaconda-runtime/checkisomd5 bin
+[ -x /usr/bin/checkisomd5 ] && cp /usr/bin/checkisomd5 bin
 
 # Copy all required shared libs
 for i in bin/* sbin/* lib/udev/*; do 

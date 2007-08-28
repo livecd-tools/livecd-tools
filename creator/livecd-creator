@@ -873,11 +873,14 @@ class ImageCreator(object):
 
     def implantIsoMD5(self):
         """Implant an isomd5sum."""
-        if os.path.exists("/usr/lib/anaconda-runtime/implantisomd5"):
+        if os.path.exists("/usr/bin/implantisomd5"):
+            subprocess.call(["/usr/bin/implantisomd5",
+                             "%s.iso" %(self.fs_label,)])
+        elif os.path.exists("/usr/lib/anaconda-runtime/implantisomd5"):
             subprocess.call(["/usr/lib/anaconda-runtime/implantisomd5",
                              "%s.iso" %(self.fs_label,)])
         else:
-            print >> sys.stderr, "anaconda-runtime not installed; not setting up mediacheck"
+            print >> sys.stderr, "isomd5sum not installed; not setting up mediacheck"
 
     def createSquashFS(self):
         """create compressed squashfs file system"""
@@ -945,7 +948,7 @@ class ImageCreator(object):
                                            env={"PWD": "%s/data" %(self.build_dir,)})
 
     def package(self):
-        if os.path.exists("%s/install_root/usr/lib/anaconda-runtime/checkisomd5" %(self.build_dir,)):        
+        if os.path.exists("%s/install_root/usr/lib/anaconda-runtime/checkisomd5" %(self.build_dir,)) or os.path.exists("%s/install_root/usr/bin/checkisomd5" %(self.build_dir,)):        
             self._checkIsoMD5 = True
         self.createSquashFS()
         self.createIso()
