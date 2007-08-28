@@ -1,6 +1,6 @@
 Summary: Tools for building live CD's
 Name: livecd-tools
-Version: 010
+Version: 011
 Release: 1%{?dist}
 License: GPL
 Group: System Environment/Base
@@ -14,10 +14,14 @@ Requires: yum >= 3.0.0
 Requires: mkisofs
 Requires: squashfs-tools
 Requires: pykickstart
-Requires: syslinux
 Requires: dosfstools >= 2.11-8
-BuildArch: noarch
-ExcludeArch: ppc ppc64
+%ifarch %{ix86} x86_64
+Requires: syslinux
+%endif
+%ifarch ppc ppc64
+Requires: yaboot
+%endif
+
 
 %description 
 Tools for generating live CD's on Fedora based systems including
@@ -48,6 +52,22 @@ rm -rf $RPM_BUILD_ROOT
 %{_datadir}/livecd-tools/*
 
 %changelog
+* Tue Aug 28 2007 Jeremy Katz <katzj@redhat.com> - 011-1
+- Many config updates for Fedora 8
+- Support $basearch in repo line of configs; use it
+- Support setting up Xen kernels and memtest86+ in the bootloader config
+- Handle rhgb setup
+- Improved default fs label (Colin Walters)
+- Support localboot from the bootloader (#252192)
+- Use hidden menu support in syslinux
+- Have a base desktop config included by the other configs (Colin Walters)
+- Use optparse for optino parsing
+- Remove a lot of command line options; things should be specified via the
+  kickstart config instead
+- Beginnings of PPC support (David Woodhouse)
+- Clean up kernel module inclusion to take advantage of files in Fedora
+  kernels listing storage drivers
+
 * Wed Jul 25 2007 Jeremy Katz <katzj@redhat.com> - 010-1
 - Separate out configs used for Fedora 7
 - Add patch from Douglas McClendon to make images smaller
