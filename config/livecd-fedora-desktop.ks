@@ -1,6 +1,7 @@
 %include livecd-fedora-base-desktop.ks
 
 %packages
+@games
 @graphical-internet
 @graphics
 @sound-and-video

@@ -11,7 +11,6 @@ repo --name=development --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist
 
 %packages
 @base-x
-@games
 @base
 @core
 @admin-tools
