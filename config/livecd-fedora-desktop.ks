@@ -113,7 +113,7 @@ gnome-blog
 -vino
 -tomboy
 -gimp-help
-
+%end
 
 %post
 cat >> /etc/rc.d/init.d/fedora-live << EOF
@@ -126,5 +126,7 @@ if [ -e /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png ] ; then
     chown fedora:fedora /home/fedora/.face
     # TODO: would be nice to get e-d-s to pick this one up too... but how?
 fi
+
 EOF
 
+%end

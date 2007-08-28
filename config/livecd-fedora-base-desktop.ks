@@ -49,10 +49,11 @@ gparted
 
 # livecd bits to set up the livecd and be able to install
 anaconda
-anaconda-runtime
+isomd5sum
 
 # make sure debuginfo doesn't end up on the live image
 -*debuginfo
+%end
 
 %post
 # FIXME: it'd be better to get this installed from a package
@@ -118,3 +119,4 @@ chmod 755 /etc/rc.d/init.d/fedora-live
 # save a little bit of space at least...
 rm -f /boot/initrd*
 
+%end
