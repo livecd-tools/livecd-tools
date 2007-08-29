@@ -496,10 +496,6 @@ class ImageCreator(object):
             b.umount()
 
         if self.instloop:
-            (xxbsize, xxfrsize, xxblocks, xxbfree,
-             xxbavail, xxfiles, xxffree, xxfavail,
-             xxflag, xxnamemax) = os.statvfs(self.build_dir + "/install_root")
-            print >> sys.stderr, "Installation target uncompressed data size is %d MB" % ( ( xxfrsize * xxblocks - xxbsize * xxbfree ) / ( 1024L * 1024L ) )
             self.instloop.cleanup()
             self.instloop = None
 
