@@ -20,8 +20,9 @@ synaptics
 fonts-*
 hal-cups-utils
 
-# if it is enough space include koffice-krita (~40 megs)
-koffice-krita
+# if it is enough space include koffice-krita (~40 megs) and ktorrent (~3 megs)
+#koffice-krita
+#ktorrent
 
 # ignore comps.xml and make sure these packages are included
 knetworkmanager
@@ -29,6 +30,7 @@ kpowersave
 redhat-artwork-kde
 rhgb
 man-pages
+smolt-firstboot
 
 #some changes that we don't want...
 -specspo
@@ -41,32 +43,25 @@ man-pages
 -speedcrunch
 
 
-# remove some packages from livecd-fedora-base-desktop.ks
+# try to remove some packages from livecd-fedora-base-desktop.ks
 -scim*
 -system-config-printer*
 -gdm
 -authconfig-gtk
 -m17n*
--xorg-x11-fonts-*
--xorg-x11-twm
 -PolicyKit-gnome
-#-libbeagle
-#-yelp
-#-firefox
 -desktop-backgrounds-basic
 -gnome-doc-utils-stylesheets
-#-yelp
-#-zenity
 -anthy
 -kasumi
 -pygtkglext
 -python-devel
 -libchewing
 -system-config-printer-libs
-#-hal-cups-utils
-#kipi-plugins
-#gutenprint-foomatic
+#-kipi-plugins
+#-gutenprint-foomatic
 
+%end
 
 %post
 
@@ -108,3 +103,4 @@ cp /usr/share/applications/fedora-knetworkmanager.desktop /usr/share/autostart/
 sed -i 's/NoDisplay=true/NoDisplay=false/' /usr/share/applications/liveinst.desktop
 EOF
 
+%end
