@@ -4,6 +4,7 @@ timezone US/Eastern
 auth --useshadow --enablemd5
 selinux --enforcing
 firewall --disabled
+part / --size 1024
 
 repo --name=development --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=rawhide&arch=$basearch
 
@@ -18,3 +19,4 @@ chkconfig
 authconfig
 rootfiles
 
+%end
