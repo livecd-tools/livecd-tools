@@ -770,19 +770,25 @@ class ImageCreator(object):
         # and now, for arbitrary %post scripts
         for s in filter(lambda s: s.type == pykickstart.parser.KS_SCRIPT_POST,
                         self.ksparser.handler.scripts):
-            # we can only safely run scripts in the chroot
-            if not s.inChroot:
-                print >> sys.stderr, "Not running script outside of chroot"
-                continue
-
             (fd, path) = tempfile.mkstemp("", "ks-script-", "%s/tmp" %(instroot,))
             os.write(fd, s.script)
             os.close(fd)
             os.chmod(path, 0700)
 
+            if not s.inChroot:
+                env = {"BUILD_DIR": self.build_dir,
+                       "INSTALL_ROOT": "%s/install_root" %(self.build_dir,),
+                       "LIVE_ROOT": "%s/out" %(self.build_dir,)}
+                preexec = lambda: os.chdir(self.build_dir,)
+                script = path
+            else:
+                env = {}
+                preexec = self.run_in_root
+                script = "/tmp/%s" %(os.path.basename(path),)
+
             try:
-                subprocess.call([s.interp, "/tmp/%s" %(os.path.basename(path),)],
-                                preexec_fn = self.run_in_root)
+                subprocess.call([s.interp, script],
+                                preexec_fn = preexec, env = env)
             except OSError, (err, msg):
                 os.unlink(path)
                 raise InstallationError("Failed to execute %%post script with '%s' : %s" % (s.interp, msg))
