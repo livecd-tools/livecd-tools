@@ -1,3 +1,5 @@
+%define debug_package %{nil}
+
 Summary: Tools for building live CD's
 Name: livecd-tools
 Version: 011
