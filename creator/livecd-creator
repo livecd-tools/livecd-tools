@@ -853,6 +853,9 @@ class ImageCreator(object):
                 yr.exclude = repo.excludepkgs
 
         self.installPackages()
+        if os.path.exists("%s/install_root/usr/lib/anaconda-runtime/checkisomd5" %(self.build_dir,)) or os.path.exists("%s/install_root/usr/bin/checkisomd5" %(self.build_dir,)):        
+            self._checkIsoMD5 = True
+
         try:
             self.configureSystem()
         except Exception, e: #FIXME: we should be a little bit more fine-grained
@@ -954,8 +957,6 @@ class ImageCreator(object):
                                            env={"PWD": "%s/data" %(self.build_dir,)})
 
     def package(self):
-        if os.path.exists("%s/install_root/usr/lib/anaconda-runtime/checkisomd5" %(self.build_dir,)) or os.path.exists("%s/install_root/usr/bin/checkisomd5" %(self.build_dir,)):        
-            self._checkIsoMD5 = True
         self.createSquashFS()
         self.createIso()
         self.implantIsoMD5()
