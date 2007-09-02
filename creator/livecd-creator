@@ -203,6 +203,15 @@ class LiveCDParser(pykickstart.parser.KickstartParser):
         self.currentdir[self._includeDepth] = cd
         return pykickstart.parser.KickstartParser.readKickstart(self, file, reset)
 
+class TextProgress(object):
+    def start(self, filename, url, *args, **kwargs):
+        sys.stdout.write("Retrieving %s " % (url,))
+        self.url = url
+    def update(self, *args):
+        pass
+    def end(self, *args):
+        sys.stdout.write("...OK\n")
+
 class LiveCDYum(yum.YumBase):
     def __init__(self):
         yum.YumBase.__init__(self)
@@ -288,6 +297,7 @@ class LiveCDYum(yum.YumBase):
         repo.gpgcheck = 0
         repo.enable()
         repo.setup(0)
+        repo.setCallback(TextProgress())
         self.repos.add(repo)
         return repo
             
