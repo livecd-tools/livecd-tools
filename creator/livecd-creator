@@ -419,7 +419,7 @@ class ImageCreator(object):
         fstab.write("sysfs                   /sys                    sysfs   defaults        0 0\n")
         fstab.close()
 
-    def setup(self, base_on = None):
+    def setup(self, base_on = None, cachedir = None):
         """setup target ext3 file system in preparation for an install"""
 
         # setup temporary build dirs
@@ -464,7 +464,7 @@ class ImageCreator(object):
         # bind mount system directories into install_root/
         for (f, dest) in [("/sys", None), ("/proc", None), ("/dev", None),
                           ("/dev/pts", None), ("/selinux", None),
-                          (self.build_dir + "/yum-cache", "/var/cache/yum")]:
+                          ((cachedir or self.build_dir) + "/yum-cache", "/var/cache/yum")]:
             self.bindmounts.append(BindChrootMount(f, self.build_dir + "/install_root", dest))
 
         for b in self.bindmounts:
@@ -1259,6 +1259,9 @@ def parse_options(args):
     parser.add_option("-t", "--tmpdir", type="string",
                       dest="tmpdir", default="/var/tmp",
                       help="Temporary directory to use (default: /var/tmp)")
+    parser.add_option("", "--cache", type="string",
+                      dest="cachedir", default=None,
+                      help="Cache directory to use (default: private cache")
 
     # debug options not recommended for "production" images
     parser.add_option("-l", "--shell", action="store_true", dest="give_shell",
@@ -1327,7 +1330,7 @@ def main():
     try:
         target.parse(options.kscfg)
 
-        target.setup(options.base_on)
+        target.setup(options.base_on, options.cachedir)
 
         target.install()
 
