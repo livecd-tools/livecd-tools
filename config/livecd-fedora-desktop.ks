@@ -107,6 +107,8 @@ gnome-blog
 -m17n-db-*
 -man-pages-*
 -scim-tables-*
+-scim-lang-*
+-wqy-bitmap-fonts
 
 # save some space
 -gnome-user-docs
