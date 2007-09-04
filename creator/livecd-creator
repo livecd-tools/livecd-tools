@@ -150,7 +150,7 @@ class LoopbackMount:
         self.mounted = True
 
 class SparseExt3LoopbackMount(LoopbackMount):
-    def __init__(self, lofile, mountdir, size, fslabel, tmpdir):
+    def __init__(self, lofile, mountdir, size, fslabel):
         LoopbackMount.__init__(self, lofile, mountdir, fstype = "ext3")
         self.size = size
         self.fslabel = fslabel
@@ -445,9 +445,7 @@ class ImageCreator(object):
                                                     "%s/install_root"
                                                     %(self.build_dir,),
                                                     self.image_size,
-                                                    self.fs_label,
-                                                    self.tmpdir)
-            
+                                                    self.fs_label)
 
         try:
             self.instloop.mount()
