@@ -150,9 +150,10 @@ class LoopbackMount:
         self.mounted = True
 
 class SparseExt3LoopbackMount(LoopbackMount):
-    def __init__(self, lofile, mountdir, size, fslabel):
+    def __init__(self, lofile, mountdir, size, blocksize, fslabel):
         LoopbackMount.__init__(self, lofile, mountdir, fstype = "ext3")
         self.size = size
+        self.blocksize = blocksize
         self.fslabel = fslabel
 
     def _createSparseFile(self):
@@ -169,8 +170,8 @@ class SparseExt3LoopbackMount(LoopbackMount):
 
     def _formatFilesystem(self):
         rc = subprocess.call(["/sbin/mkfs.ext3", "-F", "-L", self.fslabel,
-                              "-m", "1", "-b", "4096", self.lofile,
-                              "%d" % ( self.size *  1024L * 1024L / 4096L )])
+                              "-m", "1", "-b", str(self.blocksize), self.lofile,
+                              str(self.size *  1024L * 1024L / self.blocksize)])
         if rc != 0:
             raise MountError("Error creating ext3 filesystem")
         rc = subprocess.call(["/sbin/tune2fs", "-c0", "-i0", "-Odir_index",
@@ -339,7 +340,8 @@ class ImageCreator(object):
         self.bindmounts = []
         self.ksparser = None
 
-        self.image_size = 4096
+        self.image_size = 4096 # in megabytes
+        self.blocksize = 4096 # in kilobytes
 
     def _getRequiredPackages(self):
         return []
@@ -445,6 +447,7 @@ class ImageCreator(object):
                                                     "%s/install_root"
                                                     %(self.build_dir,),
                                                     self.image_size,
+                                                    self.blocksize,
                                                     self.fs_label)
 
         try:
@@ -912,57 +915,54 @@ class ImageCreator(object):
             shutil.move("%s/data/os.img" %(self.build_dir,),
                         "%s/out/ext3fs.img" %(self.build_dir,))
 
+    def resize2fs(self, image, n_blocks):
+        dev_null = os.open("/dev/null", os.O_WRONLY)
+        try:
+            return subprocess.call(["/sbin/resize2fs", image, str(n_blocks)],
+                                   stdout = dev_null,
+                                   stderr = dev_null)
+        finally:
+            os.close(dev_null)
+
+    #
+    # resize2fs doesn't have any kind of minimal setting, so use
+    # a binary search to get it to minimal size.
+    #
+    def resize2fsToMinimal(self, image, n_blocks):
+        bot = 0
+        top = n_blocks
+        while top != (bot + 1):
+            t = bot + ((top - bot) / 2)
+
+            if not self.resize2fs(image, t):
+                top = t
+            else:
+                bot = t
+
+        return top
+
     #
     # cleanupDeleted removes unused data from the sparse ext3 os image file.
     # The process involves: resize2fs-to-minimal, truncation,
     # resize2fs-to-uncompressed-size (with implicit resparsification)
     #
     def cleanupDeleted(self):
-        # e2fsck -f -y is required by resize2fs
-        subprocess.call(["/sbin/e2fsck", "-f", "-y", "os.img"],
-                        cwd="%s/data" %(self.build_dir,),
-                        env={"PWD": "%s/data" %(self.build_dir,)})
+        image = "%s/data/os.img" %(self.build_dir,)
 
+        subprocess.call(["/sbin/e2fsck", "-f", "-y", image])
 
-        (xxmode,xxino,xxdev,xxnlink,xxuid,xxgid,xxsize,xxatime,
-         xxmtime,xxctime) = os.stat(self.build_dir + "/data/os.img")
-        kbsize = xxsize / 1024L
+        n_blocks = os.stat(image)[stat.ST_SIZE] / self.blocksize
 
-        # resize2fs doesn't have any kind of minimal setting, so use
-        # a binary search to get it to minimal size.
-        # TODO: if a --verbose/debug flag exists, don't devnull the output
-        FNULL = os.open('/dev/null', os.O_WRONLY)
-        size_top = kbsize / 4L
-        size_bot = 0
-        while size_top != (size_bot + 1):
-            trysize = (size_bot + ((size_top - size_bot) / 2)) * 4
-            resize2fs_retval = subprocess.call(["/sbin/resize2fs", "os.img",
-                                                "%dK" %(trysize,)],
-                                               cwd="%s/data" %(self.build_dir,),
-                                               env={"PWD": "%s/data" %(self.build_dir,)},
-                                               stdout=FNULL,
-                                               stderr=FNULL)
-
-            if not resize2fs_retval:
-                size_top = (size_bot + ((size_top - size_bot) / 2))
-            else:
-                size_bot = (size_bot + ((size_top - size_bot) / 2))
-
-
-        os.close(FNULL)
-
-        print >> sys.stderr, "Installation target minimized to %dK" % (size_top * 4)
+        min_blocks = self.resize2fsToMinimal(image, n_blocks)
 
         # truncate the unused excess portion of the sparse file
-        fd = os.open("%s/data/os.img" %(self.build_dir,), os.O_WRONLY )
-        os.ftruncate(fd, size_top * 4096L)
+        fd = os.open(image, os.O_WRONLY )
+        os.ftruncate(fd, min_blocks * self.blocksize)
         os.close(fd)
 
-        # resize back to uncompressed-size
-        resize2fs_retval = subprocess.call(["/sbin/resize2fs", "os.img",
-                                            "%dK" %(kbsize,)],
-                                           cwd="%s/data" %(self.build_dir,),
-                                           env={"PWD": "%s/data" %(self.build_dir,)})
+        print >> sys.stderr, "Installation target minimized to %dK" % (min_blocks * self.blocksize / 1024L)
+
+        self.resize2fs(image, n_blocks)
 
     def package(self):
         self.createSquashFS()
