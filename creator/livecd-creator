@@ -843,7 +843,7 @@ class ImageCreator(object):
         mcfg.write('MODULES+="squashfs ext3 ext2 vfat msdos "\n')
         mcfg.write('MODULES+="ehci_hcd uhci_hcd ohci_hcd usb_storage usbhid "\n')
         mcfg.write('MODULES+="firewire-sbp2 firewire-ohci "\n')
-        mcfg.write('MODULES+="sr_mod sd_mod "\n')
+        mcfg.write('MODULES+="sr_mod sd_mod ide-cd"\n')
         mcfg.write('MODULES+="=ata "\n')
         mcfg.write('MODULES+="sym53c8xx aic7xxx "\n')
         mcfg.close()
