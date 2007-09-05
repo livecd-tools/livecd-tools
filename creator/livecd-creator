@@ -346,6 +346,8 @@ class ImageCreator(object):
 
     def _getRequiredPackages(self):
         return []
+    def _getRequiredExcludePackages(self):
+        return []
 
     def _getKernelOptions(self):
         r = "ro quiet liveimg"
@@ -538,7 +540,8 @@ class ImageCreator(object):
                         print >> sys.stderr, "Unable to find group '%s'; skipping" %(group.name,)
 
             map(lambda pkg: self.ayum.deselectPackage(pkg),
-                self.ksparser.handler.packages.excludedList)
+                self.ksparser.handler.packages.excludedList +
+                self._getRequiredExcludePackages())
 
             self.ayum.runInstall()
         except yum.Errors.RepoError, e:
@@ -1237,12 +1240,20 @@ image=/ppc/ppc32/vmlinuz
         ret.extend(ImageCreator._getRequiredPackages(self))
         return ret
 
+class ppc64ImageCreator(ppcImageCreator):
+    def _getRequiredExcludePackages(self):
+        # FIXME: while kernel.ppc and kernel.ppc64 co-exist, we can't
+        # have both
+        return ["kernel.ppc"]
+
 def getImageCreator(fs_label):
     arch = rpmUtils.arch.getBaseArch()
     if arch in ("i386", "x86_64"):
         return x86ImageCreator(fs_label)
-    elif arch in ("ppc", "ppc64"):
+    elif arch in ("ppc",):
         return ppcImageCreator(fs_label)
+    elif arch in ("ppc64",):
+        return ppc64ImageCreator(fs_label)
 
     raise InstallationError("Architecture not supported!")
 
