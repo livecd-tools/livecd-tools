@@ -103,7 +103,11 @@ for m in $MODULES ; do
     if [ $char = '=' ]; then
 	NAME=$(echo $m | cut -c2-)
 	if [ "$NAME" = "ata" ]; then
-	    MODS="$MODS $(cat /lib/modules/$KERNEL/modules.block |egrep '(ata|ahci)' |sed -e 's/.ko//')"
+	    if [ -f /lib/modules/$KERNEL/modules.libata ]; then
+		MODS="$MODS $(cat /lib/modules/$KERNEL/modules.libata |sed -e 's/.ko//')"
+	    else
+		MODS="$MODS $(cat /lib/modules/$KERNEL/modules.block |egrep '(ata|ahci)' |sed -e 's/.ko//')"
+	    fi
 	else
 	    MODS="$MODS $(cat /lib/modules/$KERNEL/modules.$NAME |sed -e 's/.ko//')"
 	fi
