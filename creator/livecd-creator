@@ -1267,28 +1267,37 @@ class Usage(Exception):
 def parse_options(args):
     parser = optparse.OptionParser()
 
-    parser.add_option("-c", "--config", type="string", dest="kscfg",
+    imgopt = optparse.OptionGroup(parser, "Image options",
+                                  "These options define the created image.")
+    imgopt.add_option("-c", "--config", type="string", dest="kscfg",
                       help="Path to kickstart config file")
-    parser.add_option("-f", "--fslabel", type="string", dest="fs_label",
-                      help="File system label (default based on config name)")
-    parser.add_option("-b", "--base-on", type="string", dest="base_on",
+    imgopt.add_option("-b", "--base-on", type="string", dest="base_on",
                       help="Add packages to an existing live CD iso9660 image.")
+    imgopt.add_option("-f", "--fslabel", type="string", dest="fs_label",
+                      help="File system label (default based on config name)")
+    parser.add_option_group(imgopt)
 
     # options related to the config of your system
-    parser.add_option("-t", "--tmpdir", type="string",
+    sysopt = optparse.OptionGroup(parser, "System directory options",
+                                  "These options define directories used on your system for creating the live image")
+    sysopt.add_option("-t", "--tmpdir", type="string",
                       dest="tmpdir", default="/var/tmp",
                       help="Temporary directory to use (default: /var/tmp)")
-    parser.add_option("", "--cache", type="string",
+    sysopt.add_option("", "--cache", type="string",
                       dest="cachedir", default=None,
                       help="Cache directory to use (default: private cache")
+    parser.add_option_group(sysopt)
 
     # debug options not recommended for "production" images
+    # Start a shell in the chroot for post-configuration.
     parser.add_option("-l", "--shell", action="store_true", dest="give_shell",
-                      help="Start a shell in the chroot for post-configuration.")
+                      help=optparse.SUPPRESS_HELP)
+    # Don't compress the image.
     parser.add_option("-s", "--skip-compression", action="store_true", dest="skip_compression",
-                      help="Don't compress the image.")
+                      help=optparse.SUPPRESS_HELP)
+    # Don't run resize2fs to clean up wasted blocks
     parser.add_option("", "--ignore-deleted", action="store_true", dest="ignore_deleted",
-                      help="Don't run resize2fs to clean up wasted blocks")
+                      help=optparse.SUPPRESS_HELP)
 
 
     (options, args) = parser.parse_args()
