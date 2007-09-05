@@ -84,6 +84,14 @@ if [ -b /dev/live ]; then
    mount -o ro /dev/live /mnt/live
 fi
 
+# enable swaps unless requested otherwise
+swaps=\`blkid -t TYPE=swap -o device\`
+if ! strstr "\`cat /proc/cmdline\`" noswap -a [ -n "\$swaps" ] ; then
+  for s in \$swaps ; do
+    action "Enabling swap partition \$s" swapon \$s
+  done
+fi
+
 # configure X
 exists system-config-display --noui --reconfig --set-depth=24
 
