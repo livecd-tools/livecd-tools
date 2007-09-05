@@ -819,12 +819,22 @@ class ImageCreator(object):
         return kernels[0]
 
     def createInitramfs(self):
+        mpath = "/usr/lib/livecd-creator/mayflower"
+
+        # look to see if we're running from a git tree; in which case,
+        # we should use the git mayflower too
+        if globals().has_key("__file__") and \
+           not os.path.abspath(__file__).startswith("/usr/bin"):
+            f = os.path.join(os.path.abspath(os.path.dirname(__file__)),
+                             "mayflower")
+            if os.path.exists(f):
+                mpath = f
+
         # Create initramfs
-        if not os.path.isfile("/usr/lib/livecd-creator/mayflower"):
+        if not os.path.isfile(mpath):
             raise InstallationError("livecd-creator not correctly installed : "+
                                     "/usr/lib/livecd-creator/mayflower not found")
-        shutil.copy("/usr/lib/livecd-creator/mayflower",
-                        "%s/install_root/sbin/mayflower" %(self.build_dir,))
+        shutil.copy(mpath, "%s/install_root/sbin/mayflower" %(self.build_dir,))
         # modules we want to support for booting
         mcfg = open(self.build_dir + "/install_root/etc/mayflower.conf", "w")
         mcfg.write('MODULES+="squashfs ext3 ext2 vfat msdos "\n')
