@@ -1049,8 +1049,7 @@ menu hidden
 menu hiddenrow 5
 """ %{"menu" : syslinuxMenu, "label": self.fs_label, "background" : have_background}
 
-        stanzas = [("linux", "Run from image", ""),
-                   ("runfromram", "Run from RAM - requires 1 GB+", "live_ram")]
+        stanzas = [("linux", "Run from image", "")]
         if self._checkIsoMD5:
             stanzas.append( ("check", "Verify and run from image", "check") )
 
