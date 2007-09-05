@@ -1240,11 +1240,15 @@ image=/ppc/ppc32/vmlinuz
         ret.extend(ImageCreator._getRequiredPackages(self))
         return ret
 
+    def _getRequiredExcludePackages(self):
+        # kind of hacky, but exclude memtest86+ on ppc so it can stay in cfg
+        return ["memtest86+"]
+
 class ppc64ImageCreator(ppcImageCreator):
     def _getRequiredExcludePackages(self):
         # FIXME: while kernel.ppc and kernel.ppc64 co-exist, we can't
         # have both
-        return ["kernel.ppc"]
+        return ["kernel.ppc", "memtest86+"]
 
 def getImageCreator(fs_label):
     arch = rpmUtils.arch.getBaseArch()
