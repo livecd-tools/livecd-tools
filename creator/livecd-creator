@@ -1077,7 +1077,8 @@ menu hiddenrow 5
             shutil.copy(memtest[0], "%s/out/isolinux/memtest" %(self.build_dir,))
             cfg += """label memtest
   menu label Memory Test
-  kernel memtest"""
+  kernel memtest
+"""
 
         # add local boot
         cfg += """label local
