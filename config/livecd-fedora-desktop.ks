@@ -115,6 +115,7 @@ gnome-blog
 -vino
 -tomboy
 -gimp-help
+-autofs
 %end
 
 %post
