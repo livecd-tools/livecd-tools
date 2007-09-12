@@ -113,9 +113,10 @@ gnome-blog
 # save some space
 -gnome-user-docs
 -vino
--tomboy
 -gimp-help
+-evolution-help
 -autofs
+
 %end
 
 %post
