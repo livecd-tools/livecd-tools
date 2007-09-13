@@ -135,6 +135,11 @@ if [ $(id -u) != 0 ]; then
     exit 1
 fi
 
+if [ "$1" = "--noverify" ]; then
+  noverify=1
+  shift;
+fi
+
 if [ $# -ne 2 ]; then
     usage
 fi
@@ -148,6 +153,17 @@ fi
 
 if [ ! -b $USBDEV ]; then
     usage
+fi
+
+if [ -z "$noverify" ]; then
+    # verify the image
+    echo "Verifying image..."
+    checkisomd5 --verbose $ISO
+    if [ $? -ne 0 ]; then
+	echo "Are you SURE you want to continue?"
+	echo "Press Enter to continue or ctrl-c to abort"
+	read
+    fi
 fi
 
 # FIXME: would be better if we had better mountpoints

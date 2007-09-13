@@ -17,6 +17,7 @@ Requires: mkisofs
 Requires: squashfs-tools
 Requires: pykickstart
 Requires: dosfstools >= 2.11-8
+Requires: isomd5sum
 %ifarch %{ix86} x86_64
 Requires: syslinux
 %endif
