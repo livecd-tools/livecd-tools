@@ -1182,8 +1182,7 @@ timeout=6000
 
 """ %{"label": self.fs_label}
 
-            stanzas = [("linux", "Run from image", ""),
-                       ("runfromram", "Run from RAM - requires 1 GiB+", "live_ram")]
+            stanzas = [("linux", "Run from image", "")]
             if self._checkIsoMD5:
                 stanzas.append( ("check", "Verify and run from image", "check") )
 
