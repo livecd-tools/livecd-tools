@@ -866,6 +866,11 @@ class ImageCreator(object):
         subprocess.call(["/bin/bash"], preexec_fn=self.run_in_root)
 
     def install(self):
+        try:
+            self.ksparser.handler.repo.methodToRepo()
+        except:
+            pass
+
         for repo in self.ksparser.handler.repo.repoList:
             yr = self.ayum.addRepository(repo.name, repo.baseurl, repo.mirrorlist)
             if hasattr(repo, "includepkgs"):
