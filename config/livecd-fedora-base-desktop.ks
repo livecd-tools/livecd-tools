@@ -128,3 +128,8 @@ chmod 755 /etc/rc.d/init.d/fedora-live
 rm -f /boot/initrd*
 
 %end
+
+
+%post --nochroot
+cp $INSTALL_ROOT/usr/share/doc/*-release-*/GPL $LIVE_ROOT/GPL
+%end
