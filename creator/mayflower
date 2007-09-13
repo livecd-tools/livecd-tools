@@ -117,7 +117,7 @@ for m in $MODULES ; do
 done
 
 for m in $MODS ; do
-    /sbin/modprobe --set-version $KERNEL --show-depends $m >> modules 2/dev/null
+    /sbin/modprobe --set-version $KERNEL --show-depends $m >> modules 2>/dev/null
 done
 
 cat modules | awk '{ print $2 }' | sort -u > modules2
