@@ -109,24 +109,18 @@ class LoopbackMount:
         if self.losetup:
             return
 
-        rc = subprocess.call(["/sbin/losetup", "-f", self.lofile])
+        losetupProc = subprocess.Popen(["/sbin/losetup", "-f"],
+                                       stdout=subprocess.PIPE)
+        losetupOutput = losetupProc.communicate()[0]
+
+        if losetupProc.returncode:
+            raise MountError("Failed to allocate loop device for '%s'" % self.lofile)
+        else:
+            self.loopdev = losetupOutput.split()[0]
+
+        rc = subprocess.call(["/sbin/losetup", self.loopdev, self.lofile])
         if rc != 0:
             raise MountError("Failed to allocate loop device for '%s'" % self.lofile)
-
-        # succeeded; figure out which loopdevice we're using
-        buf = subprocess.Popen(["/sbin/losetup", "-a"],
-                               stdout=subprocess.PIPE).communicate()[0]
-        for line in buf.split("\n"):
-            # loopdev: fdinfo (filename)
-            fields = line.split()
-            if len(fields) != 3:
-                continue
-            if fields[2] == "(%s)" %(self.lofile,):
-                self.loopdev = fields[0][:-1]
-                break
-
-        if not self.loopdev:
-            raise MountError("Failed to find loop device associated with '%s' from '/sbin/losetup -a'" % self.lofile)
 
         self.losetup = True
 
