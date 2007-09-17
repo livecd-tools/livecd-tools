@@ -924,6 +924,21 @@ class ImageCreator(object):
             shutil.move("%s/data/os.img" %(self.build_dir,),
                         "%s/out/ext3fs.img" %(self.build_dir,))
 
+    def parseField(self, output, field):
+        for line in output.split("\n"):
+            if line.startswith(field + ":"):
+                return line[len(field) + 1:].strip()
+
+        raise KeyError("Failed to find field '%s' in output" % field)
+
+    def getBlockCountOfExt2FS(self, filesystem):
+        output = subprocess.Popen(['/sbin/dumpe2fs', '-h', filesystem],
+                                  stdout=subprocess.PIPE,
+                                  stderr=open('/dev/null', 'w')
+                                  ).communicate()[0]
+
+        return int(self.parseField(output, "Block count"))
+
     def resize2fs(self, image, n_blocks):
         dev_null = os.open("/dev/null", os.O_WRONLY)
         try:
@@ -937,9 +952,9 @@ class ImageCreator(object):
     # resize2fs doesn't have any kind of minimal setting, so use
     # a binary search to get it to minimal size.
     #
-    def resize2fsToMinimal(self, image, n_blocks):
+    def resize2fsToMinimal(self, image):
         bot = 0
-        top = n_blocks
+        top = self.getBlockCountOfExt2FS(image)
         while top != (bot + 1):
             t = bot + ((top - bot) / 2)
 
@@ -962,7 +977,7 @@ class ImageCreator(object):
 
         n_blocks = os.stat(image)[stat.ST_SIZE] / self.blocksize
 
-        min_blocks = self.resize2fsToMinimal(image, n_blocks)
+        min_blocks = self.resize2fsToMinimal(image)
 
         # truncate the unused excess portion of the sparse file
         fd = os.open(image, os.O_WRONLY )
