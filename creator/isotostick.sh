@@ -20,7 +20,7 @@
 export PATH=/sbin:/usr/sbin:$PATH
 
 usage() {
-    echo "$0 <isopath> <usbstick device>"
+    echo "$0 [--reset-mbr] [--noverify] <isopath> <usbstick device>"
     exit 1
 }
 
