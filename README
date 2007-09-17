@@ -118,7 +118,7 @@ then the following command
   --fslabel=Fedora-7-LiveCD-1-foo
 
 will create a live CD called "Fedora-7-LiveCD-1-foo". The name
-given by --fs-label is used. 
+given by --fslabel is used.
 
  o as a file system label on the ext3 and iso960 file systems
    (as such it's visible on the desktop as the CD name)
@@ -155,7 +155,7 @@ USB sticks are becoming increasingly prevalent and are a nice way to
 use live images.  You can take a live CD iso image and transform it so
 that it can be used on a USB stick.  To do so, use the
 livecd-iso-to-disk script.
-   /usr/bin/livecd-iso-to-stick /path/to/live.iso /dev/sdb1 
+   /usr/bin/livecd-iso-to-disk /path/to/live.iso /dev/sdb1
 
 Replace /dev/sdb1 with the (unmounted) partition where you wish to put
 the live image.  This is not a destructive process; any data you 
