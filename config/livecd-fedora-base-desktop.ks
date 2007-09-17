@@ -93,8 +93,16 @@ if ! strstr "\`cat /proc/cmdline\`" noswap -a [ -n "\$swaps" ] ; then
   done
 fi
 
-# configure X
-exists system-config-display --noui --reconfig --set-depth=24
+# configure X, allowing user to override xdriver
+for o in \`cat /proc/cmdline\` ; do
+    case \$o in
+    xdriver=*)
+        xdriver="--set-driver=\${o#xdriver=}"
+        ;;
+    esac
+done
+
+exists system-config-display --noui --reconfig --set-depth=24 \$xdriver
 
 # unmute sound card
 exists alsaunmute 0 2> /dev/null
