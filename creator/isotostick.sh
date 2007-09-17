@@ -52,6 +52,11 @@ getdisk() {
     device="/dev/$device"
 }
 
+resetMBR() {
+    getdisk $1
+    cat /usr/lib/syslinux/mbr.bin > $device
+}
+
 checkMBR() {
     getdisk $1
 
@@ -62,9 +67,10 @@ checkMBR() {
     rm -f $bs
     if [ "$mbrword" = "0000" ]; then
 	echo "MBR appears to be blank."
-	echo "You can add an MBR to this device with "
-	echo "   # cat /usr/lib/syslinux/mbr.bin > $device"
-	exitclean
+	echo "Do you want to replace the MBR on this device?"
+	echo "Press Enter to continue or ctrl-c to abort"
+	read
+	resetMBR $1
     fi
 
     return 0
@@ -135,14 +141,20 @@ if [ $(id -u) != 0 ]; then
     exit 1
 fi
 
-if [ "$1" = "--noverify" ]; then
-  noverify=1
-  shift;
-fi
-
-if [ $# -ne 2 ]; then
-    usage
-fi
+while [ $# -gt 2 ]; do
+    case $1 in
+	--noverify)
+	    noverify=1
+	    ;;
+	--reset-mbr|--resetmbr)
+	    resetmbr=1
+	    ;;
+	*)
+	    usage
+	    ;;
+    esac
+    shift
+done
 
 ISO=$1
 USBDEV=$2
@@ -166,17 +178,18 @@ if [ -z "$noverify" ]; then
     fi
 fi
 
-# FIXME: would be better if we had better mountpoints
-CDMNT=$(mktemp -d /media/cdtmp.XXXXXX)
-mount -o loop $ISO $CDMNT || exitclean
-USBMNT=$(mktemp -d /media/usbdev.XXXXXX)
-mount $USBDEV $USBMNT || exitclean
-
 # do some basic sanity checks.  
 checkSyslinuxVersion 
 checkFilesystem $USBDEV
 checkPartActive $USBDEV
 checkMBR $USBDEV
+[ -n $resetmbr ] && resetMBR $USBDEV
+
+# FIXME: would be better if we had better mountpoints
+CDMNT=$(mktemp -d /media/cdtmp.XXXXXX)
+mount -o loop $ISO $CDMNT || exitclean
+USBMNT=$(mktemp -d /media/usbdev.XXXXXX)
+mount $USBDEV $USBMNT || exitclean
 
 trap exitclean SIGINT SIGTERM
 
