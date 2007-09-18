@@ -78,6 +78,7 @@ cp /sbin/losetup sbin
 cp /sbin/blockdev sbin
 cp /sbin/dmsetup sbin
 cp /bin/dd bin
+cp /bin/gzip bin
 
 # we explicitly load these, so should be sure they're present
 MODULES="loop dm_snapshot "
@@ -629,19 +630,17 @@ modprobe loop max_loop=128
 
 # we might have a genMinInstDelta delta file for anaconda to take advantage of
 if [ -e /sysroot/LiveOS/osmin.gz ]; then
-    OSMIN=/sysroot/LiveOS/osmin.gz
+    OSMINGZ=/sysroot/LiveOS/osmin.gz
 elif [ -e /sysroot/osmin.gz ]; then
-    OSMIN=/sysroot/osmin.gz
+    OSMINGZ=/sysroot/osmin.gz
 fi
 
-if [ -n "\$OSMIN" ]; then
+if [ -n "\$OSMINGZ" ]; then
     mknod /dev/loop118 b 7 118
-    dd if=\$OSMIN of=/osmin.gz bs=512 2> /dev/null
-    # pad to at least next sector boundry
-    dd if=/dev/zero of=/osmin.gz bs=512 count=1 oflag=append conv=notrunc 2> /dev/null
-    losetup /dev/loop118 /osmin.gz
+    # decompress the delta data
+    gzip -cd \$OSMINGZ > /osmin
+    losetup /dev/loop118 /osmin
 fi
-
 
 # we might have an uncompressed embedded ext3  to use as rootfs (uncompressed live)
 #
@@ -712,6 +711,12 @@ if [ -n "\$SQUASHED" ] ; then
     fi
 
     do_live_from_loop121
+fi
+
+if [ -e /osmin ]; then
+    # set up the devicemapper snapshot device, which will merge
+    # the normal live fs image, and the delta, into a minimzied fs image
+    echo "0 \$( blockdev --getsize /dev/loop121 ) snapshot /dev/loop121 /dev/loop118 p 8" | dmsetup create --readonly live-osimg-min
 fi
 
 if [ "\$eshell" == "1" ] ; then
