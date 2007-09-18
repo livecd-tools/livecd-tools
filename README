@@ -74,6 +74,13 @@ In a nutshell, the livecd-creator program
 
  o Unmounts the installation root
 
+ o Runs resize2fs to minimize and unminimize the ext3 file to remove data
+   from deleted files
+
+ o Runs resize2fs to minimize on a devicemapper snapshot, to generate a
+   small minimized delta image file which can be used by anaconda to
+   reduce installation time by not copying unused data to disk
+
  o Creates a squashfs file system containing only the ext3 file (compression)
 
  o Configures the boot loader

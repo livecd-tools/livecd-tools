@@ -337,6 +337,7 @@ class ImageCreator(object):
 
         self.image_size = 4096 # in megabytes
         self.blocksize = 4096 # in kilobytes
+        self.minimized_image_size = 0 # in kilobytes
 
     def _getRequiredPackages(self):
         return []
@@ -984,9 +985,88 @@ class ImageCreator(object):
         os.ftruncate(fd, min_blocks * self.blocksize)
         os.close(fd)
 
-        print >> sys.stderr, "Installation target minimized to %dK" % (min_blocks * self.blocksize / 1024L)
+        self.minimized_image_size = min_blocks * self.blocksize / 1024L
+        print >> sys.stderr, "Installation target minimized to %dK" % (self.minimized_image_size)
 
         self._resize2fs(image, n_blocks)
+
+
+    #
+    # genMinInstDelta: generates an osmin overlay file to sit alongside
+    #                  os.img.  liveinst may then detect the existence of
+    #                  osmin, and use it to create a minimized os.img
+    #                  which can be installed more quickly, and to smaller
+    #                  destination volumes.
+    #
+    def genMinInstDelta(self):
+        # create the sparse file for the minimized overlay
+        fd = os.open("%s/out/osmin" %(self.build_dir,),
+                     os.O_WRONLY | os.O_CREAT)
+        off = long(64L * 1024L * 1024L)
+        os.lseek(fd, off, 0)
+        os.write(fd, '\x00')
+        os.close(fd)
+
+        # associate os image with loop device
+        osloop = LoopbackMount("%s/data/os.img" %(self.build_dir,), "None")
+        osloop.loopsetup()
+
+        # associate overlay with loop device
+        minloop = LoopbackMount("%s/out/osmin" %(self.build_dir,), "None")
+        minloop.loopsetup()
+
+        # create a snapshot device
+        rc = subprocess.call(["/sbin/dmsetup",
+                              "--table",
+                              "0 %d snapshot %s %s p 8"
+                              %(self.image_size * 1024L * 2L,
+                                osloop.loopdev, minloop.loopdev),
+                              "create",
+                              "livecd-creator-%d" %(os.getpid(),) ])
+        if rc != 0:
+            raise InstallationError("Could not create genMinInstDelta snapshot device")
+        # resize snapshot device back to minimal (self.minimized_image_size)
+        rc = subprocess.call(["/sbin/resize2fs",
+                              "/dev/mapper/livecd-creator-%d" %(os.getpid(),),
+                              "%dK" %(self.minimized_image_size,)])
+        if rc != 0:
+            raise InstallationError("Could not shrink ext3fs image")
+
+        # calculate how much delta data to keep
+        dmsetupOutput = subprocess.Popen(['/sbin/dmsetup', 'status',
+                                          "livecd-creator-%d" %(os.getpid(),)],
+                                         stdout=subprocess.PIPE,
+                                         stderr=open('/dev/null', 'w')
+                                         ).communicate()[0]
+
+        # The format for dmsetup status on a snapshot device that we are
+        # counting on here is as follows.
+        # e.g. "0 8388608 snapshot 416/1048576" or "A B snapshot C/D"
+        try:
+            minInstDeltaDataLength = int((dmsetupOutput.split()[3]).split('/')[0])
+            print >> sys.stderr, "genMinInstDelta data length is %d 512 byte sectors" % (minInstDeltaDataLength)
+        except ValueError:
+            raise InstallationError("Could not calculate amount of data used by genMinInstDelta")
+
+        # tear down snapshot and loop devices
+        rc = subprocess.call(["/sbin/dmsetup", "remove",
+                              "livecd-creator-%d" %(os.getpid(),) ])
+        if rc != 0:
+            raise InstallationError("Could not remove genMinInstDelta snapshot device")
+        osloop.lounsetup()
+        minloop.lounsetup()
+
+        # truncate the unused excess portion of the sparse file
+        fd = os.open("%s/out/osmin" %(self.build_dir,), os.O_WRONLY )
+        os.ftruncate(fd, minInstDeltaDataLength * 512)
+        os.close(fd)
+
+        # the delta data is *extremely* compressible (e.g. 1.2M->7kb)
+        rc = subprocess.call(["/usr/bin/gzip", "osmin"],
+                             cwd="%s/out" %(self.build_dir,),
+                             env={"PWD": "%s/out" %(self.build_dir,)})
+        if rc != 0:
+            raise InstallationError("Could not compress genMinInstDelta data")
 
     def package(self):
         self.createSquashFS()
@@ -1310,7 +1390,6 @@ def parse_options(args):
     parser.add_option("-s", "--skip-compression", action="store_true", dest="skip_compression",
                       help=optparse.SUPPRESS_HELP)
 
-
     (options, args) = parser.parse_args()
     if not options.kscfg or not os.path.isfile(options.kscfg):
         raise Usage("Kickstart config '%s' does not exist" %(options.kscfg,))
@@ -1381,8 +1460,10 @@ def main():
         target.unmount()
 
         target.cleanupDeleted()
+        target.genMinInstDelta()
 
         target.package()
+
     except InstallationError, e:
         print >> sys.stderr, "Error creating Live CD : %s" % e
         target.teardown()

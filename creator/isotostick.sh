@@ -208,6 +208,10 @@ if [ -f $CDMNT/squashfs.img ]; then
 elif [ -f $CDMNT/ext3fs.img ]; then
     cp $CDMNT/ext3fs.img $USBMNT/LiveOS/ext3fs.img || exitclean 
 fi
+if [ -f $CDMNT/osmin.gz ]; then
+    cp $CDMNT/osmin.gz $USBMNT/LiveOS/osmin.gz || exitclean
+fi
+
 cp $CDMNT/isolinux/* $USBMNT/$SYSLINUXPATH
 
 echo "Updating boot config file"

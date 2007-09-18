@@ -625,6 +625,24 @@ do_live_from_loop121() {
     mount -n -o ro,remount /sysroot
 }
 
+modprobe loop max_loop=128
+
+# we might have a genMinInstDelta delta file for anaconda to take advantage of
+if [ -e /sysroot/LiveOS/osmin.gz ]; then
+    OSMIN=/sysroot/LiveOS/osmin.gz
+elif [ -e /sysroot/osmin.gz ]; then
+    OSMIN=/sysroot/osmin.gz
+fi
+
+if [ -n "\$OSMIN" ]; then
+    mknod /dev/loop118 b 7 118
+    dd if=\$OSMIN of=/osmin.gz bs=512 2> /dev/null
+    # pad to at least next sector boundry
+    dd if=/dev/zero of=/osmin.gz bs=512 count=1 oflag=append conv=notrunc 2> /dev/null
+    losetup /dev/loop118 /osmin.gz
+fi
+
+
 # we might have an uncompressed embedded ext3  to use as rootfs (uncompressed live)
 #
 if [ -e /sysroot/LiveOS/ext3fs.img ]; then
@@ -638,13 +656,11 @@ if [ -n "\$EXT3FS" ] ; then
         echo "setting up embedded ext3 fs "
     fi
 
-    mknod /dev/loop118 b 7 118
     mknod /dev/loop119 b 7 119
     mknod /dev/loop120 b 7 120
     mknod /dev/loop121 b 7 121
     mkdir -p /dev/mapper
     mknod /dev/mapper/control c 10 63
-    modprobe loop max_loop=128
     modprobe dm_snapshot
 
     losetup /dev/loop121 \$EXT3FS
@@ -667,13 +683,11 @@ if [ -n "\$SQUASHED" ] ; then
         echo "setting up embedded squash -> ext3 fs "
     fi
 
-    mknod /dev/loop118 b 7 118
     mknod /dev/loop119 b 7 119
     mknod /dev/loop120 b 7 120
     mknod /dev/loop121 b 7 121
     mkdir -p /dev/mapper
     mknod /dev/mapper/control c 10 63
-    modprobe loop max_loop=128
     modprobe dm_snapshot
 
     if [ "\$live_ram" == "1" ] ; then
