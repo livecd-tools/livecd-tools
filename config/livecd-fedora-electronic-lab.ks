@@ -1,21 +1,26 @@
+# Description : Live image for Fedora Electronic Lab
+# last updated: 07 September 2007
+
 %include livecd-fedora-base-desktop.ks
 
 %packages
-# fonts
-dejavu-lgc-fonts
-
 # KDE basic packages
 kdebase
 kde-filesystem
 kdelibs
 kdenetwork
-kdepim
-kde-settings
-kde-settings-kdm
+kdegraphics
 kdeutils
 knetworkmanager
+kmenu-gnome
 kpowersave
-redhat-artwork-kde
+yakuake
+
+#project management
+vym
+koffice-kspread
+koffice-kword
+koffice-kplato
 
 # some other extra packages
 ntfsprogs
@@ -29,7 +34,13 @@ rhgb
 
 # we don't want these
 -dos2unix
--gphoto2
+-firefox
+-gdm
+-authconfig-gtk
+-PolicyKit-gnome
+-desktop-backgrounds-basic
+-gnome-doc-utils-stylesheets
+-gtk-nodoka-engine
 
 #vlsi
 alliance-doc
@@ -46,6 +57,7 @@ gtkwave
 iverilog
 drawtiming
 ghdl
+freehdl
 
 #spice
 ngspice
@@ -72,15 +84,19 @@ ktechlab
 pikloops
 sdcc
 
+# Serial Port Terminals
+gtkterm
+picocom
+
 #embedded
-avr-gcc
-avr-binutils
-avr-libc
-avr-gdb
+arm-gp2x-linux*
+avr-*
 avrdude
+dfu-programmer
 
 #computing
 octave
+octave-forge
 
 %post
 
@@ -113,6 +129,26 @@ ButtonsOnRight=FIAX
 CustomButtonPositions=true
 EOF
 
+
+# kill stupid klipper
+cat > /usr/share/kde-settings/kde-profile/default/share/config/klipperrc <<EOF
+[General]
+AutoStart=false
+EOF
+
+# use the LCD_Style clock as alliance's windows demand a lot of space on kicker
+cat > /usr/share/kde-settings/kde-profile/default/share/config/clock_panelappletrc <<EOF
+[Digital]
+LCD_Style=false
+Show_Date=false
+Show_Seconds=true
+
+[General]
+Initial_TZ=0
+RemoteZones=
+Type=Digital
+EOF
+
 ###### KDE #####################################################################
 
 # create /etc/sysconfig/desktop (needed for installation)
@@ -129,13 +165,9 @@ cat > /etc/rc.d/init.d/fedora-live-kde << EOF
 # live: Init script for live image
 #
 # chkconfig: 345 00 99
-# description: Init script for live image.
+# description: Init script for Electronic Lab live image.
 
 if [ -e /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png ] ; then
-    cp /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png /home/fedora/.face
-    chown fedora:fedora /home/fedora/.face
-    # TODO: would be nice to get e-d-s to pick this one up too... but how?
-
     # use image also for kdm
     mkdir -p /usr/share/apps/kdm/faces
     cp /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png /usr/share/apps/kdm/faces/fedora.face.icon
@@ -168,3 +200,11 @@ EOF
 chmod 755 /etc/rc.d/init.d/fedora-live-kde
 /sbin/restorecon /etc/rc.d/init.d/fedora-live-kde
 /sbin/chkconfig --add fedora-live-kde
+
+###### Fedora Electronic Lab ####################################################
+
+# FEL doesn't need these and boots slowly
+/sbin/chkconfig --del sendmail
+/sbin/chkconfig --del nfs
+/sbin/chkconfig --del rpcidmapd
+/sbin/chkconfig --del rpcbind
