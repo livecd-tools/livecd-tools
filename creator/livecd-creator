@@ -1143,9 +1143,9 @@ menu hidden
 menu hiddenrow 5
 """ %{"menu" : syslinuxMenu, "label": self.fs_label, "background" : have_background}
 
-        stanzas = [("linux", "Run from image", "")]
+        stanzas = [("linux", "Boot %s" %(self.fs_label,), "")]
         if self._checkIsoMD5:
-            stanzas.append( ("check", "Verify and run from image", "check") )
+            stanzas.append( ("check", "Verify and boot %s" %(self.fs_label,), "check") )
 
         for (short, long, extra) in stanzas:
             if not isXen:
