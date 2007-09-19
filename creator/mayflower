@@ -627,6 +627,9 @@ do_live_from_loop121() {
 }
 
 modprobe loop max_loop=128
+while [ ! -b /dev/loop127 ] ; do
+  sleep 1
+done
 
 # we might have a genMinInstDelta delta file for anaconda to take advantage of
 if [ -e /sysroot/LiveOS/osmin.gz ]; then
@@ -636,7 +639,6 @@ elif [ -e /sysroot/osmin.gz ]; then
 fi
 
 if [ -n "\$OSMINGZ" ]; then
-    mknod /dev/loop118 b 7 118
     # decompress the delta data
     gzip -cd \$OSMINGZ > /osmin
     losetup /dev/loop118 /osmin
@@ -655,9 +657,6 @@ if [ -n "\$EXT3FS" ] ; then
         echo "setting up embedded ext3 fs "
     fi
 
-    mknod /dev/loop119 b 7 119
-    mknod /dev/loop120 b 7 120
-    mknod /dev/loop121 b 7 121
     mkdir -p /dev/mapper
     mknod /dev/mapper/control c 10 63
     modprobe dm_snapshot
@@ -682,9 +681,6 @@ if [ -n "\$SQUASHED" ] ; then
         echo "setting up embedded squash -> ext3 fs "
     fi
 
-    mknod /dev/loop119 b 7 119
-    mknod /dev/loop120 b 7 120
-    mknod /dev/loop121 b 7 121
     mkdir -p /dev/mapper
     mknod /dev/mapper/control c 10 63
     modprobe dm_snapshot
