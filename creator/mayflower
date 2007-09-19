@@ -576,13 +576,14 @@ else
 fi
 
 # live cd helper function
-do_live_from_loop121() {
+do_live_from_base_loop() {
     # create a sparse file for the overlay
     dd if=/dev/null of=/overlay bs=1024 count=1 seek=$((512*1024)) 2> /dev/null
-    losetup /dev/loop119 /overlay
+    OVERLAY_LOOPDEV=\$( losetup -f )
+    losetup \$OVERLAY_LOOPDEV /overlay
 
     # set up the snapshot
-    echo 0 \`blockdev --getsize /dev/loop121\` snapshot /dev/loop121 /dev/loop119 p 8 | dmsetup create live-rw
+    echo 0 \`blockdev --getsize \$BASE_LOOPDEV\` snapshot \$BASE_LOOPDEV \$OVERLAY_LOOPDEV p 8 | dmsetup create live-rw
 
     # set up new /dev/root symlink
     rm -f /dev/root
@@ -619,9 +620,17 @@ do_live_from_loop121() {
        echo "KERNEL==\"sd[a-z][0-9]*\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"\$UUID\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*        
     fi
 
-    # add rules for /dev/live-squashed and /dev/live-osimg
-    echo "KERNEL==\"loop120\" SYMLINK+=\"live-squashed\"" >> /sysroot/etc/udev/rules.d/50-udev*
-    echo "KERNEL==\"loop121\" SYMLINK+=\"live-osimg\"" >> /sysroot/etc/udev/rules.d/50-udev*
+    # add rules for loop devices created by this mayflower generated init
+    # i.e. /dev/live-osimg, /dev/live-osmin, /dev/live-overlay,
+    #      and /dev/live-squashed
+    if [ -b "\$SQUASHED_LOOPDEV" ]; then
+        echo "KERNEL==\"\${SQUASHED_LOOPDEV#/dev/}\" SYMLINK+=\"live-squashed\"" >> /sysroot/etc/udev/rules.d/50-udev*
+    fi
+    if [ -b "\$OSMIN_LOOPDEV" ]; then
+        echo "KERNEL==\"\${OSMIN_LOOPDEV#/dev/}\" SYMLINK+=\"live-osmin\"" >> /sysroot/etc/udev/rules.d/50-udev*
+    fi
+    echo "KERNEL==\"\${BASE_LOOPDEV#/dev/}\" SYMLINK+=\"live-osimg\"" >> /sysroot/etc/udev/rules.d/50-udev*
+    echo "KERNEL==\"\${OVERLAY_LOOPDEV#/dev/}\" SYMLINK+=\"live-overlay\"" >> /sysroot/etc/udev/rules.d/50-udev*
 
     mount -n -o ro,remount /sysroot
 }
@@ -641,7 +650,8 @@ fi
 if [ -n "\$OSMINGZ" ]; then
     # decompress the delta data
     gzip -cd \$OSMINGZ > /osmin
-    losetup /dev/loop118 /osmin
+    OSMIN_LOOPDEV=\$( losetup -f )
+    losetup \$OSMIN_LOOPDEV /osmin
 fi
 
 # we might have an uncompressed embedded ext3  to use as rootfs (uncompressed live)
@@ -661,10 +671,11 @@ if [ -n "\$EXT3FS" ] ; then
     mknod /dev/mapper/control c 10 63
     modprobe dm_snapshot
 
-    losetup /dev/loop121 \$EXT3FS
+    BASE_LOOPDEV=\$( losetup -f )
+    losetup \$BASE_LOOPDEV \$EXT3FS
     umount -l /sysroot
 
-    do_live_from_loop121
+    do_live_from_base_loop
 fi
 
 # we might have an embedded ext3 on squashfs to use as rootfs (compressed live)
@@ -695,24 +706,26 @@ if [ -n "\$SQUASHED" ] ; then
         SQUASHED="/squashed.img"
     fi
 
-    losetup /dev/loop120 \$SQUASHED
+    SQUASHED_LOOPDEV=\$( losetup -f )
+    losetup \$SQUASHED_LOOPDEV \$SQUASHED
     mkdir -p /squashfs
-    mount -n -t squashfs -o ro /dev/loop120 /squashfs
+    mount -n -t squashfs -o ro \$SQUASHED_LOOPDEV /squashfs
 
-    losetup /dev/loop121 /squashfs/os.img
+    BASE_LOOPDEV=\$( losetup -f )
+    losetup \$BASE_LOOPDEV /squashfs/os.img
     
     umount -l /squashfs
     if [ "\$live_ram" == "0" ] ; then
         umount -l /sysroot
     fi
 
-    do_live_from_loop121
+    do_live_from_base_loop
 fi
 
 if [ -e /osmin ]; then
     # set up the devicemapper snapshot device, which will merge
     # the normal live fs image, and the delta, into a minimzied fs image
-    echo "0 \$( blockdev --getsize /dev/loop121 ) snapshot /dev/loop121 /dev/loop118 p 8" | dmsetup create --readonly live-osimg-min
+    echo "0 \$( blockdev --getsize \$BASE_LOOPDEV ) snapshot \$BASE_LOOPDEV \$OSMIN_LOOPDEV p 8" | dmsetup create --readonly live-osimg-min
 fi
 
 if [ "\$eshell" == "1" ] ; then
