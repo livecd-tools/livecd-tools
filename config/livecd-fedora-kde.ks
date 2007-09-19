@@ -11,18 +11,15 @@ koffice-kpresenter
 koffice-filters
 twinkle
 filelight
-kdeutils-extras
+
+# if it is enough space include koffice-krita (~40 megs) and ktorrent (~3 megs)
+koffice-krita
+ktorrent
 
 # some other extra packages
 gnupg
-xine-lib-extras
 synaptics
-fonts-*
 hal-cups-utils
-
-# if it is enough space include koffice-krita (~40 megs) and ktorrent (~3 megs)
-#koffice-krita
-#ktorrent
 
 # ignore comps.xml and make sure these packages are included
 knetworkmanager
@@ -41,25 +38,24 @@ smolt-firstboot
 -kmymoney2
 -basket
 -speedcrunch
-
+-autofs
 
 # try to remove some packages from livecd-fedora-base-desktop.ks
 -scim*
--system-config-printer*
 -gdm
 -authconfig-gtk
 -m17n*
 -PolicyKit-gnome
--desktop-backgrounds-basic
 -gnome-doc-utils-stylesheets
 -anthy
 -kasumi
 -pygtkglext
 -python-devel
 -libchewing
--system-config-printer-libs
-#-kipi-plugins
-#-gutenprint-foomatic
+
+# workaround for the moment (requirements of hplip)
+python-imaging
+python-reportlab
 
 %end
 
