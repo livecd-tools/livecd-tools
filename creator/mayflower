@@ -635,8 +635,8 @@ do_live_from_base_loop() {
     mount -n -o ro,remount /sysroot
 }
 
-modprobe loop max_loop=128
-while [ ! -b /dev/loop127 ] ; do
+modprobe loop max_loop=16
+while [ ! -b /dev/loop15 ] ; do
   sleep 1
 done
 
