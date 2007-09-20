@@ -21,4 +21,8 @@ Send patches to the fedora-livecd-list@redhat.com mailing list
 
  http://www.redhat.com/mailman/listinfo/fedora-livecd-list
 
-
+If you have a number of patches and want to have them pulled from a
+public git repository, please post a pointer to it as well as sending
+each of the patches individually to the list.  Note that the
+combination of git-format-patch and git-send-email works well for
+sending a series of patches which you have in a local repository.
