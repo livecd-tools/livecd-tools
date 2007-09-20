@@ -834,7 +834,7 @@ class ImageCreator(object):
                                     "/usr/lib/livecd-creator/mayflower not found")
         shutil.copy(mpath, "%s/install_root/sbin/mayflower" %(self.build_dir,))
         # modules we want to support for booting
-        mcfg = open(self.build_dir + "/install_root/etc/mayflower.conf", "w")
+        mcfg = open(self.build_dir + "/install_root/etc/mayflower.conf", "a")
         mcfg.write('MODULES+="squashfs ext3 ext2 vfat msdos "\n')
         mcfg.write('MODULES+="ehci_hcd uhci_hcd ohci_hcd usb_storage usbhid "\n')
         mcfg.write('MODULES+="firewire-sbp2 firewire-ohci "\n')
