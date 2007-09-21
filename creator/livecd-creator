@@ -405,12 +405,15 @@ class ImageCreator(object):
             except MountError, e:
                 raise InstallationError("Failed to loopback mount squashfs.img from '%s' : %s" % (base_on, e))
 
-            os_image = self.build_dir + "/base_on_squashfs/os.img"
-
-            if not os.path.exists(os_image):
+            # legacy LiveOS filesystem layout support, remove for F9 or F10
+            if os.path.exists(self.build_dir + "/base_on_squashfs/os.img"):
+                os_image = self.build_dir + "/base_on_squashfs/os.img"
+            elif os.path.exists(self.build_dir + "/base_on_squashfs/LiveOS/os.img"):
+                os_image = self.build_dir + "/base_on_squashfs/LiveOS/os.img"
+            else:
                 raise InstallationError("'%s' is not a valid live CD ISO : os.img doesn't exist" % base_on)
 
-            shutil.copyfile(os_image, self.build_dir + "/data/os.img")
+            shutil.copyfile(os_image, self.build_dir + "/data/LiveOS/os.img")
         finally:
             # unmount and tear down the mount points and loop devices used
             squashloop.cleanup()
@@ -434,9 +437,8 @@ class ImageCreator(object):
         except OSError, (err, msg):
             raise InstallationError("Failed create build directory in %s: %s" % (self.tmpdir, msg))
 
-        os.makedirs(self.build_dir + "/out")
         os.makedirs(self.build_dir + "/out/LiveOS")
-        os.makedirs(self.build_dir + "/data")
+        os.makedirs(self.build_dir + "/data/LiveOS")
         os.makedirs(self.build_dir + "/install_root")
         os.makedirs(self.build_dir + "/yum-cache")
 
@@ -444,10 +446,10 @@ class ImageCreator(object):
             # get backing ext3 image if we're based this build on an existing live CD ISO
             self.base_on_iso(base_on)
 
-            self.instloop = LoopbackMount("%s/data/os.img" %(self.build_dir,),
+            self.instloop = LoopbackMount("%s/data/LiveOS/os.img" %(self.build_dir,),
                                           "%s/install_root" %(self.build_dir,))
         else:
-            self.instloop = SparseExt3LoopbackMount("%s/data/os.img"
+            self.instloop = SparseExt3LoopbackMount("%s/data/LiveOS/os.img"
                                                     %(self.build_dir,),
                                                     "%s/install_root"
                                                     %(self.build_dir,),
@@ -922,14 +924,14 @@ class ImageCreator(object):
     def createSquashFS(self):
         """create compressed squashfs file system"""
         if not self.skip_compression:
-            ret = subprocess.call(["/sbin/mksquashfs", "os.img",
-                                   "../out/squashfs.img"],
-                                  cwd="%s/data" %(self.build_dir,),
-                                  env={"PWD": "%s/data" %(self.build_dir,)})
+            ret = subprocess.call(["/sbin/mksquashfs", "data",
+                                   "./out/LiveOS/squashfs.img"],
+                                  cwd="%s" %(self.build_dir,),
+                                  env={"PWD": "%s" %(self.build_dir,)})
             if ret != 0:
                 raise InstallationError("mksquashfs exited with error (%d)" %(ret,))
         else:
-            shutil.move("%s/data/os.img" %(self.build_dir,),
+            shutil.move("%s/data/LiveOS/os.img" %(self.build_dir,),
                         "%s/out/LiveOS/ext3fs.img" %(self.build_dir,))
 
     def _getBlockCountOfExt2FS(self, filesystem):
@@ -979,7 +981,7 @@ class ImageCreator(object):
     # resize2fs-to-uncompressed-size (with implicit resparsification)
     #
     def cleanupDeleted(self):
-        image = "%s/data/os.img" %(self.build_dir,)
+        image = "%s/data/LiveOS/os.img" %(self.build_dir,)
 
         subprocess.call(["/sbin/e2fsck", "-f", "-y", image])
 
@@ -1015,7 +1017,7 @@ class ImageCreator(object):
         os.close(fd)
 
         # associate os image with loop device
-        osloop = LoopbackMount("%s/data/os.img" %(self.build_dir,), \
+        osloop = LoopbackMount("%s/data/LiveOS/os.img" %(self.build_dir,), \
                                "None")
         osloop.loopsetup()
 
