@@ -428,8 +428,8 @@ class ImageCreator(object):
         except OSError, (err, msg):
             raise InstallationError("Failed create build directory in %s: %s" % (self.tmpdir, msg))
 
-        os.makedirs(self.build_dir + "/out/sysroot")
-        os.makedirs(self.build_dir + "/data/sysroot")
+        os.makedirs(self.build_dir + "/out")
+        os.makedirs(self.build_dir + "/data")
         os.makedirs(self.build_dir + "/install_root")
         os.makedirs(self.build_dir + "/yum-cache")
 
@@ -915,7 +915,7 @@ class ImageCreator(object):
     def createSquashFS(self):
         """create compressed squashfs file system"""
         if not self.skip_compression:
-            ret = subprocess.call(["/sbin/mksquashfs", "os.img", "sysroot",
+            ret = subprocess.call(["/sbin/mksquashfs", "os.img",
                                    "../out/squashfs.img"],
                                   cwd="%s/data" %(self.build_dir,),
                                   env={"PWD": "%s/data" %(self.build_dir,)})
