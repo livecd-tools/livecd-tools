@@ -706,7 +706,7 @@ if [ -e "\$SQUASHED" ] ; then
     mount -n -t squashfs -o ro \$SQUASHED_LOOPDEV /squashfs
 
     BASE_LOOPDEV=\$( losetup -f )
-    losetup \$BASE_LOOPDEV /squashfs/LiveOS/os.img
+    losetup \$BASE_LOOPDEV /squashfs/LiveOS/ext3fs.img
     
     umount -l /squashfs
     if [ "\$live_ram" == "0" ] ; then
