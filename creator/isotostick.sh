@@ -203,12 +203,19 @@ fi
 echo "Copying live image to USB stick"
 if [ ! -d $USBMNT/$SYSLINUXPATH ]; then mkdir $USBMNT/$SYSLINUXPATH ; fi
 if [ ! -d $USBMNT/LiveOS ]; then mkdir $USBMNT/LiveOS ; fi
-if [ -f $CDMNT/squashfs.img ]; then
+# cases without /LiveOS are legacy detection, remove for F10
+if [ -f $CDMNT/LiveOS/squashfs.img ]; then
+    cp $CDMNT/LiveOS/squashfs.img $USBMNT/LiveOS/squashfs.img || exitclean
+elif [ -f $CDMNT/squashfs.img ]; then
     cp $CDMNT/squashfs.img $USBMNT/LiveOS/squashfs.img || exitclean 
+elif [ -f $CDMNT/LiveOS/ext3fs.img ]; then
+    cp $CDMNT/LiveOS/ext3fs.img $USBMNT/LiveOS/ext3fs.img || exitclean
 elif [ -f $CDMNT/ext3fs.img ]; then
     cp $CDMNT/ext3fs.img $USBMNT/LiveOS/ext3fs.img || exitclean 
 fi
-if [ -f $CDMNT/osmin.gz ]; then
+if [ -f $CDMNT/LiveOS/osmin.gz ]; then
+    cp $CDMNT/LiveOS/osmin.gz $USBMNT/LiveOS/osmin.gz || exitclean
+elif [ -f $CDMNT/osmin.gz ]; then
     cp $CDMNT/osmin.gz $USBMNT/LiveOS/osmin.gz || exitclean
 fi
 

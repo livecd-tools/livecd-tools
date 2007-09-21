@@ -643,8 +643,6 @@ done
 # we might have a genMinInstDelta delta file for anaconda to take advantage of
 if [ -e /sysroot/LiveOS/osmin.gz ]; then
     OSMINGZ=/sysroot/LiveOS/osmin.gz
-elif [ -e /sysroot/osmin.gz ]; then
-    OSMINGZ=/sysroot/osmin.gz
 fi
 
 if [ -n "\$OSMINGZ" ]; then
@@ -658,8 +656,6 @@ fi
 #
 if [ -e /sysroot/LiveOS/ext3fs.img ]; then
   EXT3FS="/sysroot/LiveOS/ext3fs.img"
-elif [ -e /sysroot/ext3fs.img ] ; then
-  EXT3FS="/sysroot/ext3fs.img"
 fi
 
 if [ -n "\$EXT3FS" ] ; then
@@ -682,11 +678,9 @@ fi
 #
 if [ -e /sysroot/LiveOS/squashfs.img ]; then
   SQUASHED="/sysroot/LiveOS/squashfs.img"
-elif [ -e /sysroot/squashfs.img ]; then
-  SQUASHED="/sysroot/squashfs.img"
 fi
 
-if [ -n "\$SQUASHED" ] ; then
+if [ -e "\$SQUASHED" ] ; then
 
     if [ "\$quiet" != "1" ] ; then
         echo "setting up embedded squash -> ext3 fs "
