@@ -1073,6 +1073,10 @@ class ImageCreator(object):
                          "%s/data" %(self.build_dir,))
         if ret != 0:
                 raise InstallationError("mksquashfs exited with error (%d)" %(ret,))
+        try:
+            os.unlink("%s/data/osmin" %(self.build_dir))
+        except:
+            pass
 
     def package(self):
         self.createSquashFS()
