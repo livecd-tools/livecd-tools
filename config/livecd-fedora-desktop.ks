@@ -6,6 +6,7 @@
 @graphics
 @sound-and-video
 @gnome-desktop
+nss-mdns
 # we don't include @office so that we don't get OOo.  but some nice bits
 abiword
 gnumeric
@@ -119,6 +120,10 @@ gnome-blog
 %end
 
 %post
+# workaround avahi segfault (#279301)
+touch /etc/resolv.conf
+/sbin/restorecon /etc/resolv.conf
+
 cat >> /etc/rc.d/init.d/fedora-live << EOF
 # disable screensaver locking
 gconftool-2 --direct --config-source=xml:readwrite:/etc/gconf/gconf.xml.defaults -s -t bool /apps/gnome-screensaver/lock_enabled false >/dev/null
