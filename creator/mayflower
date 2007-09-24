@@ -434,6 +434,8 @@ echo "KERNEL==\"msr[0-9]*\", NAME=\"cpu/%n/msr\"" > /etc/udev/rules.d/20-cpu.rul
 # FIXME: hack since sr_mod seems to fail to get loaded sometimes (#239657)
 /sbin/modprobe sr_mod
 
+/sbin/modprobe loop max_loop=16
+
 if [ "\$quiet" != "1" ] ; then
     echo "starting udevd"
 fi
@@ -634,11 +636,6 @@ do_live_from_base_loop() {
 
     mount -n -o ro,remount /sysroot
 }
-
-modprobe loop max_loop=16
-while [ ! -b /dev/loop15 ] ; do
-  sleep 1
-done
 
 # we might have a genMinInstDelta delta file for anaconda to take advantage of
 if [ -e /sysroot/LiveOS/osmin.gz ]; then
