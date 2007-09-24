@@ -1000,7 +1000,7 @@ class ImageCreator(object):
     #
     def genMinInstDelta(self):
         # create the sparse file for the minimized overlay
-        fd = os.open("%s/out/osmin" %(self.build_dir,),
+        fd = os.open("%s/data/osmin" %(self.build_dir,),
                      os.O_WRONLY | os.O_CREAT)
         off = long(64L * 1024L * 1024L)
         os.lseek(fd, off, 0)
@@ -1012,7 +1012,7 @@ class ImageCreator(object):
         osloop.loopsetup()
 
         # associate overlay with loop device
-        minloop = LoopbackMount("%s/out/osmin" %(self.build_dir,), "None")
+        minloop = LoopbackMount("%s/data/osmin" %(self.build_dir,), "None")
         minloop.loopsetup()
 
         # create a snapshot device
@@ -1057,16 +1057,16 @@ class ImageCreator(object):
         minloop.lounsetup()
 
         # truncate the unused excess portion of the sparse file
-        fd = os.open("%s/out/osmin" %(self.build_dir,), os.O_WRONLY )
+        fd = os.open("%s/data/osmin" %(self.build_dir,), os.O_WRONLY )
         os.ftruncate(fd, minInstDeltaDataLength * 512)
         os.close(fd)
 
-        # the delta data is *extremely* compressible (e.g. 1.2M->7kb)
-        rc = subprocess.call(["/usr/bin/gzip", "osmin"],
-                             cwd="%s/out" %(self.build_dir,),
-                             env={"PWD": "%s/out" %(self.build_dir,)})
-        if rc != 0:
-            raise InstallationError("Could not compress genMinInstDelta data")
+        ret = subprocess.call(["/sbin/mksquashfs", "osmin",
+                               "../out/osmin.img"],
+                              cwd="%s/data" %(self.build_dir,),
+                              env={"PWD": "%s/data" %(self.build_dir,)})
+        if ret != 0:
+                raise InstallationError("mksquashfs exited with error (%d)" %(ret,))
 
     def package(self):
         self.createSquashFS()

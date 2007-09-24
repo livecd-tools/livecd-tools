@@ -208,8 +208,8 @@ if [ -f $CDMNT/squashfs.img ]; then
 elif [ -f $CDMNT/ext3fs.img ]; then
     cp $CDMNT/ext3fs.img $USBMNT/LiveOS/ext3fs.img || exitclean 
 fi
-if [ -f $CDMNT/osmin.gz ]; then
-    cp $CDMNT/osmin.gz $USBMNT/LiveOS/osmin.gz || exitclean
+if [ -f $CDMNT/osmin.img ]; then
+    cp $CDMNT/osmin.img $USBMNT/LiveOS/osmin.squashfs.img || exitclean
 fi
 
 cp $CDMNT/isolinux/* $USBMNT/$SYSLINUXPATH

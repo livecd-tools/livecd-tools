@@ -78,7 +78,6 @@ cp /sbin/losetup sbin
 cp /sbin/blockdev sbin
 cp /sbin/dmsetup sbin
 cp /bin/dd bin
-cp /bin/gzip bin
 
 # we explicitly load these, so should be sure they're present
 MODULES="loop dm_snapshot "
@@ -628,6 +627,9 @@ do_live_from_base_loop() {
     if [ -b "\$SQUASHED_LOOPDEV" ]; then
         echo "KERNEL==\"\${SQUASHED_LOOPDEV#/dev/}\" SYMLINK+=\"live-squashed\"" >> /sysroot/etc/udev/rules.d/50-udev*
     fi
+    if [ -b "\$OSMIN_SQUASHED_LOOPDEV" ]; then
+        echo "KERNEL==\"\${OSMIN_SQUASHED_LOOPDEV#/dev/}\" SYMLINK+=\"live-squashed-osmin\"" >> /sysroot/etc/udev/rules.d/50-udev*
+    fi
     if [ -b "\$OSMIN_LOOPDEV" ]; then
         echo "KERNEL==\"\${OSMIN_LOOPDEV#/dev/}\" SYMLINK+=\"live-osmin\"" >> /sysroot/etc/udev/rules.d/50-udev*
     fi
@@ -638,17 +640,22 @@ do_live_from_base_loop() {
 }
 
 # we might have a genMinInstDelta delta file for anaconda to take advantage of
-if [ -e /sysroot/LiveOS/osmin.gz ]; then
-    OSMINGZ=/sysroot/LiveOS/osmin.gz
-elif [ -e /sysroot/osmin.gz ]; then
-    OSMINGZ=/sysroot/osmin.gz
+if [ -e /sysroot/LiveOS/osmin.img ]; then
+    OSMINSQFS=/sysroot/LiveOS/osmin.img
+elif [ -e /sysroot/osmin.img ]; then
+    OSMINSQFS=/sysroot/osmin.img
 fi
 
-if [ -n "\$OSMINGZ" ]; then
+if [ -n "\$OSMINSQFS" ]; then
     # decompress the delta data
-    gzip -cd \$OSMINGZ > /osmin
+    dd if=\$OSMINSQFS of=/osmin.img 2> /dev/null
+    OSMIN_SQUASHED_LOOPDEV=\$( losetup -f )
+    losetup \$OSMIN_SQUASHED_LOOPDEV /osmin.img
+    mkdir -p /squashfs.osmin
+    mount -n -t squashfs -o ro \$OSMIN_SQUASHED_LOOPDEV /squashfs.osmin
     OSMIN_LOOPDEV=\$( losetup -f )
-    losetup \$OSMIN_LOOPDEV /osmin
+    losetup \$OSMIN_LOOPDEV /squashfs.osmin/osmin
+    umount -l /squashfs.osmin
 fi
 
 # we might have an uncompressed embedded ext3  to use as rootfs (uncompressed live)
@@ -719,7 +726,7 @@ if [ -n "\$SQUASHED" ] ; then
     do_live_from_base_loop
 fi
 
-if [ -e /osmin ]; then
+if [ -b "\$OSMIN_LOOPDEV" ]; then
     # set up the devicemapper snapshot device, which will merge
     # the normal live fs image, and the delta, into a minimzied fs image
     echo "0 \$( blockdev --getsize \$BASE_LOOPDEV ) snapshot \$BASE_LOOPDEV \$OSMIN_LOOPDEV p 8" | dmsetup create --readonly live-osimg-min
