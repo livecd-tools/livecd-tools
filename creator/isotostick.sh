@@ -159,11 +159,11 @@ done
 ISO=$1
 USBDEV=$2
 
-if [ ! -e $ISO ]; then
+if [ -z "$ISO" -o ! -e "$ISO" ]; then
     usage
 fi
 
-if [ ! -b $USBDEV ]; then
+if [ -z "$USBDEV" -o ! -b "$USBDEV" ]; then
     usage
 fi
 
