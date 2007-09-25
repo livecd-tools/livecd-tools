@@ -642,8 +642,6 @@ do_live_from_base_loop() {
 # we might have a genMinInstDelta delta file for anaconda to take advantage of
 if [ -e /sysroot/LiveOS/osmin.img ]; then
     OSMINSQFS=/sysroot/LiveOS/osmin.img
-elif [ -e /sysroot/osmin.img ]; then
-    OSMINSQFS=/sysroot/osmin.img
 fi
 
 if [ -n "\$OSMINSQFS" ]; then
@@ -660,10 +658,8 @@ fi
 
 # we might have an uncompressed embedded ext3  to use as rootfs (uncompressed live)
 #
-if [ -e /sysroot/LiveOS/ext3fs.img ]; then
-  EXT3FS="/sysroot/LiveOS/ext3fs.img"
-elif [ -e /sysroot/ext3fs.img ] ; then
-  EXT3FS="/sysroot/ext3fs.img"
+if [ -e /sysroot/LiveOS/ext3.img ]; then
+  EXT3FS="/sysroot/LiveOS/ext3.img"
 fi
 
 if [ -n "\$EXT3FS" ] ; then
@@ -686,11 +682,9 @@ fi
 #
 if [ -e /sysroot/LiveOS/squashfs.img ]; then
   SQUASHED="/sysroot/LiveOS/squashfs.img"
-elif [ -e /sysroot/squashfs.img ]; then
-  SQUASHED="/sysroot/squashfs.img"
 fi
 
-if [ -n "\$SQUASHED" ] ; then
+if [ -e "\$SQUASHED" ] ; then
 
     if [ "\$quiet" != "1" ] ; then
         echo "setting up embedded squash -> ext3 fs "
@@ -716,7 +710,7 @@ if [ -n "\$SQUASHED" ] ; then
     mount -n -t squashfs -o ro \$SQUASHED_LOOPDEV /squashfs
 
     BASE_LOOPDEV=\$( losetup -f )
-    losetup \$BASE_LOOPDEV /squashfs/os.img
+    losetup \$BASE_LOOPDEV /squashfs/LiveOS/ext3.img
     
     umount -l /squashfs
     if [ "\$live_ram" == "0" ] ; then

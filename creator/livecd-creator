@@ -391,9 +391,15 @@ class ImageCreator(object):
 
         isoloop = LoopbackMount(base_on, "%s/base_on_iso" %(self.build_dir,))
 
-        squashloop = LoopbackMount("%s/squashfs.img" %(isoloop.mountdir,),
-                                   "%s/base_on_squashfs" %(self.build_dir,),
-                                   "squashfs")
+        # legacy LiveOS filesystem layout support, remove for F9 or F10
+        if os.path.exists("%s/LiveOS/squashfs.img" %(isoloop.mountdir,)):
+            squashloop = LoopbackMount("%s/LiveOS/squashfs.img" %(isoloop.mountdir,),
+                                       "%s/base_on_squashfs" %(self.build_dir,),
+                                       "squashfs")
+        else:
+            squashloop = LoopbackMount("%s/squashfs.img" %(isoloop.mountdir,),
+                                       "%s/base_on_squashfs" %(self.build_dir,),
+                                       "squashfs")
 
         try:
             try:
@@ -409,12 +415,15 @@ class ImageCreator(object):
             except MountError, e:
                 raise InstallationError("Failed to loopback mount squashfs.img from '%s' : %s" % (base_on, e))
 
-            os_image = self.build_dir + "/base_on_squashfs/os.img"
-
-            if not os.path.exists(os_image):
+            # legacy LiveOS filesystem layout support, remove for F9 or F10
+            if os.path.exists(self.build_dir + "/base_on_squashfs/os.img"):
+                os_image = self.build_dir + "/base_on_squashfs/os.img"
+            elif os.path.exists(self.build_dir + "/base_on_squashfs/LiveOS/ext3.img"):
+                os_image = self.build_dir + "/base_on_squashfs/LiveOS/ext3.img"
+            else:
                 raise InstallationError("'%s' is not a valid live CD ISO : os.img doesn't exist" % base_on)
 
-            shutil.copyfile(os_image, self.build_dir + "/data/os.img")
+            shutil.copyfile(os_image, self.build_dir + "/data/LiveOS/ext3.img")
         finally:
             # unmount and tear down the mount points and loop devices used
             squashloop.cleanup()
@@ -438,8 +447,8 @@ class ImageCreator(object):
         except OSError, (err, msg):
             raise InstallationError("Failed create build directory in %s: %s" % (self.tmpdir, msg))
 
-        os.makedirs(self.build_dir + "/out/sysroot")
-        os.makedirs(self.build_dir + "/data/sysroot")
+        os.makedirs(self.build_dir + "/out/LiveOS")
+        os.makedirs(self.build_dir + "/data/LiveOS")
         os.makedirs(self.build_dir + "/install_root")
         os.makedirs(self.build_dir + "/yum-cache")
 
@@ -447,10 +456,10 @@ class ImageCreator(object):
             # get backing ext3 image if we're based this build on an existing live CD ISO
             self.base_on_iso(base_on)
 
-            self.instloop = LoopbackMount("%s/data/os.img" %(self.build_dir,),
+            self.instloop = LoopbackMount("%s/data/LiveOS/ext3.img" %(self.build_dir,),
                                           "%s/install_root" %(self.build_dir,))
         else:
-            self.instloop = SparseExt3LoopbackMount("%s/data/os.img"
+            self.instloop = SparseExt3LoopbackMount("%s/data/LiveOS/ext3.img"
                                                     %(self.build_dir,),
                                                     "%s/install_root"
                                                     %(self.build_dir,),
@@ -925,13 +934,13 @@ class ImageCreator(object):
     def createSquashFS(self):
         """create compressed squashfs file system"""
         if not self.skip_compression:
-            ret = mksquashfs("../out/squashfs.img", ["os.img", "sysroot"],
-                             "%s/data" %(self.build_dir,))
+            ret = mksquashfs("out/LiveOS/squashfs.img", ["data"],
+                             self.build_dir)
             if ret != 0:
                 raise InstallationError("mksquashfs exited with error (%d)" %(ret,))
         else:
-            shutil.move("%s/data/os.img" %(self.build_dir,),
-                        "%s/out/ext3fs.img" %(self.build_dir,))
+            shutil.move("%s/data/LiveOS/ext3.img" %(self.build_dir,),
+                        "%s/out/LiveOS/ext3.img" %(self.build_dir,))
 
     def _getBlockCountOfExt2FS(self, filesystem):
         def parseField(output, field):
@@ -980,7 +989,7 @@ class ImageCreator(object):
     # resize2fs-to-uncompressed-size (with implicit resparsification)
     #
     def cleanupDeleted(self):
-        image = "%s/data/os.img" %(self.build_dir,)
+        image = "%s/data/LiveOS/ext3.img" %(self.build_dir,)
 
         subprocess.call(["/sbin/e2fsck", "-f", "-y", image])
 
@@ -1001,14 +1010,14 @@ class ImageCreator(object):
 
     #
     # genMinInstDelta: generates an osmin overlay file to sit alongside
-    #                  os.img.  liveinst may then detect the existence of
-    #                  osmin, and use it to create a minimized os.img
+    #                  ext3.img.  liveinst may then detect the existence of
+    #                  osmin, and use it to create a minimized ext3.img
     #                  which can be installed more quickly, and to smaller
     #                  destination volumes.
     #
     def genMinInstDelta(self):
         # create the sparse file for the minimized overlay
-        fd = os.open("%s/data/osmin" %(self.build_dir,),
+        fd = os.open("%s/out/LiveOS/osmin" %(self.build_dir,),
                      os.O_WRONLY | os.O_CREAT)
         off = long(64L * 1024L * 1024L)
         os.lseek(fd, off, 0)
@@ -1016,11 +1025,13 @@ class ImageCreator(object):
         os.close(fd)
 
         # associate os image with loop device
-        osloop = LoopbackMount("%s/data/os.img" %(self.build_dir,), "None")
+        osloop = LoopbackMount("%s/data/LiveOS/ext3.img" %(self.build_dir,), \
+                               "None")
         osloop.loopsetup()
 
         # associate overlay with loop device
-        minloop = LoopbackMount("%s/data/osmin" %(self.build_dir,), "None")
+        minloop = LoopbackMount("%s/out/LiveOS/osmin" %(self.build_dir,), \
+                                "None")
         minloop.loopsetup()
 
         # create a snapshot device
@@ -1038,7 +1049,7 @@ class ImageCreator(object):
                               "/dev/mapper/livecd-creator-%d" %(os.getpid(),),
                               "%dK" %(self.minimized_image_size,)])
         if rc != 0:
-            raise InstallationError("Could not shrink ext3fs image")
+            raise InstallationError("Could not shrink ext3 image")
 
         # calculate how much delta data to keep
         dmsetupOutput = subprocess.Popen(['/sbin/dmsetup', 'status',
@@ -1065,16 +1076,16 @@ class ImageCreator(object):
         minloop.lounsetup()
 
         # truncate the unused excess portion of the sparse file
-        fd = os.open("%s/data/osmin" %(self.build_dir,), os.O_WRONLY )
+        fd = os.open("%s/out/LiveOS/osmin" %(self.build_dir,), os.O_WRONLY )
         os.ftruncate(fd, minInstDeltaDataLength * 512)
         os.close(fd)
 
-        ret = mksquashfs("../out/osmin.img", ["osmin"],
-                         "%s/data" %(self.build_dir,))
+        ret = mksquashfs("osmin.img", ["osmin"],
+                         "%s/out/LiveOS" %(self.build_dir,))
         if ret != 0:
                 raise InstallationError("mksquashfs exited with error (%d)" %(ret,))
         try:
-            os.unlink("%s/data/osmin" %(self.build_dir))
+            os.unlink("%s/out/LiveOS/osmin" %(self.build_dir))
         except:
             pass
 
