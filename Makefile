@@ -1,5 +1,5 @@
 
-VERSION = 011
+VERSION = 012
 
 INSTALL = /usr/bin/install -c
 INSTALL_PROGRAM = ${INSTALL}
@@ -16,6 +16,7 @@ install:
 	$(INSTALL_DATA) -D COPYING $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)/COPYING
 	$(INSTALL_DATA) -D README $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)/README
 	$(INSTALL_DATA) -D HACKING $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)/HACKING
+	mkdir -p $(DESTDIR)/usr/share/livecd-tools/
 	$(INSTALL_DATA) -D config/*.ks $(DESTDIR)/usr/share/livecd-tools/
 
 uninstall:

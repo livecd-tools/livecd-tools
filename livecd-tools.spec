@@ -2,7 +2,7 @@
 
 Summary: Tools for building live CD's
 Name: livecd-tools
-Version: 011
+Version: 012
 Release: 1%{?dist}
 License: GPL
 Group: System Environment/Base
@@ -55,6 +55,24 @@ rm -rf $RPM_BUILD_ROOT
 %{_datadir}/livecd-tools/*
 
 %changelog
+* Tue Sep 25 2007 Jeremy Katz <katzj@redhat.com> - 012-1
+- Allow %%post --nochroot to work for putting files in the root of the iso
+- Set environment variables for when %%post is run
+- Add progress for downloads (Colin Walters)
+- Add cachedir option (Colin Walters)
+- Fixes for ppc/ppc64 to work again
+- Clean up bootloader config a little
+- Enable swaps in the default desktop config
+- Ensure all configs are installed (#281911)
+- Convert method line to a repo for easier config reuse (jkeating)
+- Kill the modprobe FATAL warnings (#240585)
+- Verify isos with iso-to-disk script
+- Allow passing xdriver for setting the xdriver (#291281)
+- Add turboliveinst patch (Douglas McClendon)
+- Make iso-to-disk support --resetmbr (#294041)
+- Clean up filesystem layout (Douglas McClendon)
+- Manifest tweaks for most configs
+
 * Tue Aug 28 2007 Jeremy Katz <katzj@redhat.com> - 011-1
 - Many config updates for Fedora 8
 - Support $basearch in repo line of configs; use it
