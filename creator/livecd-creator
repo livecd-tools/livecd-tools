@@ -560,6 +560,8 @@ class ImageCreator(object):
             self.ayum.runInstall()
         except yum.Errors.RepoError, e:
             raise InstallationError("Unable to download from repo : %s" %(e,))
+        except yum.Errors.YumBaseError, e:
+            raise InstallationError("Unable to install: %s" %(e,))
         finally:
             self.ayum.closeRpmDB()
 
