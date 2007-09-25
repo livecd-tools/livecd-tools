@@ -418,12 +418,12 @@ class ImageCreator(object):
             # legacy LiveOS filesystem layout support, remove for F9 or F10
             if os.path.exists(self.build_dir + "/base_on_squashfs/os.img"):
                 os_image = self.build_dir + "/base_on_squashfs/os.img"
-            elif os.path.exists(self.build_dir + "/base_on_squashfs/LiveOS/ext3.img"):
-                os_image = self.build_dir + "/base_on_squashfs/LiveOS/ext3.img"
+            elif os.path.exists(self.build_dir + "/base_on_squashfs/LiveOS/ext3fs.img"):
+                os_image = self.build_dir + "/base_on_squashfs/LiveOS/ext3fs.img"
             else:
                 raise InstallationError("'%s' is not a valid live CD ISO : os.img doesn't exist" % base_on)
 
-            shutil.copyfile(os_image, self.build_dir + "/data/LiveOS/ext3.img")
+            shutil.copyfile(os_image, self.build_dir + "/data/LiveOS/ext3fs.img")
         finally:
             # unmount and tear down the mount points and loop devices used
             squashloop.cleanup()
@@ -456,10 +456,10 @@ class ImageCreator(object):
             # get backing ext3 image if we're based this build on an existing live CD ISO
             self.base_on_iso(base_on)
 
-            self.instloop = LoopbackMount("%s/data/LiveOS/ext3.img" %(self.build_dir,),
+            self.instloop = LoopbackMount("%s/data/LiveOS/ext3fs.img" %(self.build_dir,),
                                           "%s/install_root" %(self.build_dir,))
         else:
-            self.instloop = SparseExt3LoopbackMount("%s/data/LiveOS/ext3.img"
+            self.instloop = SparseExt3LoopbackMount("%s/data/LiveOS/ext3fs.img"
                                                     %(self.build_dir,),
                                                     "%s/install_root"
                                                     %(self.build_dir,),
@@ -939,8 +939,8 @@ class ImageCreator(object):
             if ret != 0:
                 raise InstallationError("mksquashfs exited with error (%d)" %(ret,))
         else:
-            shutil.move("%s/data/LiveOS/ext3.img" %(self.build_dir,),
-                        "%s/out/LiveOS/ext3.img" %(self.build_dir,))
+            shutil.move("%s/data/LiveOS/ext3fs.img" %(self.build_dir,),
+                        "%s/out/LiveOS/ext3fs.img" %(self.build_dir,))
 
     def _getBlockCountOfExt2FS(self, filesystem):
         def parseField(output, field):
@@ -989,7 +989,7 @@ class ImageCreator(object):
     # resize2fs-to-uncompressed-size (with implicit resparsification)
     #
     def cleanupDeleted(self):
-        image = "%s/data/LiveOS/ext3.img" %(self.build_dir,)
+        image = "%s/data/LiveOS/ext3fs.img" %(self.build_dir,)
 
         subprocess.call(["/sbin/e2fsck", "-f", "-y", image])
 
@@ -1010,8 +1010,8 @@ class ImageCreator(object):
 
     #
     # genMinInstDelta: generates an osmin overlay file to sit alongside
-    #                  ext3.img.  liveinst may then detect the existence of
-    #                  osmin, and use it to create a minimized ext3.img
+    #                  ext3fs.img.  liveinst may then detect the existence of
+    #                  osmin, and use it to create a minimized ext3fs.img
     #                  which can be installed more quickly, and to smaller
     #                  destination volumes.
     #
@@ -1025,7 +1025,7 @@ class ImageCreator(object):
         os.close(fd)
 
         # associate os image with loop device
-        osloop = LoopbackMount("%s/data/LiveOS/ext3.img" %(self.build_dir,), \
+        osloop = LoopbackMount("%s/data/LiveOS/ext3fs.img" %(self.build_dir,), \
                                "None")
         osloop.loopsetup()
 
@@ -1049,7 +1049,7 @@ class ImageCreator(object):
                               "/dev/mapper/livecd-creator-%d" %(os.getpid(),),
                               "%dK" %(self.minimized_image_size,)])
         if rc != 0:
-            raise InstallationError("Could not shrink ext3 image")
+            raise InstallationError("Could not shrink ext3fs image")
 
         # calculate how much delta data to keep
         dmsetupOutput = subprocess.Popen(['/sbin/dmsetup', 'status',

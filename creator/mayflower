@@ -658,8 +658,8 @@ fi
 
 # we might have an uncompressed embedded ext3  to use as rootfs (uncompressed live)
 #
-if [ -e /sysroot/LiveOS/ext3.img ]; then
-  EXT3FS="/sysroot/LiveOS/ext3.img"
+if [ -e /sysroot/LiveOS/ext3fs.img ]; then
+  EXT3FS="/sysroot/LiveOS/ext3fs.img"
 fi
 
 if [ -n "\$EXT3FS" ] ; then
@@ -710,7 +710,7 @@ if [ -e "\$SQUASHED" ] ; then
     mount -n -t squashfs -o ro \$SQUASHED_LOOPDEV /squashfs
 
     BASE_LOOPDEV=\$( losetup -f )
-    losetup \$BASE_LOOPDEV /squashfs/LiveOS/ext3.img
+    losetup \$BASE_LOOPDEV /squashfs/LiveOS/ext3fs.img
     
     umount -l /squashfs
     if [ "\$live_ram" == "0" ] ; then
