@@ -11,6 +11,7 @@ koffice-kpresenter
 koffice-filters
 twinkle
 filelight
+krusader
 
 # if it is enough space include koffice-krita (~40 megs) and ktorrent (~3 megs)
 koffice-krita
@@ -20,6 +21,7 @@ ktorrent
 gnupg
 synaptics
 hal-cups-utils
+nss-mdns
 
 # ignore comps.xml and make sure these packages are included
 knetworkmanager
@@ -60,6 +62,10 @@ python-reportlab
 %end
 
 %post
+# workaround avahi segfault (#279301)
+touch /etc/resolv.conf
+/sbin/restorecon /etc/resolv.conf
+
 
 # create /etc/sysconfig/desktop (needed for installation)
 cat > /etc/sysconfig/desktop <<EOF
