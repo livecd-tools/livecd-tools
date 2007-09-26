@@ -93,15 +93,10 @@
 
 # and some extra packages
 koffice-*
-krusader
-nss-mdns
 
 %end 
 
 %post
-# workaround avahi segfault (#279301)
-touch /etc/resolv.conf
-/sbin/restorecon /etc/resolv.conf
 
 # Use gdm here for language selection
 
