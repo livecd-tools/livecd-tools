@@ -47,6 +47,8 @@ mock
 rpmdevtools
 rpmlint
 
+eclipse-demos
+
 # Should we?
 #@sql-server
 #@mysql
@@ -57,7 +59,11 @@ rpmlint
 #*-devel
 %end
 
-#%post
-# Enable debuginfo repository
-# ?
-#%end
+%post
+# TODO: Enable debuginfo repository
+
+# Put link to demonstration videos on the desktop
+pushd /home/fedora/Desktop
+ln -s /usr/share/eclipse-demos-0.0.1 "Eclipse demonstration videos"
+popd
+%end
