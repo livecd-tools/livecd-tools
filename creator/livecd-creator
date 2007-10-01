@@ -381,6 +381,10 @@ class ImageCreator(object):
         if not self.ksparser.handler.repo.repoList:
             raise InstallationError("No repositories specified")
 
+        if not self.ksparser.handler.device.moduleName:
+            # default module list if not specified
+            self.ksparser.handler.device.moduleName = "=ata:sym53c8xx:aic7xxx:=usb:=firewire"
+
         # more sanity checks
         if self.ksparser.handler.selinux.selinux and not \
                os.path.exists("/selinux/enforce"):
@@ -857,11 +861,17 @@ class ImageCreator(object):
         # modules we want to support for booting
         mcfg = open(self.build_dir + "/install_root/etc/mayflower.conf", "a")
         mcfg.write('MODULES+="squashfs ext3 ext2 vfat msdos "\n')
-        mcfg.write('MODULES+="ehci_hcd uhci_hcd ohci_hcd usb_storage usbhid "\n')
-        mcfg.write('MODULES+="firewire-sbp2 firewire-ohci "\n')
         mcfg.write('MODULES+="sr_mod sd_mod ide-cd "\n')
-        mcfg.write('MODULES+="=ata "\n')
-        mcfg.write('MODULES+="sym53c8xx aic7xxx "\n')
+
+        mods = self.ksparser.handler.device.moduleName.split(":")
+        if "=usb" in mods:
+            mcfg.write('MODULES+="ehci_hcd uhci_hcd ohci_hcd usb_storage usbhid "\n')
+            mods.remove("=usb")
+        if "=firewire" in mods:
+            mcfg.write('MODULES+="firewire-sbp2 firewire-ohci "\n')
+            mcfg.write('MODULES+="sbp2 ohci1394 ieee1394 "\n')
+            mods.remove("=firewire")
+        mcfg.write('MODULES+="%s "\n' %(string.join(mods),))
         mcfg.close()
 
         subprocess.call(["/sbin/mayflower", "-f", "/boot/livecd-initramfs.img",
