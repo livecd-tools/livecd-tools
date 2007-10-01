@@ -6,7 +6,7 @@ selinux --enforcing
 firewall --disabled
 xconfig --startxonboot
 part / --size 4096
-services --enabled=NetworkManager,dhcdbd --disabled=network,sshd
+services --enabled=NetworkManager --disabled=network,sshd
 
 repo --name=development --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=rawhide&arch=$basearch
 
