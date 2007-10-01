@@ -141,4 +141,5 @@ rm -f /boot/initrd*
 
 %post --nochroot
 cp $INSTALL_ROOT/usr/share/doc/*-release-*/GPL $LIVE_ROOT/GPL
+cp $INSTALL_ROOT/usr/share/doc/HTML/readme-live-image/en_US/readme-live-image-en_US.txt $LIVE_ROOT/README
 %end
