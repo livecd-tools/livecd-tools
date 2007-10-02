@@ -11,6 +11,9 @@ part / --size 6000
 # SCM tools
 bazaar
 bzr
+cogito
+cvs2cl
+cvsutils
 git
 mercurial
 monotone
@@ -28,26 +31,44 @@ codeblocks
 @editors
 @system-tools
 @virtualization
+ElectricFence
 alleyoop
+crash
 dejagnu
 dogtail
+elfutils-devel
 emacs
+emacs-el
 expect
 frysk-gnome
+gconf-editor
+gettext-devel
 gnuplot
+hexedit
 inkscape
+intltool
+lynx
 maven2
+mutt
 scons
+sharutils
+socat
+sox
 sysprof
+tcp_wrappers-devel
+tcsh
+texi2html
 
 # RPM/Fedora-specific tools
 @buildsys-build
+createrepo
 koji
 mock
 rpmdevtools
 rpmlint
+yum-priorities
 
-eclipse-demos
+#eclipse-demos
 
 # Should we?
 #@sql-server
