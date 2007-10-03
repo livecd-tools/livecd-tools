@@ -352,6 +352,7 @@ class ImageCreator(object):
 
         self._modules = []
         self._timeout = 10
+        self._defaultKernel = "kernel"
 
     def _getRequiredPackages(self):
         return []
@@ -397,6 +398,8 @@ class ImageCreator(object):
 
         if hasattr(self.ksparser.handler.bootloader, "timeout") and self.ksparser.handler.bootloader.timeout is not None:
             self._timeout = int(self.ksparser.handler.bootloader.timeout)
+        if hasattr(self.ksparser.handler.bootloader, "default") and self.ksparser.handler.bootloader.default:
+            self._defaultKernel = self.ksparser.handler.bootloader.default
 
         # more sanity checks
         if self.ksparser.handler.selinux.selinux and not \
@@ -842,21 +845,19 @@ class ImageCreator(object):
                 raise InstallationError("Failed to execute %%post script with '%s' : %s" % (s.interp, msg))
             os.unlink(path)
 
-    def get_kernel_version(self):
-        #
-        # FIXME: this doesn't handle multiple kernels - we should list
-        #        them all in the isolinux menu
-        #
-        kernels = []
-        modules_dir = "%s/install_root/lib/modules" % self.build_dir
-
-        if os.path.isdir(modules_dir):
-            kernels = os.listdir(modules_dir)
-
-        if not kernels:
-            raise InstallationError("No kernels installed: /lib/modules is empty")
-
-        return kernels[0]
+    def getKernelVersions(self):
+        # find the kernel versions.  this iterates over everything providing
+        # 'kernel' and finds /boot/vmlinuz-* and grabbing the version based
+        # on the filename being /boot/vmlinuz-version
+        ts = rpm.TransactionSet("%s/install_root" %(self.build_dir,))
+        mi = ts.dbMatch('provides', 'kernel')
+        ret = {}
+        for h in mi:
+            name = h['name']
+            for f in h['filenames']:
+                if f.startswith("/boot/vmlinuz-"):
+                    ret[name] = f[14:]
+        return ret
 
     def createInitramfs(self):
         mpath = "/usr/lib/livecd-creator/mayflower"
@@ -890,9 +891,10 @@ class ImageCreator(object):
         mcfg.write('MODULES+="%s "\n' %(string.join(self._modules),))
         mcfg.close()
 
-        subprocess.call(["/sbin/mayflower", "-f", "/boot/livecd-initramfs.img",
-                        self.get_kernel_version()],
-                        preexec_fn=self.run_in_root)
+        map(lambda ver: subprocess.call(["/sbin/mayflower", "-f",
+                                       "/boot/livecd-initramfs-%s.img" %(ver,), 
+                                       ver], preexec_fn=self.run_in_root),
+            self.getKernelVersions().values())
         for f in ("/sbin/mayflower", "/etc/mayflower.conf"):
             os.unlink("%s/install_root/%s" %(self.build_dir, f))
 
@@ -1124,19 +1126,22 @@ class ImageCreator(object):
 
 class x86ImageCreator(ImageCreator):
     """ImageCreator for x86 machines"""
+    def _getImageStanza(self):
+        return """label %(short)s
+  menu label %(long)s
+  kernel vmlinuz%(index)d
+  append initrd=initrd%(index)d.img root=CDLABEL=%(label)s rootfstype=iso9660 %(liveargs)s %(extra)s
+"""
+    def _getImageStanzaXen(self):
+        return """label %(short)s
+  menu label %(long)s
+  kernel mboot.c32
+  append xen%(index)d.gz --- vmlinuz%(index)d --- initrd%(index)d.img  root=CDLABEL=%(label)s rootfstype=iso9660 %(liveargs)s %(extra)s
+"""
+
     def configureBootloader(self):
         """configure the boot loader"""
         os.makedirs(self.build_dir + "/out/isolinux")
-
-        shutil.copyfile("%s/install_root/boot/vmlinuz-%s"
-                        %(self.build_dir, self.get_kernel_version()),
-                        "%s/out/isolinux/vmlinuz" %(self.build_dir,))
-
-        shutil.copyfile("%s/install_root/boot/livecd-initramfs.img"
-                        %(self.build_dir,),
-                        "%s/out/isolinux/initrd.img" %(self.build_dir,))
-        os.unlink("%s/install_root/boot/livecd-initramfs.img"
-                  %(self.build_dir,))
 
         syslinuxfiles = ["isolinux.bin"]
         menus = ["vesamenu.c32", "menu.c32"]
@@ -1151,12 +1156,10 @@ class x86ImageCreator(ImageCreator):
         if syslinuxMenu is None:
             raise InstallationError("syslinux not installed : no suitable *menu.c32 found")
 
-        isXen = False
+        # if we have any xen hypervisors, make sure we have the mboot module
         xen = glob.glob("%s/install_root/boot/xen.gz-*" %(self.build_dir,))
         if len(xen) > 0:
-            shutil.copyfile(xen[0], "%s/out/isolinux/xen.gz" %(self.build_dir,))
             syslinuxfiles.append("mboot.c32")
-            isXen = True
 
         for p in syslinuxfiles:
             path = "%s/install_root/usr/lib/syslinux/%s" % (self.build_dir, p)
@@ -1192,28 +1195,55 @@ menu hidden
 menu hiddenrow 5
 """ %{"menu" : syslinuxMenu, "label": self.fs_label, "background" : have_background, "timeout": self._timeout * 10}
 
-        stanzas = [("linux", "Boot %s" %(self.fs_label,), "")]
-        if self._checkIsoMD5:
-            stanzas.append( ("check", "Verify and boot %s" %(self.fs_label,), "check") )
+        stanzas = []
+        count = 0
+        for (name, ver) in self.getKernelVersions().items():
+            shutil.copyfile("%s/install_root/boot/vmlinuz-%s"
+                            %(self.build_dir, ver),
+                            "%s/out/isolinux/vmlinuz%d" %(self.build_dir,count))
+            shutil.copyfile("%s/install_root/boot/livecd-initramfs-%s.img"
+                            %(self.build_dir, ver),
+                            "%s/out/isolinux/initrd%d.img" 
+                            %(self.build_dir, count))
+            os.unlink("%s/install_root/boot/livecd-initramfs-%s.img"
+                      %(self.build_dir, ver))
 
-        for (short, long, extra) in stanzas:
-            if not isXen:
-                cfg += """label %(short)s
-  menu label %(long)s
-  kernel vmlinuz
-  append initrd=initrd.img root=CDLABEL=%(label)s rootfstype=iso9660 %(liveargs)s %(extra)s
-""" %{"label": self.fs_label, "background" : have_background,
-      "short": short, "long": long, "extra": extra,
-      "liveargs": self._getKernelOptions()}
+            isXen = False
+            if os.path.exists("%s/install_root/boot/xen.gz-%s" %(self.build_dir,
+                                                                 ver[:-3])):
+                shutil.copy("%s/install_root/boot/xen.gz-%s" 
+                            %(self.build_dir, ver[:-3]), 
+                            "%s/out/isolinux/xen%d.gz" %(self.build_dir, count))
+                isXen = True
+
+            default = False
+            if (len(self.getKernelVersions().items()) == 1 or 
+                name == self._defaultKernel or (name.startswith("kernel-") 
+                              and name[7:] == self._defaultKernel)):
+                default = True
+                q = ""
+            elif name.startswith("kernel-"):
+                q = " (%s)" %(name[7:],)
             else:
-                cfg += """label %(short)s
-  menu label %(long)s
-  kernel mboot.c32
-  append xen.gz --- vmlinuz --- initrd.img  root=CDLABEL=%(label)s rootfstype=iso9660 %(liveargs)s %(extra)s
-""" %{"label": self.fs_label, "background" : have_background,
-      "short": short, "long": long, "extra": extra,
-      "liveargs": self._getKernelOptions()}
+                q = " (%s)" %(name,)
 
+            extra = ""
+            if self._checkIsoMD5:
+                extra = "check"
+
+            short = "linux%s" %(q,)
+            long = "Boot %s%s" %(self.fs_label,q)
+
+            if not isXen:
+                s = self._getImageStanza()
+            else:
+                s = self._getImageStanzaXen()
+            cfg += s %{"label": self.fs_label, "background" : have_background,
+                       "short": short, "long": long, "extra": extra,
+                       "liveargs": self._getKernelOptions(), "index": count}
+            if default:
+                cfg += "menu default\n"
+            count += 1
 
         memtest = glob.glob("%s/install_root/boot/memtest86*" %(self.build_dir,))
         if len(memtest) > 0:
@@ -1226,7 +1256,8 @@ menu hiddenrow 5
         # add local boot
         cfg += """label local
   menu label Boot from local drive
-  localboot 0xffff"""
+  localboot 0xffff
+"""
 
         cfgf = open("%s/out/isolinux/isolinux.cfg" %(self.build_dir,), "w")
         cfgf.write(cfg)
@@ -1289,29 +1320,32 @@ class ppcImageCreator(ImageCreator):
                         "%s/out/ppc/chrp/yaboot" %(self.build_dir,))
         subprocess.call(["/usr/sbin/addnote", "%s/out/ppc/chrp/yaboot" %(self.build_dir,)])
 
+        # FIXME: ppc should support multiple kernels too...
+        ver = self.getKernelVersions().values()[0]
+
         os.makedirs(self.build_dir + "/out/ppc/ppc32")
-        if not os.path.exists("%s/install_root/lib/modules/%s/kernel/arch/powerpc/platforms" %(self.build_dir, self.get_kernel_version())):
+        if not os.path.exists("%s/install_root/lib/modules/%s/kernel/arch/powerpc/platforms" %(self.build_dir, ver)):
             havekernel[32] = True
             shutil.copyfile("%s/install_root/boot/vmlinuz-%s"
-                            %(self.build_dir, self.get_kernel_version()),
+                            %(self.build_dir, ver),
                             "%s/out/ppc/ppc32/vmlinuz" %(self.build_dir,))
-            shutil.copyfile("%s/install_root/boot/livecd-initramfs.img"
-                            %(self.build_dir,),
+            shutil.copyfile("%s/install_root/boot/livecd-initramfs-%s.img"
+                            %(self.build_dir, ver),
                             "%s/out/ppc/ppc32/initrd.img" %(self.build_dir,))
-            os.unlink("%s/install_root/boot/livecd-initramfs.img"
-                      %(self.build_dir,))
+            os.unlink("%s/install_root/boot/livecd-initramfs-%s.img"
+                      %(self.build_dir, ver))
 
         os.makedirs(self.build_dir + "/out/ppc/ppc64")
-        if os.path.exists("%s/install_root/lib/modules/%s/kernel/arch/powerpc/platforms" %(self.build_dir, self.get_kernel_version())):
+        if os.path.exists("%s/install_root/lib/modules/%s/kernel/arch/powerpc/platforms" %(self.build_dir, ver)):
             havekernel[64] = True
             shutil.copyfile("%s/install_root/boot/vmlinuz-%s"
-                            %(self.build_dir, self.get_kernel_version()),
+                            %(self.build_dir, ver),
                             "%s/out/ppc/ppc64/vmlinuz" %(self.build_dir,))
-            shutil.copyfile("%s/install_root/boot/livecd-initramfs.img"
-                            %(self.build_dir,),
+            shutil.copyfile("%s/install_root/boot/livecd-initramfs-%s.img"
+                            %(self.build_dir, ver),
                             "%s/out/ppc/ppc64/initrd.img" %(self.build_dir,))
-            os.unlink("%s/install_root/boot/livecd-initramfs.img"
-                      %(self.build_dir,))
+            os.unlink("%s/install_root/boot/livecd-initramfs-%s.img"
+                      %(self.build_dir, ver))
 
         for bit in havekernel.keys():
             cfg = """
