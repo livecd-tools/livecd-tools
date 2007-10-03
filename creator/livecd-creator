@@ -349,6 +349,8 @@ class ImageCreator(object):
         self.blocksize = 4096 # in kilobytes
         self.minimized_image_size = 0 # in kilobytes
 
+        self._modules = []
+
     def _getRequiredPackages(self):
         return []
     def _getRequiredExcludePackages(self):
@@ -381,9 +383,15 @@ class ImageCreator(object):
         if not self.ksparser.handler.repo.repoList:
             raise InstallationError("No repositories specified")
 
-        if not self.ksparser.handler.device.moduleName:
+        if isinstance(self.ksparser.handler.device, pykickstart.commands.device.FC3_Device):
+            if self.ksparser.handler.device.moduleName:
+                self._modules = self.ksparser.handler.device.moduleName.split(":")
+        else:
+            map(lambda x: self._modules.extend(x.moduleName.split(":")),
+                self.ksparser.handler.device.deviceList)
+        if len(self._modules) == 0:
             # default module list if not specified
-            self.ksparser.handler.device.moduleName = "=ata:sym53c8xx:aic7xxx:=usb:=firewire"
+            self._modules = ["=ata","sym53c8xx","aic7xxx","=usb","=firewire"]
 
         # more sanity checks
         if self.ksparser.handler.selinux.selinux and not \
@@ -863,15 +871,14 @@ class ImageCreator(object):
         mcfg.write('MODULES+="squashfs ext3 ext2 vfat msdos "\n')
         mcfg.write('MODULES+="sr_mod sd_mod ide-cd "\n')
 
-        mods = self.ksparser.handler.device.moduleName.split(":")
-        if "=usb" in mods:
+        if "=usb" in self._modules:
             mcfg.write('MODULES+="ehci_hcd uhci_hcd ohci_hcd usb_storage usbhid "\n')
-            mods.remove("=usb")
-        if "=firewire" in mods:
+            self._modules.remove("=usb")
+        if "=firewire" in self._modules:
             mcfg.write('MODULES+="firewire-sbp2 firewire-ohci "\n')
             mcfg.write('MODULES+="sbp2 ohci1394 ieee1394 "\n')
-            mods.remove("=firewire")
-        mcfg.write('MODULES+="%s "\n' %(string.join(mods),))
+            self._modules.remove("=firewire")
+        mcfg.write('MODULES+="%s "\n' %(string.join(self._modules),))
         mcfg.close()
 
         subprocess.call(["/sbin/mayflower", "-f", "/boot/livecd-initramfs.img",
