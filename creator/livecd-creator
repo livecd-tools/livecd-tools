@@ -351,6 +351,7 @@ class ImageCreator(object):
         self.minimized_image_size = 0 # in kilobytes
 
         self._modules = []
+        self._timeout = 10
 
     def _getRequiredPackages(self):
         return []
@@ -393,6 +394,9 @@ class ImageCreator(object):
         if len(self._modules) == 0:
             # default module list if not specified
             self._modules = ["=ata","sym53c8xx","aic7xxx","=usb","=firewire"]
+
+        if hasattr(self.ksparser.handler.bootloader, "timeout") and self.ksparser.handler.bootloader.timeout is not None:
+            self._timeout = int(self.ksparser.handler.bootloader.timeout)
 
         # more sanity checks
         if self.ksparser.handler.selinux.selinux and not \
@@ -1170,7 +1174,7 @@ class x86ImageCreator(ImageCreator):
 
         cfg = """
 default %(menu)s
-timeout 600
+timeout %(timeout)d
 
 %(background)s
 menu title Welcome to %(label)s!
@@ -1186,7 +1190,7 @@ menu color timeout 0 #ffffffff #00000000
 menu color cmdline 0 #ffffffff #00000000
 menu hidden
 menu hiddenrow 5
-""" %{"menu" : syslinuxMenu, "label": self.fs_label, "background" : have_background}
+""" %{"menu" : syslinuxMenu, "label": self.fs_label, "background" : have_background, "timeout": self._timeout * 10}
 
         stanzas = [("linux", "Boot %s" %(self.fs_label,), "")]
         if self._checkIsoMD5:
@@ -1312,9 +1316,9 @@ class ppcImageCreator(ImageCreator):
         for bit in havekernel.keys():
             cfg = """
 init-message = "Welcome to %(label)s"
-timeout=6000
+timeout=%(timeout)d
 
-""" %{"label": self.fs_label}
+""" %{"label": self.fs_label, "timeout": self._timeout * 100}
 
             stanzas = [("linux", "Run from image", "")]
             if self._checkIsoMD5:
@@ -1350,7 +1354,7 @@ image=/ppc/ppc%(bit)s/vmlinuz
         else:
             cfg = """
 init-message = "\nWelcome to %(label)s!\nUse 'linux32' for 32-bit kernel.\n\n"
-timeout=6000
+timeout=%(timeout)d
 default=linux
 
 image=/ppc/ppc64/vmlinuz
@@ -1363,7 +1367,7 @@ image=/ppc/ppc32/vmlinuz
 	label=linux32
 	initrd=/ppc/ppc32/initrd.img
 	read-only
-""" %{"label": self.fs_label,}
+""" %{"label": self.fs_label, "timeout": self._timeout * 100}
 
             cfgf = open("%s/out/etc/yaboot.conf" %(self.build_dir,), "w")
             cfgf.write(cfg)
