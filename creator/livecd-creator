@@ -1227,22 +1227,32 @@ menu hiddenrow 5
             else:
                 q = " (%s)" %(name,)
 
-            extra = ""
-            if self._checkIsoMD5:
-                extra = "check"
-
-            short = "linux%s" %(q,)
-            long = "Boot %s%s" %(self.fs_label,q)
 
             if not isXen:
                 s = self._getImageStanza()
             else:
                 s = self._getImageStanzaXen()
-            cfg += s %{"label": self.fs_label, "background" : have_background,
+
+            short = "linux%s" %(count,)
+            long = "Boot %s%s" %(self.fs_label,q)
+            extra = ""
+            if self._checkIsoMD5:
+                extra = "check"
+
+            cfg += s %{"label": self.fs_label,
                        "short": short, "long": long, "extra": extra,
                        "liveargs": self._getKernelOptions(), "index": count}
             if default:
                 cfg += "menu default\n"
+
+            if self._checkIsoMD5:
+                short = "check%s" %(count,)
+                long = "Verify and boot %s%s" %(self.fs_label,q)
+                extra = "check"
+                cfg += s %{"label": self.fs_label,
+                           "short": short, "long": long, "extra": extra,
+                           "liveargs": self._getKernelOptions(), "index": count}
+
             count += 1
 
         memtest = glob.glob("%s/install_root/boot/memtest86*" %(self.build_dir,))
