@@ -218,6 +218,13 @@ class LiveCDYum(yum.YumBase):
         # being left and an inability to clean up after ourself
         pass
 
+    def close(self):
+        try:
+            os.unlink(self.conf.installroot + "/yum.conf")
+        except:
+            pass
+        yum.YumBase.close(self)
+
     def _writeConf(self, datadir, installroot):
         conf  = "[main]\n"
         conf += "installroot=%s\n" % installroot
