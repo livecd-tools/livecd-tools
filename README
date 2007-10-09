@@ -3,7 +3,7 @@
                     David Zeuthen <davidz@redhat.com>
  		    Jeremy Katz <katzj@redhat.com>
 
-                    Last updated: September 20 2007 (v0.4)
+                    Last updated: October 9 2007 (v0.5)
 
 This project concerns tools to generate live CD's on Fedora based
 systems including derived distributions such as RHEL, CentOS and
@@ -106,14 +106,10 @@ same format as installing a system via kickstart.  They can include
 some basic system configuration items, the package manifest and a
 script to be run at the end of the build process.
 
-For the Fedora project, there are currently two different live CD
-configuration files; they are
- 
- livecd-fedora-minimal.ks  : the base livecd system
-
- livecd-fedora-desktop.ks  : complete desktop with applications and
- 			     input/output support for all supported 
-			     locales in Fedora
+For the Fedora project, there are currently a variety of different
+live CD configuration files.  These include a minimal live image
+(livecd-fedora-minimal.ks), a complete desktop image
+(livecd-fedora-desktop.ks) and others.
 
 2.4 EXAMPLE: SPINNING THE FEDORA DESKTOP LIVE CD
 
