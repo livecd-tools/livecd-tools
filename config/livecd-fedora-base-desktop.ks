@@ -124,6 +124,9 @@ chkconfig --level 345 readahead_later off
 
 # Stopgap fix for RH #217966; should be fixed in HAL instead
 touch /media/.hal-mtab
+
+# workaround clock syncing on shutdown that we don't want (#297421)
+sed -i -e 's/hwclock/no-such-hwclock/g' /etc/rc.d/init.d/halt
 EOF
 
 # workaround avahi segfault (#279301)
