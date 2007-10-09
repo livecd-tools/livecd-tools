@@ -1236,8 +1236,6 @@ menu hiddenrow 5
             short = "linux%s" %(count,)
             long = "Boot %s%s" %(self.fs_label,q)
             extra = ""
-            if self._checkIsoMD5:
-                extra = "check"
 
             cfg += s %{"label": self.fs_label,
                        "short": short, "long": long, "extra": extra,
