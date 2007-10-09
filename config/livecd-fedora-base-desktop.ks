@@ -126,6 +126,10 @@ chkconfig --level 345 readahead_later off
 touch /media/.hal-mtab
 EOF
 
+# workaround avahi segfault (#279301)
+touch /etc/resolv.conf
+/sbin/restorecon /etc/resolv.conf
+
 chmod 755 /etc/rc.d/init.d/fedora-live
 /sbin/restorecon /etc/rc.d/init.d/fedora-live
 /sbin/chkconfig --add fedora-live

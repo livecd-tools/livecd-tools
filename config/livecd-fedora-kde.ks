@@ -66,11 +66,6 @@ python-reportlab
 %end
 
 %post
-# workaround avahi segfault (#279301)
-touch /etc/resolv.conf
-/sbin/restorecon /etc/resolv.conf
-
-
 # create /etc/sysconfig/desktop (needed for installation)
 cat > /etc/sysconfig/desktop <<EOF
 DESKTOP="KDE"
