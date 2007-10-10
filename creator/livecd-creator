@@ -823,6 +823,12 @@ class ImageCreator(object):
             f.write(buf)
             f.close()
 
+        # touch some files which get unhappy if they're not labeled correctly
+        for fn in ("/etc/modprobe.conf", "/etc/resolv.conf"):
+            path = instroot + fn
+            f = file(path, "w+")
+            os.chmod(path, 0644)
+
     def runPost(self):
         instroot = "%s/install_root" %(self.build_dir,)        
         # and now, for arbitrary %post scripts
