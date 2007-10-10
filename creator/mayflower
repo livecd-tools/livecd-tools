@@ -78,6 +78,7 @@ cp /sbin/losetup sbin
 cp /sbin/blockdev sbin
 cp /sbin/dmsetup sbin
 cp /bin/dd bin
+cp /bin/cut bin
 
 # we explicitly load these, so should be sure they're present
 MODULES="loop dm_snapshot "
@@ -290,6 +291,19 @@ for o in \`cat /proc/cmdline\` ; do
         ;;
     check)
         check_iso=1
+        ;;
+    *)
+        m=\$(echo \$o |cut -s -d . -f 1)
+        opt=\$(echo \$o |cut -s -d . -f 2-)
+        if [ -z "\$m" -o -z "\$opt" ]; then
+          continue
+        fi
+        p=\$(echo \$opt |cut -s -d = -f 1)
+        v=\$(echo \$opt |cut -s -d = -f 2-)
+        if [ -z "\$p" -o -z "\$v" ]; then
+          continue
+        fi
+        echo "options \$m \$p=\$v" >> /etc/modprobe.conf
         ;;
     esac
 done
@@ -602,6 +616,9 @@ do_live_from_base_loop() {
     if [ "\$live_locale" != "" ] ; then
         echo "LANG=\$live_locale" > /sysroot/etc/sysconfig/i18n
     fi
+
+    # copy over module options
+    [ -f /etc/modprobe.conf ] && cat /etc/modprobe.conf >> /sysroot/etc/modprobe.conf
 
     # create rule so udev creates /dev/live symlink on real rootfs
     if [ -n "\$CDLABEL" ]; then
