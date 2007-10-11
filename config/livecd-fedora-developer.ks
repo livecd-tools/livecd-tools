@@ -68,7 +68,7 @@ rpmdevtools
 rpmlint
 yum-priorities
 
-#eclipse-demos
+eclipse-demos
 
 # Should we?
 #@sql-server
@@ -83,8 +83,10 @@ yum-priorities
 %post
 # TODO: Enable debuginfo repository
 
+cat >> /etc/rc.d/init.d/fedora-live << EOF
 # Put link to demonstration videos on the desktop
 pushd /home/fedora/Desktop
 ln -s /usr/share/eclipse-demos-0.0.1 "Eclipse demonstration videos"
 popd
+EOF
 %end
