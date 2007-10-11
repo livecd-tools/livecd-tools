@@ -25,7 +25,6 @@ nss-mdns
 
 # ignore comps.xml and make sure these packages are included
 kpowersave
-redhat-artwork-kde
 rhgb
 man-pages
 smolt-firstboot
