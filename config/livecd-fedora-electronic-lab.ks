@@ -1,5 +1,5 @@
 # Description : Live image for Fedora Electronic Lab
-# last updated: 07 September 2007
+# last updated: 10 October 2007
 
 %include livecd-fedora-base-desktop.ks
 
@@ -12,15 +12,24 @@ kdenetwork
 kdegraphics
 kdeutils
 knetworkmanager
+kde-settings
 kmenu-gnome
-kpowersave
+kdesvn
+beryl-kde
 yakuake
+# include default fedora wallpaper
+desktop-backgrounds-basic
+wget
+
+# some projects based on ghdl and gtkwave needs
+zlib-devel
 
 #project management
 vym
 koffice-kspread
 koffice-kword
 koffice-kplato
+koffice-filters
 
 # some other extra packages
 ntfsprogs
@@ -30,17 +39,20 @@ setroubleshoot
 smolt
 smolt-firstboot
 syslinux
-rhgb
+gnupg
+hal-cups-utils
 
 # we don't want these
 -dos2unix
 -firefox
--gdm
 -authconfig-gtk
 -PolicyKit-gnome
--desktop-backgrounds-basic
 -gnome-doc-utils-stylesheets
--gtk-nodoka-engine
+
+# ignore comps.xml and make sure these packages are included
+kpowersave
+rhgb
+
 
 #vlsi
 alliance-doc
@@ -87,39 +99,25 @@ sdcc
 # Serial Port Terminals
 gtkterm
 picocom
+minicom
 
 #embedded
 arm-gp2x-linux*
 avr-*
 avrdude
 dfu-programmer
+avarice
+uisp
 
 #computing
 octave
 octave-forge
 
+%end
+
 %post
 
 ###### Fedora Electronic Lab ####################################################
-
-# Fedora Electronic Lab:  KDE keyboard layouts
-cat > /usr/share/kde-settings/kde-profile/default/share/config/kxkbrc <<EOF
-[Layout]
-DisplayNames=
-EnableXkbOptions=false
-IncludeGroups=
-LayoutList=us,fr,de,jp
-Model=pc104
-Options=
-ResetOldOptions=false
-ShowFlag=true
-ShowSingle=true
-StickySwitching=false
-StickySwitchingDepth=2
-SwitchMode=Global
-Use=true
-EOF
-
 
 # Fedora Electronic Lab: Kwin buttons
 cat > /usr/share/kde-settings/kde-profile/default/share/config/kwinrc <<EOF
@@ -144,10 +142,33 @@ Show_Date=false
 Show_Seconds=true
 
 [General]
-Initial_TZ=0
-RemoteZones=
 Type=Digital
 EOF
+
+
+cat > /usr/share/kde-settings/kde-profile/default/share/config/kxkbrc <<EOF
+[Layout]
+DisplayNames=
+EnableXkbOptions=false
+IncludeGroups=
+LayoutList=us,de,fr,jp
+Model=pc104
+Options=
+ResetOldOptions=false
+ShowFlag=true
+ShowSingle=true
+StickySwitching=false
+StickySwitchingDepth=2
+SwitchMode=Global
+Use=true
+EOF
+
+# Chitlesh doesn't like the KDE icon on the kicker, but fedora's
+# This is a feature for Fedora and not for KDE
+cp -fp /usr/share/icons/Bluecurve/16x16/apps/gnome-main-menu.png /usr/share/icons/crystalsvg/16x16/apps/kmenu.png
+cp -fp /usr/share/icons/Bluecurve/24x24/apps/gnome-main-menu.png /usr/share/icons/crystalsvg/22x22/apps/kmenu.png
+cp -fp /usr/share/icons/Bluecurve/32x32/apps/gnome-main-menu.png /usr/share/icons/crystalsvg/32x32/apps/kmenu.png
+cp -fp /usr/share/icons/Bluecurve/48x48/apps/gnome-main-menu.png /usr/share/icons/crystalsvg/48x48/apps/kmenu.png
 
 ###### KDE #####################################################################
 
@@ -157,15 +178,8 @@ DESKTOP="KDE"
 DISPLAYMANAGER="KDE"
 EOF
 
-# add initscript
-# FIXME: it'd be better to get this installed from a package
-cat > /etc/rc.d/init.d/fedora-live-kde << EOF
-#!/bin/bash
-#
-# live: Init script for live image
-#
-# chkconfig: 345 00 99
-# description: Init script for Electronic Lab live image.
+# add initscript qnd # Fedora Electronic Lab:  KDE keyboard layouts
+cat >> /etc/rc.d/init.d/fedora-live << EOF
 
 if [ -e /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png ] ; then
     # use image also for kdm
@@ -189,22 +203,37 @@ sed -i 's/#DefaultUser=johndoe/DefaultUser=fedora/' /etc/kde/kdm/kdmrc
 # disable screensaver
 sed -i 's/Enabled=true/Enabled=false/' /usr/share/kde-settings/kde-profile/default/share/config/kdesktoprc
 
-# adding some autostarted applications
-cp /usr/share/applications/fedora-knetworkmanager.desktop /usr/share/autostart/
-
 # workaround to put liveinst on desktop and in menu
 sed -i 's/NoDisplay=true/NoDisplay=false/' /usr/share/applications/liveinst.desktop
-
 EOF
 
-chmod 755 /etc/rc.d/init.d/fedora-live-kde
-/sbin/restorecon /etc/rc.d/init.d/fedora-live-kde
-/sbin/chkconfig --add fedora-live-kde
+# and set up gnome-keyring to startup/shutdown in kde
+mkdir -p /etc/skel/.kde/env /etc/skel/.kde/shutdown
+cat > /etc/skel/.kde/env/start-custom.sh << EOF
+#!/bin/sh
+eval \`gnome-keyring-daemon\`
+export GNOME_KEYRING_PID
+export GNOME_KEYRING_SOCKET
+EOF
+chmod 755 /etc/skel/.kde/env/start-custom.sh
+
+cat > /etc/skel/.kde/shutdown/stop-custom.sh << EOF
+#/bin/sh
+if [-n "$GNOME_KEYRING_PID"];then
+kill $GNOME_KEYRING_PID
+fi
+EOF
+chmod 755 /etc/skel/.kde/shutdown/stop-custom.sh
 
 ###### Fedora Electronic Lab ####################################################
 
 # FEL doesn't need these and boots slowly
+/sbin/chkconfig --del anacron
 /sbin/chkconfig --del sendmail
 /sbin/chkconfig --del nfs
+/sbin/chkconfig --del nfslock
 /sbin/chkconfig --del rpcidmapd
 /sbin/chkconfig --del rpcbind
+
+%end
+	
