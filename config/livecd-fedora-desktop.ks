@@ -105,11 +105,14 @@ gnome-blog
 
 # dictionaries are big
 -aspell-*
--m17n-db-*
 -man-pages-*
 -scim-tables-*
--scim-lang-*
 -wqy-bitmap-fonts
+
+# more fun with space saving 
+-scim-lang-chinese
+scim-chewing
+scim-pinyin
 
 # save some space
 -gnome-user-docs
