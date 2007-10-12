@@ -25,8 +25,8 @@ usage() {
 }
 
 cleanup() {
-    [ -d $CDMNT ] && umount $CDMNT && rmdir $CDMNT
-    [ -d $USBMNT ] && umount $USBMNT && rmdir $USBMNT
+    [ -d "$CDMNT" ] && umount $CDMNT && rmdir $CDMNT
+    [ -d "$USBMNT" ] && umount $USBMNT && rmdir $USBMNT
 }
 
 exitclean() {
