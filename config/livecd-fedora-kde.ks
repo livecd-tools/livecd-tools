@@ -13,9 +13,8 @@ twinkle
 filelight
 krusader
 
-# if it is enough space include koffice-krita (~40 megs) and ktorrent (~3 megs)
+# if it is enough space include koffice-krita (~40 megs)
 koffice-krita
-ktorrent
 
 # some other extra packages
 gnupg
@@ -102,7 +101,7 @@ EOF
 
 # adding some autostarted applications
 #cp /usr/share/applications/fedora-knetworkmanager.desktop /usr/share/autostart/
-sed -e 's/OnlyShowIn=GNOME;XFCE;/OnlyShowIn=GNOME;XFCE;KDE;/' < /usr/share/gnome/autostart/nm-applet.desktop > /usr/share/autostart/nm-applet.desktop
+sed -i 's/OnlyShowIn=GNOME;XFCE;/OnlyShowIn=GNOME;XFCE;KDE;/' /etc/xdg/autostart/nm-applet.desktop
 
 # and set up gnome-keyring to startup/shutdown in kde
 mkdir -p /etc/skel/.kde/env /etc/skel/.kde/shutdown
