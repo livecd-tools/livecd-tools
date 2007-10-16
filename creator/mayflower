@@ -292,6 +292,10 @@ for o in \`cat /proc/cmdline\` ; do
     check)
         check_iso=1
         ;;
+    blacklist=*)
+        blacklist=\${o#blacklist=}
+        echo "blacklist \$blacklist" >> /etc/modprobe.conf
+        ;;
     *)
         m=\$(echo \$o |cut -s -d . -f 1)
         opt=\$(echo \$o |cut -s -d . -f 2-)
