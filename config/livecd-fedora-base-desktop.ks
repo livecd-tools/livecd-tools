@@ -26,6 +26,7 @@ memtest86+
 -esc
 -samba-client
 -a2ps
+-mpage
 -redhat-lsb
 -sox
 -hplip
@@ -112,15 +113,15 @@ passwd -d fedora > /dev/null
 echo "RUN_FIRSTBOOT=NO" > /etc/sysconfig/firstboot
 
 # don't start yum-updatesd for livecd boots
-chkconfig --level 345 yum-updatesd off
+chkconfig --level 345 yum-updatesd off 2>/dev/null
 
 # don't start cron/at as they tend to spawn things which are
 # disk intensive that are painful on a live image
-chkconfig --level 345 crond off
-chkconfig --level 345 atd off
-chkconfig --level 345 anacron off
-chkconfig --level 345 readahead_early off
-chkconfig --level 345 readahead_later off
+chkconfig --level 345 crond off 2>/dev/null
+chkconfig --level 345 atd off 2>/dev/null
+chkconfig --level 345 anacron off 2>/dev/null
+chkconfig --level 345 readahead_early off 2>/dev/null
+chkconfig --level 345 readahead_later off 2>/dev/null
 
 # Stopgap fix for RH #217966; should be fixed in HAL instead
 touch /media/.hal-mtab
