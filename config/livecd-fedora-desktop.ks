@@ -7,6 +7,8 @@
 @sound-and-video
 @gnome-desktop
 nss-mdns
+NetworkManager-vpnc
+NetworkManager-openvpn
 # we don't include @office so that we don't get OOo.  but some nice bits
 abiword
 gnumeric
@@ -108,6 +110,8 @@ gnome-blog
 -man-pages-*
 -scim-tables-*
 -wqy-bitmap-fonts
+-dejavu-fonts-experimental
+-dejavu-fonts
 
 # more fun with space saving 
 -scim-lang-chinese
@@ -119,6 +123,7 @@ scim-pinyin
 -gimp-help
 -evolution-help
 -autofs
+-vino
 
 %end
 
