@@ -54,7 +54,13 @@ getdisk() {
 
 resetMBR() {
     getdisk $1
-    cat /usr/lib/syslinux/mbr.bin > $device
+    if [ -f /usr/lib/syslinux/mbr.bin ]; then
+	cat /usr/lib/syslinux/mbr.bin > $device
+    elif [ -f /usr/share/syslinux/mbr.bin ]; then
+	cat /usr/share/syslinux/mbr.bin > $device
+    else
+	exitclean
+    fi
 }
 
 checkMBR() {
