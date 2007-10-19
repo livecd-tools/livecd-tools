@@ -3,7 +3,6 @@
 %packages
 @kde-desktop
 kdegames
-beryl-kde
 k3b
 koffice-kword
 koffice-kspread

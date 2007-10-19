@@ -15,7 +15,6 @@ knetworkmanager
 kde-settings
 kmenu-gnome
 kdesvn
-beryl-kde
 yakuake
 # include default fedora wallpaper
 desktop-backgrounds-basic
