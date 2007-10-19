@@ -58,11 +58,13 @@ sysprof
 tcp_wrappers-devel
 tcsh
 texi2html
+xchat
 
 # RPM/Fedora-specific tools
 @buildsys-build
 createrepo
 koji
+livecd-tools
 mock
 rpmdevtools
 rpmlint
