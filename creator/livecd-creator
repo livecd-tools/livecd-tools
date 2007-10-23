@@ -418,6 +418,11 @@ class ImageCreator(object):
 
         isoloop = LoopbackMount(base_on, "%s/base_on_iso" %(self.build_dir,))
 
+        try:
+            isoloop.mount()
+        except MountError, e:
+            raise InstallationError("Failed to loopback mount '%s' : %s" % (base_on, e))
+
         # legacy LiveOS filesystem layout support, remove for F9 or F10
         if os.path.exists("%s/LiveOS/squashfs.img" %(isoloop.mountdir,)):
             squashloop = LoopbackMount("%s/LiveOS/squashfs.img" %(isoloop.mountdir,),
@@ -429,11 +434,6 @@ class ImageCreator(object):
                                        "squashfs")
 
         try:
-            try:
-                isoloop.mount()
-            except MountError, e:
-                raise InstallationError("Failed to loopback mount '%s' : %s" % (base_on, e))
-
             if not os.path.exists(squashloop.lofile):
                 raise InstallationError("'%s' is not a valid live CD ISO : squashfs.img doesn't exist" % base_on)
 
