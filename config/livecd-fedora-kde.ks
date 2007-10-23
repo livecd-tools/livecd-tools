@@ -12,6 +12,7 @@ twinkle
 filelight
 krusader
 
+
 # if it is enough space include koffice-krita (~40 megs)
 koffice-krita
 
@@ -26,11 +27,7 @@ kpowersave
 rhgb
 man-pages
 smolt-firstboot
-
-# workaround the fact that knetworkmanager doesn't work with NM 0.7
-#knetworkmanager
-NetworkManager-gnome
--knetworkmanager
+knetworkmanager
 
 #some changes that we don't want...
 -specspo
@@ -97,27 +94,5 @@ sed -i 's/Enabled=true/Enabled=false/' /usr/share/kde-settings/kde-profile/defau
 # workaround to put liveinst on desktop and in menu
 sed -i 's/NoDisplay=true/NoDisplay=false/' /usr/share/applications/liveinst.desktop
 EOF
-
-# adding some autostarted applications
-#cp /usr/share/applications/fedora-knetworkmanager.desktop /usr/share/autostart/
-sed -i 's/OnlyShowIn=GNOME;XFCE;/OnlyShowIn=GNOME;XFCE;KDE;/' /etc/xdg/autostart/nm-applet.desktop
-
-# and set up gnome-keyring to startup/shutdown in kde
-mkdir -p /etc/skel/.kde/env /etc/skel/.kde/shutdown
-cat > /etc/skel/.kde/env/start-custom.sh << EOF
-#!/bin/sh
-eval \`gnome-keyring-daemon\`
-export GNOME_KEYRING_PID
-export GNOME_KEYRING_SOCKET
-EOF
-chmod 755 /etc/skel/.kde/env/start-custom.sh
-
-cat > /etc/skel/.kde/shutdown/stop-custom.sh << EOF
-#/bin/sh
-if [-n "$GNOME_KEYRING_PID"];then
-kill $GNOME_KEYRING_PID
-fi
-EOF
-chmod 755 /etc/skel/.kde/shutdown/stop-custom.sh
 
 %end
