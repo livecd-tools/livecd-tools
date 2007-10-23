@@ -1316,6 +1316,17 @@ class ppcImageCreator(ImageCreator):
         if rc != 0:
             raise InstallationError("ISO creation failed!")
 
+    def _copyBootFile(self, file, dest):
+        # get the file from either anaconda-runtime or ppc64-utils
+        if os.path.exists("%s/install_root/usr/share/ppc64-utils/%s" %(self.build_dir, file)):
+            shutil.copyfile("%s/install_root/usr/share/ppc64-utils/%s"
+                            %(self.build_dir, file), dest)
+        elif os.path.exists("%s/install_root/usr/lib/anaconda-runtime/boot/%s" %(self.build_dir, file)):
+            shutil.copyfile("%s/install_root/usr/lib/anaconda-runtime/boot/%s"
+                            %(self.build_dir, file), dest)
+        else:
+            raise InstallationError("Unable to find boot file %s" %(file,))
+
     def configureBootloader(self):
         """configure the boot loader"""
         havekernel = { 32: False, 64: False }
@@ -1323,20 +1334,17 @@ class ppcImageCreator(ImageCreator):
         os.makedirs(self.build_dir + "/out/ppc")
 
         # copy the mapping file to somewhere we can get to it later
-        shutil.copyfile("%s/install_root/usr/lib/anaconda-runtime/boot/mapping" %(self.build_dir,),
-                        "%s/out/ppc/mapping" %(self.build_dir,))
+        self._copyBootFile("mapping", "%s/out/ppc/mapping" %(self.build_dir,))
 
         # Copy yaboot and ofboot.b in to mac directory
         os.makedirs(self.build_dir + "/out/ppc/mac")
-        shutil.copyfile("%s/install_root/usr/lib/anaconda-runtime/boot/ofboot.b" %(self.build_dir),
-                        "%s/out/ppc/mac/ofboot.b" %(self.build_dir,))
+        self._copyBootFile("ofboot.b", "%s/out/ppc/mac/ofboot.b" %(self.build_dir,))
         shutil.copyfile("%s/install_root/usr/lib/yaboot/yaboot" %(self.build_dir),
                         "%s/out/ppc/mac/yaboot" %(self.build_dir,))
 
         # Copy yaboot and ofboot.b in to chrp directory
         os.makedirs(self.build_dir + "/out/ppc/chrp")
-        shutil.copyfile("%s/install_root/usr/lib/anaconda-runtime/boot/bootinfo.txt" %(self.build_dir),
-                        "%s/out/ppc/bootinfo.txt" %(self.build_dir,))
+        self._copyBootFile("bootinfo.txt", "%s/out/ppc/bootinfo.txt" %(self.build_dir,))
         shutil.copyfile("%s/install_root/usr/lib/yaboot/yaboot" %(self.build_dir),
                         "%s/out/ppc/chrp/yaboot" %(self.build_dir,))
         subprocess.call(["/usr/sbin/addnote", "%s/out/ppc/chrp/yaboot" %(self.build_dir,)])
@@ -1431,9 +1439,7 @@ image=/ppc/ppc32/vmlinuz
         # TODO: build 'netboot' images with kernel+initrd, like mk-images.ppc
 
     def _getRequiredPackages(self):
-        # For now we need anaconda-runtime, for bits like ofboot.b and
-        # mapping files.
-        ret = ["yaboot", "anaconda-runtime"]
+        ret = ["yaboot"]
         ret.extend(ImageCreator._getRequiredPackages(self))
         return ret
 
