@@ -83,7 +83,29 @@ eclipse-demos
 %end
 
 %post
-# TODO: Enable debuginfo repository
+# Enable debuginfo repository (useful for frysk, gdb, etc.)
+awk '
+BEGIN {
+  debuginfo = 0
+}
+  /^\[.*\]/ {
+  if (/debuginfo/) {
+    debuginfo = 1
+  } else {
+    debuginfo = 0
+  }
+  print
+  next
+}
+  /enabled=0/ && debuginfo {
+  print "enabled=1"
+  next
+}
+{
+  print
+  next
+}' < /etc/yum.repos.d/fedora.repo > /etc/yum.repos.d/fedora.repo.tmp
+mv /etc/yum.repos.d/fedora.repo{.tmp,}
 
 cat >> /etc/rc.d/init.d/fedora-live << EOF
 # Put link to demonstration videos on the desktop
