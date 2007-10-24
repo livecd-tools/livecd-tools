@@ -92,6 +92,27 @@ if [ -b /dev/live ]; then
    mount -o ro /dev/live /mnt/live
 fi
 
+# read some variables out of /proc/cmdline
+for o in \`cat /proc/cmdline\` ; do
+    case \$o in
+    ks=*)
+        ks="\${o#ks=}"
+        ;;
+    xdriver=*)
+        xdriver="--set-driver=\${o#xdriver=}"
+        ;;
+    esac
+done
+
+
+# if liveinst or textinst is given, start anaconda
+if strstr "\`cat /proc/cmdline\`" liveinst ; then
+   /usr/sbin/liveinst \$ks
+fi
+if strstr "\`cat /proc/cmdline\`" textinst ; then
+   /usr/sbin/liveinst --text \$ks
+fi
+
 # enable swaps unless requested otherwise
 swaps=\`blkid -t TYPE=swap -o device\`
 if ! strstr "\`cat /proc/cmdline\`" noswap -a [ -n "\$swaps" ] ; then
@@ -101,14 +122,6 @@ if ! strstr "\`cat /proc/cmdline\`" noswap -a [ -n "\$swaps" ] ; then
 fi
 
 # configure X, allowing user to override xdriver
-for o in \`cat /proc/cmdline\` ; do
-    case \$o in
-    xdriver=*)
-        xdriver="--set-driver=\${o#xdriver=}"
-        ;;
-    esac
-done
-
 exists system-config-display --noui --reconfig --set-depth=24 \$xdriver
 
 # add fedora user with no passwd
@@ -153,4 +166,9 @@ rm -f /boot/initrd*
 %post --nochroot
 cp $INSTALL_ROOT/usr/share/doc/*-release-*/GPL $LIVE_ROOT/GPL
 cp $INSTALL_ROOT/usr/share/doc/HTML/readme-live-image/en_US/readme-live-image-en_US.txt $LIVE_ROOT/README
+
+# only works on x86, x86_64
+if [ "$(uname -i)" = "i386" -o "$(uname -i)" = "x86_64" ]; then
+  cp /usr/bin/livecd-iso-to-disk $LIVE_ROOT/LiveOS
+fi
 %end
