@@ -123,6 +123,7 @@ scim-pinyin
 -gimp-help
 -evolution-help
 -autofs
+-nss_db
 -vino
 
 %end
