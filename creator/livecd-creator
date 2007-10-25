@@ -1581,7 +1581,7 @@ def main():
 
         target.unmount()
 
-        if not skip_minimize:
+        if not options.skip_minimize:
             target.cleanupDeleted()
             target.genMinInstDelta()
 
