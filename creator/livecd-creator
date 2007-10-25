@@ -1509,6 +1509,8 @@ def parse_options(args):
     # Don't compress the image.
     parser.add_option("-s", "--skip-compression", action="store_true", dest="skip_compression",
                       help=optparse.SUPPRESS_HELP)
+    parser.add_option("", "--skip-minimize", action="store_true", dest="skip_minimize",
+                      help=optparse.SUPPRESS_HELP)
 
     (options, args) = parser.parse_args()
     if not options.kscfg or not os.path.isfile(options.kscfg):
@@ -1579,8 +1581,9 @@ def main():
 
         target.unmount()
 
-        target.cleanupDeleted()
-        target.genMinInstDelta()
+        if not skip_minimize:
+            target.cleanupDeleted()
+            target.genMinInstDelta()
 
         target.package()
 
