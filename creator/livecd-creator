@@ -596,6 +596,16 @@ class ImageCreator(object):
         finally:
             self.ayum.closeRpmDB()
 
+        # do some clean up to avoid lvm info leakage.  this sucks.
+        for subdir in ("cache", "backup", "archive"):
+            for f in os.listdir("%s/install_root/etc/lvm/%s"
+                                %(self.build_dir, subdir)):
+                try:
+                    os.unlink("%s/install_root/etc/lvm/%s/%s"
+                              %(self.build_dir, subdir, f))
+                except:
+                    pass
+
     def writeNetworkIfCfg(self, instroot, network):
         path = instroot + "/etc/sysconfig/network-scripts/ifcfg-" + network.device
 
