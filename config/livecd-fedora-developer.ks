@@ -68,7 +68,6 @@ livecd-tools
 mock
 rpmdevtools
 rpmlint
-yum-priorities
 
 eclipse-demos
 
