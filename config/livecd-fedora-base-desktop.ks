@@ -159,6 +159,8 @@ chmod 755 /etc/rc.d/init.d/fedora-live
 
 # save a little bit of space at least...
 rm -f /boot/initrd*
+# make sure there aren't core files lying around
+rm -f /core*
 
 %end
 
