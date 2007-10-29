@@ -2,7 +2,7 @@
 
 Summary: Tools for building live CD's
 Name: livecd-tools
-Version: 012
+Version: 013
 Release: 1%{?dist}
 License: GPL
 Group: System Environment/Base
@@ -55,6 +55,14 @@ rm -rf $RPM_BUILD_ROOT
 %{_datadir}/livecd-tools/*
 
 %changelog
+* Mon Oct 29 2007 Jeremy Katz <katzj@redhat.com> - 013-1
+- Lots of config updates
+- Support 'device foo' to say what modules go in the initramfs
+- Support multiple kernels being installed
+- Allow blacklisting kernel modules on boot with blacklist=foo
+- Improve bootloader configs
+- Split configs off for f8
+
 * Tue Sep 25 2007 Jeremy Katz <katzj@redhat.com> - 012-1
 - Allow %%post --nochroot to work for putting files in the root of the iso
 - Set environment variables for when %%post is run
