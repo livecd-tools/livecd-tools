@@ -204,7 +204,7 @@ for i in bin/* sbin/* lib/udev/*; do
     done
 done
 
-cat > sbin/run-init <<EOF
+cat > sbin/run-init <<'EOF'
 #!/sbin/nash
 setuproot
 switchroot
@@ -212,7 +212,7 @@ EOF
 chmod 755 sbin/run-init
 
 # Write out init
-cat > init <<EOF
+cat > init <<'EOF'
 #!/bin/bash
 
 emergency_shell()
@@ -263,10 +263,10 @@ live_locale=""
 
 # Parse kernel commandline options
 #
-for o in \`cat /proc/cmdline\` ; do
-    case \$o in 
+for o in `cat /proc/cmdline` ; do
+    case $o in
     init=*)
-        init=\${o#init=}
+        init=${o#init=}
         ;;
     ro)
         root_ro=1
@@ -287,33 +287,33 @@ for o in \`cat /proc/cmdline\` ; do
         live_ram=1
         ;;
     live_locale=*)
-        live_locale=\${o#live_locale=}
+        live_locale=${o#live_locale=}
         ;;
     check)
         check_iso=1
         ;;
     blacklist=*)
-        blacklist=\${o#blacklist=}
-        echo "blacklist \$blacklist" >> /etc/modprobe.conf
+        blacklist=${o#blacklist=}
+        echo "blacklist $blacklist" >> /etc/modprobe.conf
         ;;
     *)
-        m=\$(echo \$o |cut -s -d . -f 1)
-        opt=\$(echo \$o |cut -s -d . -f 2-)
-        if [ -z "\$m" -o -z "\$opt" ]; then
+        m=$(echo $o |cut -s -d . -f 1)
+        opt=$(echo $o |cut -s -d . -f 2-)
+        if [ -z "$m" -o -z "$opt" ]; then
           continue
         fi
-        p=\$(echo \$opt |cut -s -d = -f 1)
-        v=\$(echo \$opt |cut -s -d = -f 2-)
-        if [ -z "\$p" -o -z "\$v" ]; then
+        p=$(echo $opt |cut -s -d = -f 1)
+        v=$(echo $opt |cut -s -d = -f 2-)
+        if [ -z "$p" -o -z "$v" ]; then
           continue
         fi
-        echo "options \$m \$p=\$v" >> /etc/modprobe.conf
+        echo "options $m $p=$v" >> /etc/modprobe.conf
         ;;
     esac
 done
 
-if [ "\$quiet" != "1" ] ; then
-    echo "kernel commandline: \`cat /proc/cmdline\`"
+if [ "$quiet" != "1" ] ; then
+    echo "kernel commandline: `cat /proc/cmdline`"
 fi
 
 # First, read rootfs target from embedded /etc/fstab file
@@ -322,14 +322,14 @@ if [ -f /etc/fstab ] ; then
     root=$(cat /etc/fstab | while read d m f o r; do if [ "$m" == "/" ] ; then echo $d; fi; done)
     rootflags=$(cat /etc/fstab | while read d m f o r; do if [ "$m" == "/" ] ; then echo $o; fi; done)
     rootfstype=$(cat /etc/fstab | while read d m f o r; do if [ "$m" == "/" ] ; then echo $f; fi; done)
-    if [ "\$quiet" != "1" ] ; then
-        echo "fstab suggests root=\$root"
-        echo "fstab suggests rootflags=\$rootflags"
-        echo "fstab suggests rootfstype=\$rootfstype"
+    if [ "$quiet" != "1" ] ; then
+        echo "fstab suggests root=$root"
+        echo "fstab suggests rootflags=$rootflags"
+        echo "fstab suggests rootfstype=$rootfstype"
         # Handle the case with bogus /etc/fstab pointing to /dev/root
         # which by definition does not exist...
         #
-        if [ "\$root" == "/dev/root" ] ; then
+        if [ "$root" == "/dev/root" ] ; then
             echo "WARNING: Bogus /etc/fstab file - cannot have /dev/root as the device for /"
             root=""
             rootflags=""
@@ -340,41 +340,41 @@ fi
 
 # Users can override rootfs target on the kernel commandline
 #
-for o in \`cat /proc/cmdline\` ; do
-    case \$o in 
+for o in `cat /proc/cmdline` ; do
+    case $o in
     root=*)
-        root=\${o#root=}
+        root=${o#root=}
         ;;
     rootflags=*)
-        rootflags=\${o#rootflags=}
+        rootflags=${o#rootflags=}
         ;;
     rootfstype=*)
-        rootfstype=\${o#rootfstype=}
+        rootfstype=${o#rootfstype=}
         ;;
     esac
 done
 
 # Print out what we are going to do
 #
-if [ "\$quiet" != "1" ] ; then
-    echo "init=\$init"
-    echo "root=\$root"
-    echo "rootflags=\$rootflags"
-    echo "rootfstype=\$rootfstype"
-    echo "root_ro=\$root_ro"
-    echo "root_rw=\$root_rw"
+if [ "$quiet" != "1" ] ; then
+    echo "init=$init"
+    echo "root=$root"
+    echo "rootflags=$rootflags"
+    echo "rootfstype=$rootfstype"
+    echo "root_ro=$root_ro"
+    echo "root_rw=$root_rw"
 fi
 
 waitforsymlink=0
 # generate udev rules to generate /dev/root symlink
-if [ -z \$root ] ; then
+if [ -z $root ] ; then
     root=/dev/something
 else
-    case \$root in
+    case $root in
         /dev/disk/by-label/*)
-            LABEL=\${root#/dev/disk/by-label/}
-            echo "SUBSYSTEM==\"block\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$LABEL\", SYMLINK+=\"root\"" > /etc/udev/rules.d/00-label.rules
-            if [ "\$quiet" != "1" ] ; then
+            LABEL=${root#/dev/disk/by-label/}
+            echo "SUBSYSTEM==\"block\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$LABEL\", SYMLINK+=\"root\"" > /etc/udev/rules.d/00-label.rules
+            if [ "$quiet" != "1" ] ; then
                 echo "Added udev rule 00-label.rules:"
                 cat /etc/udev/rules.d/00-label.rules
             fi
@@ -382,12 +382,12 @@ else
             thingtomount=/dev/root
             ;;
         CDLABEL=*)
-            CDLABEL=\${root#CDLABEL=}
-            echo "KERNEL==\"hd[a-z]\", BUS==\"ide\", SYSFS{removable}==\"1\", ATTRS{media}==\"cdrom\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"root\"" > /etc/udev/rules.d/00-cdlabel.rules
-            echo "KERNEL==\"sr[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"root\"" >> /etc/udev/rules.d/00-cdlabel.rules
-            echo "KERNEL==\"scd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"root\"" >> /etc/udev/rules.d/00-cdlabel.rules
-            echo "KERNEL==\"pcd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"root\"" >> /etc/udev/rules.d/00-cdlabel.rules
-            if [ "\$quiet" != "1" ] ; then
+            CDLABEL=${root#CDLABEL=}
+            echo "KERNEL==\"hd[a-z]\", BUS==\"ide\", SYSFS{removable}==\"1\", ATTRS{media}==\"cdrom\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$CDLABEL\", SYMLINK+=\"root\"" > /etc/udev/rules.d/00-cdlabel.rules
+            echo "KERNEL==\"sr[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$CDLABEL\", SYMLINK+=\"root\"" >> /etc/udev/rules.d/00-cdlabel.rules
+            echo "KERNEL==\"scd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$CDLABEL\", SYMLINK+=\"root\"" >> /etc/udev/rules.d/00-cdlabel.rules
+            echo "KERNEL==\"pcd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$CDLABEL\", SYMLINK+=\"root\"" >> /etc/udev/rules.d/00-cdlabel.rules
+            if [ "$quiet" != "1" ] ; then
                 echo "Added udev rule 00-cdlabel.rules:"
                 cat /etc/udev/rules.d/00-cdlabel.rules
             fi
@@ -395,9 +395,9 @@ else
             thingtomount=/dev/root
             ;;
         LABEL=*)
-            LABEL=\${root#LABEL=}
-            echo "SUBSYSTEM==\"block\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$LABEL\", SYMLINK+=\"root\"" > /etc/udev/rules.d/00-label.rules
-            if [ "\$quiet" != "1" ] ; then
+            LABEL=${root#LABEL=}
+            echo "SUBSYSTEM==\"block\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$LABEL\", SYMLINK+=\"root\"" > /etc/udev/rules.d/00-label.rules
+            if [ "$quiet" != "1" ] ; then
                 echo "Added udev rule 00-label.rules:"
                 cat /etc/udev/rules.d/00-label.rules
             fi
@@ -405,9 +405,9 @@ else
             thingtomount=/dev/root
             ;;
         /dev/disk/by-id/*)
-            UUID=\${root#/dev/disk/by-id/}
-            echo "SUBSYSTEM==\"block\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"\$UUID\", SYMLINK+=\"root\"" > /etc/udev/rules.d/01-uuid.rules
-            if [ "\$quiet" != "1" ] ; then
+            UUID=${root#/dev/disk/by-id/}
+            echo "SUBSYSTEM==\"block\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"$UUID\", SYMLINK+=\"root\"" > /etc/udev/rules.d/01-uuid.rules
+            if [ "$quiet" != "1" ] ; then
                 echo "Added udev rule 01-uuid.rules:"
                 cat /etc/udev/rules.d/01-uuid.rules
             fi
@@ -415,9 +415,9 @@ else
             thingtomount=/dev/root
             ;;
         UUID=*)
-            UUID=\${root#UUID=}
-            echo "SUBSYSTEM==\"block\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"\$UUID\", SYMLINK+=\"root\"" > /etc/udev/rules.d/01-uuid.rules
-            if [ "\$quiet" != "1" ] ; then
+            UUID=${root#UUID=}
+            echo "SUBSYSTEM==\"block\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"$UUID\", SYMLINK+=\"root\"" > /etc/udev/rules.d/01-uuid.rules
+            if [ "$quiet" != "1" ] ; then
                 echo "Added udev rule 01-uuid.rules:"
                 cat /etc/udev/rules.d/01-uuid.rules
             fi
@@ -425,11 +425,11 @@ else
             thingtomount=/dev/root
             ;;
         /dev/*)
-            ln -s \$root /dev/root
-            thingtomount=\$root
+            ln -s $root /dev/root
+            thingtomount=$root
             ;;
         *)
-            thingtomount=\$root      
+            thingtomount=$root
             ;;
     esac
 fi
@@ -438,7 +438,7 @@ echo "udev_log=\"error\"" >> /etc/udev/udev.conf
 
 # rules for loading modules
 #
-echo -n "ACTION==\"add\", SUBSYSTEM==\"?*\", ENV{MODALIAS}==\"?*\", RUN+=\"/sbin/modprobe \$" >> /etc/udev/rules.d/10-modprobe.rules
+echo -n "ACTION==\"add\", SUBSYSTEM==\"?*\", ENV{MODALIAS}==\"?*\", RUN+=\"/sbin/modprobe $" >> /etc/udev/rules.d/10-modprobe.rules
 echo "env{MODALIAS}\"" >> /etc/udev/rules.d/10-modprobe.rules
 echo "ACTION==\"add\", SUBSYSTEM==\"scsi_device\" RUN+=\"/sbin/modprobe sg\"" >> /etc/udev/rules.d/10-modprobe.rules
 echo "ACTION==\"add\", SUBSYSTEM==\"scsi_device\", SYSFS{type}==\"0|7|14\", RUN+=\"/sbin/modprobe sd_mod\"" >> /etc/udev/rules.d/10-modprobe.rules
@@ -453,33 +453,33 @@ echo "KERNEL==\"msr[0-9]*\", NAME=\"cpu/%n/msr\"" > /etc/udev/rules.d/20-cpu.rul
 
 /sbin/modprobe loop max_loop=16
 
-if [ "\$quiet" != "1" ] ; then
+if [ "$quiet" != "1" ] ; then
     echo "starting udevd"
 fi
 /sbin/udevd --daemon
 
-if [ "\$quiet" != "1" ] ; then
+if [ "$quiet" != "1" ] ; then
     echo "creating devices"
 fi
 /sbin/udevtrigger
 
-if [ "\$quiet" != "1" ] ; then
+if [ "$quiet" != "1" ] ; then
     echo "waiting for system to settle"
 fi
 /sbin/udevsettle --timeout=30 || :
 
 
-if [ "\$shell" == "1" ] ; then
+if [ "$shell" == "1" ] ; then
     echo "Shell requested on kernel commandline. Exit to continue booting."
     echo
     bash
 fi
 
 # don't wait for "mtd0" as no device file will appear
-if [ "\$root" != "mtd0" ] ; then
+if [ "$root" != "mtd0" ] ; then
 
     # If we don't have the /dev/root link.. ask the user to create..
-    if [ "\$waitforsymlink" != "1" ] ; then
+    if [ "$waitforsymlink" != "1" ] ; then
         if [ ! -L /dev/root ] ; then
             echo
             echo "--------------------------------------"
@@ -497,17 +497,17 @@ if [ "\$root" != "mtd0" ] ; then
     # Wait up to 60 seconds for them to appear...
     #
     if [ ! -b /dev/root ] ; then
-        if [ "\$quiet" != "1" ] ; then
+        if [ "$quiet" != "1" ] ; then
             echo "no root yet, udev rule will write symlink..."
             echo
             echo "waiting up to 60 seconds before dropping to emergency shell."
         fi
         COUNTDOWN=60
-        while [ "x\$COUNTDOWN" != "x0" ] ; do
-            if [ "\$quiet" != "1" ] ; then
+        while [ "x$COUNTDOWN" != "x0" ] ; do
+            if [ "$quiet" != "1" ] ; then
                 echo -n "."
             fi
-            COUNTDOWN=\$((\$COUNTDOWN - 1))
+            COUNTDOWN=$(($COUNTDOWN - 1))
             /bin/sleep 1
             if [ -e /dev/root ] ; then
 	        COUNTDOWN=0
@@ -527,53 +527,53 @@ if [ "\$root" != "mtd0" ] ; then
         bash
     fi
 
-    if [ "\$quiet" != "1" ] ; then
+    if [ "$quiet" != "1" ] ; then
         echo "mounting /dev/root"
         ls -l /dev/root
     fi
 
-    if [ -z \$rootfstype ] ; then
+    if [ -z $rootfstype ] ; then
         rootfstype=auto
     fi
 
 fi
 
-if [ "x\$check_iso" == "x1" -a -x /bin/checkisomd5 -a "x\$rootfstype" == "xiso9660" ]; then
+if [ "x$check_iso" == "x1" -a -x /bin/checkisomd5 -a "x$rootfstype" == "xiso9660" ]; then
    echo "Verifying ISO image..."
    /bin/checkisomd5 --verbose /dev/root
-   if [ \$? -ne 0 ]; then
+   if [ $? -ne 0 ]; then
        echo "Are you SURE you want to continue?"
        echo "Press Enter to continue or ctrl-alt-del to reboot."
        read
    fi
 fi 
 
-if [ "x\$root_ro" == "x1" ] ; then
-   if [ -z \$rootflags ] ; then
+if [ "x$root_ro" == "x1" ] ; then
+   if [ -z $rootflags ] ; then
        rootflags="ro"
    else
-       rootflags="\$rootflags,ro"
+       rootflags="$rootflags,ro"
    fi
 fi
 
-if [ "x\$root_rw" == "x1" ] ; then
-   if [ -z \$rootflags ] ; then
+if [ "x$root_rw" == "x1" ] ; then
+   if [ -z $rootflags ] ; then
        rootflags="rw"
    else
-       rootflags="\$rootflags,rw"
+       rootflags="$rootflags,rw"
    fi
 fi
 
-if [ -z \$rootflags ] ; then
+if [ -z $rootflags ] ; then
     mountoptions=""
 else
-    mountoptions=" -o\$rootflags"
+    mountoptions=" -o$rootflags"
 fi
 
-mount -n -t \$rootfstype \$mountoptions \$thingtomount /sysroot
-RES=\$?
+mount -n -t $rootfstype $mountoptions $thingtomount /sysroot
+RES=$?
 
-if [ "\$RES" != "0" ] ; then
+if [ "$RES" != "0" ] ; then
     echo "---------------------------------"
     echo "WARNING: Cannot mount rootfs!"
     echo "---------------------------------"
@@ -588,8 +588,8 @@ fi
 #
 
 # only pass kernel command line if we're launching /sbin/init
-if [ "\$init" == "/sbin/init" ] ; then
-    initargs=\$(cat /proc/cmdline)
+if [ "$init" == "/sbin/init" ] ; then
+    initargs=$(cat /proc/cmdline)
 else
     initargs=""
 fi
@@ -598,11 +598,11 @@ fi
 do_live_from_base_loop() {
     # create a sparse file for the overlay
     dd if=/dev/null of=/overlay bs=1024 count=1 seek=$((512*1024)) 2> /dev/null
-    OVERLAY_LOOPDEV=\$( losetup -f )
-    losetup \$OVERLAY_LOOPDEV /overlay
+    OVERLAY_LOOPDEV=$( losetup -f )
+    losetup $OVERLAY_LOOPDEV /overlay
 
     # set up the snapshot
-    echo 0 \`blockdev --getsize \$BASE_LOOPDEV\` snapshot \$BASE_LOOPDEV \$OVERLAY_LOOPDEV p 8 | dmsetup create live-rw
+    echo 0 `blockdev --getsize $BASE_LOOPDEV` snapshot $BASE_LOOPDEV $OVERLAY_LOOPDEV p 8 | dmsetup create live-rw
 
     # set up new /dev/root symlink
     rm -f /dev/root
@@ -617,45 +617,45 @@ do_live_from_base_loop() {
     # We also use it to dynamically set the system locale from the boot
     # menu on live cd's.
     #
-    if [ "\$live_locale" != "" ] ; then
-        echo "LANG=\$live_locale" > /sysroot/etc/sysconfig/i18n
+    if [ "$live_locale" != "" ] ; then
+        echo "LANG=$live_locale" > /sysroot/etc/sysconfig/i18n
     fi
 
     # copy over module options
     [ -f /etc/modprobe.conf ] && cat /etc/modprobe.conf >> /sysroot/etc/modprobe.conf
 
     # create rule so udev creates /dev/live symlink on real rootfs
-    if [ -n "\$CDLABEL" ]; then
-       echo "KERNEL==\"hd[a-z]\", BUS==\"ide\", SYSFS{removable}==\"1\", ATTRS{media}==\"cdrom\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*
-       echo "KERNEL==\"sr[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*
-       echo "KERNEL==\"scd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*
-       echo "KERNEL==\"pcd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$CDLABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*
-    elif [ -n "\$LABEL" ]; then
-       echo "KERNEL==\"hd[a-z]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$LABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*        
-       echo "KERNEL==\"hd[a-z][0-9]*\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$LABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*        
-       echo "KERNEL==\"sd[a-z]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$LABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*        
-       echo "KERNEL==\"sd[a-z][0-9]*\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"\$LABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*        
-    elif [ -n "\$UUID" ]; then
-       echo "KERNEL==\"hd[a-z]\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"\$UUID\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*        
-       echo "KERNEL==\"hd[a-z][0-9]*\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"\$UUID\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*        
-       echo "KERNEL==\"sd[a-z]\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"\$UUID\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*        
-       echo "KERNEL==\"sd[a-z][0-9]*\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"\$UUID\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*        
+    if [ -n "$CDLABEL" ]; then
+       echo "KERNEL==\"hd[a-z]\", BUS==\"ide\", SYSFS{removable}==\"1\", ATTRS{media}==\"cdrom\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$CDLABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*
+       echo "KERNEL==\"sr[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$CDLABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*
+       echo "KERNEL==\"scd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$CDLABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*
+       echo "KERNEL==\"pcd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$CDLABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*
+    elif [ -n "$LABEL" ]; then
+       echo "KERNEL==\"hd[a-z]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$LABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*
+       echo "KERNEL==\"hd[a-z][0-9]*\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$LABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*
+       echo "KERNEL==\"sd[a-z]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$LABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*
+       echo "KERNEL==\"sd[a-z][0-9]*\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$LABEL\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*
+    elif [ -n "$UUID" ]; then
+       echo "KERNEL==\"hd[a-z]\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"$UUID\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*
+       echo "KERNEL==\"hd[a-z][0-9]*\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"$UUID\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*
+       echo "KERNEL==\"sd[a-z]\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"$UUID\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*
+       echo "KERNEL==\"sd[a-z][0-9]*\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"$UUID\", SYMLINK+=\"live\"" >> /sysroot/etc/udev/rules.d/50-udev*
     fi
 
     # add rules for loop devices created by this mayflower generated init
     # i.e. /dev/live-osimg, /dev/live-osmin, /dev/live-overlay,
     #      and /dev/live-squashed
-    if [ -b "\$SQUASHED_LOOPDEV" ]; then
-        echo "KERNEL==\"\${SQUASHED_LOOPDEV#/dev/}\" SYMLINK+=\"live-squashed\"" >> /sysroot/etc/udev/rules.d/50-udev*
+    if [ -b "$SQUASHED_LOOPDEV" ]; then
+        echo "KERNEL==\"${SQUASHED_LOOPDEV#/dev/}\" SYMLINK+=\"live-squashed\"" >> /sysroot/etc/udev/rules.d/50-udev*
     fi
-    if [ -b "\$OSMIN_SQUASHED_LOOPDEV" ]; then
-        echo "KERNEL==\"\${OSMIN_SQUASHED_LOOPDEV#/dev/}\" SYMLINK+=\"live-squashed-osmin\"" >> /sysroot/etc/udev/rules.d/50-udev*
+    if [ -b "$OSMIN_SQUASHED_LOOPDEV" ]; then
+        echo "KERNEL==\"${OSMIN_SQUASHED_LOOPDEV#/dev/}\" SYMLINK+=\"live-squashed-osmin\"" >> /sysroot/etc/udev/rules.d/50-udev*
     fi
-    if [ -b "\$OSMIN_LOOPDEV" ]; then
-        echo "KERNEL==\"\${OSMIN_LOOPDEV#/dev/}\" SYMLINK+=\"live-osmin\"" >> /sysroot/etc/udev/rules.d/50-udev*
+    if [ -b "$OSMIN_LOOPDEV" ]; then
+        echo "KERNEL==\"${OSMIN_LOOPDEV#/dev/}\" SYMLINK+=\"live-osmin\"" >> /sysroot/etc/udev/rules.d/50-udev*
     fi
-    echo "KERNEL==\"\${BASE_LOOPDEV#/dev/}\" SYMLINK+=\"live-osimg\"" >> /sysroot/etc/udev/rules.d/50-udev*
-    echo "KERNEL==\"\${OVERLAY_LOOPDEV#/dev/}\" SYMLINK+=\"live-overlay\"" >> /sysroot/etc/udev/rules.d/50-udev*
+    echo "KERNEL==\"${BASE_LOOPDEV#/dev/}\" SYMLINK+=\"live-osimg\"" >> /sysroot/etc/udev/rules.d/50-udev*
+    echo "KERNEL==\"${OVERLAY_LOOPDEV#/dev/}\" SYMLINK+=\"live-overlay\"" >> /sysroot/etc/udev/rules.d/50-udev*
 
     mount -n -o ro,remount /sysroot
 }
@@ -665,15 +665,15 @@ if [ -e /sysroot/LiveOS/osmin.img ]; then
     OSMINSQFS=/sysroot/LiveOS/osmin.img
 fi
 
-if [ -n "\$OSMINSQFS" ]; then
+if [ -n "$OSMINSQFS" ]; then
     # decompress the delta data
-    dd if=\$OSMINSQFS of=/osmin.img 2> /dev/null
-    OSMIN_SQUASHED_LOOPDEV=\$( losetup -f )
-    losetup \$OSMIN_SQUASHED_LOOPDEV /osmin.img
+    dd if=$OSMINSQFS of=/osmin.img 2> /dev/null
+    OSMIN_SQUASHED_LOOPDEV=$( losetup -f )
+    losetup $OSMIN_SQUASHED_LOOPDEV /osmin.img
     mkdir -p /squashfs.osmin
-    mount -n -t squashfs -o ro \$OSMIN_SQUASHED_LOOPDEV /squashfs.osmin
-    OSMIN_LOOPDEV=\$( losetup -f )
-    losetup \$OSMIN_LOOPDEV /squashfs.osmin/osmin
+    mount -n -t squashfs -o ro $OSMIN_SQUASHED_LOOPDEV /squashfs.osmin
+    OSMIN_LOOPDEV=$( losetup -f )
+    losetup $OSMIN_LOOPDEV /squashfs.osmin/osmin
     umount -l /squashfs.osmin
 fi
 
@@ -683,8 +683,8 @@ if [ -e /sysroot/LiveOS/ext3fs.img ]; then
   EXT3FS="/sysroot/LiveOS/ext3fs.img"
 fi
 
-if [ -n "\$EXT3FS" ] ; then
-    if [ "\$quiet" != "1" ] ; then
+if [ -n "$EXT3FS" ] ; then
+    if [ "$quiet" != "1" ] ; then
         echo "setting up embedded ext3 fs "
     fi
 
@@ -692,8 +692,8 @@ if [ -n "\$EXT3FS" ] ; then
     mknod /dev/mapper/control c 10 63
     modprobe dm_snapshot
 
-    BASE_LOOPDEV=\$( losetup -f )
-    losetup \$BASE_LOOPDEV \$EXT3FS
+    BASE_LOOPDEV=$( losetup -f )
+    losetup $BASE_LOOPDEV $EXT3FS
     umount -l /sysroot
 
     do_live_from_base_loop
@@ -705,9 +705,9 @@ if [ -e /sysroot/LiveOS/squashfs.img ]; then
   SQUASHED="/sysroot/LiveOS/squashfs.img"
 fi
 
-if [ -e "\$SQUASHED" ] ; then
+if [ -e "$SQUASHED" ] ; then
 
-    if [ "\$quiet" != "1" ] ; then
+    if [ "$quiet" != "1" ] ; then
         echo "setting up embedded squash -> ext3 fs "
     fi
 
@@ -715,51 +715,51 @@ if [ -e "\$SQUASHED" ] ; then
     mknod /dev/mapper/control c 10 63
     modprobe dm_snapshot
 
-    if [ "\$live_ram" == "1" ] ; then
+    if [ "$live_ram" == "1" ] ; then
         echo "Copying live image to RAM..."
         echo "(this may take a few minutes)"
-        dd if=\$SQUASHED of=/squashed.img bs=512 2> /dev/null
+        dd if=$SQUASHED of=/squashed.img bs=512 2> /dev/null
         umount -n /sysroot
         echo "Done copying live image to RAM."
         eject -p /dev/root
         SQUASHED="/squashed.img"
     fi
 
-    SQUASHED_LOOPDEV=\$( losetup -f )
-    losetup \$SQUASHED_LOOPDEV \$SQUASHED
+    SQUASHED_LOOPDEV=$( losetup -f )
+    losetup $SQUASHED_LOOPDEV $SQUASHED
     mkdir -p /squashfs
-    mount -n -t squashfs -o ro \$SQUASHED_LOOPDEV /squashfs
+    mount -n -t squashfs -o ro $SQUASHED_LOOPDEV /squashfs
 
-    BASE_LOOPDEV=\$( losetup -f )
-    losetup \$BASE_LOOPDEV /squashfs/LiveOS/ext3fs.img
+    BASE_LOOPDEV=$( losetup -f )
+    losetup $BASE_LOOPDEV /squashfs/LiveOS/ext3fs.img
     
     umount -l /squashfs
-    if [ "\$live_ram" == "0" ] ; then
+    if [ "$live_ram" == "0" ] ; then
         umount -l /sysroot
     fi
 
     do_live_from_base_loop
 fi
 
-if [ -b "\$OSMIN_LOOPDEV" ]; then
+if [ -b "$OSMIN_LOOPDEV" ]; then
     # set up the devicemapper snapshot device, which will merge
     # the normal live fs image, and the delta, into a minimzied fs image
-    echo "0 \$( blockdev --getsize \$BASE_LOOPDEV ) snapshot \$BASE_LOOPDEV \$OSMIN_LOOPDEV p 8" | dmsetup create --readonly live-osimg-min
+    echo "0 $( blockdev --getsize $BASE_LOOPDEV ) snapshot $BASE_LOOPDEV $OSMIN_LOOPDEV p 8" | dmsetup create --readonly live-osimg-min
 fi
 
-if [ "\$eshell" == "1" ] ; then
+if [ "$eshell" == "1" ] ; then
     echo "Shell requested on kernel commandline."
     echo "Rootfs is mounted ro on /sysroot. Exit to continue booting."
     echo
     bash
 fi
 
-if [ -x /sysroot\$init ] ; then
+if [ -x /sysroot$init ] ; then
 
     # Leave initramfs and transition to rootfs
-    kill \`pidof udevd\`
-    if [ "\$quiet" != "1" ] ; then
-        echo "transfering control to \$init"
+    kill `pidof udevd`
+    if [ "$quiet" != "1" ] ; then
+        echo "transfering control to $init"
     fi
 
     exec /sbin/run-init
@@ -772,7 +772,7 @@ if [ -x /sysroot\$init ] ; then
     bash
 else
     echo "---------------------------------------------------------"
-    echo "WARNING: Requested \$init binary does not exist on rootfs."
+    echo "WARNING: Requested $init binary does not exist on rootfs."
     echo "---------------------------------------------------------"
     echo
     echo "Dropping to a shell. Good luck!"
