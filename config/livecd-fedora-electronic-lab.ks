@@ -110,7 +110,6 @@ uisp
 
 #computing
 octave
-octave-forge
 
 %end
 
