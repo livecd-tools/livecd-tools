@@ -892,7 +892,7 @@ class LoopImageCreator(ImageCreatorBase):
             self._instloop.cleanup()
             self._instloop = None
 
-    def _resize2fs(self, image, n_blocks):
+    def __resize2fs(self, image, n_blocks):
         dev_null = os.open("/dev/null", os.O_WRONLY)
         try:
             return subprocess.call(["/sbin/resize2fs", image, str(n_blocks)],
@@ -922,7 +922,7 @@ class LoopImageCreator(ImageCreatorBase):
         while top != (bot + 1):
             t = bot + ((top - bot) / 2)
 
-            if not self._resize2fs(image, t):
+            if not self.__resize2fs(image, t):
                 top = t
             else:
                 bot = t
@@ -949,7 +949,7 @@ class LoopImageCreator(ImageCreatorBase):
         self.__minsizeKB = min_blocks * self.__blocksizeKB / 1024L
         print >> sys.stderr, "Installation target minimized to %dK" % (self.__minsizeKB)
 
-        self._resize2fs(image, n_blocks)
+        self.__resize2fs(image, n_blocks)
 
 
     # genMinInstDelta: generates an osmin overlay file to sit alongside
@@ -987,9 +987,8 @@ class LoopImageCreator(ImageCreatorBase):
         if rc != 0:
             raise InstallationError("Could not create genMinInstDelta snapshot device")
         # resize snapshot device back to minimal (self.__minsizeKB)
-        rc = subprocess.call(["/sbin/resize2fs",
-                              "/dev/mapper/livecd-creator-%d" %(os.getpid(),),
-                              "%dK" %(self.__minsizeKB,)])
+        rc = self.__resize2fs("/dev/mapper/livecd-creator-%d" %(os.getpid(),),
+                              "%dK" %(self.__minsizeKB,))
         if rc != 0:
             raise InstallationError("Could not shrink ext3fs image")
 
