@@ -508,6 +508,15 @@ class ImageCreatorBase(object):
         self.__setDefaultsFromKS()
         self.__sanityCheckKS()
 
+    def create(self):
+        """This is the simplest method to generate an image from the given
+        configuration."""
+        self.mountImage()
+        self.installPackages()
+        self.configureImage()
+        self.unmountImage()
+        self.package()
+
     def _getRequiredPackages(self):
         return []
     def _getRequiredExcludePackages(self):
@@ -583,7 +592,7 @@ class ImageCreatorBase(object):
         # IMAGE-SPECIFIC-IMPLEMENT
         raise RuntimeError, "I shouldn't ever get here."
 
-    def setup(self, cachedir = None):
+    def mountImage(self, cachedir = None):
         """setup target ext3 file system in preparation for an install"""
 
         # setup temporary build dirs
@@ -704,7 +713,7 @@ class ImageCreatorBase(object):
                 except:
                     pass
 
-    def configureImage(self):
+    def _configureImage(self):
         # FIXME: this is a bit ugly, but with the current pykickstart
         # API, we don't really have a lot of choice.  it'd be nice to
         # be able to do something different, but so it goes
@@ -842,11 +851,9 @@ class ImageCreatorBase(object):
     def launchShell(self):
         subprocess.call(["/bin/bash"], preexec_fn=self._rootRun)
 
-    def install(self):
-        self.installPackages()
-
+    def configureImage(self):
         try:
-            self.configureImage()
+            self._configureImage()
         except Exception, e: #FIXME: we should be a little bit more fine-grained
             raise InstallationError("Error configuring live image: %s" %(e,))
         net = ImageNetworkConfig(self.ks.handler.network, self._instroot)
@@ -1605,20 +1612,17 @@ def main():
     target.tmpdir = options.tmpdir
 
     try:
-        target.setup(options.cachedir)
-
-        target.install()
-
+        target.mountImage(options.cachedir)
+        target.installPackages()
+        target.configureImage()
         if options.give_shell:
             print "Launching shell. Exit to continue."
             print "----------------------------------"
             target.launchShell()
-
         target.unmountImage()
 
         if not options.skip_minimize:
             target.minimizeImage()
-
         target.package()
 
     except InstallationError, e:
