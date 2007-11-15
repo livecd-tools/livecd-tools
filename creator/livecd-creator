@@ -513,9 +513,13 @@ class ImageCreatorBase(object):
     def _getRequiredExcludePackages(self):
         return []
 
+    def _get_instroot(self):
+        return "%s/install_root" %(self._builddir,)
+    _instroot = property(_get_instroot)
+
     def _getKernelOptions(self):
         r = "ro quiet liveimg"
-        if os.path.exists("%s/install_root/usr/bin/rhgb" %(self._builddir,)):
+        if os.path.exists("%s/usr/bin/rhgb" %(self._instroot,)):
             r += " rhgb"
         return r
         
@@ -581,12 +585,12 @@ class ImageCreatorBase(object):
         # setup temporary build dirs
         try:
             self._builddir = tempfile.mkdtemp(dir=self.tmpdir, prefix="livecd-creator-")
+            os.makedirs(self._instroot)
         except OSError, (err, msg):
             raise InstallationError("Failed create build directory in %s: %s" % (self.tmpdir, msg))
 
         os.makedirs(self._builddir + "/out/LiveOS")
         os.makedirs(self._builddir + "/data/LiveOS")
-        os.makedirs(self._builddir + "/install_root")
         os.makedirs(self._builddir + "/yum-cache")
 
         self._mountInstallRoot()
@@ -594,7 +598,7 @@ class ImageCreatorBase(object):
         # create a few directories that have to exist
         for d in ("/etc", "/boot", "/var/log", "/var/cache/yum"):
             try:
-                os.makedirs("%s/install_root/%s" %(self._builddir,d))
+                os.makedirs("%s/%s" %(self._instroot,d))
             except OSError:
                 pass
 
@@ -608,7 +612,7 @@ class ImageCreatorBase(object):
             b.mount()
 
         # make sure /etc/mtab is current inside install_root
-        os.symlink("../proc/mounts", self._builddir + "/install_root/etc/mtab")
+        os.symlink("../proc/mounts", self._instroot + "/etc/mtab")
 
         self.__writeFstab()
 
@@ -637,7 +641,7 @@ class ImageCreatorBase(object):
             shutil.rmtree(self._builddir, ignore_errors = True)
 
     def _rootRun(self):
-        os.chroot("%s/install_root" %(self._builddir,))
+        os.chroot(self._instroot)
         os.chdir("/")
 
     def installPackages(self):
@@ -692,24 +696,20 @@ class ImageCreatorBase(object):
 
         # do some clean up to avoid lvm info leakage.  this sucks.
         for subdir in ("cache", "backup", "archive"):
-            for f in os.listdir("%s/install_root/etc/lvm/%s"
-                                %(self._builddir, subdir)):
+            for f in os.listdir("%s/etc/lvm/%s" %(self._instroot, subdir)):
                 try:
-                    os.unlink("%s/install_root/etc/lvm/%s/%s"
-                              %(self._builddir, subdir, f))
+                    os.unlink("%s/etc/lvm/%s/%s" %(self._instroot, subdir, f))
                 except:
                     pass
 
     def configureImage(self):
-        instroot = "%s/install_root" %(self._builddir,)
-        
         # FIXME: this is a bit ugly, but with the current pykickstart
         # API, we don't really have a lot of choice.  it'd be nice to
         # be able to do something different, but so it goes
 
         # set up the language
         lang = self.ks.handler.lang.lang or "en_US.UTF-8"
-        f = open("%s/etc/sysconfig/i18n" %(instroot,), "w+")
+        f = open("%s/etc/sysconfig/i18n" %(self._instroot,), "w+")
         f.write("LANG=\"%s\"\n" %(lang,))
         f.close()
 
@@ -720,31 +720,31 @@ class ImageCreatorBase(object):
         k = rhpl.keyboard.Keyboard()
         if self.ks.handler.keyboard.keyboard:
             k.set(self.ks.handler.keyboard.keyboard)
-        k.write(instroot)
+        k.write(self._instroot)
 
         # next up is timezone
         tz = self.ks.handler.timezone.timezone or "America/New_York"
         utc = self.ks.handler.timezone.isUtc
-        f = open("%s/etc/sysconfig/clock" %(instroot,), "w+")
+        f = open("%s/etc/sysconfig/clock" %(self._instroot,), "w+")
         f.write("ZONE=\"%s\"\n" %(tz,))
         f.write("UTC=%s\n" %(utc,))
         f.close()
 
         # do any authconfig bits
         auth = self.ks.handler.authconfig.authconfig or "--useshadow --enablemd5"
-        if os.path.exists("%s/usr/sbin/authconfig" %(instroot,)):
+        if os.path.exists("%s/usr/sbin/authconfig" %(self._instroot,)):
             args = ["/usr/sbin/authconfig", "--update", "--nostart"]
             args.extend(auth.split())
             subprocess.call(args, preexec_fn=self._rootRun)
 
         # firewall.  FIXME: should handle the rest of the options
-        if self.ks.handler.firewall.enabled and os.path.exists("%s/usr/sbin/lokkit" %(instroot,)):
+        if self.ks.handler.firewall.enabled and os.path.exists("%s/usr/sbin/lokkit" %(self._instroot,)):
             subprocess.call(["/usr/sbin/lokkit", "-f", "--quiet",
                              "--nostart", "--enabled"],
                             preexec_fn=self._rootRun)
 
         # selinux
-        if os.path.exists("%s/usr/sbin/lokkit" %(instroot,)):
+        if os.path.exists("%s/usr/sbin/lokkit" %(self._instroot,)):
             args = ["/usr/sbin/lokkit", "-f", "--quiet", "--nostart"]
             if self.ks.handler.selinux.selinux:
                 args.append("--selinux=enforcing")
@@ -765,7 +765,7 @@ class ImageCreatorBase(object):
             output = p2.communicate()[0]
 
         # enable/disable services appropriately
-        if os.path.exists("%s/sbin/chkconfig" %(instroot,)):
+        if os.path.exists("%s/sbin/chkconfig" %(self._instroot,)):
             for s in self.ks.handler.services.enabled:
                 subprocess.call(["/sbin/chkconfig", s, "on"],
                                 preexec_fn=self._rootRun)
@@ -775,7 +775,7 @@ class ImageCreatorBase(object):
 
         # x by default?
         if self.ks.handler.xconfig.startX:
-            f = open("%s/etc/inittab" %(instroot,), "rw+")
+            f = open("%s/etc/inittab" %(self._instroot,), "rw+")
             buf = f.read()
             buf = buf.replace("id:3:initdefault", "id:5:initdefault")
             f.seek(0)
@@ -784,23 +784,22 @@ class ImageCreatorBase(object):
 
         # touch some files which get unhappy if they're not labeled correctly
         for fn in ("/etc/modprobe.conf", "/etc/resolv.conf"):
-            path = instroot + fn
+            path = self._instroot + fn
             f = file(path, "w+")
             os.chmod(path, 0644)
 
     def runPost(self):
-        instroot = "%s/install_root" %(self._builddir,)        
         # and now, for arbitrary %post scripts
         for s in filter(lambda s: s.type == pykickstart.parser.KS_SCRIPT_POST,
                         self.ks.handler.scripts):
-            (fd, path) = tempfile.mkstemp("", "ks-script-", "%s/tmp" %(instroot,))
+            (fd, path) = tempfile.mkstemp("", "ks-script-", "%s/tmp" %(self._instroot,))
             os.write(fd, s.script)
             os.close(fd)
             os.chmod(path, 0700)
 
             if not s.inChroot:
                 env = {"BUILD_DIR": self._builddir,
-                       "INSTALL_ROOT": "%s/install_root" %(self._builddir,),
+                       "INSTALL_ROOT": self._instroot,
                        "LIVE_ROOT": "%s/out" %(self._builddir,)}
                 preexec = lambda: os.chdir(self._builddir,)
                 script = path
@@ -821,7 +820,7 @@ class ImageCreatorBase(object):
         # find the kernel versions.  this iterates over everything providing
         # 'kernel' and finds /boot/vmlinuz-* and grabbing the version based
         # on the filename being /boot/vmlinuz-version
-        ts = rpm.TransactionSet("%s/install_root" %(self._builddir,))
+        ts = rpm.TransactionSet(self._instroot)
         mi = ts.dbMatch('provides', 'kernel')
         ret = {}
         for h in mi:
@@ -834,8 +833,7 @@ class ImageCreatorBase(object):
     def __relabelSystem(self):
         # finally relabel all files
         if self.ks.handler.selinux.selinux:
-            instroot = "%s/install_root" %(self._builddir,)
-            if os.path.exists("%s/sbin/restorecon" %(instroot,)):
+            if os.path.exists("%s/sbin/restorecon" %(self._instroot,)):
                 subprocess.call(["/sbin/restorecon", "-v", "-r", "/"],
                                 preexec_fn=self._rootRun)
 
@@ -849,7 +847,7 @@ class ImageCreatorBase(object):
             self.configureImage()
         except Exception, e: #FIXME: we should be a little bit more fine-grained
             raise InstallationError("Error configuring live image: %s" %(e,))
-        net = ImageNetworkConfig(self.ks.handler.network, "%s/install_root" %(self._builddir,))
+        net = ImageNetworkConfig(self.ks.handler.network, self._instroot)
         net.write()
         self.__relabelSystem()
 
@@ -877,8 +875,7 @@ class LoopImageCreator(ImageCreatorBase):
         """Do any creation necessary and mount the install root"""
         self._instloop = SparseExt3LoopbackMount("%s/data/LiveOS/ext3fs.img"
                                                 %(self._builddir,),
-                                                "%s/install_root"
-                                                %(self._builddir,),
+                                                self._instroot,
                                                 self._imageSizeMB,
                                                 self.__blocksizeKB,
                                                 self.fsLabel)
@@ -1094,7 +1091,7 @@ class LiveImageCreatorBase(LoopImageCreator):
             LoopImageCreator._mountInstallRoot(self)
 
     def _hasCheckIsoMD5(self):
-        if os.path.exists("%s/install_root/usr/lib/anaconda-runtime/checkisomd5" %(self._builddir,)) or os.path.exists("%s/install_root/usr/bin/checkisomd5" %(self._builddir,)):
+        if os.path.exists("%s/usr/lib/anaconda-runtime/checkisomd5" %(self._instroot,)) or os.path.exists("%s/usr/bin/checkisomd5" %(self._instroot,)):
             return True
         return False
 
@@ -1119,9 +1116,9 @@ class LiveImageCreatorBase(LoopImageCreator):
         if not os.path.isfile(mpath):
             raise InstallationError("livecd-creator not correctly installed : "+
                                     "/usr/lib/livecd-creator/mayflower not found")
-        shutil.copy(mpath, "%s/install_root/sbin/mayflower" %(self._builddir,))
+        shutil.copy(mpath, "%s/sbin/mayflower" %(self._instroot,))
         # modules we want to support for booting
-        mcfg = open(self._builddir + "/install_root/etc/mayflower.conf", "a")
+        mcfg = open(self._instroot + "/etc/mayflower.conf", "a")
         mcfg.write('MODULES+="squashfs ext3 ext2 vfat msdos "\n')
         mcfg.write('MODULES+="sr_mod sd_mod ide-cd "\n')
 
@@ -1140,7 +1137,7 @@ class LiveImageCreatorBase(LoopImageCreator):
                                        ver], preexec_fn=self._rootRun),
             self.getKernelVersions().values())
         for f in ("/sbin/mayflower", "/etc/mayflower.conf"):
-            os.unlink("%s/install_root/%s" %(self._builddir, f))
+            os.unlink("%s/%s" %(self._instroot, f))
 
     def _configureBootloader(self):
         raise InstallationError("Bootloader configuration is arch-specific, but not implemented for this arch!")
@@ -1205,7 +1202,7 @@ class x86LiveImageCreator(LiveImageCreatorBase):
         syslinuxMenu = None
 
         for m in menus:
-            path = "%s/install_root/usr/lib/syslinux/%s" % (self._builddir, m)
+            path = "%s/usr/lib/syslinux/%s" % (self._instroot, m)
             if os.path.isfile(path):
                 syslinuxfiles.append(m)
                 syslinuxMenu=m
@@ -1214,19 +1211,19 @@ class x86LiveImageCreator(LiveImageCreatorBase):
             raise InstallationError("syslinux not installed : no suitable *menu.c32 found")
 
         # if we have any xen hypervisors, make sure we have the mboot module
-        xen = glob.glob("%s/install_root/boot/xen.gz-*" %(self._builddir,))
+        xen = glob.glob("%s/boot/xen.gz-*" %(self._instroot,))
         if len(xen) > 0:
             syslinuxfiles.append("mboot.c32")
 
         for p in syslinuxfiles:
-            path = "%s/install_root/usr/lib/syslinux/%s" % (self._builddir, p)
+            path = "%s/usr/lib/syslinux/%s" % (self._instroot, p)
             if not os.path.isfile(path):
                 raise InstallationError("syslinux not installed : %s not found" % path)
 
             shutil.copy(path, "%s/out/isolinux/%s" % (self._builddir, p))
 
-        if os.path.exists("%s/install_root/usr/lib/anaconda-runtime/syslinux-vesa-splash.jpg" %(self._builddir,)):
-            shutil.copy("%s/install_root/usr/lib/anaconda-runtime/syslinux-vesa-splash.jpg" %(self._builddir,),
+        if os.path.exists("%s/usr/lib/anaconda-runtime/syslinux-vesa-splash.jpg" %(self._instroot,)):
+            shutil.copy("%s/usr/lib/anaconda-runtime/syslinux-vesa-splash.jpg" %(self._instroot,),
                         "%s/out/isolinux/splash.jpg" %(self._builddir,))
             have_background = "menu background splash.jpg"
         else:
@@ -1255,21 +1252,18 @@ menu hiddenrow 5
         stanzas = []
         count = 0
         for (name, ver) in self.getKernelVersions().items():
-            shutil.copyfile("%s/install_root/boot/vmlinuz-%s"
-                            %(self._builddir, ver),
+            shutil.copyfile("%s/boot/vmlinuz-%s"
+                            %(self._instroot, ver),
                             "%s/out/isolinux/vmlinuz%d" %(self._builddir,count))
-            shutil.copyfile("%s/install_root/boot/livecd-initramfs-%s.img"
-                            %(self._builddir, ver),
+            shutil.copyfile("%s/boot/livecd-initramfs-%s.img"
+                            %(self._instroot, ver),
                             "%s/out/isolinux/initrd%d.img" 
                             %(self._builddir, count))
-            os.unlink("%s/install_root/boot/livecd-initramfs-%s.img"
-                      %(self._builddir, ver))
+            os.unlink("%s/boot/livecd-initramfs-%s.img" %(self._instroot, ver))
 
             isXen = False
-            if os.path.exists("%s/install_root/boot/xen.gz-%s" %(self._builddir,
-                                                                 ver[:-3])):
-                shutil.copy("%s/install_root/boot/xen.gz-%s" 
-                            %(self._builddir, ver[:-3]), 
+            if os.path.exists("%s/boot/xen.gz-%s" %(self._instroot, ver[:-3])):
+                shutil.copy("%s/boot/xen.gz-%s" %(self._instroot, ver[:-3]), 
                             "%s/out/isolinux/xen%d.gz" %(self._builddir, count))
                 isXen = True
 
@@ -1310,7 +1304,7 @@ menu hiddenrow 5
 
             count += 1
 
-        memtest = glob.glob("%s/install_root/boot/memtest86*" %(self._builddir,))
+        memtest = glob.glob("%s/boot/memtest86*" %(self._instroot,))
         if len(memtest) > 0:
             shutil.copy(memtest[0], "%s/out/isolinux/memtest" %(self._builddir,))
             cfg += """label memtest
@@ -1362,12 +1356,12 @@ class ppcLiveImageCreator(ImageCreatorBase):
 
     def _copyBootFile(self, file, dest):
         # get the file from either anaconda-runtime or ppc64-utils
-        if os.path.exists("%s/install_root/usr/share/ppc64-utils/%s" %(self._builddir, file)):
-            shutil.copyfile("%s/install_root/usr/share/ppc64-utils/%s"
-                            %(self._builddir, file), dest)
-        elif os.path.exists("%s/install_root/usr/lib/anaconda-runtime/boot/%s" %(self._builddir, file)):
-            shutil.copyfile("%s/install_root/usr/lib/anaconda-runtime/boot/%s"
-                            %(self._builddir, file), dest)
+        if os.path.exists("%s/usr/share/ppc64-utils/%s" %(self._instroot, file)):
+            shutil.copyfile("%s/usr/share/ppc64-utils/%s"
+                            %(self._instroot, file), dest)
+        elif os.path.exists("%s/usr/lib/anaconda-runtime/boot/%s" %(self._instroot, file)):
+            shutil.copyfile("%s/usr/lib/anaconda-runtime/boot/%s"
+                            %(self._instroot, file), dest)
         else:
             raise InstallationError("Unable to find boot file %s" %(file,))
 
@@ -1383,13 +1377,13 @@ class ppcLiveImageCreator(ImageCreatorBase):
         # Copy yaboot and ofboot.b in to mac directory
         os.makedirs(self._builddir + "/out/ppc/mac")
         self._copyBootFile("ofboot.b", "%s/out/ppc/mac/ofboot.b" %(self._builddir,))
-        shutil.copyfile("%s/install_root/usr/lib/yaboot/yaboot" %(self._builddir),
+        shutil.copyfile("%s/usr/lib/yaboot/yaboot" %(self._instroot),
                         "%s/out/ppc/mac/yaboot" %(self._builddir,))
 
         # Copy yaboot and ofboot.b in to chrp directory
         os.makedirs(self._builddir + "/out/ppc/chrp")
         self._copyBootFile("bootinfo.txt", "%s/out/ppc/bootinfo.txt" %(self._builddir,))
-        shutil.copyfile("%s/install_root/usr/lib/yaboot/yaboot" %(self._builddir),
+        shutil.copyfile("%s/usr/lib/yaboot/yaboot" %(self._instroot),
                         "%s/out/ppc/chrp/yaboot" %(self._builddir,))
         subprocess.call(["/usr/sbin/addnote", "%s/out/ppc/chrp/yaboot" %(self._builddir,)])
 
@@ -1397,28 +1391,22 @@ class ppcLiveImageCreator(ImageCreatorBase):
         ver = self.getKernelVersions().values()[0]
 
         os.makedirs(self._builddir + "/out/ppc/ppc32")
-        if not os.path.exists("%s/install_root/lib/modules/%s/kernel/arch/powerpc/platforms" %(self._builddir, ver)):
+        if not os.path.exists("%s/lib/modules/%s/kernel/arch/powerpc/platforms" %(self._instroot, ver)):
             havekernel[32] = True
-            shutil.copyfile("%s/install_root/boot/vmlinuz-%s"
-                            %(self._builddir, ver),
+            shutil.copyfile("%s/boot/vmlinuz-%s" %(self._instroot, ver),
                             "%s/out/ppc/ppc32/vmlinuz" %(self._builddir,))
-            shutil.copyfile("%s/install_root/boot/livecd-initramfs-%s.img"
-                            %(self._builddir, ver),
+            shutil.copyfile("%s/boot/livecd-initramfs-%s.img" %(self._instroot, ver),
                             "%s/out/ppc/ppc32/initrd.img" %(self._builddir,))
-            os.unlink("%s/install_root/boot/livecd-initramfs-%s.img"
-                      %(self._builddir, ver))
+            os.unlink("%s/boot/livecd-initramfs-%s.img" %(self._instroot, ver))
 
         os.makedirs(self._builddir + "/out/ppc/ppc64")
-        if os.path.exists("%s/install_root/lib/modules/%s/kernel/arch/powerpc/platforms" %(self._builddir, ver)):
+        if os.path.exists("%s/lib/modules/%s/kernel/arch/powerpc/platforms" %(self._instroot, ver)):
             havekernel[64] = True
-            shutil.copyfile("%s/install_root/boot/vmlinuz-%s"
-                            %(self._builddir, ver),
+            shutil.copyfile("%s/boot/vmlinuz-%s" %(self._instroot, ver),
                             "%s/out/ppc/ppc64/vmlinuz" %(self._builddir,))
-            shutil.copyfile("%s/install_root/boot/livecd-initramfs-%s.img"
-                            %(self._builddir, ver),
+            shutil.copyfile("%s/boot/livecd-initramfs-%s.img" %(self._instroot, ver),
                             "%s/out/ppc/ppc64/initrd.img" %(self._builddir,))
-            os.unlink("%s/install_root/boot/livecd-initramfs-%s.img"
-                      %(self._builddir, ver))
+            os.unlink("%s/boot/livecd-initramfs-%s.img" %(self._instroot, ver))
 
         for bit in havekernel.keys():
             cfg = """
