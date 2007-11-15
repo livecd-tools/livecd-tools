@@ -499,8 +499,8 @@ class ImageCreator(object):
         self._checkIsoMD5 = False
 
         self._builddir = None
-        self.instloop = None
-        self.bindmounts = []
+        self._instloop = None
+        self._bindmounts = []
         self.ks = None
 
         self.image_size = 4096 # in megabytes
@@ -633,10 +633,10 @@ class ImageCreator(object):
             # get backing ext3 image if we're based this build on an existing live CD ISO
             self.base_on_iso(base_on)
 
-            self.instloop = LoopbackMount("%s/data/LiveOS/ext3fs.img" %(self._builddir,),
+            self._instloop = LoopbackMount("%s/data/LiveOS/ext3fs.img" %(self._builddir,),
                                           "%s/install_root" %(self._builddir,))
         else:
-            self.instloop = SparseExt3LoopbackMount("%s/data/LiveOS/ext3fs.img"
+            self._instloop = SparseExt3LoopbackMount("%s/data/LiveOS/ext3fs.img"
                                                     %(self._builddir,),
                                                     "%s/install_root"
                                                     %(self._builddir,),
@@ -645,9 +645,9 @@ class ImageCreator(object):
                                                     self.fsLabel)
 
         try:
-            self.instloop.mount()
+            self._instloop.mount()
         except MountError, e:
-            raise InstallationError("Failed to loopback mount '%s' : %s" % (self.instloop.lofile, e))
+            raise InstallationError("Failed to loopback mount '%s' : %s" % (self._instloop.lofile, e))
 
         if not base_on:
             # create a few directories needed if it's a new image
@@ -660,9 +660,9 @@ class ImageCreator(object):
         for (f, dest) in [("/sys", None), ("/proc", None), ("/dev", None),
                           ("/dev/pts", None), ("/selinux", None),
                           ((cachedir or self._builddir) + "/yum-cache", "/var/cache/yum")]:
-            self.bindmounts.append(BindChrootMount(f, self._builddir + "/install_root", dest))
+            self._bindmounts.append(BindChrootMount(f, self._builddir + "/install_root", dest))
 
-        for b in self.bindmounts:
+        for b in self._bindmounts:
             b.mount()
 
         # make sure /etc/mtab is current inside install_root
@@ -685,13 +685,13 @@ class ImageCreator(object):
         except OSError:
             pass
 
-        self.bindmounts.reverse()
-        for b in self.bindmounts:
+        self._bindmounts.reverse()
+        for b in self._bindmounts:
             b.umount()
 
-        if self.instloop:
-            self.instloop.cleanup()
-            self.instloop = None
+        if self._instloop:
+            self._instloop.cleanup()
+            self._instloop = None
 
     def teardown(self):
         if self._builddir:
