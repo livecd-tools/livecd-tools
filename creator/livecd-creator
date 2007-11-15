@@ -351,7 +351,7 @@ class ImageCreator(object):
         self.build_dir = None
         self.instloop = None
         self.bindmounts = []
-        self.ksparser = None
+        self.ks = None
 
         self.image_size = 4096 # in megabytes
         self.blocksize = 4096 # in kilobytes
@@ -374,42 +374,42 @@ class ImageCreator(object):
         
     def parse(self, kscfg):
         ksversion = pykickstart.version.makeVersion()
-        self.ksparser = LiveCDParser(ksversion)
+        self.ks = LiveCDParser(ksversion)
         if kscfg:
             try:
-                self.ksparser.readKickstart(kscfg)
+                self.ks.readKickstart(kscfg)
             except IOError, (err, msg):
                 raise InstallationError("Failed to read kickstart file '%s' : %s" % (kscfg, msg))
             except pykickstart.errors.KickstartError, e:
                 raise InstallationError("Failed to parse kickstart file '%s' : %s" % (kscfg, e))
 
-        for p in self.ksparser.handler.partition.partitions:
+        for p in self.ks.handler.partition.partitions:
             if p.mountpoint == "/" and p.size:
                 self.image_size = int(p.size)
 
-        if len(self.ksparser.handler.packages.packageList) == 0 and len(self.ksparser.handler.packages.groupList) == 0:
+        if len(self.ks.handler.packages.packageList) == 0 and len(self.ks.handler.packages.groupList) == 0:
             raise InstallationError("No packages or groups specified")
 
-        if not self.ksparser.handler.repo.repoList:
+        if not self.ks.handler.repo.repoList:
             raise InstallationError("No repositories specified")
 
-        if isinstance(self.ksparser.handler.device, pykickstart.commands.device.FC3_Device):
-            if self.ksparser.handler.device.moduleName:
-                self._modules = self.ksparser.handler.device.moduleName.split(":")
+        if isinstance(self.ks.handler.device, pykickstart.commands.device.FC3_Device):
+            if self.ks.handler.device.moduleName:
+                self._modules = self.ks.handler.device.moduleName.split(":")
         else:
             map(lambda x: self._modules.extend(x.moduleName.split(":")),
-                self.ksparser.handler.device.deviceList)
+                self.ks.handler.device.deviceList)
         if len(self._modules) == 0:
             # default module list if not specified
             self._modules = ["=ata","sym53c8xx","aic7xxx","=usb","=firewire"]
 
-        if hasattr(self.ksparser.handler.bootloader, "timeout") and self.ksparser.handler.bootloader.timeout is not None:
-            self._timeout = int(self.ksparser.handler.bootloader.timeout)
-        if hasattr(self.ksparser.handler.bootloader, "default") and self.ksparser.handler.bootloader.default:
-            self._defaultKernel = self.ksparser.handler.bootloader.default
+        if hasattr(self.ks.handler.bootloader, "timeout") and self.ks.handler.bootloader.timeout is not None:
+            self._timeout = int(self.ks.handler.bootloader.timeout)
+        if hasattr(self.ks.handler.bootloader, "default") and self.ks.handler.bootloader.default:
+            self._defaultKernel = self.ks.handler.bootloader.default
 
         # more sanity checks
-        if self.ksparser.handler.selinux.selinux and not \
+        if self.ks.handler.selinux.selinux and not \
                os.path.exists("/selinux/enforce"):
             raise InstallationError("SELinux requested but not enabled on host system")
 
@@ -559,33 +559,32 @@ class ImageCreator(object):
     def installPackages(self):
         """install packages into target file system"""
 
-        if self.ksparser.handler.packages.excludeDocs:
+        if self.ks.handler.packages.excludeDocs:
             rpm.addMacro("_excludedocs","1")
 
         try:
-            for pkg in (self.ksparser.handler.packages.packageList + 
-                        self._getRequiredPackages()):
+            for pkg in (self.ks.handler.packages.packageList + self._getRequiredPackages()):
                 try:
                     self._ayum.selectPackage(pkg)
                 except yum.Errors.InstallError, e:
-                    if self.ksparser.handler.packages.handleMissing != \
+                    if self.ks.handler.packages.handleMissing != \
                            pykickstart.constants.KS_MISSING_IGNORE:
                         raise InstallationError("Failed to find package '%s' : %s" % (pkg, e))
                     else:
                         print >> sys.stderr, "Unable to find package '%s'; skipping" %(pkg,)
 
-            for group in self.ksparser.handler.packages.groupList:
+            for group in self.ks.handler.packages.groupList:
                 try:
                     self._ayum.selectGroup(group.name, group.include)
                 except (yum.Errors.InstallError, yum.Errors.GroupsError), e:
-                    if self.ksparser.handler.packages.handleMissing != \
+                    if self.ks.handler.packages.handleMissing != \
                            pykickstart.constants.KS_MISSING_IGNORE:
                         raise InstallationError("Failed to find group '%s' : %s" % (group.name, e))
                     else:
                         print >> sys.stderr, "Unable to find group '%s'; skipping" %(group.name,)
 
             map(lambda pkg: self._ayum.deselectPackage(pkg),
-                self.ksparser.handler.packages.excludedList +
+                self.ks.handler.packages.excludedList +
                 self._getRequiredExcludePackages())
 
             self._ayum.runInstall()
@@ -722,7 +721,7 @@ class ImageCreator(object):
         gateway = None
         nameservers = None
 
-        for network in self.ksparser.handler.network.network:
+        for network in self.ks.handler.network.network:
             if not network.device:
                 raise InstallationError("No --device specified with network kickstart command")
 
@@ -759,7 +758,7 @@ class ImageCreator(object):
         # be able to do something different, but so it goes
 
         # set up the language
-        lang = self.ksparser.handler.lang.lang or "en_US.UTF-8"
+        lang = self.ks.handler.lang.lang or "en_US.UTF-8"
         f = open("%s/etc/sysconfig/i18n" %(instroot,), "w+")
         f.write("LANG=\"%s\"\n" %(lang,))
         f.close()
@@ -769,27 +768,27 @@ class ImageCreator(object):
         # or do we want to make X be able to do this mapping
         import rhpl.keyboard
         k = rhpl.keyboard.Keyboard()
-        if self.ksparser.handler.keyboard.keyboard:
-            k.set(self.ksparser.handler.keyboard.keyboard)
+        if self.ks.handler.keyboard.keyboard:
+            k.set(self.ks.handler.keyboard.keyboard)
         k.write(instroot)
 
         # next up is timezone
-        tz = self.ksparser.handler.timezone.timezone or "America/New_York"
-        utc = self.ksparser.handler.timezone.isUtc
+        tz = self.ks.handler.timezone.timezone or "America/New_York"
+        utc = self.ks.handler.timezone.isUtc
         f = open("%s/etc/sysconfig/clock" %(instroot,), "w+")
         f.write("ZONE=\"%s\"\n" %(tz,))
         f.write("UTC=%s\n" %(utc,))
         f.close()
 
         # do any authconfig bits
-        auth = self.ksparser.handler.authconfig.authconfig or "--useshadow --enablemd5"
+        auth = self.ks.handler.authconfig.authconfig or "--useshadow --enablemd5"
         if os.path.exists("%s/usr/sbin/authconfig" %(instroot,)):
             args = ["/usr/sbin/authconfig", "--update", "--nostart"]
             args.extend(auth.split())
             subprocess.call(args, preexec_fn=self._rootRun)
 
         # firewall.  FIXME: should handle the rest of the options
-        if self.ksparser.handler.firewall.enabled and os.path.exists("%s/usr/sbin/lokkit" %(instroot,)):
+        if self.ks.handler.firewall.enabled and os.path.exists("%s/usr/sbin/lokkit" %(instroot,)):
             subprocess.call(["/usr/sbin/lokkit", "-f", "--quiet",
                              "--nostart", "--enabled"],
                             preexec_fn=self._rootRun)
@@ -797,35 +796,35 @@ class ImageCreator(object):
         # selinux
         if os.path.exists("%s/usr/sbin/lokkit" %(instroot,)):
             args = ["/usr/sbin/lokkit", "-f", "--quiet", "--nostart"]
-            if self.ksparser.handler.selinux.selinux:
+            if self.ks.handler.selinux.selinux:
                 args.append("--selinux=enforcing")
             else:
                 args.append("--selinux=disabled")
             subprocess.call(args, preexec_fn=self._rootRun)
 
         # Set the root password
-        if self.ksparser.handler.rootpw.isCrypted:
-            subprocess.call(["/usr/sbin/usermod", "-p", self.ksparser.handler.rootpw.password, "root"], preexec_fn=self._rootRun)
-        elif self.ksparser.handler.rootpw.password == "":
+        if self.ks.handler.rootpw.isCrypted:
+            subprocess.call(["/usr/sbin/usermod", "-p", self.ks.handler.rootpw.password, "root"], preexec_fn=self._rootRun)
+        elif self.ks.handler.rootpw.password == "":
             # Root password is not set and not crypted, empty it
             subprocess.call(["/usr/bin/passwd", "-d", "root"], preexec_fn=self._rootRun)
         else:
             # Root password is set and not crypted
-            p1 = subprocess.Popen(["/bin/echo", self.ksparser.handler.rootpw.password], stdout=subprocess.PIPE, preexec_fn=self._rootRun)
+            p1 = subprocess.Popen(["/bin/echo", self.ks.handler.rootpw.password], stdout=subprocess.PIPE, preexec_fn=self._rootRun)
             p2 = subprocess.Popen(["/usr/bin/passwd", "--stdin", "root"], stdin=p1.stdout, stdout=subprocess.PIPE, preexec_fn=self._rootRun)
             output = p2.communicate()[0]
 
         # enable/disable services appropriately
         if os.path.exists("%s/sbin/chkconfig" %(instroot,)):
-            for s in self.ksparser.handler.services.enabled:
+            for s in self.ks.handler.services.enabled:
                 subprocess.call(["/sbin/chkconfig", s, "on"],
                                 preexec_fn=self._rootRun)
-            for s in self.ksparser.handler.services.disabled:
+            for s in self.ks.handler.services.disabled:
                 subprocess.call(["/sbin/chkconfig", s, "off"],
                                 preexec_fn=self._rootRun)
 
         # x by default?
-        if self.ksparser.handler.xconfig.startX:
+        if self.ks.handler.xconfig.startX:
             f = open("%s/etc/inittab" %(instroot,), "rw+")
             buf = f.read()
             buf = buf.replace("id:3:initdefault", "id:5:initdefault")
@@ -843,7 +842,7 @@ class ImageCreator(object):
         instroot = "%s/install_root" %(self.build_dir,)        
         # and now, for arbitrary %post scripts
         for s in filter(lambda s: s.type == pykickstart.parser.KS_SCRIPT_POST,
-                        self.ksparser.handler.scripts):
+                        self.ks.handler.scripts):
             (fd, path) = tempfile.mkstemp("", "ks-script-", "%s/tmp" %(instroot,))
             os.write(fd, s.script)
             os.close(fd)
@@ -923,7 +922,7 @@ class ImageCreator(object):
 
     def relabelSystem(self):
         # finally relabel all files
-        if self.ksparser.handler.selinux.selinux:
+        if self.ks.handler.selinux.selinux:
             instroot = "%s/install_root" %(self.build_dir,)
             if os.path.exists("%s/sbin/restorecon" %(instroot,)):
                 subprocess.call(["/sbin/restorecon", "-v", "-r", "/"],
@@ -934,11 +933,11 @@ class ImageCreator(object):
 
     def install(self):
         try:
-            self.ksparser.handler.repo.methodToRepo()
+            self.ks.handler.repo.methodToRepo()
         except:
             pass
 
-        for repo in self.ksparser.handler.repo.repoList:
+        for repo in self.ks.handler.repo.repoList:
             yr = self._ayum.addRepository(repo.name, repo.baseurl, repo.mirrorlist)
             if hasattr(repo, "includepkgs"):
                 yr.includepkgs = repo.includepkgs
