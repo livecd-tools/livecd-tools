@@ -502,11 +502,12 @@ class ImageCreatorBase(object):
         self.__blocksizeKB = 4096
 
         # defaults to allow some kickstart options to not be specified
-        self._modules = []
+        self._modules = ["=ata","sym53c8xx","aic7xxx","=usb","=firewire"]
         self._timeout = 10
         self._defaultKernel = "kernel"
         self._imageSizeMB = 4096
         self.__setDefaultsFromKS()
+        self.__sanityCheckKS()
 
         # livecd specific options
         self.skip_compression = False
@@ -525,35 +526,39 @@ class ImageCreatorBase(object):
         return r
         
     def __setDefaultsFromKS(self):
+        """Set up some options based on the config."""
+        # image size
         for p in self.ks.handler.partition.partitions:
             if p.mountpoint == "/" and p.size:
                 self._imageSizeMB = int(p.size)
 
+        # modules for initramfs
+        if isinstance(self.ks.handler.device, pykickstart.commands.device.FC3_Device):
+            if self.ks.handler.device.moduleName:
+                self._modules = self.ks.handler.device.moduleName.split(":")
+        elif len(self.ks.handler.device.deviceList) > 0:
+            map(lambda x: self._modules.extend(x.moduleName.split(":")),
+                self.ks.handler.device.deviceList)
+
+        # bootloader defaults
+        if hasattr(self.ks.handler.bootloader, "timeout") and self.ks.handler.bootloader.timeout is not None:
+            self._timeout = int(self.ks.handler.bootloader.timeout)
+        if hasattr(self.ks.handler.bootloader, "default") and self.ks.handler.bootloader.default:
+            self._defaultKernel = self.ks.handler.bootloader.default
+
+
+    def __sanityCheckKS(self):
+        """Ensure that the config we've been given is sane."""
         if len(self.ks.handler.packages.packageList) == 0 and len(self.ks.handler.packages.groupList) == 0:
             raise InstallationError("No packages or groups specified")
 
         if not self.ks.handler.repo.repoList:
             raise InstallationError("No repositories specified")
 
-        if isinstance(self.ks.handler.device, pykickstart.commands.device.FC3_Device):
-            if self.ks.handler.device.moduleName:
-                self._modules = self.ks.handler.device.moduleName.split(":")
-        else:
-            map(lambda x: self._modules.extend(x.moduleName.split(":")),
-                self.ks.handler.device.deviceList)
-        if len(self._modules) == 0:
-            # default module list if not specified
-            self._modules = ["=ata","sym53c8xx","aic7xxx","=usb","=firewire"]
-
-        if hasattr(self.ks.handler.bootloader, "timeout") and self.ks.handler.bootloader.timeout is not None:
-            self._timeout = int(self.ks.handler.bootloader.timeout)
-        if hasattr(self.ks.handler.bootloader, "default") and self.ks.handler.bootloader.default:
-            self._defaultKernel = self.ks.handler.bootloader.default
-
-        # more sanity checks
         if self.ks.handler.selinux.selinux and not \
                os.path.exists("/selinux/enforce"):
             raise InstallationError("SELinux requested but not enabled on host system")
+
 
     def base_on_iso(self, base_on):
         """helper function to extract ext3 file system from a live CD ISO"""
