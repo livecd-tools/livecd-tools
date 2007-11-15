@@ -490,8 +490,8 @@ class ImageNetworkConfig(object):
         self.__writeNetworkResolv(nodns, nameservers)
 
 class ImageCreatorBase(object):
-    def __init__(self, fsLabel):
-        self.ks = None
+    def __init__(self, ks, fsLabel):
+        self.ks = ks
         self.fsLabel = fsLabel
         self.tmpdir = "/var/tmp"
 
@@ -506,6 +506,7 @@ class ImageCreatorBase(object):
         self._timeout = 10
         self._defaultKernel = "kernel"
         self._imageSizeMB = 4096
+        self.__setDefaultsFromKS()
 
         # livecd specific options
         self.skip_compression = False
@@ -523,17 +524,7 @@ class ImageCreatorBase(object):
             r += " rhgb"
         return r
         
-    def parse(self, kscfg):
-        ksversion = pykickstart.version.makeVersion()
-        self.ks = LiveCDParser(ksversion)
-        if kscfg:
-            try:
-                self.ks.readKickstart(kscfg)
-            except IOError, (err, msg):
-                raise InstallationError("Failed to read kickstart file '%s' : %s" % (kscfg, msg))
-            except pykickstart.errors.KickstartError, e:
-                raise InstallationError("Failed to parse kickstart file '%s' : %s" % (kscfg, e))
-
+    def __setDefaultsFromKS(self):
         for p in self.ks.handler.partition.partitions:
             if p.mountpoint == "/" and p.size:
                 self._imageSizeMB = int(p.size)
@@ -1564,13 +1555,20 @@ def main():
             fs_label = name + "-" + fs_label_suffix
         print "Using label %s" % (fs_label,)
 
-    target = ImageCreator(fs_label)
+    ksversion = pykickstart.version.makeVersion()
+    ks = LiveCDParser(ksversion)
+    try:
+        ks.readKickstart(options.kscfg)
+    except IOError, (err, msg):
+        raise InstallationError("Failed to read kickstart file '%s' : %s" % (kscfg, msg))
+    except pykickstart.errors.KickstartError, e:
+        raise InstallationError("Failed to parse kickstart file '%s' : %s" % (kscfg, e))
+
+    target = ImageCreator(ks, fs_label)
     target.skip_compression = options.skip_compression
     target.tmpdir = options.tmpdir
 
     try:
-        target.parse(options.kscfg)
-
         target.setup(options.base_on, options.cachedir)
 
         target.install()
