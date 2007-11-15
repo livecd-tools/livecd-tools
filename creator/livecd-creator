@@ -498,7 +498,7 @@ class ImageCreator(object):
 
         self._checkIsoMD5 = False
 
-        self.build_dir = None
+        self._builddir = None
         self.instloop = None
         self.bindmounts = []
         self.ks = None
@@ -518,7 +518,7 @@ class ImageCreator(object):
 
     def _getKernelOptions(self):
         r = "ro quiet liveimg"
-        if os.path.exists("%s/install_root/usr/bin/rhgb" %(self.build_dir,)):
+        if os.path.exists("%s/install_root/usr/bin/rhgb" %(self._builddir,)):
             r += " rhgb"
         return r
         
@@ -566,7 +566,7 @@ class ImageCreator(object):
     def base_on_iso(self, base_on):
         """helper function to extract ext3 file system from a live CD ISO"""
 
-        isoloop = LoopbackMount(base_on, "%s/base_on_iso" %(self.build_dir,))
+        isoloop = LoopbackMount(base_on, "%s/base_on_iso" %(self._builddir,))
 
         try:
             isoloop.mount()
@@ -576,11 +576,11 @@ class ImageCreator(object):
         # legacy LiveOS filesystem layout support, remove for F9 or F10
         if os.path.exists("%s/LiveOS/squashfs.img" %(isoloop.mountdir,)):
             squashloop = LoopbackMount("%s/LiveOS/squashfs.img" %(isoloop.mountdir,),
-                                       "%s/base_on_squashfs" %(self.build_dir,),
+                                       "%s/base_on_squashfs" %(self._builddir,),
                                        "squashfs")
         else:
             squashloop = LoopbackMount("%s/squashfs.img" %(isoloop.mountdir,),
-                                       "%s/base_on_squashfs" %(self.build_dir,),
+                                       "%s/base_on_squashfs" %(self._builddir,),
                                        "squashfs")
 
         try:
@@ -593,21 +593,21 @@ class ImageCreator(object):
                 raise InstallationError("Failed to loopback mount squashfs.img from '%s' : %s" % (base_on, e))
 
             # legacy LiveOS filesystem layout support, remove for F9 or F10
-            if os.path.exists(self.build_dir + "/base_on_squashfs/os.img"):
-                os_image = self.build_dir + "/base_on_squashfs/os.img"
-            elif os.path.exists(self.build_dir + "/base_on_squashfs/LiveOS/ext3fs.img"):
-                os_image = self.build_dir + "/base_on_squashfs/LiveOS/ext3fs.img"
+            if os.path.exists(self._builddir + "/base_on_squashfs/os.img"):
+                os_image = self._builddir + "/base_on_squashfs/os.img"
+            elif os.path.exists(self._builddir + "/base_on_squashfs/LiveOS/ext3fs.img"):
+                os_image = self._builddir + "/base_on_squashfs/LiveOS/ext3fs.img"
             else:
                 raise InstallationError("'%s' is not a valid live CD ISO : os.img doesn't exist" % base_on)
 
-            shutil.copyfile(os_image, self.build_dir + "/data/LiveOS/ext3fs.img")
+            shutil.copyfile(os_image, self._builddir + "/data/LiveOS/ext3fs.img")
         finally:
             # unmount and tear down the mount points and loop devices used
             squashloop.cleanup()
             isoloop.cleanup()
 
     def write_fstab(self):
-        fstab = open(self.build_dir + "/install_root/etc/fstab", "w")
+        fstab = open(self._builddir + "/install_root/etc/fstab", "w")
         fstab.write("/dev/mapper/livecd-rw   /                       ext3    defaults,noatime 0 0\n")
         fstab.write("devpts                  /dev/pts                devpts  gid=5,mode=620  0 0\n")
         fstab.write("tmpfs                   /dev/shm                tmpfs   defaults        0 0\n")
@@ -620,26 +620,26 @@ class ImageCreator(object):
 
         # setup temporary build dirs
         try:
-            self.build_dir = tempfile.mkdtemp(dir=self.tmpdir, prefix="livecd-creator-")
+            self._builddir = tempfile.mkdtemp(dir=self.tmpdir, prefix="livecd-creator-")
         except OSError, (err, msg):
             raise InstallationError("Failed create build directory in %s: %s" % (self.tmpdir, msg))
 
-        os.makedirs(self.build_dir + "/out/LiveOS")
-        os.makedirs(self.build_dir + "/data/LiveOS")
-        os.makedirs(self.build_dir + "/install_root")
-        os.makedirs(self.build_dir + "/yum-cache")
+        os.makedirs(self._builddir + "/out/LiveOS")
+        os.makedirs(self._builddir + "/data/LiveOS")
+        os.makedirs(self._builddir + "/install_root")
+        os.makedirs(self._builddir + "/yum-cache")
 
         if base_on:
             # get backing ext3 image if we're based this build on an existing live CD ISO
             self.base_on_iso(base_on)
 
-            self.instloop = LoopbackMount("%s/data/LiveOS/ext3fs.img" %(self.build_dir,),
-                                          "%s/install_root" %(self.build_dir,))
+            self.instloop = LoopbackMount("%s/data/LiveOS/ext3fs.img" %(self._builddir,),
+                                          "%s/install_root" %(self._builddir,))
         else:
             self.instloop = SparseExt3LoopbackMount("%s/data/LiveOS/ext3fs.img"
-                                                    %(self.build_dir,),
+                                                    %(self._builddir,),
                                                     "%s/install_root"
-                                                    %(self.build_dir,),
+                                                    %(self._builddir,),
                                                     self.image_size,
                                                     self.blocksize,
                                                     self.fsLabel)
@@ -651,28 +651,28 @@ class ImageCreator(object):
 
         if not base_on:
             # create a few directories needed if it's a new image
-            os.makedirs(self.build_dir + "/install_root/etc")
-            os.makedirs(self.build_dir + "/install_root/boot")
-            os.makedirs(self.build_dir + "/install_root/var/log")
-            os.makedirs(self.build_dir + "/install_root/var/cache/yum")
+            os.makedirs(self._builddir + "/install_root/etc")
+            os.makedirs(self._builddir + "/install_root/boot")
+            os.makedirs(self._builddir + "/install_root/var/log")
+            os.makedirs(self._builddir + "/install_root/var/cache/yum")
 
         # bind mount system directories into install_root/
         for (f, dest) in [("/sys", None), ("/proc", None), ("/dev", None),
                           ("/dev/pts", None), ("/selinux", None),
-                          ((cachedir or self.build_dir) + "/yum-cache", "/var/cache/yum")]:
-            self.bindmounts.append(BindChrootMount(f, self.build_dir + "/install_root", dest))
+                          ((cachedir or self._builddir) + "/yum-cache", "/var/cache/yum")]:
+            self.bindmounts.append(BindChrootMount(f, self._builddir + "/install_root", dest))
 
         for b in self.bindmounts:
             b.mount()
 
         # make sure /etc/mtab is current inside install_root
-        os.symlink("../proc/mounts", self.build_dir + "/install_root/etc/mtab")
+        os.symlink("../proc/mounts", self._builddir + "/install_root/etc/mtab")
 
         self.write_fstab()
 
         self._ayum = LiveCDYum()
-        self._ayum.setup(self.build_dir + "/data",
-                        self.build_dir + "/install_root")
+        self._ayum.setup(self._builddir + "/data",
+                        self._builddir + "/install_root")
 
     def unmount(self):
         """detaches system bind mounts and install_root for the file system and tears down loop devices used"""
@@ -681,7 +681,7 @@ class ImageCreator(object):
             self._ayum = None
 
         try:
-            os.unlink(self.build_dir + "/install_root/etc/mtab")
+            os.unlink(self._builddir + "/install_root/etc/mtab")
         except OSError:
             pass
 
@@ -694,16 +694,16 @@ class ImageCreator(object):
             self.instloop = None
 
     def teardown(self):
-        if self.build_dir:
+        if self._builddir:
             self.unmount()
-            shutil.rmtree(self.build_dir, ignore_errors = True)
+            shutil.rmtree(self._builddir, ignore_errors = True)
 
     def addRepository(self, name, url):
         """adds a yum repository to temporary yum.conf file used"""
         self._ayum.addRepository(name, url)
 
     def _rootRun(self):
-        os.chroot("%s/install_root" %(self.build_dir,))
+        os.chroot("%s/install_root" %(self._builddir,))
         os.chdir("/")
 
     def installPackages(self):
@@ -748,15 +748,15 @@ class ImageCreator(object):
         # do some clean up to avoid lvm info leakage.  this sucks.
         for subdir in ("cache", "backup", "archive"):
             for f in os.listdir("%s/install_root/etc/lvm/%s"
-                                %(self.build_dir, subdir)):
+                                %(self._builddir, subdir)):
                 try:
                     os.unlink("%s/install_root/etc/lvm/%s/%s"
-                              %(self.build_dir, subdir, f))
+                              %(self._builddir, subdir, f))
                 except:
                     pass
 
     def configureSystem(self):
-        instroot = "%s/install_root" %(self.build_dir,)
+        instroot = "%s/install_root" %(self._builddir,)
         
         # FIXME: this is a bit ugly, but with the current pykickstart
         # API, we don't really have a lot of choice.  it'd be nice to
@@ -844,7 +844,7 @@ class ImageCreator(object):
             os.chmod(path, 0644)
 
     def runPost(self):
-        instroot = "%s/install_root" %(self.build_dir,)        
+        instroot = "%s/install_root" %(self._builddir,)        
         # and now, for arbitrary %post scripts
         for s in filter(lambda s: s.type == pykickstart.parser.KS_SCRIPT_POST,
                         self.ks.handler.scripts):
@@ -854,10 +854,10 @@ class ImageCreator(object):
             os.chmod(path, 0700)
 
             if not s.inChroot:
-                env = {"BUILD_DIR": self.build_dir,
-                       "INSTALL_ROOT": "%s/install_root" %(self.build_dir,),
-                       "LIVE_ROOT": "%s/out" %(self.build_dir,)}
-                preexec = lambda: os.chdir(self.build_dir,)
+                env = {"BUILD_DIR": self._builddir,
+                       "INSTALL_ROOT": "%s/install_root" %(self._builddir,),
+                       "LIVE_ROOT": "%s/out" %(self._builddir,)}
+                preexec = lambda: os.chdir(self._builddir,)
                 script = path
             else:
                 env = {}
@@ -876,7 +876,7 @@ class ImageCreator(object):
         # find the kernel versions.  this iterates over everything providing
         # 'kernel' and finds /boot/vmlinuz-* and grabbing the version based
         # on the filename being /boot/vmlinuz-version
-        ts = rpm.TransactionSet("%s/install_root" %(self.build_dir,))
+        ts = rpm.TransactionSet("%s/install_root" %(self._builddir,))
         mi = ts.dbMatch('provides', 'kernel')
         ret = {}
         for h in mi:
@@ -902,9 +902,9 @@ class ImageCreator(object):
         if not os.path.isfile(mpath):
             raise InstallationError("livecd-creator not correctly installed : "+
                                     "/usr/lib/livecd-creator/mayflower not found")
-        shutil.copy(mpath, "%s/install_root/sbin/mayflower" %(self.build_dir,))
+        shutil.copy(mpath, "%s/install_root/sbin/mayflower" %(self._builddir,))
         # modules we want to support for booting
-        mcfg = open(self.build_dir + "/install_root/etc/mayflower.conf", "a")
+        mcfg = open(self._builddir + "/install_root/etc/mayflower.conf", "a")
         mcfg.write('MODULES+="squashfs ext3 ext2 vfat msdos "\n')
         mcfg.write('MODULES+="sr_mod sd_mod ide-cd "\n')
 
@@ -923,12 +923,12 @@ class ImageCreator(object):
                                        ver], preexec_fn=self._rootRun),
             self.getKernelVersions().values())
         for f in ("/sbin/mayflower", "/etc/mayflower.conf"):
-            os.unlink("%s/install_root/%s" %(self.build_dir, f))
+            os.unlink("%s/install_root/%s" %(self._builddir, f))
 
     def relabelSystem(self):
         # finally relabel all files
         if self.ks.handler.selinux.selinux:
-            instroot = "%s/install_root" %(self.build_dir,)
+            instroot = "%s/install_root" %(self._builddir,)
             if os.path.exists("%s/sbin/restorecon" %(instroot,)):
                 subprocess.call(["/sbin/restorecon", "-v", "-r", "/"],
                                 preexec_fn=self._rootRun)
@@ -950,7 +950,7 @@ class ImageCreator(object):
                 yr.exclude = repo.excludepkgs
 
         self.installPackages()
-        if os.path.exists("%s/install_root/usr/lib/anaconda-runtime/checkisomd5" %(self.build_dir,)) or os.path.exists("%s/install_root/usr/bin/checkisomd5" %(self.build_dir,)):        
+        if os.path.exists("%s/install_root/usr/lib/anaconda-runtime/checkisomd5" %(self._builddir,)) or os.path.exists("%s/install_root/usr/bin/checkisomd5" %(self._builddir,)):        
             self._checkIsoMD5 = True
 
         try:
@@ -973,7 +973,7 @@ class ImageCreator(object):
         rc = subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(self.fsLabel,),
                          "-J", "-r", "-hide-rr-moved", "-hide-joliet-trans-tbl",
                          "-V", "%s" %(self.fsLabel,),
-                         "%s/out" %(self.build_dir)])
+                         "%s/out" %(self._builddir)])
         if rc != 0:
             import pdb; pdb.set_trace()
         import pdb; pdb.set_trace()
@@ -993,12 +993,12 @@ class ImageCreator(object):
         """create compressed squashfs file system"""
         if not self.skip_compression:
             ret = mksquashfs("out/LiveOS/squashfs.img", ["data"],
-                             self.build_dir)
+                             self._builddir)
             if ret != 0:
                 raise InstallationError("mksquashfs exited with error (%d)" %(ret,))
         else:
-            shutil.move("%s/data/LiveOS/ext3fs.img" %(self.build_dir,),
-                        "%s/out/LiveOS/ext3fs.img" %(self.build_dir,))
+            shutil.move("%s/data/LiveOS/ext3fs.img" %(self._builddir,),
+                        "%s/out/LiveOS/ext3fs.img" %(self._builddir,))
 
     def _getBlockCountOfExt2FS(self, filesystem):
         def parseField(output, field):
@@ -1047,7 +1047,7 @@ class ImageCreator(object):
     # resize2fs-to-uncompressed-size (with implicit resparsification)
     #
     def cleanupDeleted(self):
-        image = "%s/data/LiveOS/ext3fs.img" %(self.build_dir,)
+        image = "%s/data/LiveOS/ext3fs.img" %(self._builddir,)
 
         subprocess.call(["/sbin/e2fsck", "-f", "-y", image])
 
@@ -1075,7 +1075,7 @@ class ImageCreator(object):
     #
     def genMinInstDelta(self):
         # create the sparse file for the minimized overlay
-        fd = os.open("%s/out/LiveOS/osmin" %(self.build_dir,),
+        fd = os.open("%s/out/LiveOS/osmin" %(self._builddir,),
                      os.O_WRONLY | os.O_CREAT)
         off = long(64L * 1024L * 1024L)
         os.lseek(fd, off, 0)
@@ -1083,12 +1083,12 @@ class ImageCreator(object):
         os.close(fd)
 
         # associate os image with loop device
-        osloop = LoopbackMount("%s/data/LiveOS/ext3fs.img" %(self.build_dir,), \
+        osloop = LoopbackMount("%s/data/LiveOS/ext3fs.img" %(self._builddir,), \
                                "None")
         osloop.loopsetup()
 
         # associate overlay with loop device
-        minloop = LoopbackMount("%s/out/LiveOS/osmin" %(self.build_dir,), \
+        minloop = LoopbackMount("%s/out/LiveOS/osmin" %(self._builddir,), \
                                 "None")
         minloop.loopsetup()
 
@@ -1134,16 +1134,16 @@ class ImageCreator(object):
         minloop.lounsetup()
 
         # truncate the unused excess portion of the sparse file
-        fd = os.open("%s/out/LiveOS/osmin" %(self.build_dir,), os.O_WRONLY )
+        fd = os.open("%s/out/LiveOS/osmin" %(self._builddir,), os.O_WRONLY )
         os.ftruncate(fd, minInstDeltaDataLength * 512)
         os.close(fd)
 
         ret = mksquashfs("osmin.img", ["osmin"],
-                         "%s/out/LiveOS" %(self.build_dir,))
+                         "%s/out/LiveOS" %(self._builddir,))
         if ret != 0:
                 raise InstallationError("mksquashfs exited with error (%d)" %(ret,))
         try:
-            os.unlink("%s/out/LiveOS/osmin" %(self.build_dir))
+            os.unlink("%s/out/LiveOS/osmin" %(self._builddir))
         except:
             pass
 
@@ -1169,14 +1169,14 @@ class x86ImageCreator(ImageCreator):
 
     def configureBootloader(self):
         """configure the boot loader"""
-        os.makedirs(self.build_dir + "/out/isolinux")
+        os.makedirs(self._builddir + "/out/isolinux")
 
         syslinuxfiles = ["isolinux.bin"]
         menus = ["vesamenu.c32", "menu.c32"]
         syslinuxMenu = None
 
         for m in menus:
-            path = "%s/install_root/usr/lib/syslinux/%s" % (self.build_dir, m)
+            path = "%s/install_root/usr/lib/syslinux/%s" % (self._builddir, m)
             if os.path.isfile(path):
                 syslinuxfiles.append(m)
                 syslinuxMenu=m
@@ -1185,20 +1185,20 @@ class x86ImageCreator(ImageCreator):
             raise InstallationError("syslinux not installed : no suitable *menu.c32 found")
 
         # if we have any xen hypervisors, make sure we have the mboot module
-        xen = glob.glob("%s/install_root/boot/xen.gz-*" %(self.build_dir,))
+        xen = glob.glob("%s/install_root/boot/xen.gz-*" %(self._builddir,))
         if len(xen) > 0:
             syslinuxfiles.append("mboot.c32")
 
         for p in syslinuxfiles:
-            path = "%s/install_root/usr/lib/syslinux/%s" % (self.build_dir, p)
+            path = "%s/install_root/usr/lib/syslinux/%s" % (self._builddir, p)
             if not os.path.isfile(path):
                 raise InstallationError("syslinux not installed : %s not found" % path)
 
-            shutil.copy(path, "%s/out/isolinux/%s" % (self.build_dir, p))
+            shutil.copy(path, "%s/out/isolinux/%s" % (self._builddir, p))
 
-        if os.path.exists("%s/install_root/usr/lib/anaconda-runtime/syslinux-vesa-splash.jpg" %(self.build_dir,)):
-            shutil.copy("%s/install_root/usr/lib/anaconda-runtime/syslinux-vesa-splash.jpg" %(self.build_dir,),
-                        "%s/out/isolinux/splash.jpg" %(self.build_dir,))
+        if os.path.exists("%s/install_root/usr/lib/anaconda-runtime/syslinux-vesa-splash.jpg" %(self._builddir,)):
+            shutil.copy("%s/install_root/usr/lib/anaconda-runtime/syslinux-vesa-splash.jpg" %(self._builddir,),
+                        "%s/out/isolinux/splash.jpg" %(self._builddir,))
             have_background = "menu background splash.jpg"
         else:
             have_background = ""
@@ -1227,21 +1227,21 @@ menu hiddenrow 5
         count = 0
         for (name, ver) in self.getKernelVersions().items():
             shutil.copyfile("%s/install_root/boot/vmlinuz-%s"
-                            %(self.build_dir, ver),
-                            "%s/out/isolinux/vmlinuz%d" %(self.build_dir,count))
+                            %(self._builddir, ver),
+                            "%s/out/isolinux/vmlinuz%d" %(self._builddir,count))
             shutil.copyfile("%s/install_root/boot/livecd-initramfs-%s.img"
-                            %(self.build_dir, ver),
+                            %(self._builddir, ver),
                             "%s/out/isolinux/initrd%d.img" 
-                            %(self.build_dir, count))
+                            %(self._builddir, count))
             os.unlink("%s/install_root/boot/livecd-initramfs-%s.img"
-                      %(self.build_dir, ver))
+                      %(self._builddir, ver))
 
             isXen = False
-            if os.path.exists("%s/install_root/boot/xen.gz-%s" %(self.build_dir,
+            if os.path.exists("%s/install_root/boot/xen.gz-%s" %(self._builddir,
                                                                  ver[:-3])):
                 shutil.copy("%s/install_root/boot/xen.gz-%s" 
-                            %(self.build_dir, ver[:-3]), 
-                            "%s/out/isolinux/xen%d.gz" %(self.build_dir, count))
+                            %(self._builddir, ver[:-3]), 
+                            "%s/out/isolinux/xen%d.gz" %(self._builddir, count))
                 isXen = True
 
             default = False
@@ -1281,9 +1281,9 @@ menu hiddenrow 5
 
             count += 1
 
-        memtest = glob.glob("%s/install_root/boot/memtest86*" %(self.build_dir,))
+        memtest = glob.glob("%s/install_root/boot/memtest86*" %(self._builddir,))
         if len(memtest) > 0:
-            shutil.copy(memtest[0], "%s/out/isolinux/memtest" %(self.build_dir,))
+            shutil.copy(memtest[0], "%s/out/isolinux/memtest" %(self._builddir,))
             cfg += """label memtest
   menu label Memory Test
   kernel memtest
@@ -1295,7 +1295,7 @@ menu hiddenrow 5
   localboot 0xffff
 """
 
-        cfgf = open("%s/out/isolinux/isolinux.cfg" %(self.build_dir,), "w")
+        cfgf = open("%s/out/isolinux/isolinux.cfg" %(self._builddir,), "w")
         cfgf.write(cfg)
         cfgf.close()
         
@@ -1310,7 +1310,7 @@ menu hiddenrow 5
                          "-boot-info-table",
                          "-J", "-r", "-hide-rr-moved", "-hide-joliet-trans-tbl",
                          "-V", "%s" %(self.fsLabel,),
-                         "%s/out" %(self.build_dir)])
+                         "%s/out" %(self._builddir)])
         if rc != 0:
             raise InstallationError("ISO creation failed!")
 
@@ -1323,22 +1323,22 @@ class ppcImageCreator(ImageCreator):
     def createIso(self):
         """write out the live CD ISO"""
         rc = subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(self.fsLabel,),
-                         "-hfs", "-hfs-bless", "%s/out/ppc/mac" %(self.build_dir),
+                         "-hfs", "-hfs-bless", "%s/out/ppc/mac" %(self._builddir),
                          "-hfs-volid", "%s" %(self.fsLabel,), "-part",
-                         "-map", "%s/out/ppc/mapping" %(self.build_dir,),
+                         "-map", "%s/out/ppc/mapping" %(self._builddir,),
                          "-J", "-r", "-hide-rr-moved", "-no-desktop",
-                         "-V", "%s" %(self.fsLabel,), "%s/out" %(self.build_dir)])
+                         "-V", "%s" %(self.fsLabel,), "%s/out" %(self._builddir)])
         if rc != 0:
             raise InstallationError("ISO creation failed!")
 
     def _copyBootFile(self, file, dest):
         # get the file from either anaconda-runtime or ppc64-utils
-        if os.path.exists("%s/install_root/usr/share/ppc64-utils/%s" %(self.build_dir, file)):
+        if os.path.exists("%s/install_root/usr/share/ppc64-utils/%s" %(self._builddir, file)):
             shutil.copyfile("%s/install_root/usr/share/ppc64-utils/%s"
-                            %(self.build_dir, file), dest)
-        elif os.path.exists("%s/install_root/usr/lib/anaconda-runtime/boot/%s" %(self.build_dir, file)):
+                            %(self._builddir, file), dest)
+        elif os.path.exists("%s/install_root/usr/lib/anaconda-runtime/boot/%s" %(self._builddir, file)):
             shutil.copyfile("%s/install_root/usr/lib/anaconda-runtime/boot/%s"
-                            %(self.build_dir, file), dest)
+                            %(self._builddir, file), dest)
         else:
             raise InstallationError("Unable to find boot file %s" %(file,))
 
@@ -1346,50 +1346,50 @@ class ppcImageCreator(ImageCreator):
         """configure the boot loader"""
         havekernel = { 32: False, 64: False }
 
-        os.makedirs(self.build_dir + "/out/ppc")
+        os.makedirs(self._builddir + "/out/ppc")
 
         # copy the mapping file to somewhere we can get to it later
-        self._copyBootFile("mapping", "%s/out/ppc/mapping" %(self.build_dir,))
+        self._copyBootFile("mapping", "%s/out/ppc/mapping" %(self._builddir,))
 
         # Copy yaboot and ofboot.b in to mac directory
-        os.makedirs(self.build_dir + "/out/ppc/mac")
-        self._copyBootFile("ofboot.b", "%s/out/ppc/mac/ofboot.b" %(self.build_dir,))
-        shutil.copyfile("%s/install_root/usr/lib/yaboot/yaboot" %(self.build_dir),
-                        "%s/out/ppc/mac/yaboot" %(self.build_dir,))
+        os.makedirs(self._builddir + "/out/ppc/mac")
+        self._copyBootFile("ofboot.b", "%s/out/ppc/mac/ofboot.b" %(self._builddir,))
+        shutil.copyfile("%s/install_root/usr/lib/yaboot/yaboot" %(self._builddir),
+                        "%s/out/ppc/mac/yaboot" %(self._builddir,))
 
         # Copy yaboot and ofboot.b in to chrp directory
-        os.makedirs(self.build_dir + "/out/ppc/chrp")
-        self._copyBootFile("bootinfo.txt", "%s/out/ppc/bootinfo.txt" %(self.build_dir,))
-        shutil.copyfile("%s/install_root/usr/lib/yaboot/yaboot" %(self.build_dir),
-                        "%s/out/ppc/chrp/yaboot" %(self.build_dir,))
-        subprocess.call(["/usr/sbin/addnote", "%s/out/ppc/chrp/yaboot" %(self.build_dir,)])
+        os.makedirs(self._builddir + "/out/ppc/chrp")
+        self._copyBootFile("bootinfo.txt", "%s/out/ppc/bootinfo.txt" %(self._builddir,))
+        shutil.copyfile("%s/install_root/usr/lib/yaboot/yaboot" %(self._builddir),
+                        "%s/out/ppc/chrp/yaboot" %(self._builddir,))
+        subprocess.call(["/usr/sbin/addnote", "%s/out/ppc/chrp/yaboot" %(self._builddir,)])
 
         # FIXME: ppc should support multiple kernels too...
         ver = self.getKernelVersions().values()[0]
 
-        os.makedirs(self.build_dir + "/out/ppc/ppc32")
-        if not os.path.exists("%s/install_root/lib/modules/%s/kernel/arch/powerpc/platforms" %(self.build_dir, ver)):
+        os.makedirs(self._builddir + "/out/ppc/ppc32")
+        if not os.path.exists("%s/install_root/lib/modules/%s/kernel/arch/powerpc/platforms" %(self._builddir, ver)):
             havekernel[32] = True
             shutil.copyfile("%s/install_root/boot/vmlinuz-%s"
-                            %(self.build_dir, ver),
-                            "%s/out/ppc/ppc32/vmlinuz" %(self.build_dir,))
+                            %(self._builddir, ver),
+                            "%s/out/ppc/ppc32/vmlinuz" %(self._builddir,))
             shutil.copyfile("%s/install_root/boot/livecd-initramfs-%s.img"
-                            %(self.build_dir, ver),
-                            "%s/out/ppc/ppc32/initrd.img" %(self.build_dir,))
+                            %(self._builddir, ver),
+                            "%s/out/ppc/ppc32/initrd.img" %(self._builddir,))
             os.unlink("%s/install_root/boot/livecd-initramfs-%s.img"
-                      %(self.build_dir, ver))
+                      %(self._builddir, ver))
 
-        os.makedirs(self.build_dir + "/out/ppc/ppc64")
-        if os.path.exists("%s/install_root/lib/modules/%s/kernel/arch/powerpc/platforms" %(self.build_dir, ver)):
+        os.makedirs(self._builddir + "/out/ppc/ppc64")
+        if os.path.exists("%s/install_root/lib/modules/%s/kernel/arch/powerpc/platforms" %(self._builddir, ver)):
             havekernel[64] = True
             shutil.copyfile("%s/install_root/boot/vmlinuz-%s"
-                            %(self.build_dir, ver),
-                            "%s/out/ppc/ppc64/vmlinuz" %(self.build_dir,))
+                            %(self._builddir, ver),
+                            "%s/out/ppc/ppc64/vmlinuz" %(self._builddir,))
             shutil.copyfile("%s/install_root/boot/livecd-initramfs-%s.img"
-                            %(self.build_dir, ver),
-                            "%s/out/ppc/ppc64/initrd.img" %(self.build_dir,))
+                            %(self._builddir, ver),
+                            "%s/out/ppc/ppc64/initrd.img" %(self._builddir,))
             os.unlink("%s/install_root/boot/livecd-initramfs-%s.img"
-                      %(self.build_dir, ver))
+                      %(self._builddir, ver))
 
         for bit in havekernel.keys():
             cfg = """
@@ -1413,22 +1413,22 @@ image=/ppc/ppc%(bit)s/vmlinuz
 """ %{"label": self.fsLabel, "short": short, "long": long, "extra": extra, "bit": bit, "liveargs": self._getKernelOptions()}
 
                 if havekernel[bit]:
-                    cfgf = open("%s/out/ppc/ppc%d/yaboot.conf" %(self.build_dir, bit), "w")
+                    cfgf = open("%s/out/ppc/ppc%d/yaboot.conf" %(self._builddir, bit), "w")
                     cfgf.write(cfg)
                     cfgf.close()
                 else:
-                    cfgf = open("%s/out/ppc/ppc%d/yaboot.conf" %(self.build_dir, bit), "w")
+                    cfgf = open("%s/out/ppc/ppc%d/yaboot.conf" %(self._builddir, bit), "w")
                     cfgf.write('init-message = "Sorry, this LiveCD does not support your hardware"')
                     cfgf.close()
 
 
-        os.makedirs(self.build_dir + "/out/etc")
+        os.makedirs(self._builddir + "/out/etc")
         if havekernel[32] and not havekernel[64]:
-            shutil.copyfile("%s/out/ppc/ppc32/yaboot.conf" %(self.build_dir,),
-                            "%s/out/etc/yaboot.conf" %(self.build_dir,))
+            shutil.copyfile("%s/out/ppc/ppc32/yaboot.conf" %(self._builddir,),
+                            "%s/out/etc/yaboot.conf" %(self._builddir,))
         elif havekernel[64] and not havekernel[32]:
-            shutil.copyfile("%s/out/ppc/ppc64/yaboot.conf" %(self.build_dir,),
-                            "%s/out/etc/yaboot.conf" %(self.build_dir,))
+            shutil.copyfile("%s/out/ppc/ppc64/yaboot.conf" %(self._builddir,),
+                            "%s/out/etc/yaboot.conf" %(self._builddir,))
         else:
             cfg = """
 init-message = "\nWelcome to %(label)s!\nUse 'linux32' for 32-bit kernel.\n\n"
@@ -1447,7 +1447,7 @@ image=/ppc/ppc32/vmlinuz
 	read-only
 """ %{"label": self.fsLabel, "timeout": self._timeout * 100}
 
-            cfgf = open("%s/out/etc/yaboot.conf" %(self.build_dir,), "w")
+            cfgf = open("%s/out/etc/yaboot.conf" %(self._builddir,), "w")
             cfgf.write(cfg)
             cfgf.close()
 
