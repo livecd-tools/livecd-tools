@@ -130,7 +130,7 @@ def main():
         print "Using label %s" % (fs_label,)
 
     ksversion = pykickstart.version.makeVersion()
-    ks = LiveCDParser(ksversion)
+    ks = pykickstart.parser.KickstartParser(ksversion)
     try:
         ks.readKickstart(options.kscfg)
     except IOError, (err, msg):

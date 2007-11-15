@@ -178,28 +178,6 @@ class SparseExt3LoopbackMount(LoopbackMount):
         self._formatFilesystem()
         return LoopbackMount.mount(self)
 
-class LiveCDParser(pykickstart.parser.KickstartParser):
-    def __init__(self, *args, **kwargs):
-        pykickstart.parser.KickstartParser.__init__(self, *args, **kwargs)
-        self.currentdir = {}
-
-    def readKickstart(self, file, reset=True):
-        # an %include might not specify a full path.  if we don't try to figure
-        # out what the path should have been, then we're unable to find it
-        # requiring full path specification, though, sucks.  so let's make
-        # the reading "smart" by keeping track of what the path is at each
-        # include depth.
-        if not os.path.exists(file):
-            if self.currentdir.has_key(self._includeDepth - 1):
-                if os.path.exists(os.path.join(self.currentdir[self._includeDepth - 1], file)):
-                    file = os.path.join(self.currentdir[self._includeDepth - 1], file)
-
-        cd = os.path.dirname(file)
-        if not cd.startswith("/"):
-            cd = os.path.abspath(cd)
-        self.currentdir[self._includeDepth] = cd
-        return pykickstart.parser.KickstartParser.readKickstart(self, file, reset)
-
 class TextProgress(object):
     def start(self, filename, url, *args, **kwargs):
         sys.stdout.write("Retrieving %s " % (url,))
