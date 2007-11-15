@@ -552,7 +552,7 @@ class ImageCreator(object):
         """adds a yum repository to temporary yum.conf file used"""
         self._ayum.addRepository(name, url)
 
-    def run_in_root(self):
+    def _rootRun(self):
         os.chroot("%s/install_root" %(self.build_dir,))
         os.chdir("/")
 
@@ -786,13 +786,13 @@ class ImageCreator(object):
         if os.path.exists("%s/usr/sbin/authconfig" %(instroot,)):
             args = ["/usr/sbin/authconfig", "--update", "--nostart"]
             args.extend(auth.split())
-            subprocess.call(args, preexec_fn=self.run_in_root)
+            subprocess.call(args, preexec_fn=self._rootRun)
 
         # firewall.  FIXME: should handle the rest of the options
         if self.ksparser.handler.firewall.enabled and os.path.exists("%s/usr/sbin/lokkit" %(instroot,)):
             subprocess.call(["/usr/sbin/lokkit", "-f", "--quiet",
                              "--nostart", "--enabled"],
-                            preexec_fn=self.run_in_root)
+                            preexec_fn=self._rootRun)
 
         # selinux
         if os.path.exists("%s/usr/sbin/lokkit" %(instroot,)):
@@ -801,28 +801,28 @@ class ImageCreator(object):
                 args.append("--selinux=enforcing")
             else:
                 args.append("--selinux=disabled")
-            subprocess.call(args, preexec_fn=self.run_in_root)
+            subprocess.call(args, preexec_fn=self._rootRun)
 
         # Set the root password
         if self.ksparser.handler.rootpw.isCrypted:
-            subprocess.call(["/usr/sbin/usermod", "-p", self.ksparser.handler.rootpw.password, "root"], preexec_fn=self.run_in_root)
+            subprocess.call(["/usr/sbin/usermod", "-p", self.ksparser.handler.rootpw.password, "root"], preexec_fn=self._rootRun)
         elif self.ksparser.handler.rootpw.password == "":
             # Root password is not set and not crypted, empty it
-            subprocess.call(["/usr/bin/passwd", "-d", "root"], preexec_fn=self.run_in_root)
+            subprocess.call(["/usr/bin/passwd", "-d", "root"], preexec_fn=self._rootRun)
         else:
             # Root password is set and not crypted
-            p1 = subprocess.Popen(["/bin/echo", self.ksparser.handler.rootpw.password], stdout=subprocess.PIPE, preexec_fn=self.run_in_root)
-            p2 = subprocess.Popen(["/usr/bin/passwd", "--stdin", "root"], stdin=p1.stdout, stdout=subprocess.PIPE, preexec_fn=self.run_in_root)
+            p1 = subprocess.Popen(["/bin/echo", self.ksparser.handler.rootpw.password], stdout=subprocess.PIPE, preexec_fn=self._rootRun)
+            p2 = subprocess.Popen(["/usr/bin/passwd", "--stdin", "root"], stdin=p1.stdout, stdout=subprocess.PIPE, preexec_fn=self._rootRun)
             output = p2.communicate()[0]
 
         # enable/disable services appropriately
         if os.path.exists("%s/sbin/chkconfig" %(instroot,)):
             for s in self.ksparser.handler.services.enabled:
                 subprocess.call(["/sbin/chkconfig", s, "on"],
-                                preexec_fn=self.run_in_root)
+                                preexec_fn=self._rootRun)
             for s in self.ksparser.handler.services.disabled:
                 subprocess.call(["/sbin/chkconfig", s, "off"],
-                                preexec_fn=self.run_in_root)
+                                preexec_fn=self._rootRun)
 
         # x by default?
         if self.ksparser.handler.xconfig.startX:
@@ -857,7 +857,7 @@ class ImageCreator(object):
                 script = path
             else:
                 env = {}
-                preexec = self.run_in_root
+                preexec = self._rootRun
                 script = "/tmp/%s" %(os.path.basename(path),)
 
             try:
@@ -916,7 +916,7 @@ class ImageCreator(object):
 
         map(lambda ver: subprocess.call(["/sbin/mayflower", "-f",
                                        "/boot/livecd-initramfs-%s.img" %(ver,), 
-                                       ver], preexec_fn=self.run_in_root),
+                                       ver], preexec_fn=self._rootRun),
             self.getKernelVersions().values())
         for f in ("/sbin/mayflower", "/etc/mayflower.conf"):
             os.unlink("%s/install_root/%s" %(self.build_dir, f))
@@ -927,10 +927,10 @@ class ImageCreator(object):
             instroot = "%s/install_root" %(self.build_dir,)
             if os.path.exists("%s/sbin/restorecon" %(instroot,)):
                 subprocess.call(["/sbin/restorecon", "-v", "-r", "/"],
-                                preexec_fn=self.run_in_root)
+                                preexec_fn=self._rootRun)
 
     def launchShell(self):
-        subprocess.call(["/bin/bash"], preexec_fn=self.run_in_root)
+        subprocess.call(["/bin/bash"], preexec_fn=self._rootRun)
 
     def install(self):
         try:
