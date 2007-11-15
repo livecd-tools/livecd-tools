@@ -508,6 +508,9 @@ class ImageCreatorBase(object):
         self.__setDefaultsFromKS()
         self.__sanityCheckKS()
 
+    def __del__(self):
+        self.teardown()
+
     def create(self):
         """This is the simplest method to generate an image from the given
         configuration."""
@@ -650,6 +653,7 @@ class ImageCreatorBase(object):
         if self._builddir:
             self.unmountImage()
             shutil.rmtree(self._builddir, ignore_errors = True)
+            self._builddir = None
 
     def _rootRun(self):
         os.chroot(self._instroot)
@@ -1627,13 +1631,14 @@ def main():
 
     except InstallationError, e:
         print >> sys.stderr, "Error creating Live CD : %s" % e
-        target.teardown()
+        del target
         return 1
     except:
         exc = sys.exc_info()
+        del target
         target.teardown()
         raise exc[0], exc[1], exc[2]
-    target.teardown()
+    del target
 
     return 0
 
