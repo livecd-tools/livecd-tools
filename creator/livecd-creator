@@ -560,7 +560,7 @@ class ImageCreatorBase(object):
             raise InstallationError("SELinux requested but not enabled on host system")
 
 
-    def base_on_iso(self, base_on):
+    def _baseOnIso(self, base_on):
         """helper function to extract ext3 file system from a live CD ISO"""
 
         isoloop = LoopbackMount(base_on, "%s/base_on_iso" %(self._builddir,))
@@ -603,7 +603,7 @@ class ImageCreatorBase(object):
             squashloop.cleanup()
             isoloop.cleanup()
 
-    def write_fstab(self):
+    def __writeFstab(self):
         fstab = open(self._builddir + "/install_root/etc/fstab", "w")
         fstab.write("/dev/mapper/livecd-rw   /                       ext3    defaults,noatime 0 0\n")
         fstab.write("devpts                  /dev/pts                devpts  gid=5,mode=620  0 0\n")
@@ -628,7 +628,7 @@ class ImageCreatorBase(object):
 
         if base_on:
             # get backing ext3 image if we're based this build on an existing live CD ISO
-            self.base_on_iso(base_on)
+            self._baseOnIso(base_on)
 
             self._instloop = LoopbackMount("%s/data/LiveOS/ext3fs.img" %(self._builddir,),
                                           "%s/install_root" %(self._builddir,))
@@ -665,13 +665,13 @@ class ImageCreatorBase(object):
         # make sure /etc/mtab is current inside install_root
         os.symlink("../proc/mounts", self._builddir + "/install_root/etc/mtab")
 
-        self.write_fstab()
+        self.__writeFstab()
 
         self._ayum = LiveCDYum()
         self._ayum.setup(self._builddir + "/data",
                         self._builddir + "/install_root")
 
-    def unmount(self):
+    def unmountImage(self):
         """detaches system bind mounts and install_root for the file system and tears down loop devices used"""
         if self._ayum:
             self._ayum.close()
@@ -692,7 +692,7 @@ class ImageCreatorBase(object):
 
     def teardown(self):
         if self._builddir:
-            self.unmount()
+            self.unmountImage()
             shutil.rmtree(self._builddir, ignore_errors = True)
 
     def _rootRun(self):
@@ -748,7 +748,7 @@ class ImageCreatorBase(object):
                 except:
                     pass
 
-    def configureSystem(self):
+    def configureImage(self):
         instroot = "%s/install_root" %(self._builddir,)
         
         # FIXME: this is a bit ugly, but with the current pykickstart
@@ -918,7 +918,7 @@ class ImageCreatorBase(object):
         for f in ("/sbin/mayflower", "/etc/mayflower.conf"):
             os.unlink("%s/install_root/%s" %(self._builddir, f))
 
-    def relabelSystem(self):
+    def __relabelSystem(self):
         # finally relabel all files
         if self.ks.handler.selinux.selinux:
             instroot = "%s/install_root" %(self._builddir,)
@@ -947,12 +947,12 @@ class ImageCreatorBase(object):
             self._checkIsoMD5 = True
 
         try:
-            self.configureSystem()
+            self.configureImage()
         except Exception, e: #FIXME: we should be a little bit more fine-grained
             raise InstallationError("Error configuring live image: %s" %(e,))
         net = ImageNetworkConfig(self.ks.handler.network, "%s/install_root" %(self._builddir,))
         net.write()
-        self.relabelSystem()
+        self.__relabelSystem()
         self.createInitramfs()
         self.configureBootloader()
         self.runPost()
@@ -1583,7 +1583,7 @@ def main():
             print "----------------------------------"
             target.launchShell()
 
-        target.unmount()
+        target.unmountImage()
 
         if not options.skip_minimize:
             target.cleanupDeleted()
