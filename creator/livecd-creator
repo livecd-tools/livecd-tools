@@ -1148,7 +1148,7 @@ class ImageCreatorBase(object):
         self.createIso()
         self.implantIsoMD5()
 
-class x86ImageCreator(ImageCreatorBase):
+class x86LiveImageCreator(ImageCreatorBase):
     """ImageCreator for x86 machines"""
     def _getImageStanza(self):
         return """label %(short)s
@@ -1315,7 +1315,7 @@ menu hiddenrow 5
         ret.extend(ImageCreatorBase._getRequiredPackages(self))
         return ret
 
-class ppcImageCreator(ImageCreatorBase):
+class ppcLiveImageCreator(ImageCreatorBase):
     def createIso(self):
         """write out the live CD ISO"""
         rc = subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(self.fsLabel,),
@@ -1458,7 +1458,7 @@ image=/ppc/ppc32/vmlinuz
         # kind of hacky, but exclude memtest86+ on ppc so it can stay in cfg
         return ["memtest86+"]
 
-class ppc64ImageCreator(ppcImageCreator):
+class ppc64LiveImageCreator(ppcLiveImageCreator):
     def _getRequiredExcludePackages(self):
         # FIXME: while kernel.ppc and kernel.ppc64 co-exist, we can't
         # have both
@@ -1466,11 +1466,11 @@ class ppc64ImageCreator(ppcImageCreator):
 
 arch = rpmUtils.arch.getBaseArch()
 if arch in ("i386", "x86_64"):
-    ImageCreator = x86ImageCreator
+    LiveImageCreator = x86LiveImageCreator
 elif arch in ("ppc",):
-    ImageCreator = ppcImageCreator
+    LiveImageCreator = ppcLiveImageCreator
 elif arch in ("ppc64",):
-    ImageCreator = ppc64ImageCreator(fs_label)
+    LiveImageCreator = ppc64LiveImageCreator(fs_label)
 else:
     raise InstallationError("Architecture not supported!")
 
@@ -1572,7 +1572,7 @@ def main():
     except pykickstart.errors.KickstartError, e:
         raise InstallationError("Failed to parse kickstart file '%s' : %s" % (kscfg, e))
 
-    target = ImageCreator(ks, fs_label)
+    target = LiveImageCreator(ks, fs_label)
     target.skip_compression = options.skip_compression
     target.tmpdir = options.tmpdir
 
