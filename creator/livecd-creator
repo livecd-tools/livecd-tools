@@ -490,9 +490,9 @@ class ImageNetworkConfig(object):
         self.__writeNetworkResolv(nodns, nameservers)
 
 class ImageCreator(object):
-    def __init__(self, fs_label):
+    def __init__(self, fsLabel):
         self._ayum = None
-        self.fs_label = fs_label
+        self.fsLabel = fsLabel
         self.skip_compression = False
         self.tmpdir = "/var/tmp"
 
@@ -642,7 +642,7 @@ class ImageCreator(object):
                                                     %(self.build_dir,),
                                                     self.image_size,
                                                     self.blocksize,
-                                                    self.fs_label)
+                                                    self.fsLabel)
 
         try:
             self.instloop.mount()
@@ -970,9 +970,9 @@ class ImageCreator(object):
     def createIso(self):
         # WARNING: if you don't override this, your CD probably won't be
         # bootable
-        rc = subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(self.fs_label,),
+        rc = subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(self.fsLabel,),
                          "-J", "-r", "-hide-rr-moved", "-hide-joliet-trans-tbl",
-                         "-V", "%s" %(self.fs_label,),
+                         "-V", "%s" %(self.fsLabel,),
                          "%s/out" %(self.build_dir)])
         if rc != 0:
             import pdb; pdb.set_trace()
@@ -982,10 +982,10 @@ class ImageCreator(object):
         """Implant an isomd5sum."""
         if os.path.exists("/usr/bin/implantisomd5"):
             subprocess.call(["/usr/bin/implantisomd5",
-                             "%s.iso" %(self.fs_label,)])
+                             "%s.iso" %(self.fsLabel,)])
         elif os.path.exists("/usr/lib/anaconda-runtime/implantisomd5"):
             subprocess.call(["/usr/lib/anaconda-runtime/implantisomd5",
-                             "%s.iso" %(self.fs_label,)])
+                             "%s.iso" %(self.fsLabel,)])
         else:
             print >> sys.stderr, "isomd5sum not installed; not setting up mediacheck"
 
@@ -1221,7 +1221,7 @@ menu color timeout 0 #ffffffff #00000000
 menu color cmdline 0 #ffffffff #00000000
 menu hidden
 menu hiddenrow 5
-""" %{"menu" : syslinuxMenu, "label": self.fs_label, "background" : have_background, "timeout": self._timeout * 10}
+""" %{"menu" : syslinuxMenu, "label": self.fsLabel, "background" : have_background, "timeout": self._timeout * 10}
 
         stanzas = []
         count = 0
@@ -1262,10 +1262,10 @@ menu hiddenrow 5
                 s = self._getImageStanzaXen()
 
             short = "linux%s" %(count,)
-            long = "Boot %s%s" %(self.fs_label,q)
+            long = "Boot %s%s" %(self.fsLabel,q)
             extra = ""
 
-            cfg += s %{"label": self.fs_label,
+            cfg += s %{"label": self.fsLabel,
                        "short": short, "long": long, "extra": extra,
                        "liveargs": self._getKernelOptions(), "index": count}
             if default:
@@ -1273,9 +1273,9 @@ menu hiddenrow 5
 
             if self._checkIsoMD5:
                 short = "check%s" %(count,)
-                long = "Verify and boot %s%s" %(self.fs_label,q)
+                long = "Verify and boot %s%s" %(self.fsLabel,q)
                 extra = "check"
-                cfg += s %{"label": self.fs_label,
+                cfg += s %{"label": self.fsLabel,
                            "short": short, "long": long, "extra": extra,
                            "liveargs": self._getKernelOptions(), "index": count}
 
@@ -1303,13 +1303,13 @@ menu hiddenrow 5
 
     def createIso(self):
         """Write out the live CD ISO."""
-        rc = subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(self.fs_label,),
+        rc = subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(self.fsLabel,),
                          "-b", "isolinux/isolinux.bin",
                          "-c", "isolinux/boot.cat",
                          "-no-emul-boot", "-boot-load-size", "4",
                          "-boot-info-table",
                          "-J", "-r", "-hide-rr-moved", "-hide-joliet-trans-tbl",
-                         "-V", "%s" %(self.fs_label,),
+                         "-V", "%s" %(self.fsLabel,),
                          "%s/out" %(self.build_dir)])
         if rc != 0:
             raise InstallationError("ISO creation failed!")
@@ -1322,12 +1322,12 @@ menu hiddenrow 5
 class ppcImageCreator(ImageCreator):
     def createIso(self):
         """write out the live CD ISO"""
-        rc = subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(self.fs_label,),
+        rc = subprocess.call(["/usr/bin/mkisofs", "-o", "%s.iso" %(self.fsLabel,),
                          "-hfs", "-hfs-bless", "%s/out/ppc/mac" %(self.build_dir),
-                         "-hfs-volid", "%s" %(self.fs_label,), "-part",
+                         "-hfs-volid", "%s" %(self.fsLabel,), "-part",
                          "-map", "%s/out/ppc/mapping" %(self.build_dir,),
                          "-J", "-r", "-hide-rr-moved", "-no-desktop",
-                         "-V", "%s" %(self.fs_label,), "%s/out" %(self.build_dir)])
+                         "-V", "%s" %(self.fsLabel,), "%s/out" %(self.build_dir)])
         if rc != 0:
             raise InstallationError("ISO creation failed!")
 
@@ -1396,7 +1396,7 @@ class ppcImageCreator(ImageCreator):
 init-message = "Welcome to %(label)s"
 timeout=%(timeout)d
 
-""" %{"label": self.fs_label, "timeout": self._timeout * 100}
+""" %{"label": self.fsLabel, "timeout": self._timeout * 100}
 
             stanzas = [("linux", "Run from image", "")]
             if self._checkIsoMD5:
@@ -1410,7 +1410,7 @@ image=/ppc/ppc%(bit)s/vmlinuz
   initrd=/ppc/ppc%(bit)s/initrd.img
   read-only
   append="root=CDLABEL=%(label)s rootfstype=iso9660 %(liveargs)s %(extra)s"
-""" %{"label": self.fs_label, "short": short, "long": long, "extra": extra, "bit": bit, "liveargs": self._getKernelOptions()}
+""" %{"label": self.fsLabel, "short": short, "long": long, "extra": extra, "bit": bit, "liveargs": self._getKernelOptions()}
 
                 if havekernel[bit]:
                     cfgf = open("%s/out/ppc/ppc%d/yaboot.conf" %(self.build_dir, bit), "w")
@@ -1445,7 +1445,7 @@ image=/ppc/ppc32/vmlinuz
 	label=linux32
 	initrd=/ppc/ppc32/initrd.img
 	read-only
-""" %{"label": self.fs_label, "timeout": self._timeout * 100}
+""" %{"label": self.fsLabel, "timeout": self._timeout * 100}
 
             cfgf = open("%s/out/etc/yaboot.conf" %(self.build_dir,), "w")
             cfgf.write(cfg)
