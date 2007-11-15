@@ -957,7 +957,7 @@ class ImageCreator(object):
             self.configureSystem()
         except Exception, e: #FIXME: we should be a little bit more fine-grained
             raise InstallationError("Error configuring live image: %s" %(e,))
-        net = ImageNetworkConfig(self.ks.handler.network, instroot)
+        net = ImageNetworkConfig(self.ks.handler.network, "%s/install_root" %(self._builddir,))
         net.write()
         self.relabelSystem()
         self.createInitramfs()
