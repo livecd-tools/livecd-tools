@@ -339,6 +339,156 @@ def mksquashfs(output, filelist, cwd = None):
         cwd = os.getcwd()
     return subprocess.call(args, cwd = cwd,  env={"PWD": cwd})
 
+class ImageNetworkConfig(object):
+    """An object to take the kickstart network configuration and turn it
+    into something useful on the filesystem."""
+    def __init__(self, ksnet, instroot):
+        self.instroot = instroot
+        self.ksnet = ksnet
+
+    def __writeNetworkIfCfg(self, network):
+        path = self.instroot + "/etc/sysconfig/network-scripts/ifcfg-" + network.device
+
+        f = file(path, "w+")
+        os.chmod(path, 0644)
+
+        f.write("DEVICE=%s\n" % network.device)
+        f.write("BOOTPROTO=%s\n" % network.bootProto)
+
+        if network.bootProto.lower() == "static":
+            if network.ip:
+                f.write("IPADDR=%s\n" % network.ip)
+            if network.netmask:
+                f.write("NETMASK=%s\n" % network.netmask)
+
+        if network.onboot:
+            f.write("ONBOOT=on\n")
+        else:
+            f.write("ONBOOT=off\n")
+
+        if network.essid:
+            f.write("ESSID=%s\n" % network.essid)
+
+        if network.ethtool:
+            if network.ethtool.find("autoneg") == -1:
+                network.ethtool = "autoneg off " + network.ethtool
+            f.write("ETHTOOL_OPTS=%s\n" % network.ethtool)
+
+        if network.bootProto.lower() == "dhcp":
+            if network.hostname:
+                f.write("DHCP_HOSTNAME=%s\n" % network.hostname)
+            if network.dhcpclass:
+                f.write("DHCP_CLASSID=%s\n" % network.dhcpclass)
+
+        if network.mtu:
+            f.write("MTU=%s\n" % network.mtu)
+
+        f.close()
+
+    def __writeNetworkKey(self, network):
+        if not network.wepkey:
+            return
+
+        path = self.instroot + "/etc/sysconfig/network-scripts/keys-" + network.device
+        f = file(path, "w+")
+        os.chmod(path, 0600)
+        f.write("KEY=%s\n" % network.wepkey)
+        f.close()
+
+    def __writeNetworkConfig(self, useipv6, hostname, gateway):
+        path = self.instroot + "/etc/sysconfig/network"
+        f = file(path, "w+")
+        os.chmod(path, 0644)
+
+        f.write("NETWORKING=yes\n")
+
+        if useipv6:
+            f.write("NETWORKING_IPV6=yes\n")
+        else:
+            f.write("NETWORKING_IPV6=no\n")
+
+        if hostname:
+            f.write("HOSTNAME=%s\n" % hostname)
+        else:
+            f.write("HOSTNAME=localhost.localdomain\n")
+
+        if gateway:
+            f.write("GATEWAY=%s\n" % gateway)
+
+        f.close()
+
+    def __writeNetworkHosts(self, hostname):
+        localline = ""
+        if hostname and hostname != "localhost.localdomain":
+            localline += hostname + " "
+            l = string.split(hostname, ".")
+            if len(l) > 1:
+                localline += l[0] + " "
+        localline += "localhost.localdomain localhost"
+
+        path = self.instroot + "/etc/hosts"
+        f = file(path, "w+")
+        os.chmod(path, 0644)
+        f.write("127.0.0.1\t\t%s\n" % localline)
+        f.write("::1\t\tlocalhost6.localdomain6 localhost6\n")
+        f.close()
+
+    def __writeNetworkResolv(self, nodns, nameservers):
+        if nodns or not nameservers:
+            return
+
+        path = self.instroot + "/etc/resolv.conf"
+        f = file(path, "w+")
+        os.chmod(path, 0644)
+
+        for ns in (nameservers):
+            if ns:
+                f.write("nameserver %s\n" % ns)
+
+        f.close()
+
+    def write(self):
+        try:
+            os.makedirs(self.instroot + "/etc/sysconfig/network-scripts")
+        except OSError, (err, msg):
+            if err != errno.EEXIST:
+                raise
+
+        useipv6 = False
+        nodns = False
+        hostname = None
+        gateway = None
+        nameservers = None
+
+        for network in self.ksnet.network:
+            if not network.device:
+                raise InstallationError("No --device specified with network kickstart command")
+
+            if network.onboot and network.bootProto.lower() != "dhcp" and \
+               not (network.ip and network.netmask):
+                raise InstallationError("No IP address and/or netmask specified with static " +
+                                        "configuration for '%s'" % network.device)
+
+            self.__writeNetworkIfCfg(network)
+            self.__writeNetworkKey(network)
+
+            if network.ipv6:
+                useipv6 = True
+            if network.nodns:
+                nodns = True
+
+            if network.hostname:
+                hostname = network.hostname
+            if network.gateway:
+                gateway = network.gateway
+
+            if network.nameserver:
+                nameservers = string.split(network.nameserver, ",")
+
+        self.__writeNetworkConfig(useipv6, hostname, gateway)
+        self.__writeNetworkHosts(hostname)
+        self.__writeNetworkResolv(nodns, nameservers)
+
 class ImageCreator(object):
     def __init__(self, fs_label):
         self._ayum = None
@@ -605,151 +755,6 @@ class ImageCreator(object):
                 except:
                     pass
 
-    def writeNetworkIfCfg(self, instroot, network):
-        path = instroot + "/etc/sysconfig/network-scripts/ifcfg-" + network.device
-
-        f = file(path, "w+")
-        os.chmod(path, 0644)
-
-        f.write("DEVICE=%s\n" % network.device)
-        f.write("BOOTPROTO=%s\n" % network.bootProto)
-
-        if network.bootProto.lower() == "static":
-            if network.ip:
-                f.write("IPADDR=%s\n" % network.ip)
-            if network.netmask:
-                f.write("NETMASK=%s\n" % network.netmask)
-
-        if network.onboot:
-            f.write("ONBOOT=on\n")
-        else:
-            f.write("ONBOOT=off\n")
-
-        if network.essid:
-            f.write("ESSID=%s\n" % network.essid)
-
-        if network.ethtool:
-            if network.ethtool.find("autoneg") == -1:
-                network.ethtool = "autoneg off " + network.ethtool
-            f.write("ETHTOOL_OPTS=%s\n" % network.ethtool)
-
-        if network.bootProto.lower() == "dhcp":
-            if network.hostname:
-                f.write("DHCP_HOSTNAME=%s\n" % network.hostname)
-            if network.dhcpclass:
-                f.write("DHCP_CLASSID=%s\n" % network.dhcpclass)
-
-        if network.mtu:
-            f.write("MTU=%s\n" % network.mtu)
-
-        f.close()
-
-    def writeNetworkKey(self, instroot, network):
-        if not network.wepkey:
-            return
-
-        path = instroot + "/etc/sysconfig/network-scripts/keys-" + network.device
-        f = file(path, "w+")
-        os.chmod(path, 0600)
-        f.write("KEY=%s\n" % network.wepkey)
-        f.close()
-
-    def writeNetworkConfig(self, instroot, useipv6, hostname, gateway):
-        path = instroot + "/etc/sysconfig/network"
-        f = file(path, "w+")
-        os.chmod(path, 0644)
-
-        f.write("NETWORKING=yes\n")
-
-        if useipv6:
-            f.write("NETWORKING_IPV6=yes\n")
-        else:
-            f.write("NETWORKING_IPV6=no\n")
-
-        if hostname:
-            f.write("HOSTNAME=%s\n" % hostname)
-        else:
-            f.write("HOSTNAME=localhost.localdomain\n")
-
-        if gateway:
-            f.write("GATEWAY=%s\n" % gateway)
-
-        f.close()
-
-    def writeNetworkHosts(self, instroot, hostname):
-        localline = ""
-        if hostname and hostname != "localhost.localdomain":
-            localline += hostname + " "
-            l = string.split(hostname, ".")
-            if len(l) > 1:
-                localline += l[0] + " "
-        localline += "localhost.localdomain localhost"
-
-        path = instroot + "/etc/hosts"
-        f = file(path, "w+")
-        os.chmod(path, 0644)
-        f.write("127.0.0.1\t\t%s\n" % localline)
-        f.write("::1\t\tlocalhost6.localdomain6 localhost6\n")
-        f.close()
-
-    def writeNetworkResolv(self, instroot, nodns, nameservers):
-        if nodns or not nameservers:
-            return
-
-        path = instroot + "/etc/resolv.conf"
-        f = file(path, "w+")
-        os.chmod(path, 0644)
-
-        for ns in (nameservers):
-            if ns:
-                f.write("nameserver %s\n" % ns)
-
-        f.close()
-
-    def configureNetwork(self):
-        instroot = self.build_dir + "/install_root"
-
-        try:
-            os.makedirs(instroot + "/etc/sysconfig/network-scripts")
-        except OSError, (err, msg):
-            if err != errno.EEXIST:
-                raise
-
-        useipv6 = False
-        nodns = False
-        hostname = None
-        gateway = None
-        nameservers = None
-
-        for network in self.ks.handler.network.network:
-            if not network.device:
-                raise InstallationError("No --device specified with network kickstart command")
-
-            if network.onboot and network.bootProto.lower() != "dhcp" and \
-               not (network.ip and network.netmask):
-                raise InstallationError("No IP address and/or netmask specified with static " +
-                                        "configuration for '%s'" % network.device)
-
-            self.writeNetworkIfCfg(instroot, network)
-            self.writeNetworkKey(instroot, network)
-
-            if network.ipv6:
-                useipv6 = True
-            if network.nodns:
-                nodns = True
-
-            if network.hostname:
-                hostname = network.hostname
-            if network.gateway:
-                gateway = network.gateway
-
-            if network.nameserver:
-                nameservers = string.split(network.nameserver, ",")
-
-        self.writeNetworkConfig(instroot, useipv6, hostname, gateway)
-        self.writeNetworkHosts(instroot, hostname)
-        self.writeNetworkResolv(instroot, nodns, nameservers)
-
     def configureSystem(self):
         instroot = "%s/install_root" %(self.build_dir,)
         
@@ -952,7 +957,8 @@ class ImageCreator(object):
             self.configureSystem()
         except Exception, e: #FIXME: we should be a little bit more fine-grained
             raise InstallationError("Error configuring live image: %s" %(e,))
-        self.configureNetwork()
+        net = ImageNetworkConfig(self.ks.handler.network, instroot)
+        net.write()
         self.relabelSystem()
         self.createInitramfs()
         self.configureBootloader()
