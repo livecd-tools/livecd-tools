@@ -341,7 +341,7 @@ def mksquashfs(output, filelist, cwd = None):
 
 class ImageCreator(object):
     def __init__(self, fs_label):
-        self.ayum = None
+        self._ayum = None
         self.fs_label = fs_label
         self.skip_compression = False
         self.tmpdir = "/var/tmp"
@@ -520,15 +520,15 @@ class ImageCreator(object):
 
         self.write_fstab()
 
-        self.ayum = LiveCDYum()
-        self.ayum.setup(self.build_dir + "/data",
+        self._ayum = LiveCDYum()
+        self._ayum.setup(self.build_dir + "/data",
                         self.build_dir + "/install_root")
 
     def unmount(self):
         """detaches system bind mounts and install_root for the file system and tears down loop devices used"""
-        if self.ayum:
-            self.ayum.close()
-            self.ayum = None
+        if self._ayum:
+            self._ayum.close()
+            self._ayum = None
 
         try:
             os.unlink(self.build_dir + "/install_root/etc/mtab")
@@ -550,7 +550,7 @@ class ImageCreator(object):
 
     def addRepository(self, name, url):
         """adds a yum repository to temporary yum.conf file used"""
-        self.ayum.addRepository(name, url)
+        self._ayum.addRepository(name, url)
 
     def run_in_root(self):
         os.chroot("%s/install_root" %(self.build_dir,))
@@ -566,7 +566,7 @@ class ImageCreator(object):
             for pkg in (self.ksparser.handler.packages.packageList + 
                         self._getRequiredPackages()):
                 try:
-                    self.ayum.selectPackage(pkg)
+                    self._ayum.selectPackage(pkg)
                 except yum.Errors.InstallError, e:
                     if self.ksparser.handler.packages.handleMissing != \
                            pykickstart.constants.KS_MISSING_IGNORE:
@@ -576,7 +576,7 @@ class ImageCreator(object):
 
             for group in self.ksparser.handler.packages.groupList:
                 try:
-                    self.ayum.selectGroup(group.name, group.include)
+                    self._ayum.selectGroup(group.name, group.include)
                 except (yum.Errors.InstallError, yum.Errors.GroupsError), e:
                     if self.ksparser.handler.packages.handleMissing != \
                            pykickstart.constants.KS_MISSING_IGNORE:
@@ -584,17 +584,17 @@ class ImageCreator(object):
                     else:
                         print >> sys.stderr, "Unable to find group '%s'; skipping" %(group.name,)
 
-            map(lambda pkg: self.ayum.deselectPackage(pkg),
+            map(lambda pkg: self._ayum.deselectPackage(pkg),
                 self.ksparser.handler.packages.excludedList +
                 self._getRequiredExcludePackages())
 
-            self.ayum.runInstall()
+            self._ayum.runInstall()
         except yum.Errors.RepoError, e:
             raise InstallationError("Unable to download from repo : %s" %(e,))
         except yum.Errors.YumBaseError, e:
             raise InstallationError("Unable to install: %s" %(e,))
         finally:
-            self.ayum.closeRpmDB()
+            self._ayum.closeRpmDB()
 
         # do some clean up to avoid lvm info leakage.  this sucks.
         for subdir in ("cache", "backup", "archive"):
@@ -939,7 +939,7 @@ class ImageCreator(object):
             pass
 
         for repo in self.ksparser.handler.repo.repoList:
-            yr = self.ayum.addRepository(repo.name, repo.baseurl, repo.mirrorlist)
+            yr = self._ayum.addRepository(repo.name, repo.baseurl, repo.mirrorlist)
             if hasattr(repo, "includepkgs"):
                 yr.includepkgs = repo.includepkgs
             if hasattr(repo, "excludepkgs"):
