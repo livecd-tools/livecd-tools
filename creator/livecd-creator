@@ -699,10 +699,6 @@ class ImageCreator(object):
             self.unmount()
             shutil.rmtree(self._builddir, ignore_errors = True)
 
-    def addRepository(self, name, url):
-        """adds a yum repository to temporary yum.conf file used"""
-        self._ayum.addRepository(name, url)
-
     def _rootRun(self):
         os.chroot("%s/install_root" %(self._builddir,))
         os.chdir("/")
