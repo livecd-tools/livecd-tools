@@ -577,7 +577,11 @@ class ImageCreatorBase(object):
         """Do any creation necessary and mount the install root"""
         # IMAGE-SPECIFIC-IMPLEMENT
         raise RuntimeError, "I shouldn't ever get here."
-        pass
+
+    def _unmountInstallRoot(self):
+        """Tear down the install root."""
+        # IMAGE-SPECIFIC-IMPLEMENT
+        raise RuntimeError, "I shouldn't ever get here."
 
     def setup(self, cachedir = None):
         """setup target ext3 file system in preparation for an install"""
@@ -631,9 +635,7 @@ class ImageCreatorBase(object):
         for b in self._bindmounts:
             b.umount()
 
-        if self._instloop:
-            self._instloop.cleanup()
-            self._instloop = None
+        self._unmountInstallRoot()
 
     def teardown(self):
         if self._builddir:
@@ -884,6 +886,11 @@ class LoopImageCreator(ImageCreatorBase):
             self._instloop.mount()
         except MountError, e:
             raise InstallationError("Failed to loopback mount '%s' : %s" % (self.instloop.lofile, e))
+
+    def _unmountInstallRoot(self):
+        if self._instloop:
+            self._instloop.cleanup()
+            self._instloop = None
 
     def _resize2fs(self, image, n_blocks):
         dev_null = os.open("/dev/null", os.O_WRONLY)
