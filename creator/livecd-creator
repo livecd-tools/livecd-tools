@@ -546,6 +546,12 @@ class ImageCreatorBase(object):
         if hasattr(self.ks.handler.bootloader, "default") and self.ks.handler.bootloader.default:
             self._defaultKernel = self.ks.handler.bootloader.default
 
+        # if there's a method specified; turn it into a repo definition
+        try:
+            self.ks.handler.repo.methodToRepo()
+        except:
+            pass
+
 
     def __sanityCheckKS(self):
         """Ensure that the config we've been given is sane."""
@@ -667,10 +673,6 @@ class ImageCreatorBase(object):
 
         self.__writeFstab()
 
-        self._ayum = LiveCDYum()
-        self._ayum.setup(self._builddir + "/data",
-                        self._builddir + "/install_root")
-
     def unmountImage(self):
         """detaches system bind mounts and install_root for the file system and tears down loop devices used"""
         if self._ayum:
@@ -700,7 +702,18 @@ class ImageCreatorBase(object):
         os.chdir("/")
 
     def installPackages(self):
-        """install packages into target file system"""
+        """Install packages into install_root"""
+
+        self._ayum = LiveCDYum()
+        self._ayum.setup(self._builddir + "/data",
+                        self._builddir + "/install_root")
+
+        for repo in self.ks.handler.repo.repoList:
+            yr = self._ayum.addRepository(repo.name, repo.baseurl, repo.mirrorlist)
+            if hasattr(repo, "includepkgs"):
+                yr.includepkgs = repo.includepkgs
+            if hasattr(repo, "excludepkgs"):
+                yr.exclude = repo.excludepkgs
 
         if self.ks.handler.packages.excludeDocs:
             rpm.addMacro("_excludedocs","1")
@@ -930,18 +943,6 @@ class ImageCreatorBase(object):
         subprocess.call(["/bin/bash"], preexec_fn=self._rootRun)
 
     def install(self):
-        try:
-            self.ks.handler.repo.methodToRepo()
-        except:
-            pass
-
-        for repo in self.ks.handler.repo.repoList:
-            yr = self._ayum.addRepository(repo.name, repo.baseurl, repo.mirrorlist)
-            if hasattr(repo, "includepkgs"):
-                yr.includepkgs = repo.includepkgs
-            if hasattr(repo, "excludepkgs"):
-                yr.exclude = repo.excludepkgs
-
         self.installPackages()
         if os.path.exists("%s/install_root/usr/lib/anaconda-runtime/checkisomd5" %(self._builddir,)) or os.path.exists("%s/install_root/usr/bin/checkisomd5" %(self._builddir,)):        
             self._checkIsoMD5 = True
@@ -953,8 +954,10 @@ class ImageCreatorBase(object):
         net = ImageNetworkConfig(self.ks.handler.network, "%s/install_root" %(self._builddir,))
         net.write()
         self.__relabelSystem()
+
         self.createInitramfs()
         self.configureBootloader()
+
         self.runPost()
 
     def configureBootloader(self):
