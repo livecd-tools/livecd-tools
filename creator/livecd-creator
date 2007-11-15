@@ -491,25 +491,26 @@ class ImageNetworkConfig(object):
 
 class ImageCreator(object):
     def __init__(self, fsLabel):
-        self._ayum = None
+        self.ks = None
         self.fsLabel = fsLabel
-        self.skip_compression = False
         self.tmpdir = "/var/tmp"
 
-        self._checkIsoMD5 = False
-
+        self._ayum = None
         self._builddir = None
         self._instloop = None
         self._bindmounts = []
-        self.ks = None
+        self.__blocksizeKB = 4096
 
-        self.image_size = 4096 # in megabytes
-        self.blocksize = 4096 # in kilobytes
-        self.minimized_image_size = 0 # in kilobytes
-
+        # defaults to allow some kickstart options to not be specified
         self._modules = []
         self._timeout = 10
         self._defaultKernel = "kernel"
+        self._imageSizeMB = 4096
+
+        # livecd specific options
+        self.skip_compression = False
+        self._checkIsoMD5 = False
+        self.__minsizeKB = 0
 
     def _getRequiredPackages(self):
         return []
@@ -535,7 +536,7 @@ class ImageCreator(object):
 
         for p in self.ks.handler.partition.partitions:
             if p.mountpoint == "/" and p.size:
-                self.image_size = int(p.size)
+                self._imageSizeMB = int(p.size)
 
         if len(self.ks.handler.packages.packageList) == 0 and len(self.ks.handler.packages.groupList) == 0:
             raise InstallationError("No packages or groups specified")
@@ -640,8 +641,8 @@ class ImageCreator(object):
                                                     %(self._builddir,),
                                                     "%s/install_root"
                                                     %(self._builddir,),
-                                                    self.image_size,
-                                                    self.blocksize,
+                                                    self._imageSizeMB,
+                                                    self.__blocksizeKB,
                                                     self.fsLabel)
 
         try:
@@ -1051,17 +1052,17 @@ class ImageCreator(object):
 
         subprocess.call(["/sbin/e2fsck", "-f", "-y", image])
 
-        n_blocks = os.stat(image)[stat.ST_SIZE] / self.blocksize
+        n_blocks = os.stat(image)[stat.ST_SIZE] / self.__blocksizeKB
 
         min_blocks = self._resize2fsToMinimal(image)
 
         # truncate the unused excess portion of the sparse file
         fd = os.open(image, os.O_WRONLY )
-        os.ftruncate(fd, min_blocks * self.blocksize)
+        os.ftruncate(fd, min_blocks * self.__blocksizeKB)
         os.close(fd)
 
-        self.minimized_image_size = min_blocks * self.blocksize / 1024L
-        print >> sys.stderr, "Installation target minimized to %dK" % (self.minimized_image_size)
+        self.__minsizeKB = min_blocks * self.__blocksizeKB / 1024L
+        print >> sys.stderr, "Installation target minimized to %dK" % (self.__minsizeKB)
 
         self._resize2fs(image, n_blocks)
 
@@ -1096,16 +1097,16 @@ class ImageCreator(object):
         rc = subprocess.call(["/sbin/dmsetup",
                               "--table",
                               "0 %d snapshot %s %s p 8"
-                              %(self.image_size * 1024L * 2L,
+                              %(self._imageSizeMB * 1024L * 2L,
                                 osloop.loopdev, minloop.loopdev),
                               "create",
                               "livecd-creator-%d" %(os.getpid(),) ])
         if rc != 0:
             raise InstallationError("Could not create genMinInstDelta snapshot device")
-        # resize snapshot device back to minimal (self.minimized_image_size)
+        # resize snapshot device back to minimal (self.__minsizeKB)
         rc = subprocess.call(["/sbin/resize2fs",
                               "/dev/mapper/livecd-creator-%d" %(os.getpid(),),
-                              "%dK" %(self.minimized_image_size,)])
+                              "%dK" %(self.__minsizeKB,)])
         if rc != 0:
             raise InstallationError("Could not shrink ext3fs image")
 
