@@ -473,7 +473,7 @@ class ImageCreatorBase(object):
         self.fsLabel = fsLabel
         self.tmpdir = "/var/tmp"
 
-        self._ayum = None
+        self.__ayum = None
         self._builddir = None
         self._instloop = None
         self._bindmounts = []
@@ -612,9 +612,9 @@ class ImageCreatorBase(object):
 
     def unmountImage(self):
         """detaches system bind mounts and install_root for the file system and tears down loop devices used"""
-        if self._ayum:
-            self._ayum.close()
-            self._ayum = None
+        if self.__ayum:
+            self.__ayum.close()
+            self.__ayum = None
 
         try:
             os.unlink(self._builddir + "/install_root/etc/mtab")
@@ -640,12 +640,12 @@ class ImageCreatorBase(object):
     def installPackages(self):
         """Install packages into install_root"""
 
-        self._ayum = LiveCDYum()
-        self._ayum.setup(self._builddir + "/data",
+        self.__ayum = LiveCDYum()
+        self.__ayum.setup(self._builddir + "/data",
                         self._builddir + "/install_root")
 
         for repo in self.ks.handler.repo.repoList:
-            yr = self._ayum.addRepository(repo.name, repo.baseurl, repo.mirrorlist)
+            yr = self.__ayum.addRepository(repo.name, repo.baseurl, repo.mirrorlist)
             if hasattr(repo, "includepkgs"):
                 yr.includepkgs = repo.includepkgs
             if hasattr(repo, "excludepkgs"):
@@ -657,7 +657,7 @@ class ImageCreatorBase(object):
         try:
             for pkg in (self.ks.handler.packages.packageList + self._getRequiredPackages()):
                 try:
-                    self._ayum.selectPackage(pkg)
+                    self.__ayum.selectPackage(pkg)
                 except yum.Errors.InstallError, e:
                     if self.ks.handler.packages.handleMissing != \
                            pykickstart.constants.KS_MISSING_IGNORE:
@@ -667,7 +667,7 @@ class ImageCreatorBase(object):
 
             for group in self.ks.handler.packages.groupList:
                 try:
-                    self._ayum.selectGroup(group.name, group.include)
+                    self.__ayum.selectGroup(group.name, group.include)
                 except (yum.Errors.InstallError, yum.Errors.GroupsError), e:
                     if self.ks.handler.packages.handleMissing != \
                            pykickstart.constants.KS_MISSING_IGNORE:
@@ -675,17 +675,17 @@ class ImageCreatorBase(object):
                     else:
                         print >> sys.stderr, "Unable to find group '%s'; skipping" %(group.name,)
 
-            map(lambda pkg: self._ayum.deselectPackage(pkg),
+            map(lambda pkg: self.__ayum.deselectPackage(pkg),
                 self.ks.handler.packages.excludedList +
                 self._getRequiredExcludePackages())
 
-            self._ayum.runInstall()
+            self.__ayum.runInstall()
         except yum.Errors.RepoError, e:
             raise InstallationError("Unable to download from repo : %s" %(e,))
         except yum.Errors.YumBaseError, e:
             raise InstallationError("Unable to install: %s" %(e,))
         finally:
-            self._ayum.closeRpmDB()
+            self.__ayum.closeRpmDB()
 
         # do some clean up to avoid lvm info leakage.  this sucks.
         for subdir in ("cache", "backup", "archive"):
