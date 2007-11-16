@@ -827,7 +827,7 @@ class ImageCreatorBase(object):
         # finally relabel all files
         if self.ks.handler.selinux.selinux:
             if os.path.exists("%s/sbin/restorecon" %(self._instroot,)):
-                subprocess.call(["/sbin/restorecon", "-v", "-r", "/"],
+                subprocess.call(["/sbin/restorecon", "-l", "-v", "-r", "/"],
                                 preexec_fn=self._rootRun)
 
     def launchShell(self):
