@@ -8,6 +8,10 @@
 # Inspired by similar programs from a bunch of other distributions.
 #
 
+# Override any TMPDIR setting from the environment, since this script is
+# run in a chroot: a nonstandard $TMPDIR setting would make mktemp fail.
+export TMPDIR=/tmp
+
 usage() {
     echo "$0 [--help] <out-initrd-image> <kernel-version>"
     echo
