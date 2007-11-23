@@ -614,6 +614,15 @@ class ImageCreatorBase(object):
         # IMAGE-SPECIFIC-IMPLEMENT
         raise RuntimeError, "I shouldn't ever get here."
 
+    def _doBindMounts(self):
+        for b in self._bindmounts:
+            b.mount()
+
+    def _undoBindMounts(self):
+        self._bindmounts.reverse()
+        for b in self._bindmounts:
+            b.umount()
+
     def mountImage(self, cachedir = None):
         """setup target ext3 file system in preparation for an install"""
 
@@ -641,8 +650,7 @@ class ImageCreatorBase(object):
                           (cachesrc, "/var/cache/yum")]:
             self._bindmounts.append(BindChrootMount(f, self._builddir + "/install_root", dest))
 
-        for b in self._bindmounts:
-            b.mount()
+        self._doBindMounts()
 
         # make sure /etc/mtab is current inside install_root
         os.symlink("../proc/mounts", self._instroot + "/etc/mtab")
@@ -660,9 +668,7 @@ class ImageCreatorBase(object):
         except OSError:
             pass
 
-        self._bindmounts.reverse()
-        for b in self._bindmounts:
-            b.umount()
+        self._undoBindMounts()
 
         self._unmountInstallRoot()
 
