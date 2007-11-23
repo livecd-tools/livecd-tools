@@ -581,13 +581,12 @@ class ImageCreatorBase(object):
         # setup temporary build dirs
         try:
             self._builddir = tempfile.mkdtemp(dir=self.tmpdir, prefix="livecd-creator-")
-            os.makedirs(self._instroot)
         except OSError, (err, msg):
             raise InstallationError("Failed create build directory in %s: %s" % (self.tmpdir, msg))
 
-        os.makedirs(self._builddir + "/out/LiveOS")
-        os.makedirs(self._builddir + "/data/LiveOS")
-        os.makedirs(self._builddir + "/yum-cache")
+        os.makedirs(self._builddir + "/install_root")
+        os.makedirs(self._builddir + "/data")
+        os.makedirs(self._builddir + "/out")
 
         self._mountInstallRoot()
 
@@ -595,10 +594,12 @@ class ImageCreatorBase(object):
         for d in ("/etc", "/boot", "/var/log", "/var/cache/yum"):
             makedirs("%s/%s" %(self._instroot,d))
 
-        # bind mount system directories into install_root/
+        cachesrc = (cachedir or self._builddir) + "/yum-cache"
+        makedirs(cachesrc)
+
         for (f, dest) in [("/sys", None), ("/proc", None), ("/dev", None),
                           ("/dev/pts", None), ("/selinux", None),
-                          ((cachedir or self._builddir) + "/yum-cache", "/var/cache/yum")]:
+                          (cachesrc, "/var/cache/yum")]:
             self._bindmounts.append(BindChrootMount(f, self._builddir + "/install_root", dest))
 
         for b in self._bindmounts:
@@ -1034,6 +1035,7 @@ class LoopImageCreator(ImageCreatorBase):
         pass
 
     def package(self):
+        os.makedirs(self._outdir + "/LiveOS")
         self.minimizeImage()
 
 class LiveImageCreatorBase(LoopImageCreator):
