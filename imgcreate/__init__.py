@@ -978,12 +978,15 @@ class LoopImageCreator(ImageCreatorBase):
     # cleanupDeleted removes unused data from the sparse ext3 os image file.
     # The process involves: resize2fs-to-minimal, truncation,
     # resize2fs-to-uncompressed-size (with implicit resparsification)
-    def cleanupDeleted(self):
+    def cleanupDeleted(self, imageSizeMB = None):
         image = "%s/data/LiveOS/ext3fs.img" %(self._builddir,)
 
         subprocess.call(["/sbin/e2fsck", "-f", "-y", image])
 
-        n_blocks = os.stat(image)[stat.ST_SIZE] / self.__blocksize
+        if imageSizeMB is None:
+            n_blocks = os.stat(image)[stat.ST_SIZE] / self.__blocksize
+        else:
+            n_blocks = imageSizeMB * 1024 / self.__blocksize
 
         min_blocks = self._resize2fsToMinimal(image)
 
