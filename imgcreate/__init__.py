@@ -826,7 +826,7 @@ class ImageCreatorBase(object):
             f = file(path, "w+")
             os.chmod(path, 0644)
 
-    def runPost(self):
+    def runPost(self, env = {}):
         # and now, for arbitrary %post scripts
         for s in filter(lambda s: s.type == pykickstart.parser.KS_SCRIPT_POST,
                         self.ks.handler.scripts):
@@ -836,13 +836,12 @@ class ImageCreatorBase(object):
             os.chmod(path, 0700)
 
             if not s.inChroot:
-                env = {"BUILD_DIR": self._builddir,
-                       "INSTALL_ROOT": self._instroot,
-                       "LIVE_ROOT": "%s/out" %(self._builddir,)}
+                env["BUILD_DIR"] = self._builddir,
+                env["INSTALL_ROOT"] = self._instroot
+                env["LIVE_ROOT"] = "%s/out" %(self._builddir,)
                 preexec = lambda: os.chdir(self._builddir,)
                 script = path
             else:
-                env = {}
                 preexec = self._rootRun
                 script = "/tmp/%s" %(os.path.basename(path),)
 
