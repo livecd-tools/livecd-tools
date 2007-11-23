@@ -161,13 +161,21 @@ class SparseExt3LoopbackMount(LoopbackMount):
         self.blocksize = blocksize
         self.fslabel = fslabel
 
-    def _createSparseFile(self):
-        makedirs(os.path.dirname(self.lofile))
+    def _expandSparseFile(self, create = False):
+        flags = os.O_WRONLY
+        if create:
+            flags |= os.O_CREAT
+            makedirs(os.path.dirname(self.lofile))
 
-        # create the sparse file
-        fd = os.open(self.lofile, os.O_WRONLY | os.O_CREAT)
+        fd = os.open(self.lofile, flags)
+
         os.lseek(fd, self.size, 0)
         os.write(fd, '\x00')
+        os.close(fd)
+
+    def _truncateSparseFile(self):
+        fd = os.open(self.lofile, os.O_WRONLY )
+        os.ftruncate(fd, self.size)
         os.close(fd)
 
     def _formatFilesystem(self):
@@ -179,10 +187,38 @@ class SparseExt3LoopbackMount(LoopbackMount):
         rc = subprocess.call(["/sbin/tune2fs", "-c0", "-i0", "-Odir_index",
                               "-ouser_xattr,acl", self.lofile])
 
+    def _resizeFilesystem(self):
+        dev_null = os.open("/dev/null", os.O_WRONLY)
+        try:
+            return subprocess.call(["/sbin/resize2fs",
+                                    self.lofile, "%sk" % (self.size / 1024,)],
+                                   stdout = dev_null, stderr = dev_null)
+        finally:
+            os.close(dev_null)
+
+    def create(self):
+        self._expandSparseFile(create = True)
+        self._formatFilesystem()
+
+    def resize(self):
+        current_size = os.stat(self.lofile)[stat.ST_SIZE]
+
+        if self.size == current_size:
+            return
+
+        if self.size < current_size:
+            self._expandSparseFile()
+
+        self._resizeFilesystem()
+
+        if self.size > current_size:
+            self._truncateSparseFile()
+
     def mount(self):
         if not os.path.isfile(self.lofile):
-            self._createSparseFile()
-            self._formatFilesystem()
+            self.create()
+        else:
+            self.resize()
         return LoopbackMount.mount(self)
 
 class TextProgress(object):
