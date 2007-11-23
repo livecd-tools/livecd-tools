@@ -915,6 +915,17 @@ class LoopImageCreator(ImageCreatorBase):
         self._instloop = None
         self._imgbase = None
 
+    def _get_blocksize(self):
+        return self.__blocksize
+    def _set_blocksize(self, val):
+        if self._instloop:
+            raise InstallationError("_blocksize must be set before calling mountImage()")
+        try:
+            self.__blocksize = int(val)
+        except ValueError:
+            raise InstallationError("'%s' is not a valid integer value for _blocksize" % val)
+    _blocksize = property(_get_blocksize, _set_blocksize)
+
     def _mountInstallRoot(self):
         """Do any creation necessary and mount the install root"""
         if self._imgbase:
