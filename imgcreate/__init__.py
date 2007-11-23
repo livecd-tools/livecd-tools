@@ -46,6 +46,16 @@ class InstallationError(Exception):
     def __init__(self, msg):
         Exception.__init__(self, msg)
 
+def makedirs(dirname):
+    """A version of os.makedirs() that doesn't throw an
+    exception if the leaf directory already exists.
+    """
+    try:
+        os.makedirs(dirname)
+    except OSError, (err, msg):
+        if err != errno.EEXIST:
+            raise
+
 class BindChrootMount:
     """Represents a bind mount of a directory into a chroot."""
     def __init__(self, src, chroot, dest = None):
@@ -60,8 +70,7 @@ class BindChrootMount:
 
     def mount(self):
         if not self.mounted:
-            if not os.path.exists(self.dest):
-                os.makedirs(self.dest)
+            makedirs(self.dest)
             rc = subprocess.call(["/bin/mount", "--bind", self.src, self.dest])
             if rc != 0:
                 raise MountError("Bind-mounting '%s' to '%s' failed" % (self.src, self.dest))
@@ -153,9 +162,7 @@ class SparseExt3LoopbackMount(LoopbackMount):
         self.fslabel = fslabel
 
     def _createSparseFile(self):
-        dir = os.path.dirname(self.lofile)
-        if not os.path.isdir(dir):
-            os.makedirs(dir)
+        makedirs(os.path.dirname(self.lofile))
 
         # create the sparse file
         fd = os.open(self.lofile, os.O_WRONLY | os.O_CREAT)
@@ -425,11 +432,7 @@ class ImageNetworkConfig(object):
         f.close()
 
     def write(self):
-        try:
-            os.makedirs(self.instroot + "/etc/sysconfig/network-scripts")
-        except OSError, (err, msg):
-            if err != errno.EEXIST:
-                raise
+        makedirs(self.instroot + "/etc/sysconfig/network-scripts")
 
         useipv6 = False
         nodns = False
@@ -589,10 +592,7 @@ class ImageCreatorBase(object):
 
         # create a few directories that have to exist
         for d in ("/etc", "/boot", "/var/log", "/var/cache/yum"):
-            try:
-                os.makedirs("%s/%s" %(self._instroot,d))
-            except OSError:
-                pass
+            makedirs("%s/%s" %(self._instroot,d))
 
         # bind mount system directories into install_root/
         for (f, dest) in [("/sys", None), ("/proc", None), ("/dev", None),
