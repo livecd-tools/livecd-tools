@@ -180,8 +180,9 @@ class SparseExt3LoopbackMount(LoopbackMount):
                               "-ouser_xattr,acl", self.lofile])
 
     def mount(self):
-        self._createSparseFile()
-        self._formatFilesystem()
+        if not os.path.isfile(self.lofile):
+            self._createSparseFile()
+            self._formatFilesystem()
         return LoopbackMount.mount(self)
 
 class TextProgress(object):
@@ -1087,8 +1088,7 @@ class LiveImageCreatorBase(LoopImageCreator):
     def _mountInstallRoot(self):
         if self.isobase:
             self._baseOnIso(self.isobase)
-        else:
-            LoopImageCreator._mountInstallRoot(self)
+        LoopImageCreator._mountInstallRoot(self)
 
     def _hasCheckIsoMD5(self):
         if os.path.exists("%s/usr/lib/anaconda-runtime/checkisomd5" %(self._instroot,)) or os.path.exists("%s/usr/bin/checkisomd5" %(self._instroot,)):
