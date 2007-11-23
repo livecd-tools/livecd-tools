@@ -159,15 +159,14 @@ class SparseExt3LoopbackMount(LoopbackMount):
 
         # create the sparse file
         fd = os.open(self.lofile, os.O_WRONLY | os.O_CREAT)
-        off = long(self.size * 1024L * 1024L)
-        os.lseek(fd, off, 0)
+        os.lseek(fd, self.size, 0)
         os.write(fd, '\x00')
         os.close(fd)
 
     def _formatFilesystem(self):
         rc = subprocess.call(["/sbin/mkfs.ext3", "-F", "-L", self.fslabel,
                               "-m", "1", "-b", str(self.blocksize), self.lofile,
-                              str(self.size *  1024L * 1024L / self.blocksize)])
+                              str(self.size / self.blocksize)])
         if rc != 0:
             raise MountError("Error creating ext3 filesystem")
         rc = subprocess.call(["/sbin/tune2fs", "-c0", "-i0", "-Odir_index",
@@ -868,7 +867,7 @@ class LoopImageCreator(ImageCreatorBase):
         self._instloop = SparseExt3LoopbackMount("%s/data/LiveOS/ext3fs.img"
                                                 %(self._builddir,),
                                                 self._instroot,
-                                                self._imageSizeMB,
+                                                self._imageSizeMB * 1024L * 1024L,
                                                 self.__blocksize,
                                                 self.fsLabel)
 
