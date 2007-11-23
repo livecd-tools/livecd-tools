@@ -859,7 +859,7 @@ class LoopImageCreator(ImageCreatorBase):
     def __init__(self, *args):
         ImageCreatorBase.__init__(self, *args)
         self.__minsizeKB = 0
-        self.__blocksizeKB = 4096
+        self.__blocksize = 4096
 
         self._instloop = None
 
@@ -869,7 +869,7 @@ class LoopImageCreator(ImageCreatorBase):
                                                 %(self._builddir,),
                                                 self._instroot,
                                                 self._imageSizeMB,
-                                                self.__blocksizeKB,
+                                                self.__blocksize,
                                                 self.fsLabel)
 
         try:
@@ -927,16 +927,16 @@ class LoopImageCreator(ImageCreatorBase):
 
         subprocess.call(["/sbin/e2fsck", "-f", "-y", image])
 
-        n_blocks = os.stat(image)[stat.ST_SIZE] / self.__blocksizeKB
+        n_blocks = os.stat(image)[stat.ST_SIZE] / self.__blocksize
 
         min_blocks = self._resize2fsToMinimal(image)
 
         # truncate the unused excess portion of the sparse file
         fd = os.open(image, os.O_WRONLY )
-        os.ftruncate(fd, min_blocks * self.__blocksizeKB)
+        os.ftruncate(fd, min_blocks * self.__blocksize)
         os.close(fd)
 
-        self.__minsizeKB = min_blocks * self.__blocksizeKB / 1024L
+        self.__minsizeKB = min_blocks * self.__blocksize / 1024L
         print >> sys.stderr, "Installation target minimized to %dK" % (self.__minsizeKB)
 
         self.__resize2fs(image, n_blocks)
