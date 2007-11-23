@@ -591,14 +591,17 @@ class ImageCreatorBase(object):
                os.path.exists("/selinux/enforce"):
             raise InstallationError("SELinux requested but not enabled on host system")
 
+    def getFstabContents(self):
+        contents =  "/dev/root               /                       ext3    defaults,noatime 0 0\n"
+        contents += "devpts                  /dev/pts                devpts  gid=5,mode=620  0 0\n"
+        contents += "tmpfs                   /dev/shm                tmpfs   defaults        0 0\n"
+        contents += "proc                    /proc                   proc    defaults        0 0\n"
+        contents += "sysfs                   /sys                    sysfs   defaults        0 0\n"
+        return contents
 
     def __writeFstab(self):
         fstab = open(self._builddir + "/install_root/etc/fstab", "w")
-        fstab.write("/dev/root                /                      ext3    defaults,noatime 0 0\n")
-        fstab.write("devpts                  /dev/pts                devpts  gid=5,mode=620  0 0\n")
-        fstab.write("tmpfs                   /dev/shm                tmpfs   defaults        0 0\n")
-        fstab.write("proc                    /proc                   proc    defaults        0 0\n")
-        fstab.write("sysfs                   /sys                    sysfs   defaults        0 0\n")
+        fstab.write(self.getFstabContents())
         fstab.close()
 
     def _mountInstallRoot(self):
