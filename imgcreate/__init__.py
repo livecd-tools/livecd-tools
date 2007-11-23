@@ -475,7 +475,6 @@ class ImageCreatorBase(object):
 
         self.__ayum = None
         self._builddir = None
-        self._instloop = None
         self._bindmounts = []
 
         # defaults to allow some kickstart options to not be specified
@@ -861,6 +860,8 @@ class LoopImageCreator(ImageCreatorBase):
         ImageCreatorBase.__init__(self, *args)
         self.__minsizeKB = 0
         self.__blocksizeKB = 4096
+
+        self._instloop = None
 
     def _mountInstallRoot(self):
         """Do any creation necessary and mount the install root"""
