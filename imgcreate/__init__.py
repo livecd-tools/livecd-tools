@@ -863,9 +863,14 @@ class LoopImageCreator(ImageCreatorBase):
         self.__blocksize = 4096
 
         self._instloop = None
+        self._imgbase = None
 
     def _mountInstallRoot(self):
         """Do any creation necessary and mount the install root"""
+        if self._imgbase:
+            shutil.copyfile(self._imgbase,
+                            "%s/data/LiveOS/ext3fs.img" %(self._builddir,))
+
         self._instloop = SparseExt3LoopbackMount("%s/data/LiveOS/ext3fs.img"
                                                 %(self._builddir,),
                                                 self._instroot,
