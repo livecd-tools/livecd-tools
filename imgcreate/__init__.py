@@ -676,7 +676,7 @@ class ImageCreatorBase(object):
         os.chroot(self._instroot)
         os.chdir("/")
 
-    def installPackages(self):
+    def installPackages(self, repoUrls = {}):
         """Install packages into install_root"""
 
         self.__ayum = LiveCDYum()
@@ -684,7 +684,13 @@ class ImageCreatorBase(object):
                         self._builddir + "/install_root")
 
         for repo in self.ks.handler.repo.repoList:
-            yr = self.__ayum.addRepository(repo.name, repo.baseurl, repo.mirrorlist)
+            if repo.name in repoUrls:
+                baseurl = repoUrls[repo.name]
+                mirrorlist = None
+            else:
+                baseurl = repo.baseurl
+                mirrorlist = repo.mirrorlist
+            yr = self.__ayum.addRepository(repo.name, baseurl, mirrorlist)
             if hasattr(repo, "includepkgs"):
                 yr.includepkgs = repo.includepkgs
             if hasattr(repo, "excludepkgs"):
