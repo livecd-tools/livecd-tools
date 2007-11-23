@@ -958,52 +958,57 @@ class LoopImageCreator(ImageCreatorBase):
         # associate os image with loop device
         osloop = LoopbackMount("%s/data/LiveOS/ext3fs.img" %(self._builddir,), \
                                "None")
-        osloop.loopsetup()
 
         # associate overlay with loop device
         minloop = LoopbackMount("%s/out/LiveOS/osmin" %(self._builddir,), \
                                 "None")
-        minloop.loopsetup()
 
-        # create a snapshot device
-        rc = subprocess.call(["/sbin/dmsetup",
-                              "--table",
-                              "0 %d snapshot %s %s p 8"
-                              %(self._imageSizeMB * 1024L * 2L,
-                                osloop.loopdev, minloop.loopdev),
-                              "create",
-                              "livecd-creator-%d" %(os.getpid(),) ])
-        if rc != 0:
-            raise InstallationError("Could not create genMinInstDelta snapshot device")
-        # resize snapshot device back to minimal (self.__minsizeKB)
-        rc = self.__resize2fs("/dev/mapper/livecd-creator-%d" %(os.getpid(),),
-                              "%dK" %(self.__minsizeKB,))
-        if rc != 0:
-            raise InstallationError("Could not shrink ext3fs image")
-
-        # calculate how much delta data to keep
-        dmsetupOutput = subprocess.Popen(['/sbin/dmsetup', 'status',
-                                          "livecd-creator-%d" %(os.getpid(),)],
-                                         stdout=subprocess.PIPE,
-                                         stderr=open('/dev/null', 'w')
-                                         ).communicate()[0]
-
-        # The format for dmsetup status on a snapshot device that we are
-        # counting on here is as follows.
-        # e.g. "0 8388608 snapshot 416/1048576" or "A B snapshot C/D"
         try:
-            minInstDeltaDataLength = int((dmsetupOutput.split()[3]).split('/')[0])
-            print >> sys.stderr, "genMinInstDelta data length is %d 512 byte sectors" % (minInstDeltaDataLength)
-        except ValueError:
-            raise InstallationError("Could not calculate amount of data used by genMinInstDelta")
+            osloop.loopsetup()
+            minloop.loopsetup()
 
-        # tear down snapshot and loop devices
-        rc = subprocess.call(["/sbin/dmsetup", "remove",
-                              "livecd-creator-%d" %(os.getpid(),) ])
-        if rc != 0:
-            raise InstallationError("Could not remove genMinInstDelta snapshot device")
-        osloop.lounsetup()
-        minloop.lounsetup()
+            # create a snapshot device
+            rc = subprocess.call(["/sbin/dmsetup",
+                                  "--table",
+                                  "0 %d snapshot %s %s p 8"
+                                  %(self._imageSizeMB * 1024L * 2L,
+                                    osloop.loopdev, minloop.loopdev),
+                                  "create",
+                                  "livecd-creator-%d" %(os.getpid(),) ])
+            if rc != 0:
+                raise InstallationError("Could not create genMinInstDelta snapshot device")
+
+            try:
+                # resize snapshot device back to minimal (self.__minsizeKB)
+                rc = self.__resize2fs("/dev/mapper/livecd-creator-%d" %(os.getpid(),),
+                                      "%dK" %(self.__minsizeKB,))
+                if rc != 0:
+                    raise InstallationError("Could not shrink ext3fs image")
+
+                # calculate how much delta data to keep
+                dmsetupOutput = subprocess.Popen(['/sbin/dmsetup', 'status',
+                                                  "livecd-creator-%d" %(os.getpid(),)],
+                                                 stdout=subprocess.PIPE,
+                                                 stderr=open('/dev/null', 'w')
+                                                 ).communicate()[0]
+
+                # The format for dmsetup status on a snapshot device that we are
+                # counting on here is as follows.
+                # e.g. "0 8388608 snapshot 416/1048576" or "A B snapshot C/D"
+                try:
+                    minInstDeltaDataLength = int((dmsetupOutput.split()[3]).split('/')[0])
+                    print >> sys.stderr, "genMinInstDelta data length is %d 512 byte sectors" % (minInstDeltaDataLength)
+                except ValueError:
+                    raise InstallationError("Could not calculate amount of data used by genMinInstDelta")
+            finally:
+                # tear down snapshot and loop devices
+                rc = subprocess.call(["/sbin/dmsetup", "remove",
+                                      "livecd-creator-%d" %(os.getpid(),) ])
+                if rc != 0 and not sys.exc_info()[0]:
+                    raise InstallationError("Could not remove genMinInstDelta snapshot device")
+        finally:
+            osloop.cleanup()
+            minloop.cleanup()
 
         # truncate the unused excess portion of the sparse file
         fd = os.open("%s/out/LiveOS/osmin" %(self._builddir,), os.O_WRONLY )
