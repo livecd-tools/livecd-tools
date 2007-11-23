@@ -687,11 +687,11 @@ class ImageCreatorBase(object):
 
         # do some clean up to avoid lvm info leakage.  this sucks.
         for subdir in ("cache", "backup", "archive"):
-            for f in os.listdir("%s/etc/lvm/%s" %(self._instroot, subdir)):
-                try:
+            try:
+                for f in os.listdir("%s/etc/lvm/%s" %(self._instroot, subdir)):
                     os.unlink("%s/etc/lvm/%s/%s" %(self._instroot, subdir, f))
-                except:
-                    pass
+            except:
+                pass
 
     def _configureImage(self):
         # FIXME: this is a bit ugly, but with the current pykickstart
