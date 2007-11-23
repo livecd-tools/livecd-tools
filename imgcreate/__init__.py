@@ -1176,6 +1176,7 @@ class LiveImageCreatorBase(LoopImageCreator):
 
 
     def package(self):
+        LoopImageCreator.package(self)
         self._createSquashFS()
         self._createIso()
         self._implantIsoMD5()
