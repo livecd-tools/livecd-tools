@@ -1,6 +1,6 @@
 #!/usr/bin/python -tt
 #
-# imgcreate : Support for creating system images, including Live CDs
+# errors.py : exception definitions
 #
 # Copyright 2007, Red Hat  Inc.
 #
@@ -17,16 +17,15 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
-from imgcreate.live import *
-from imgcreate.creator import *
-from imgcreate.yuminst import *
-from imgcreate.kickstart import *
-from imgcreate.fs import *
+class CreatorError(Exception):
+    def __init__(self, msg):
+        Exception.__init__(self, msg)
 
-__all__ = (
-    'CreatorError',
-    'ImageCreator',
-    'LiveImageCreator',
-    'LoopImageCreator',
-    'read_kickstart'
-)
+class KickstartError(CreatorError):
+    pass
+class MountError(CreatorError):
+    pass
+class SnapshotError(CreatorError):
+    pass
+class SquashfsError(CreatorError):
+    pass

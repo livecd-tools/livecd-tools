@@ -24,6 +24,8 @@ import yum
 import rpmUtils
 import pykickstart.parser
 
+from yuminst import *
+
 class TextProgress(object):
     def start(self, filename, url, *args, **kwargs):
         sys.stdout.write("Retrieving %s " % (url,))
@@ -60,26 +62,22 @@ class LiveCDYum(yum.YumBase):
                 except:
                     pass
 
-    def _writeConf(self, datadir, installroot):
+    def _writeConf(self, confpath, installroot):
         conf  = "[main]\n"
         conf += "installroot=%s\n" % installroot
         conf += "cachedir=/var/cache/yum\n"
         conf += "plugins=0\n"
         conf += "reposdir=\n"
 
-        path = datadir + "/yum.conf"
-
-        f = file(path, "w+")
+        f = file(confpath, "w+")
         f.write(conf)
         f.close()
 
-        os.chmod(path, 0644)
+        os.chmod(confpath, 0644)
 
-        return path
-
-    def setup(self, datadir, installroot):
-        self.doConfigSetup(fn = self._writeConf(datadir, installroot),
-                           root = installroot)
+    def setup(self, confpath, installroot):
+        self._writeConf(confpath, installroot)
+        self.doConfigSetup(fn = confpath, root = installroot)
         self.conf.cache = 0
         self.doTsSetup()
         self.doRpmDBSetup()
@@ -144,9 +142,9 @@ class LiveCDYum(yum.YumBase):
         try:
             (res, resmsg) = self.buildTransaction()
         except yum.Errors.RepoError, e:
-            raise InstallationError("Unable to download from repo : %s" %(e,))
+            raise CreatorError("Unable to download from repo : %s" %(e,))
         if res != 2 and False:
-            raise InstallationError("Failed to build transaction : %s" % str.join("\n", resmsg))
+            raise CreatorError("Failed to build transaction : %s" % str.join("\n", resmsg))
         
         dlpkgs = map(lambda x: x.po, filter(lambda txmbr: txmbr.ts_state in ("i", "u"), self.tsInfo.getMembers()))
         self.downloadPkgs(dlpkgs)

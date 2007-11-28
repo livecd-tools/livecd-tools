@@ -19,26 +19,11 @@
 
 import os
 import os.path
-import stat
-import glob
 import sys
-import errno
-import string
-import tempfile
 import time
-import traceback
-import subprocess
-import shutil
 import optparse
 
-import yum
-import rpm
-import rpmUtils.arch
-import pykickstart
-import pykickstart.parser
-import pykickstart.version
-
-from imgcreate import *
+import imgcreate
 
 class Usage(Exception):
     def __init__(self, msg = None, no_error = False):
@@ -129,43 +114,28 @@ def main():
             fs_label = name + "-" + fs_label_suffix
         print "Using label %s" % (fs_label,)
 
-    ksversion = pykickstart.version.makeVersion()
-    ks = pykickstart.parser.KickstartParser(ksversion)
-    try:
-        ks.readKickstart(options.kscfg)
-    except IOError, (err, msg):
-        raise RuntimeError("Failed to read kickstart file '%s' : %s" % (kscfg, msg))
-    except pykickstart.errors.KickstartError, e:
-        raise RuntimeError("Failed to parse kickstart file '%s' : %s" % (kscfg, e))
+    ks = imgcreate.read_kickstart(options.kscfg)
 
-    target = LiveImageCreator(ks, fs_label)
-    target.skip_compression = options.skip_compression
-    target.isobase = options.base_on
-    target.tmpdir = options.tmpdir
+    creator = imgcreate.LiveImageCreator(ks, fs_label)
+    creator.tmpdir = options.tmpdir
+    creator.skip_compression = options.skip_compression
+    creator.skip_minimize = options.skip_minimize
 
     try:
-        target.mountImage(options.cachedir)
-        target.installPackages()
-        target.configureImage()
+        creator.mount(options.base_on, options.cachedir)
+        creator.install()
+        creator.configure()
         if options.give_shell:
             print "Launching shell. Exit to continue."
             print "----------------------------------"
-            target.launchShell()
-        target.unmountImage()
-
-        if not options.skip_minimize:
-            target.minimizeImage()
-        target.package()
-
-    except InstallationError, e:
+            creator.launch_shell()
+        creator.unmount()
+        creator.package()
+    except imgcreate.CreatorError, e:
         print >> sys.stderr, "Error creating Live CD : %s" % e
-        del target
         return 1
-    except:
-        exc = sys.exc_info()
-        del target
-        raise exc[0], exc[1], exc[2]
-    del target
+    finally:
+        creator.cleanup()
 
     return 0
 
