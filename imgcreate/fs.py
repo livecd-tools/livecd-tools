@@ -37,8 +37,8 @@ def makedirs(dirname):
         if err != errno.EEXIST:
             raise
 
-def mksquashfs(filelist, output):
-    args = ["/sbin/mksquashfs"] + filelist + [output]
+def mksquashfs(in_img, out_img):
+    args = ["/sbin/mksquashfs", in_img, out_img]
 
     if not sys.stdout.isatty():
         args.append("-no-progress")
@@ -391,6 +391,6 @@ def create_image_minimizer(path, image, minimal_size):
 
     cowloop.truncate(cow_used)
 
-    mksquashfs([cowloop.lofile], path)
+    mksquashfs(cowloop.lofile, path)
 
     os.unlink(cowloop.lofile)
