@@ -381,6 +381,9 @@ class LoopImageCreator(ImageCreator):
         self.__image_size = kickstart.get_image_size(self.ks,
                                                      4096L * 1024 * 1024)
 
+    #
+    # Properties
+    #
     def __get_image(self):
         if self.__imgdir is None:
             raise CreatorError("_image is not valid before calling mount()")
@@ -407,6 +410,15 @@ class LoopImageCreator(ImageCreator):
         self.__fstype = val
     _fstype = property(__get_fstype, __set_fstype)
 
+    #
+    # Helpers for subclasses
+    #
+    def _resparse(self, size = None):
+        return self.__instloop.resparse(size)
+        
+    #
+    # Actual implementation
+    #
     def _mount_instroot(self, base_on = None):
         """Do any creation necessary and mount the install root"""
         self.__imgdir = self._mkdtemp()
@@ -431,9 +443,6 @@ class LoopImageCreator(ImageCreator):
         if not self.__instloop is None:
             self.__instloop.cleanup()
 
-    def _resparse(self, size = None):
-        return self.__instloop.resparse(size)
-        
     def _stage_final_image(self):
         self._resparse()
         shutil.move(self._image, self._outdir + "/" + self.fslabel + ".img")

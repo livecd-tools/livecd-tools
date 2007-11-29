@@ -43,12 +43,38 @@ class LiveImageCreatorBase(LoopImageCreator):
         self._modules = ["=ata", "sym53c8xx", "aic7xxx", "=usb", "=firewire"]
         self._modules.extend(kickstart.get_modules(self.ks))
 
+    #
+    # Hooks for subclasses
+    #
+    def _configure_bootloader(self, isodir):
+        raise CreatorError("Bootloader configuration is arch-specific, "
+                           "but not implemented for this arch!")
+
     def _get_kernel_options(self):
         r = "ro quiet liveimg"
         if os.path.exists(self._instroot + "/usr/bin/rhgb"):
             r += " rhgb"
         return r
         
+    def _get_mkisofs_options(self, isodir):
+        return []
+
+    #
+    # Helpers for subclasses
+    #
+    def _has_checkisomd5(self):
+        def exists(instroot, path):
+            return os.path.exists(instroot + path)
+
+        if (exists(self._instroot, "/usr/lib/anaconda-runtime/checkisomd5") or
+            exists(self._instroot, "/usr/bin/checkisomd5")):
+            return True
+
+        return False
+
+    #
+    # Actual implementation
+    #
     def __base_on_iso(self, base_on):
         """helper function to extract ext3 file system from a live CD ISO"""
         isoloop = LoopbackMount(base_on, self._mkdtemp())
@@ -98,16 +124,6 @@ class LiveImageCreatorBase(LoopImageCreator):
         if not base_on is None:
             self.__base_on_iso(base_on)
         LoopImageCreator._mount_instroot(self)
-
-    def _has_checkisomd5(self):
-        def exists(instroot, path):
-            return os.path.exists(instroot + path)
-
-        if (exists(self._instroot, "/usr/lib/anaconda-runtime/checkisomd5") or
-            exists(self._instroot, "/usr/bin/checkisomd5")):
-            return True
-
-        return False
 
     def __ensure_isodir(self):
         if self.__isodir is None:
@@ -180,13 +196,6 @@ class LiveImageCreatorBase(LoopImageCreator):
 
         os.unlink(self._instroot + "/sbin/mayflower")
         os.unlink(self._instroot + "/etc/mayflower.conf")
-
-    def _configure_bootloader(self, isodir):
-        raise CreatorError("Bootloader configuration is arch-specific, "
-                           "but not implemented for this arch!")
-
-    def _get_mkisofs_options(self, isodir):
-        return []
 
     def __create_iso(self, isodir):
         iso = self._outdir + "/" + self.fslabel + ".iso"
