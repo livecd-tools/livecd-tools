@@ -311,6 +311,8 @@ class DeviceMapperSnapshot(object):
                               "create", self__name,
                               "--table", table])
         if rc != 0:
+            self.cowloop.cleanup()
+            self.imgloop.cleanup()
             raise SnapshotError("Could not create snapshot device")
 
         self.__created = True
