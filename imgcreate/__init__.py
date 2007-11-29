@@ -23,6 +23,23 @@ from imgcreate.yuminst import *
 from imgcreate.kickstart import *
 from imgcreate.fs import *
 
+"""A set of classes for building Fedora system images.
+
+The following image creators are available:
+  - ImageCreator - installs to a directory
+  - LoopImageCreator - installs to an ext3 image
+  - LiveImageCreator - installs to a bootable ISO
+
+Each of the creator classes are designed to be subclassable, allowing the user
+to create new creator subclasses in order to support the building other types
+of system images.
+
+Also exported are:
+  - CreatorError - all exceptions throw are of this type
+  - read_kickstart() - a utility function for kickstart parsing
+
+"""
+
 __all__ = (
     'CreatorError',
     'ImageCreator',

@@ -18,6 +18,7 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 class CreatorError(Exception):
+    """An exception base class for all imgcreate errors."""
     def __init__(self, msg):
         Exception.__init__(self, msg)
 

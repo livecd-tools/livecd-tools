@@ -36,10 +36,38 @@ from imgcreate.yuminst import *
 from imgcreate import kickstart
 
 class ImageCreator(object):
+    """Installs a system to a chroot directory.
+
+    ImageCreator is the simplest creator class available; it will install and
+    configure a system image according to the supplied kickstart file.
+
+    e.g.
+
+      import imgcreate
+      ks = imgcreate.read_kickstart("foo.ks")
+      imgcreate.ImageCreator(ks, "foo").create()
+
+    """
+
     def __init__(self, ks, fslabel):
+        """Initialize an ImageCreator instance.
+
+        ks -- a pykickstart.KickstartParser instance; this instance will be
+              used to drive the install by e.g. providing the list of packages
+              to be installed, the system configuration and %post scripts
+
+        fslabel -- a string used to label any filesystems created or as a basis
+                   for image filenames
+
+        """
         self.ks = ks
+        """A pykickstart.KickstartParser instance."""
+
         self.fslabel = fslabel
+        """A string used to label filesystems."""
+
         self.tmpdir = "/var/tmp"
+        """The directory in which all temporary files will be created."""
 
         self.__builddir = None
         self.__bindmounts = []
@@ -176,7 +204,23 @@ class ImageCreator(object):
         fstab.close()
 
     def mount(self, base_on = None, cachedir = None):
-        """setup target ext3 file system in preparation for an install"""
+        """Setup the target filesystem in preparation for an install.
+
+        This function sets up the filesystem which the ImageCreator will
+        install into and configure. The ImageCreator class merely creates an
+        install root directory, bind mounts some system directories (e.g. /dev)
+        and writes out /etc/fstab. Other subclasses may also e.g. create a
+        sparse file, format it and loopback mount it to the install root.
+
+        base_on -- a previous install on which to base this install; defaults
+                   to None, causing a new image to be created
+
+        cachedir -- a directory in which to store the Yum cache; defaults to
+                    None, causing a new cache to be created; by setting this
+                    to another directory, the same cache can be reused across
+                    multiple installs.
+
+        """
         self.__ensure_builddir()
 
         os.makedirs(self._instroot)
@@ -203,8 +247,13 @@ class ImageCreator(object):
         self.__write_fstab()
 
     def unmount(self):
-        """detaches system bind mounts and _instroot for the file system and
-        tears down loop devices used"""
+        """Unmounts the target filesystem.
+
+        The ImageCreator class detaches the system from the install root, but
+        other subclasses may also detach the loopback mounted filesystem image
+        from the install root.
+
+        """
         try:
             os.unlink(self._instroot + "/etc/mtab")
         except OSError:
@@ -215,6 +264,22 @@ class ImageCreator(object):
         self._unmount_instroot()
 
     def cleanup(self):
+        """Unmounts the target filesystem and deletes temporary files.
+
+        This method calls unmount() and then deletes any temporary files and
+        directories that were created on the host system while building the
+        image.
+
+        Note, make sure to call this method once finished with the creator
+        instance in order to ensure no stale files are left on the host e.g.:
+
+          creator = ImageCreator(ks, fslabel)
+          try:
+              creator.create()
+          finally:
+              creator.cleanup()
+
+        """
         if not self.__builddir:
             return
 
@@ -260,7 +325,17 @@ class ImageCreator(object):
             ayum.deselectPackage(pkg)
         
     def install(self, repo_urls = {}):
-        """Install packages into _instroot"""
+        """Install packages into the install root.
+
+        This function installs the packages listed in the supplied kickstart
+        into the install root. By default, the packages are installed from the
+        repository URLs specified in the kickstart.
+
+        repo_urls -- a dict which maps a repository name to a repository URL;
+                     if supplied, this causes any repository URLs specified in
+                     the kickstart to be overridden.
+
+        """
         yum_conf = self._mktemp(prefix = "yum.conf-")
 
         ayum = LiveCDYum()
@@ -330,6 +405,15 @@ class ImageCreator(object):
                 os.unlink(path)
 
     def configure(self):
+        """Configure the system image according to the kickstart.
+
+        This method applies the (e.g. keyboard or network) configuration
+        specified in the kickstart and executes the kickstart %post scripts.
+
+        If neccessary, it also prepares the image to be bootable by e.g.
+        creating an initrd and bootloader configuration.
+
+        """
         ksh = self.ks.handler
 
         kickstart.LanguageConfig(self._instroot).apply(ksh.lang)
@@ -349,10 +433,26 @@ class ImageCreator(object):
         self.__run_post_scripts()
 
     def launch_shell(self):
+        """Launch a shell in the install root.
+
+        This method is launches a bash shell chroot()ed in the install root;
+        this can be useful for debugging.
+
+        """
         subprocess.call(["/bin/bash"], preexec_fn = self._chroot)
 
     def package(self, destdir = "."):
-        """Create a nice package for delivery of the image."""
+        """Prepares the created image for final delivery.
+
+        In its simplest form, this method merely copies the install root to the
+        supplied destination directory; other subclasses may choose to package
+        the image by e.g. creating a bootable ISO containing the image and
+        bootloader configuration.
+
+        destdir -- the directory into which the final image should be moved;
+                   this defaults to the current directory.
+
+        """
         self._stage_final_image()
 
         for f in os.listdir(self._outdir):
@@ -360,8 +460,13 @@ class ImageCreator(object):
                         os.path.join(destdir, f))
 
     def create(self):
-        """This is the simplest method to generate an image from the given
-        configuration."""
+        """Install, configure and package an image.
+
+        This method is a utility method which creates and image by calling some
+        of the other methods in the following order - mount(), install(),
+        configure(), unmount and package().
+
+        """
         self.mount()
         self.install()
         self.configure()
@@ -369,7 +474,20 @@ class ImageCreator(object):
         self.package()
 
 class LoopImageCreator(ImageCreator):
+    """Installs a system into a loopback-mountable filesystem image.
+
+    LoopImageCreator is a straightforward ImageCreator subclass; the system
+    is installed into an ext3 filesystem on a sparse file which can be
+    subsequently loopback-mounted.
+
+    """
+
     def __init__(self, *args):
+        """Initialize a LoopImageCreator instance.
+
+        This method takes the same arguments as ImageCreator.__init__().
+
+        """
         ImageCreator.__init__(self, *args)
         self.__minsize_KB = 0
         self.__blocksize = 4096

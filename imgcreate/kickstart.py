@@ -32,6 +32,15 @@ import imgcreate.errors as errors
 import imgcreate.fs as fs
 
 def read_kickstart(path):
+    """Parse a kickstart file and return a KickstartParser instance.
+
+    This is a simple utility function which takes a path to a kickstart file,
+    parses it and returns a pykickstart KickstartParser instance which can
+    be then passed to an ImageCreator constructor.
+
+    If an error occurs, a CreatorError exception is thrown.
+
+    """
     version = ksversion.makeVersion()
     ks = ksparser.KickstartParser(version)
     try:

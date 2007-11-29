@@ -30,10 +30,36 @@ from imgcreate.creator import *
 MAYFLOWER_PATH = "/usr/lib/livecd-creator/mayflower"
 
 class LiveImageCreatorBase(LoopImageCreator):
+    """A base class for LiveCD image creators.
+
+    This class serves as a base class for the architecture-specific LiveCD
+    image creator subclass, LiveImageCreator.
+
+    LiveImageCreator creates a bootable ISO containing the system image,
+    bootloader, bootloader configuration, kernel and initramfs.
+
+    """
+
     def __init__(self, *args):
+        """Initialise a LiveImageCreator instance.
+
+        This method takes the same arguments as ImageCreator.__init__().
+
+        """
         LoopImageCreator.__init__(self, *args)
+
         self.skip_compression = False
+        """Controls whether to use squashfs to compress the image."""
+
         self.skip_minimize = False
+        """Controls whether an image minimizing snapshot should be created.
+
+        This snapshot can be used when copying the system image from the ISO in
+        order to minimize the amount of data that needs to be copied; simply,
+        it makes it possible to create a version of the image's filesystem with
+        no spare space.
+
+        """
 
         self.__isodir = None
 
