@@ -87,12 +87,6 @@ class ImageCreator(object):
     def _get_excluded_packages(self):
         return []
 
-    def _get_kernel_options(self):
-        r = "ro quiet liveimg"
-        if os.path.exists(self._instroot + "/usr/bin/rhgb"):
-            r += " rhgb"
-        return r
-        
     def _get_fstab(self):
         s =  "/dev/root  /         ext3    defaults,noatime 0 0\n"
         s += "devpts     /dev/pts  devpts  gid=5,mode=620   0 0\n"

@@ -43,6 +43,12 @@ class LiveImageCreatorBase(LoopImageCreator):
         self._modules = ["=ata", "sym53c8xx", "aic7xxx", "=usb", "=firewire"]
         self._modules.extend(kickstart.get_modules(self.ks))
 
+    def _get_kernel_options(self):
+        r = "ro quiet liveimg"
+        if os.path.exists(self._instroot + "/usr/bin/rhgb"):
+            r += " rhgb"
+        return r
+        
     def __base_on_iso(self, base_on):
         """helper function to extract ext3 file system from a live CD ISO"""
         isoloop = LoopbackMount(base_on, self._mkdtemp())
