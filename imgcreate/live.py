@@ -106,19 +106,18 @@ class LiveImageCreatorBase(LoopImageCreator):
     def __ensure_isodir(self):
         if self.__isodir is None:
             self.__isodir = self._mkdtemp("iso-")
+        return self.__isodir
 
     def _create_bootconfig(self):
         """Configure the image so that it's bootable."""
         self._create_initramfs()
-        self.__ensure_isodir()
-        self._configure_bootloader(self.__isodir)
+        self._configure_bootloader(self.__ensure_isodir())
 
     def _get_post_scripts_env(self, in_chroot):
         env = LoopImageCreator._get_post_scripts_env(self, in_chroot)
 
         if not in_chroot:
-            self.__ensure_isodir()
-            env["LIVE_ROOT"] = self.__isodir
+            env["LIVE_ROOT"] = self.__ensure_isodir()
 
         return env
 
@@ -215,7 +214,7 @@ class LiveImageCreatorBase(LoopImageCreator):
 
     def _stage_final_image(self):
         try:
-            makedirs(self.__isodir + "/LiveOS")
+            makedirs(self.__ensure_isodir() + "/LiveOS")
 
             minimal_size = self._resparse()
 
@@ -228,7 +227,7 @@ class LiveImageCreatorBase(LoopImageCreator):
             else:
                 fs.mksquashfs(self._image, self.__isodir + "/LiveOS/squashfs.img")
 
-            self.__create_iso(isodir)
+            self.__create_iso(self.__isodir)
         finally:
             shutil.rmtree(self.__isodir, ignore_errors = True)
             self.__isodir = None
