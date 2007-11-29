@@ -19,6 +19,7 @@
 
 import os
 import os.path
+import sys
 import errno
 import stat
 import subprocess
@@ -302,7 +303,7 @@ class DeviceMapperSnapshot(object):
 
         size = os.stat(self.imgloop.lofile)[stat.ST_SIZE]
 
-        table = "0 %d snapshot %s %s p 8" % (size,
+        table = "0 %d snapshot %s %s p 8" % (size / 512,
                                              self.imgloop.loopdev,
                                              self.cowloop.loopdev)
 
@@ -368,8 +369,8 @@ class DeviceMapperSnapshot(object):
 #   7) Truncate the COW, removing unused space
 #   8) Create a squashfs of the COW
 #
-def create_image_minimizer(path, image, mimimal_size):
-    imgloop = LoopbackMount(self._image, "None")
+def create_image_minimizer(path, image, minimal_size):
+    imgloop = LoopbackMount(image, "None")
 
     cowloop = SparseLoopbackMount(os.path.dirname(path) + "osmin",
                                   None, 64L * 1024L * 1024L)

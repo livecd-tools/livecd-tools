@@ -198,7 +198,7 @@ class LiveImageCreatorBase(LoopImageCreator):
         if subprocess.call(args) != 0:
             raise CreatorError("ISO creation failed!")
 
-        self.__implant_md5sum(self, iso)
+        self.__implant_md5sum(iso)
 
     def __implant_md5sum(self, iso):
         """Implant an isomd5sum."""
@@ -219,13 +219,13 @@ class LiveImageCreatorBase(LoopImageCreator):
             minimal_size = self._resparse()
 
             if not self.skip_minimize:
-                fs.create_image_minimizer(self.__isodir + "/LiveOS/osmin.img",
-                                          self._image, minimal_size)
+                create_image_minimizer(self.__isodir + "/LiveOS/osmin.img",
+                                       self._image, minimal_size)
 
             if self.skip_compression:
                 shutil.move(self._image, self.__isodir + "/LiveOS/ext3fs.img")
             else:
-                fs.mksquashfs(self._image, self.__isodir + "/LiveOS/squashfs.img")
+                mksquashfs(self._image, self.__isodir + "/LiveOS/squashfs.img")
 
             self.__create_iso(self.__isodir)
         finally:
@@ -234,7 +234,7 @@ class LiveImageCreatorBase(LoopImageCreator):
 
 class x86LiveImageCreator(LiveImageCreatorBase):
     """ImageCreator for x86 machines"""
-    def _get_mkisofs_options(self):
+    def _get_mkisofs_options(self, isodir):
         return [ "-b", "isolinux/isolinux.bin",
                  "-c", "isolinux/boot.cat",
                  "-no-emul-boot", "-boot-info-table",
