@@ -85,37 +85,128 @@ class ImageCreator(object):
             raise CreatorError("_instroot is not valid before calling mount()")
         return self.__builddir + "/install_root"
     _instroot = property(__get_instroot)
+    """The location of the install root directory.
+
+    This is the directory into which the system is installed. Subclasses may
+    mount a filesystem image here or copy files to/from here.
+
+    Note, this directory does not exist before ImageCreator.mount() is called.
+
+    Note also, this is a read-only attribute.
+
+    """
 
     def __get_outdir(self):
         if self.__builddir is None:
             raise CreatorError("_outdir is not valid before calling mount()")
         return self.__builddir + "/out"
     _outdir = property(__get_outdir)
+    """The staging location for the final image.
+
+    This is where subclasses should stage any files that are part of the final
+    image. ImageCreator.package() will copy any files found here into the
+    requested destination directory.
+
+    Note, this directory does not exist before ImageCreator.mount() is called.
+
+    Note also, this is a read-only attribute.
+
+    """
 
     #
     # Hooks for subclasses
     #
     def _mount_instroot(self, base_on = None):
-        """Do any creation necessary and mount the install root"""
+        """Mount or prepare the install root directory.
+
+        This is the hook where subclasses may prepare the install root by e.g.
+        mounting creating and loopback mounting a filesystem image to
+        _instroot.
+
+        There is no default implmentation.
+
+        base_on -- this is the value passed to mount() and can be interpreted
+                   as the subclass wishes; it might e.g. be the location of
+                   a previously created ISO containing a system image.
+
+        """
         pass
 
     def _unmount_instroot(self):
-        """Tear down the install root."""
+        """Undo anything performed in _mount_instroot().
+
+        This is the hook where subclasses must undo anything which was done
+        in _mount_instroot(). For example, if a filesystem image was mounted
+        onto _instroot, it should be unmounted here.
+
+        There is no default implmentation.
+
+        """
         pass
 
     def _create_bootconfig(self):
-        """Configure the image so that it's bootable."""
+        """Configure the image so that it's bootable.
+
+        This is the hook where subclasses may prepare the image for booting by
+        e.g. creating an initramfs and bootloader configuration.
+
+        This hook is called while the install root is still mounted, after the
+        packages have been installed and the kickstart configuration has been
+        applied, but before the %post scripts have been executed.
+
+        There is no default implmentation.
+
+        """
         pass
 
     def _stage_final_image(self):
+        """Stage the final system image in _outdir.
+
+        This is the hook where subclasses should place the image in _outdir
+        so that package() can copy it to the requested destination directory.
+
+        By default, this moves the install root into _outdir.
+
+        """
         shutil.move(self._instroot, self._outdir + "/" + self.fslabel)
 
     def _get_required_packages(self):
+        """Return a list of required packages.
+
+        This is the hook where subclasses may specify a set of packages which
+        it requires to be installed.
+
+        This returns an empty list by default.
+
+        Note, subclasses should usually chain up to the base class
+        implementation of this hook.
+
+        """
         return []
+
     def _get_excluded_packages(self):
+        """Return a list of excluded packages.
+
+        This is the hook where subclasses may specify a set of packages which
+        it requires _not_ to be installed.
+
+        This returns an empty list by default.
+
+        Note, subclasses should usually chain up to the base class
+        implementation of this hook.
+
+        """
         return []
 
     def _get_fstab(self):
+        """Return the desired contents of /etc/fstab.
+
+        This is the hook where subclasses may specify the contents of
+        /etc/fstab by returning a string containing the desired contents.
+
+        A sensible default implementation is provided.
+
+        """
         s =  "/dev/root  /         ext3    defaults,noatime 0 0\n"
         s += "devpts     /dev/pts  devpts  gid=5,mode=620   0 0\n"
         s += "tmpfs      /dev/shm  tmpfs   defaults         0 0\n"
@@ -124,12 +215,35 @@ class ImageCreator(object):
         return s
 
     def _get_post_scripts_env(self, in_chroot):
+        """Return an environment dict for %post scripts.
+
+        This is the hook where subclasses may specify some environment
+        variables for %post scripts by return a dict containing the desired
+        environment.
+
+        By default, this returns an empty dict.
+
+        in_chroot -- whether this %post script is to be executed chroot()ed
+                     into _instroot.
+
+        """
         return {}
 
     def _get_kernel_versions(self):
-        # find the kernel versions.  this iterates over everything providing
-        # 'kernel' and finds /boot/vmlinuz-* and grabbing the version based
-        # on the filename being /boot/vmlinuz-version
+        """Return a dict detailing the available kernel types/versions.
+
+        This is the hook where subclasses may override what kernel types and
+        versions should be available for e.g. creating the booloader
+        configuration.
+
+        A dict should be returned mapping the available kernel types to the
+        version of those kernels.
+
+        The default implementation uses rpm to iterates over everything
+        providing 'kernel', finds /boot/vmlinuz-* and returns the version
+        obtained from the vmlinuz filename.
+
+        """
         ts = rpm.TransactionSet(self._instroot)
         mi = ts.dbMatch('provides', 'kernel')
         ret = {}
@@ -144,27 +258,99 @@ class ImageCreator(object):
     # Helpers for subclasses
     #
     def _do_bindmounts(self):
+        """Mount various system directories onto _instroot.
+
+        This method is called by mount(), but may also be used by subclasses
+        in order to re-mount the bindmounts after modifying the underyling the
+        underlying filesystem.
+
+        """
         for b in self.__bindmounts:
             b.mount()
 
     def _undo_bindmounts(self):
+        """Unmount the bind-mounted system directories from _instroot.
+
+        This method is usually only called by unmount(), but may also be used
+        by subclasses in order to gain access to the filesystem obscured by
+        the bindmounts - e.g. in order to create device nodes on the image
+        filesystem.
+
+        """
         self.__bindmounts.reverse()
         for b in self.__bindmounts:
             b.unmount()
 
     def _chroot(self):
+        """Chroot into the install root.
+
+        This method may be used by subclasses when executing programs inside
+        the install root e.g.
+
+          subprocess.call(["/bin/ls"], preexec_fn = self.chroot)
+
+        """
         os.chroot(self._instroot)
         os.chdir("/")
 
     def _mkdtemp(self, prefix = "tmp-"):
+        """Create a temporary directory.
+
+        This method may be used by subclasses to create a temporary directory
+        for use in building the final image - e.g. a subclass might create
+        a temporary directory in order to bundle a set of files into a package.
+
+        The subclass may delete this directory if it wishes, but it will be
+        automatically deleted by cleanup().
+
+        The absolute path to the temporary directory is returned.
+
+        Note, this method should only be called after mount() has been called.
+
+        prefix -- a prefix which should be used when creating the directory;
+                  defaults to "tmp-".
+
+        """
         self.__ensure_builddir()
         return tempfile.mkdtemp(dir = self.__builddir, prefix = prefix)
 
     def _mkstemp(self, prefix = "tmp-"):
+        """Create a temporary file.
+
+        This method may be used by subclasses to create a temporary file
+        for use in building the final image - e.g. a subclass might need
+        a temporary location to unpack a compressed file.
+
+        The subclass may delete this file if it wishes, but it will be
+        automatically deleted by cleanup().
+
+        A tuple containing a file descriptor (returned from os.open() and the
+        absolute path to the temporary directory is returned.
+
+        Note, this method should only be called after mount() has been called.
+
+        prefix -- a prefix which should be used when creating the file;
+                  defaults to "tmp-".
+
+        """
         self.__ensure_builddir()
         return tempfile.mkstemp(dir = self.__builddir, prefix = prefix)
 
     def _mktemp(self, prefix = "tmp-"):
+        """Create a temporary file.
+
+        This method simply calls _mkstemp() and closes the returned file
+        descriptor.
+
+        The absolute path to the temporary file is returned.
+
+        Note, this method should only be called after mount() has been called.
+
+        prefix -- a prefix which should be used when creating the file;
+                  defaults to "tmp-".
+
+        """
+
         (f, path) = self._mkstemp(prefix)
         os.close(f)
         return path
@@ -507,6 +693,16 @@ class LoopImageCreator(ImageCreator):
             raise CreatorError("_image is not valid before calling mount()")
         return self.__imgdir + "/ext3fs.img"
     _image = property(__get_image)
+    """The location of the image file.
+
+    This is the path to the filesystem image. Subclasses may use this path
+    in order to package the image in _stage_final_image().
+
+    Note, this directory does not exist before ImageCreator.mount() is called.
+
+    Note also, this is a read-only attribute.
+
+    """
 
     def __get_blocksize(self):
         return self.__blocksize
@@ -519,6 +715,14 @@ class LoopImageCreator(ImageCreator):
             raise CreatorError("'%s' is not a valid integer value "
                                "for _blocksize" % val)
     _blocksize = property(__get_blocksize, __set_blocksize)
+    """The block size used by the image's filesystem.
+
+    This is the block size used when creating the filesystem image. Subclasses
+    may change this if they wish to use something other than a 4k block size.
+
+    Note, this attribute may only be set before calling mount().
+
+    """
 
     def __get_fstype(self):
         return self.__fstype
@@ -527,18 +731,43 @@ class LoopImageCreator(ImageCreator):
             raise CreatorError("Unknown _fstype '%s' supplied" % val)
         self.__fstype = val
     _fstype = property(__get_fstype, __set_fstype)
+    """The type of filesystem used for the image.
+
+    This is the filesystem type used when creating the filesystem image.
+    Subclasses may change this if they wish to use something other ext3.
+
+    Note, only ext2 and ext3 are currently supported.
+
+    Note also, this attribute may only be set before calling mount().
+
+    """
 
     #
     # Helpers for subclasses
     #
     def _resparse(self, size = None):
+        """Rebuild the filesystem image to be as sparse as possible.
+
+        This method should be used by subclasses when staging the final image
+        in order to reduce the actual space taken up by the sparse image file
+        to be as little as possible.
+
+        This is done by resizing the filesystem to the minimal size (thereby
+        eliminating any space taken up by deleted files) and then resizing it
+        back to the supplied size.
+
+        size -- the size in, in bytes, which the filesystem image should be
+                resized to after it has been minimized; this defaults to None,
+                causing the original size specified by the kickstart file to
+                be used (or 4GiB if not specified in the kickstart).
+
+        """
         return self.__instloop.resparse(size)
         
     #
     # Actual implementation
     #
     def _mount_instroot(self, base_on = None):
-        """Do any creation necessary and mount the install root"""
         self.__imgdir = self._mkdtemp()
 
         if not base_on is None:

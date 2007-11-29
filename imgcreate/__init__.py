@@ -30,13 +30,27 @@ The following image creators are available:
   - LoopImageCreator - installs to an ext3 image
   - LiveImageCreator - installs to a bootable ISO
 
+Also exported are:
+  - CreatorError - all exceptions throw are of this type
+  - read_kickstart() - a utility function for kickstart parsing
+
 Each of the creator classes are designed to be subclassable, allowing the user
 to create new creator subclasses in order to support the building other types
 of system images.
 
-Also exported are:
-  - CreatorError - all exceptions throw are of this type
-  - read_kickstart() - a utility function for kickstart parsing
+The subclassing API consists of:
+
+  1) Attributes available to subclasses, e.g. ImageCreator._instroot
+
+  2) Hooks - methods which may be overridden by subclasses, e.g.
+     ImageCreator._mount_instroot()
+
+  3) Helpers - methods which may be used by subclasses in order to implement
+     hooks, e.g. ImageCreator._chroot()
+
+Overriding public methods (e.g. ImageCreator.package()) or subclassing helpers
+is not supported and is not guaranteed to continue working as expect in the
+future.
 
 """
 

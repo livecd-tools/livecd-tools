@@ -73,22 +73,47 @@ class LiveImageCreatorBase(LoopImageCreator):
     # Hooks for subclasses
     #
     def _configure_bootloader(self, isodir):
+        """Create the architecture specific booloader configuration.
+
+        This is the hook where subclasses must create the booloader
+        configuration in order to allow a bootable ISO to be built.
+
+        isodir -- the directory where the contents of the ISO are to be staged
+
+        """
         raise CreatorError("Bootloader configuration is arch-specific, "
                            "but not implemented for this arch!")
 
     def _get_kernel_options(self):
+        """Return a kernel options string for bootloader configuration.
+
+        This is the hook where subclasses may specify a set of kernel options
+        which should be included in the images bootloader configuration.
+
+        A sensible default implementation is provided.
+
+        """
         r = "ro quiet liveimg"
         if os.path.exists(self._instroot + "/usr/bin/rhgb"):
             r += " rhgb"
         return r
         
     def _get_mkisofs_options(self, isodir):
+        """Return the architecture specific mkisosfs options.
+
+        This is the hook where subclasses may specify additional arguments to
+        mkisofs, e.g. to enable a bootable ISO to be built.
+
+        By default, an empty list is returned.
+
+        """
         return []
 
     #
     # Helpers for subclasses
     #
     def _has_checkisomd5(self):
+        """Check whether checkisomd5 is available in the install root."""
         def exists(instroot, path):
             return os.path.exists(instroot + path)
 
