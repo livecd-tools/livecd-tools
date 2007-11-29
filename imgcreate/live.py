@@ -61,13 +61,16 @@ class LiveImageCreatorBase(LoopImageCreator):
 
         """
 
+        self._timeout = kickstart.get_timeout(self.ks, 10)
+        """The bootloader timeout from kickstart."""
+
+        self._default_kernel = kickstart.get_default_kernel(self.ks, "kernel")
+        """The default kernel type from kickstart."""
+
         self.__isodir = None
 
-        self._timeout = kickstart.get_timeout(self.ks, 10)
-        self._default_kernel = kickstart.get_default_kernel(self.ks, "kernel")
-
-        self._modules = ["=ata", "sym53c8xx", "aic7xxx", "=usb", "=firewire"]
-        self._modules.extend(kickstart.get_modules(self.ks))
+        self.__modules = ["=ata", "sym53c8xx", "aic7xxx", "=usb", "=firewire"]
+        self.__modules.extend(kickstart.get_modules(self.ks))
 
     #
     # Hooks for subclasses
@@ -217,7 +220,7 @@ class LiveImageCreatorBase(LoopImageCreator):
         f.write('MODULES+="squashfs ext3 ext2 vfat msdos "\n')
         f.write('MODULES+="sr_mod sd_mod ide-cd "\n')
 
-        for module in self._modules:
+        for module in self.__modules:
             if module == "=usb":
                 f.write('MODULES+="ehci_hcd uhci_hcd ohci_hcd "\n')
                 f.write('MODULES+="usb_storage usbhid "\n')
