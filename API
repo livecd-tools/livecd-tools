@@ -11,28 +11,26 @@ needs.  To do so, you'll want to do the following:
 
 * Create a pykickstart handler object.  All of the image creators are
 driven by data stored in pykickstart handlers.
-* Then, create an image
-    image = ImageCreator(ks, fslabel)
+* Then, instantiate a creator
+    creator = ImageCreator(ks, fslabel)
   where ks is your pykickstart object and fslabel is the label/name you
   want for the image.
 * With the image, you can either do everything in one-shot with
-    image.create()
-  or call the steps of image.create() itself.  The latter lets you add
+    creator.create()
+  or call the steps of creator.create() itself.  The latter lets you add
   an interactive shell step if you want as well as a few other
   options.  The order, though, is
-    image.mountImage()
-    image.installPackages()
-    image.configureImage()
-    image.unmountImage()
-    image.package()
+    creator.mount()
+    creator.install()
+    creator.configure()
+    creator.unmount()
+    creator.package()
 
   Other available methods are
-    * image.launchShell(): This launches a root shell within the
+    * creator.launch_shell(): This launches a root shell within the
       install root
-    * image.teardown(): Tear down the image.  Note that this also
+    * creator.cleanup(): Tear down the image.  Note that this also
       occurs when the image object is deleted
-    * image.getKernelVersions(): Returns a dict of kernels installed
-      mapping from kernel type -> version
  
 
 == Image Creator Backends ==
@@ -43,28 +41,28 @@ interface should be largely the same.  This means that, eg,
 livecd-creator _could_ generate other types of outputs just by
 switching from the LiveImageCreator to another ImageCreator object.
 
-* ImageCreatorBase: This is the guts of what most image creators will
+* ImageCreator: This is the guts of what most image creators will
   need to use.  It provides all of the bits to handle a kickstart
   config, install packages into an install root, etc.  It leaves
-  basically four methods which must be implemented by more specific creators:
-   i) _mountInstallRoot(self): This method is where your filesystems
+  a number of hook methods which maybe be implemented by more specific
+  creators:
+   i) _mount_instroot(self): This method is where your filesystems
    should get mounted.  The root of your filesystem tree should be
    located at self._instroot
-   ii) _unmountInstallRoot(self): This method is called to undo
-   _mountInstallRoot() basically.
-   iii) configBoot(self): Set up anything needed for your image to
-   boot.  This could involve creating an initramfs, writing a
+   ii) _unmount_instroot(self): This method is called to undo
+   _mount_instroot() basically.
+   iii) _create_bootconfig(self): Set up anything needed for your
+   image to boot.  This could involve creating an initramfs, writing a
    bootloader configuration, etc.  The filesystem is still mounted at
    self._instroot at this point.  Note that this could be a no-op.
-   iv) package(self): Do whatever is needed to make your image
-   "consumable".  eg, for live CDs, this is where we generate the iso
-   images.  Note that this could be a no-op.
+   iv) _stage_final_image(self): Do whatever is needed to make your
+   image "consumable" and copy it to self._outdir.  eg, for live CDs,
+   this is where we generate the iso images.  Note that this could be
+   a no-op.
 
-  Other methods which can be overriden if you have a specific need.
-  But note that if you do, you should be sure to call the
-  ImageCreatorBase method as well or the results can be undefined
-   * runPost(): Runs kickstart post scripts.  If you have other
-     configuration bits, this is the place for them.
+  Other hooks are available to subclasses, as well as a number of
+  helper methods which can be used in implementing the hooks. See
+  the inline docstrings for more details.
 
   Overriding other methods is not supported or guaranteed to continue
   to give consistent results over time.
