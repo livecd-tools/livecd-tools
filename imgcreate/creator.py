@@ -435,8 +435,8 @@ class LoopImageCreator(ImageCreator):
         if not self.__instloop is None:
             self.__instloop.cleanup()
 
-    def _resparse(self):
-        return self.__instloop.resparse()
+    def _resparse(self, size = None):
+        return self.__instloop.resparse(size)
         
     def _stage_final_image(self):
         self._resparse()

@@ -167,15 +167,18 @@ class SparseLoopbackMount(LoopbackMount):
         LoopbackMount.__init__(self, lofile, mountdir, fstype)
         self.size = size
 
-    def expand(self, create = False):
+    def expand(self, create = False, size = None):
         flags = os.O_WRONLY
         if create:
             flags |= os.O_CREAT
             makedirs(os.path.dirname(self.lofile))
 
+        if size is None:
+            size = self.size
+
         fd = os.open(self.lofile, flags)
 
-        os.lseek(fd, self.size, 0)
+        os.lseek(fd, size, 0)
         os.write(fd, '\x00')
         os.close(fd)
 
@@ -210,19 +213,22 @@ class SparseExtLoopbackMount(SparseLoopbackMount):
         SparseLoopbackMount.create(self)
         self.__format_filesystem()
 
-    def resize(self):
+    def resize(self, size = None):
         current_size = os.stat(self.lofile)[stat.ST_SIZE]
 
-        if self.size == current_size:
+        if size is None:
+            size = self.size
+
+        if size == current_size:
             return
 
-        if self.size < current_size:
-            self.expand()
+        if size < current_size:
+            self.expand(size)
 
-        resize2fs(self.lofile, self.size)
+        resize2fs(self.lofile, size)
 
-        if self.size > current_size:
-            self.truncate()
+        if size > current_size:
+            self.truncate(size)
 
     def mount(self):
         if not os.path.isfile(self.lofile):
@@ -268,14 +274,14 @@ class SparseExtLoopbackMount(SparseLoopbackMount):
                 bot = t
         return top
 
-    def resparse(self):
+    def resparse(self, size = None):
         self.cleanup()
         
         minsize = self.__resize_to_minimal()
 
         self.truncate(minsize)
 
-        self.resize()
+        self.resize(size)
 
         return minsize
 
