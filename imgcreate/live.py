@@ -110,7 +110,7 @@ class LiveImageCreatorBase(LoopImageCreator):
 
     def _create_bootconfig(self):
         """Configure the image so that it's bootable."""
-        self._create_initramfs()
+        self.__create_initramfs()
         self._configure_bootloader(self.__ensure_isodir())
 
     def _get_post_scripts_env(self, in_chroot):
@@ -156,7 +156,7 @@ class LiveImageCreatorBase(LoopImageCreator):
 
         f.close()
 
-    def _create_initramfs(self):
+    def __create_initramfs(self):
         mayflower = self.__mayflower_path()
         if not os.path.isfile(mayflower):
             raise CreatorError("livecd-creator not correctly installed : "
