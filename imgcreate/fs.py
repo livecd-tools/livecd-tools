@@ -24,6 +24,7 @@ import errno
 import stat
 import subprocess
 import random
+import string
 
 from imgcreate.errors import *
 
@@ -45,7 +46,8 @@ def mksquashfs(in_img, out_img):
 
     ret = subprocess.call(args)
     if ret != 0:
-        raise SquashfsError("mksquashfs exited with error (%d)" % ret)
+        raise SquashfsError("'%s' exited with error (%d)" %
+                            (string.join(args, " "), ret))
 
 def resize2fs(fs, size):
     dev_null = os.open("/dev/null", os.O_WRONLY)
@@ -307,13 +309,12 @@ class DeviceMapperSnapshot(object):
                                              self.imgloop.loopdev,
                                              self.cowloop.loopdev)
 
-        rc = subprocess.call(["/sbin/dmsetup",
-                              "create", self__name,
-                              "--table", table])
-        if rc != 0:
+        args = ["/sbin/dmsetup", "create", self.__name, "--table", table]
+        if subprocess.call(args) != 0:
             self.cowloop.cleanup()
             self.imgloop.cleanup()
-            raise SnapshotError("Could not create snapshot device")
+            raise SnapshotError("Could not create snapshot device using: " +
+                                string.join(args, " "))
 
         self.__created = True
 
