@@ -35,7 +35,7 @@ def read_kickstart(path):
     version = ksversion.makeVersion()
     ks = ksparser.KickstartParser(version)
     try:
-        ks.readKickstart(path)
+        ks.handler.readKickstart(path)
     except IOError, (err, msg):
         raise errors.KickstartError("Failed to read kickstart file "
                                     "'%s' : %s" % (kscfg, msg))
@@ -341,17 +341,17 @@ class SelinuxConfig(KickstartConfig):
         self.relabel(ksselinux)
 
 def get_image_size(ks, default = None):
-    for p in ks.partition.partitions:
+    for p in ks.handler.partition.partitions:
         if p.mountpoint == "/" and p.size:
             return int(p.size) * 1024L * 1024L
     return default
 
 def get_modules(ks):
     devices = []
-    if isinstance(ks.device, kscommands.device.FC3_Device):
-        devices.append(ks.device)
+    if isinstance(ks.handler.device, kscommands.device.FC3_Device):
+        devices.append(ks.handler.device)
     else:
-        devices.extend(ks.device.deviceList)
+        devices.extend(ks.handler.device.deviceList)
 
     modules = []
     for device in devices:
@@ -362,22 +362,22 @@ def get_modules(ks):
     return modules
 
 def get_timeout(ks, default = None):
-    if not hasattr(ks.bootloader, "timeout"):
+    if not hasattr(ks.handler.bootloader, "timeout"):
         return default
-    if ks.bootloader.timeout is None:
+    if ks.handler.bootloader.timeout is None:
         return default
-    return int(ks.bootloader.timeout)
+    return int(ks.handler.bootloader.timeout)
 
 def get_default_kernel(ks, default = None):
-    if not hasattr(ks.bootloader, "default"):
+    if not hasattr(ks.handler.bootloader, "default"):
         return default
-    if not ks.bootloader.default:
+    if not ks.handler.bootloader.default:
         return default
-    return ks.bootloader.default
+    return ks.handler.bootloader.default
 
 def get_repos(ks, repo_urls = {}):
     repos = []
-    for repo in ks.repo.repoList:
+    for repo in ks.handler.repo.repoList:
         inc = []
         if hasattr(repo, "inc"):
             inc.extend(repo.includepkgs)
@@ -399,32 +399,32 @@ def get_repos(ks, repo_urls = {}):
 
 def convert_method_to_repo(ks):
     try:
-        ks.repo.methodToRepo()
+        ks.handler.repo.methodToRepo()
     except (AttributeError, kserrors.KickstartError):
         pass
 
 def get_packages(ks, required = []):
-    return ks.packages.packageList + required
+    return ks.handler.packages.packageList + required
 
 def get_groups(ks, required = []):
-    return ks.packages.groupList + required
+    return ks.handler.packages.groupList + required
 
 def get_excluded(ks, required = []):
-    return ks.packages.excludedList + required
+    return ks.handler.packages.excludedList + required
 
 def ignore_missing(ks):
-    return ks.packages.handleMissing == ksconstants.KS_MISSING_IGNORE
+    return ks.handler.packages.handleMissing == ksconstants.KS_MISSING_IGNORE
 
 def exclude_docs(ks):
-    return ks.packages.excludeDocs
+    return ks.handler.packages.excludeDocs
 
 def get_post_scripts(ks):
     scripts = []
-    for s in ks.scripts:
+    for s in ks.handler.scripts:
         if s.type != ksparser.KS_SCRIPT_POST:
             continue
         scripts.append(s)
     return scripts
 
 def selinux_enabled(ks):
-    return ks.selinux.selinux
+    return ks.handler.selinux.selinux

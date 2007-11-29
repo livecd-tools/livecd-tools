@@ -37,7 +37,7 @@ from imgcreate import kickstart
 
 class ImageCreator(object):
     def __init__(self, ks, fslabel):
-        self.ks = ks.handler
+        self.ks = ks
         self.fslabel = fslabel
         self.tmpdir = "/var/tmp"
 
@@ -336,17 +336,19 @@ class ImageCreator(object):
                 os.unlink(path)
 
     def configure(self):
-        kickstart.LanguageConfig(self._instroot).apply(self.ks.lang)
-        kickstart.KeyboardConfig(self._instroot).apply(self.ks.keyboard)
-        kickstart.TimezoneConfig(self._instroot).apply(self.ks.timezone)
-        kickstart.AuthConfig(self._instroot).apply(self.ks.authconfig)
-        kickstart.FirewallConfig(self._instroot).apply(self.ks.firewall)
-        kickstart.SelinuxConfig(self._instroot).apply(self.ks.selinux)
-        kickstart.RootPasswordConfig(self._instroot).apply(self.ks.rootpw)
-        kickstart.ServicesConfig(self._instroot).apply(self.ks.services)
-        kickstart.XConfig(self._instroot).apply(self.ks.xconfig)
-        kickstart.NetworkConfig(self._instroot).apply(self.ks.network)
-        kickstart.SelinuxConfig(self._instroot).apply(self.ks.selinux)
+        ksh = self.ks.handler
+
+        kickstart.LanguageConfig(self._instroot).apply(ksh.lang)
+        kickstart.KeyboardConfig(self._instroot).apply(ksh.keyboard)
+        kickstart.TimezoneConfig(self._instroot).apply(ksh.timezone)
+        kickstart.AuthConfig(self._instroot).apply(ksh.authconfig)
+        kickstart.FirewallConfig(self._instroot).apply(ksh.firewall)
+        kickstart.SelinuxConfig(self._instroot).apply(ksh.selinux)
+        kickstart.RootPasswordConfig(self._instroot).apply(ksh.rootpw)
+        kickstart.ServicesConfig(self._instroot).apply(ksh.services)
+        kickstart.XConfig(self._instroot).apply(ksh.xconfig)
+        kickstart.NetworkConfig(self._instroot).apply(ksh.network)
+        kickstart.SelinuxConfig(self._instroot).apply(ksh.selinux)
 
         self._create_bootconfig()
 
