@@ -229,6 +229,7 @@ class SparseExtLoopbackMount(SparseLoopbackMount):
 
         if size < current_size:
             self.truncate(size)
+        return size
 
     def mount(self):
         if not os.path.isfile(self.lofile):
@@ -283,7 +284,7 @@ class SparseExtLoopbackMount(SparseLoopbackMount):
 
         self.truncate(minsize)
 
-        self.resize(size)
+        return self.resize(size)
 
 class DeviceMapperSnapshot(object):
     def __init__(self, imgloop, cowloop):
