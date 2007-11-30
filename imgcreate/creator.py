@@ -236,22 +236,36 @@ class ImageCreator(object):
         versions should be available for e.g. creating the booloader
         configuration.
 
-        A dict should be returned mapping the available kernel types to the
-        version of those kernels.
+        A dict should be returned mapping the available kernel types to a list
+        of the available versions for those kernels.
 
         The default implementation uses rpm to iterates over everything
         providing 'kernel', finds /boot/vmlinuz-* and returns the version
-        obtained from the vmlinuz filename.
+        obtained from the vmlinuz filename. (This can differ from the kernel
+        RPM's n-v-r in the case of e.g. xen)
 
         """
+        def get_version(header):
+            version = None
+            for f in header['filenames']:
+                if f.startswith('/boot/vmlinuz-'):
+                    version = f[14:]
+            return version
+
         ts = rpm.TransactionSet(self._instroot)
-        mi = ts.dbMatch('provides', 'kernel')
+
         ret = {}
-        for h in mi:
-            name = h['name']
-            for f in h['filenames']:
-                if f.startswith("/boot/vmlinuz-"):
-                    ret[name] = f[14:]
+        for header in ts.dbMatch('provides', 'kernel'):
+            version = get_version(header)
+            if version is None:
+                continue
+
+            name = header['name']
+            if not name in ret:
+                ret[name] = [version]
+            else:
+                ret[name].append(version)
+
         return ret
 
     #

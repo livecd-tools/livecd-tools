@@ -242,11 +242,13 @@ class LiveImageCreatorBase(LoopImageCreator):
 
         self.__write_mayflower_conf(self._instroot + "/etc/mayflower.conf")
 
-        for version in self._get_kernel_versions().values():
-            subprocess.call(["/sbin/mayflower", "-f",
-                             "/boot/livecd-initramfs-%s.img" % (version,), 
-                             version],
-                            preexec_fn=self._chroot),
+        kernels = self._get_kernel_versions()
+        for kernel in kernels:
+            for version in kernels[kernel]:
+                subprocess.call(["/sbin/mayflower", "-f",
+                                 "/boot/livecd-initramfs-%s.img" % (version,), 
+                                 version],
+                                preexec_fn=self._chroot),
 
         os.unlink(self._instroot + "/sbin/mayflower")
         os.unlink(self._instroot + "/etc/mayflower.conf")
@@ -424,7 +426,12 @@ menu hiddenrow 5
         return template % args
 
     def __get_image_stanzas(self, isodir):
-        kernels = self._get_kernel_versions().items()
+        versions = []
+        kernels = self._get_kernel_versions()
+        for kernel in kernels:
+            for version in kernels[kernel]:
+                versions.append(version)
+
         kernel_options = self._get_kernel_options()
 
         checkisomd5 = self._has_checkisomd5()
@@ -432,7 +439,7 @@ menu hiddenrow 5
         cfg = ""
 
         index = "0"
-        for (kernel, version) in kernels:
+        for version in versions:
             is_xen = self.__copy_kernel_and_initramfs(isodir, version, index)
 
             default = self.__is_default_kernel(kernel, kernels)
@@ -657,7 +664,7 @@ image=/ppc/ppc32/vmlinuz
         #
         # FIXME: ppc should support multiple kernels too...
         #
-        kernel = self._get_kernel_versions().values()[0]
+        kernel = self._get_kernel_versions().values()[0][0]
 
         kernel_bits = self.__kernel_bits(kernel)
 
