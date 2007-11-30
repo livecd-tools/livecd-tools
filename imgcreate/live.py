@@ -411,7 +411,7 @@ menu hiddenrow 5
 """ % args
 
     def __get_image_stanza(self, is_xen, **args):
-        if is_xen:
+        if not is_xen:
             template = """label %(short)s
   menu label %(long)s
   kernel vmlinuz%(index)s
