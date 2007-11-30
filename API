@@ -1,0 +1,77 @@
+In addition to livecd-creator itself, the livecd-creator package
+provides a python API for building your own, other types of images.
+This API could also be used to build on top of the live image
+functionality.
+
+== Image Creation Frontends ==
+
+livecd-creator is one frontend for creating images.  But really, it's
+straight-forward to build your own which deals with your own specific
+needs.  To do so, you'll want to do the following:
+
+* Create a pykickstart handler object.  All of the image creators are
+driven by data stored in pykickstart handlers.
+* Then, instantiate a creator
+    creator = ImageCreator(ks, name)
+  where ks is your pykickstart object and name is the label/name you
+  want for the image.
+* With the image, you can either do everything in one-shot with
+    creator.create()
+  or call the steps of creator.create() itself.  The latter lets you add
+  an interactive shell step if you want as well as a few other
+  options.  The order, though, is
+    creator.mount()
+    creator.install()
+    creator.configure()
+    creator.unmount()
+    creator.package()
+
+  Other available methods are
+    * creator.launch_shell(): This launches a root shell within the
+      install root
+    * creator.cleanup(): Tear down the image.  Note that this also
+      occurs when the image object is deleted
+ 
+
+== Image Creator Backends ==
+
+The basic idea is that there are (presently) 3 main classes used to
+implement different types of images.  No matter which you use, the
+interface should be largely the same.  This means that, eg,
+livecd-creator _could_ generate other types of outputs just by
+switching from the LiveImageCreator to another ImageCreator object.
+
+* ImageCreator: This is the guts of what most image creators will
+  need to use.  It provides all of the bits to handle a kickstart
+  config, install packages into an install root, etc.  It leaves
+  a number of hook methods which maybe be implemented by more specific
+  creators:
+   i) _mount_instroot(self): This method is where your filesystems
+   should get mounted.  The root of your filesystem tree should be
+   located at self._instroot
+   ii) _unmount_instroot(self): This method is called to undo
+   _mount_instroot() basically.
+   iii) _create_bootconfig(self): Set up anything needed for your
+   image to boot.  This could involve creating an initramfs, writing a
+   bootloader configuration, etc.  The filesystem is still mounted at
+   self._instroot at this point.  Note that this could be a no-op.
+   iv) _stage_final_image(self): Do whatever is needed to make your
+   image "consumable" and copy it to self._outdir.  eg, for live CDs,
+   this is where we generate the iso images.  Note that this could be
+   a no-op.
+
+  Other hooks are available to subclasses, as well as a number of
+  helper methods which can be used in implementing the hooks. See
+  the inline docstrings for more details.
+
+  Overriding other methods is not supported or guaranteed to continue
+  to give consistent results over time.
+
+* LoopImageCreator: This generates ext3 images in a loopback file
+  which could then later be booted in a virtual machine environment.
+  NOTE: this does nothing to set up booting
+
+* LiveImageCreator: This builds on top of the LoopImageCreator to
+  build live images which use dm-snapshot, etc.  This is what is used
+  by livecd-creator.
+
