@@ -44,7 +44,7 @@ def read_kickstart(path):
     version = ksversion.makeVersion()
     ks = ksparser.KickstartParser(version)
     try:
-        ks.handler.readKickstart(path)
+        ks.readKickstart(path)
     except IOError, (err, msg):
         raise errors.KickstartError("Failed to read kickstart file "
                                     "'%s' : %s" % (kscfg, msg))
