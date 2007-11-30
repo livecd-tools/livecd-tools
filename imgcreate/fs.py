@@ -52,7 +52,7 @@ def mksquashfs(in_img, out_img):
 def resize2fs(fs, size):
     dev_null = os.open("/dev/null", os.O_WRONLY)
     try:
-        return subprocess.call(["/sbin/resize2fs", fs, "%sk" % (size / 1024,)],
+        return subprocess.call(["/sbin/resize2fs", fs, "%sK" % (size / 1024,)],
                                stdout = dev_null, stderr = dev_null)
     finally:
         os.close(dev_null)
@@ -222,12 +222,12 @@ class SparseExtLoopbackMount(SparseLoopbackMount):
         if size == current_size:
             return
 
-        if size < current_size:
+        if size > current_size:
             self.expand(size)
 
         resize2fs(self.lofile, size)
 
-        if size > current_size:
+        if size < current_size:
             self.truncate(size)
 
     def mount(self):
@@ -259,6 +259,8 @@ class SparseExtLoopbackMount(SparseLoopbackMount):
         return int(parse_field(out, "Block count")) * self.blocksize
 
     def __resize_to_minimal(self):
+        self.__fsck()
+
         #
         # Use a binary search to find the minimal size
         # we can resize the image to
@@ -282,8 +284,6 @@ class SparseExtLoopbackMount(SparseLoopbackMount):
         self.truncate(minsize)
 
         self.resize(size)
-
-        return minsize
 
 class DeviceMapperSnapshot(object):
     def __init__(self, imgloop, cowloop):
