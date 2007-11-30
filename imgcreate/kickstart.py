@@ -21,6 +21,7 @@ import os
 import os.path
 import string
 import subprocess
+import time
 
 import pykickstart.commands as kscommands
 import pykickstart.constants as ksconstants
@@ -52,6 +53,48 @@ def read_kickstart(path):
         raise errors.KickstartError("Failed to parse kickstart file "
                                     "'%s' : %s" % (kscfg, e))
     return ks
+
+def build_name(kscfg, prefix = None, suffix = None, maxlen = None):
+    """Construct and return an image name string.
+
+    This is a utility function to help create sensible name and fslabel
+    strings. The name is constructed using the sans-prefix-and-extension
+    kickstart filename and the supplied prefix and suffix.
+
+    If the name exceeds the maxlen length supplied, the prefix is first dropped
+    and then the kickstart filename portion is reduced until it fits. In other
+    words, the suffix takes precedence over the kickstart portion and the
+    kickstart portion takes precedence over the prefix.
+
+    kscfg -- a path to a kickstart file
+    prefix -- a prefix to prepend to the name; defaults to None, which causes
+              no prefix to be used
+    suffix -- a suffix to append to the name; defaults to None, which causes
+              a YYYYMMDDHHMM suffix to be used
+    maxlen -- the maximum length for the returned string; defaults to None,
+              which means there is no restriction on the name length
+
+    Note, if maxlen is less then the len(suffix), you get to keep both pieces.
+
+    """
+    name = os.path.basename(kscfg)
+    idx = name.rfind('.')
+    if idx >= 0:
+        name = name[:idx]
+
+    if prefix is None:
+        prefix = ""
+    if suffix is None:
+        suffix = time.strftime("%Y%m%d%H%M")
+
+    if name.startswith(prefix):
+        name = name[len(prefix):]
+
+    ret = prefix + name + "-" + suffix
+    if not maxlen is None and len(ret) > maxlen:
+        ret = name[:maxlen - len(suffix) - 1] + "-" + suffix
+
+    return ret
 
 class KickstartConfig(object):
     """A base class for applying kickstart configurations to a system."""

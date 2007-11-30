@@ -68,7 +68,7 @@ def parse_options(args):
         raise Usage("Kickstart config '%s' does not exist" %(options.kscfg,))
     if options.base_on and not os.path.isfile(options.base_on):
         raise Usage("Live CD ISO '%s' does not exist" %(options.base_on,))
-    if options.fs_label and len(options.fs_label) > 32:
+    if options.fs_label and len(options.fs_label) > imgcreate.FSLABEL_MAXLEN:
         raise Usage("CD labels are limited to 32 characters")
 
     return options
@@ -93,30 +93,19 @@ def main():
 
     if options.fs_label:
         fs_label = options.fs_label
+        name = fs_label
     else:
-        fs_label_prefix = 'livecd-'
-        fs_label_suffix = time.strftime("%Y%m%d%H%M")
-        name = ''
-        if options.kscfg:
-            name = os.path.basename(options.kscfg)
-            idx = name.rfind('.')
-            if idx >= 0:
-                name = name[:idx]
-        if name.startswith(fs_label_prefix):
-            name = name[len(fs_label_prefix):]
-        fs_label = fs_label_prefix + name + "-" + fs_label_suffix
-        if len(fs_label) > 32:
-            if name.startswith("livecd-"):
-                name = name[len("livecd-"):]
-            fs_label = name + "-" + fs_label_suffix
-        if len(fs_label) > 32:
-            name = name[:(32 - len(fs_label_suffix))]
-            fs_label = name + "-" + fs_label_suffix
-        print "Using label %s" % (fs_label,)
+        name = imgcreate.build_name(options.kscfg, "livecd-")
+
+        fs_label = imgcreate.build_name(options.kscfg,
+                                        "livecd-",
+                                        maxlen = imgcreate.FSLABEL_MAXLEN)
+
+        print "Using label '%s' and name '%s'" % (fs_label, name)
 
     ks = imgcreate.read_kickstart(options.kscfg)
 
-    creator = imgcreate.LiveImageCreator(ks, fs_label)
+    creator = imgcreate.LiveImageCreator(ks, name, fs_label)
     creator.tmpdir = options.tmpdir
     creator.skip_compression = options.skip_compression
     creator.skip_minimize = options.skip_minimize

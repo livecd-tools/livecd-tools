@@ -32,7 +32,9 @@ The following image creators are available:
 
 Also exported are:
   - CreatorError - all exceptions throw are of this type
+  - FSLABEL_MAXLEN - the length to which LoopImageCreator.fslabel is truncated
   - read_kickstart() - a utility function for kickstart parsing
+  - build_name() - a utility to construct an image name
 
 Each of the creator classes are designed to be subclassable, allowing the user
 to create new creator subclasses in order to support the building other types
@@ -59,5 +61,7 @@ __all__ = (
     'ImageCreator',
     'LiveImageCreator',
     'LoopImageCreator',
-    'read_kickstart'
+    'FSLABEL_MAXLEN',
+    'read_kickstart',
+    'construct_name'
 )

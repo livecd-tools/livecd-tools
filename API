@@ -12,8 +12,8 @@ needs.  To do so, you'll want to do the following:
 * Create a pykickstart handler object.  All of the image creators are
 driven by data stored in pykickstart handlers.
 * Then, instantiate a creator
-    creator = ImageCreator(ks, fslabel)
-  where ks is your pykickstart object and fslabel is the label/name you
+    creator = ImageCreator(ks, name)
+  where ks is your pykickstart object and name is the label/name you
   want for the image.
 * With the image, you can either do everything in one-shot with
     creator.create()

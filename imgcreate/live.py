@@ -254,7 +254,7 @@ class LiveImageCreatorBase(LoopImageCreator):
         os.unlink(self._instroot + "/etc/mayflower.conf")
 
     def __create_iso(self, isodir):
-        iso = self._outdir + "/" + self.fslabel + ".iso"
+        iso = self._outdir + "/" + self.name + ".iso"
 
         args = ["/usr/bin/mkisofs",
                 "-J", "-r",
@@ -395,7 +395,7 @@ default %(menu)s
 timeout %(timeout)d
 
 %(background)s
-menu title Welcome to %(label)s!
+menu title Welcome to %(name)s!
 menu color border 0 #ffffffff #00000000
 menu color sel 7 #ffffffff #ff000000
 menu color title 0 #ffffffff #00000000
@@ -415,13 +415,13 @@ menu hiddenrow 5
             template = """label %(short)s
   menu label %(long)s
   kernel vmlinuz%(index)s
-  append initrd=initrd%(index)s.img root=CDLABEL=%(label)s rootfstype=iso9660 %(liveargs)s %(extra)s
+  append initrd=initrd%(index)s.img root=CDLABEL=%(fslabel)s rootfstype=iso9660 %(liveargs)s %(extra)s
 """
         else:
             template = """label %(short)s
   menu label %(long)s
   kernel mboot.c32
-  append xen%(index)s.gz --- vmlinuz%(index)s --- initrd%(index)s.img  root=CDLABEL=%(label)s rootfstype=iso9660 %(liveargs)s %(extra)s
+  append xen%(index)s.gz --- vmlinuz%(index)s --- initrd%(index)s.img  root=CDLABEL=%(fslabel)s rootfstype=iso9660 %(liveargs)s %(extra)s
 """
         return template % args
 
@@ -447,12 +447,12 @@ menu hiddenrow 5
             if default:
                 long = "Boot"
             elif kernel.startswith("kernel-"):
-                long = "Boot %s(%s)" % (self.fslabel, kernel[7:])
+                long = "Boot %s(%s)" % (self.name, kernel[7:])
             else:
-                long = "Boot %s(%s)" % (self.fslbael, kernel)
+                long = "Boot %s(%s)" % (self.name, kernel)
 
             cfg += self.__get_image_stanza(is_xen,
-                                           label = self.fslabel,
+                                           fslabel = self.fslabel,
                                            liveargs = kernel_options,
                                            long = long,
                                            short = "linux" + index,
@@ -464,7 +464,7 @@ menu hiddenrow 5
 
             if checkisomd5:
                 cfg += self.__get_image_stanza(is_xen,
-                                               label = self.fslabel,
+                                               fslabel = self.fslabel,
                                                liveargs = kernel_options,
                                                long = "Verify and " + long,
                                                short = "check" + index,
@@ -508,7 +508,7 @@ menu hiddenrow 5
 
         cfg = self.__get_basic_syslinux_config(menu = menu,
                                                background = background,
-                                               label = self.fslabel,
+                                               name = self.name,
                                                timeout = self._timeout * 10)
 
         cfg += self.__get_image_stanzas(isodir)
@@ -572,7 +572,7 @@ class ppcLiveImageCreator(LiveImageCreatorBase):
 
     def __get_basic_yaboot_config(self, **args):
         return """
-init-message = "Welcome to %(label)s"
+init-message = "Welcome to %(name)s"
 timeout=%(timeout)d
 """ % args
 
@@ -583,17 +583,17 @@ image=/ppc/ppc%(bit)s/vmlinuz
   label=%(short)s
   initrd=/ppc/ppc%(bit)s/initrd.img
   read-only
-  append="root=CDLABEL=%(label)s rootfstype=iso9660 %(liveargs)s %(extra)s"
+  append="root=CDLABEL=%(fslabel)s rootfstype=iso9660 %(liveargs)s %(extra)s"
 """ % args
 
 
     def __write_yaboot_config(isodir, bit):
-        cfg = self.__get_basic_yaboot_config(label = self.fslabel,
+        cfg = self.__get_basic_yaboot_config(name = self.name,
                                              timeout = self._timeout * 100)
 
         kernel_options = self._get_kernel_options()
 
-        cfg += self.__get_image_stanza(label = self.fslabel,
+        cfg += self.__get_image_stanza(fslabel = self.fslabel,
                                        short = "linux",
                                        long = "Run from image",
                                        extra = "",
@@ -601,7 +601,7 @@ image=/ppc/ppc%(bit)s/vmlinuz
                                        liveargs = kernel_options)
 
         if self._has_checkisomd5():
-            cfg += self.__get_image_stanza(label = self.fslabel,
+            cfg += self.__get_image_stanza(fslabel = self.fslabel,
                                            short = "check",
                                            long = "Verify and run from image",
                                            extra = "check",
@@ -624,7 +624,7 @@ image=/ppc/ppc%(bit)s/vmlinuz
 
     def __write_dualbits_yaboot_config(isodir, **args):
         cfg = """
-init-message = "\nWelcome to %(label)s!\nUse 'linux32' for 32-bit kernel.\n\n"
+init-message = "\nWelcome to %(name)s!\nUse 'linux32' for 32-bit kernel.\n\n"
 timeout=%(timeout)d
 default=linux
 
@@ -685,7 +685,7 @@ image=/ppc/ppc32/vmlinuz
                             isodir + "/etc/yaboot.conf")
         else:
             self.__write_dualbits_yaboot_config(isodir,
-                                                fslabel = self.fslabel,
+                                                name = self.name,
                                                 timeout = self._timeout * 100)
 
         #
@@ -706,6 +706,6 @@ if arch in ("i386", "x86_64"):
 elif arch in ("ppc",):
     LiveImageCreator = ppcLiveImageCreator
 elif arch in ("ppc64",):
-    LiveImageCreator = ppc64LiveImageCreator(fs_label)
+    LiveImageCreator = ppc64LiveImageCreator
 else:
     raise CreatorError("Architecture not supported!")

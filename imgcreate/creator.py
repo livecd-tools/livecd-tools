@@ -35,6 +35,9 @@ from imgcreate.fs import *
 from imgcreate.yuminst import *
 from imgcreate import kickstart
 
+FSLABEL_MAXLEN = 32
+"""The maximum string length supported for LoopImageCreator.fslabel."""
+
 class ImageCreator(object):
     """Installs a system to a chroot directory.
 
@@ -49,22 +52,22 @@ class ImageCreator(object):
 
     """
 
-    def __init__(self, ks, fslabel):
+    def __init__(self, ks, name):
         """Initialize an ImageCreator instance.
 
         ks -- a pykickstart.KickstartParser instance; this instance will be
               used to drive the install by e.g. providing the list of packages
               to be installed, the system configuration and %post scripts
 
-        fslabel -- a string used to label any filesystems created or as a basis
-                   for image filenames
+        name -- a name for the image; used for e.g. image filenames or
+                filesystem labels
 
         """
         self.ks = ks
         """A pykickstart.KickstartParser instance."""
 
-        self.fslabel = fslabel
-        """A string used to label filesystems."""
+        self.name = name
+        """A name for the image."""
 
         self.tmpdir = "/var/tmp"
         """The directory in which all temporary files will be created."""
@@ -168,7 +171,7 @@ class ImageCreator(object):
         By default, this moves the install root into _outdir.
 
         """
-        shutil.move(self._instroot, self._outdir + "/" + self.fslabel)
+        shutil.move(self._instroot, self._outdir + "/" + self.name)
 
     def _get_required_packages(self):
         """Return a list of required packages.
@@ -473,7 +476,7 @@ class ImageCreator(object):
         Note, make sure to call this method once finished with the creator
         instance in order to ensure no stale files are left on the host e.g.:
 
-          creator = ImageCreator(ks, fslabel)
+          creator = ImageCreator(ks, name)
           try:
               creator.create()
           finally:
@@ -682,13 +685,20 @@ class LoopImageCreator(ImageCreator):
 
     """
 
-    def __init__(self, *args):
+    def __init__(self, ks, name, fslabel = None):
         """Initialize a LoopImageCreator instance.
 
-        This method takes the same arguments as ImageCreator.__init__().
+        This method takes the same arguments as ImageCreator.__init__() with
+        the addition of:
+
+        fslabel -- A string used as a label for any filesystems created.
 
         """
-        ImageCreator.__init__(self, *args)
+        ImageCreator.__init__(self, ks, name)
+
+        self.__fslabel = None
+        self.fslabel = fslabel
+
         self.__minsize_KB = 0
         self.__blocksize = 4096
         self.__fstype = "ext3"
@@ -702,6 +712,29 @@ class LoopImageCreator(ImageCreator):
     #
     # Properties
     #
+    def __get_fslabel(self):
+        if self.__fslabel is None:
+            return self.name
+        else:
+            return self.__fslabel
+    def __set_fslabel(self, val):
+        if val is None:
+            self.__fslabel = None
+        else:
+            self.__fslabel = val[:FSLABEL_MAXLEN]
+    fslabel = property(__get_fslabel, __set_fslabel)
+    """A string used to label any filesystems created.
+
+    Some filesystems impose a constraint on the maximum allowed size of the
+    filesystem label. In the case of ext3 it's 16 characters, but in the case
+    of ISO9660 it's 32 characters.
+
+    mke2fs silently truncates the label, but mkisofs aborts if the label is too
+    long. So, for convenience sake, any string assigned to this attribute is
+    silently truncated to FSLABEL_MAXLEN (32) characters.
+
+    """
+
     def __get_image(self):
         if self.__imgdir is None:
             raise CreatorError("_image is not valid before calling mount()")
@@ -806,4 +839,4 @@ class LoopImageCreator(ImageCreator):
 
     def _stage_final_image(self):
         self._resparse()
-        shutil.move(self._image, self._outdir + "/" + self.fslabel + ".img")
+        shutil.move(self._image, self._outdir + "/" + self.name + ".img")
