@@ -24,6 +24,7 @@ quilt
 anjuta
 anjuta-docs
 codeblocks
+pida
 
 # General developer tools
 @authoring-and-publishing
