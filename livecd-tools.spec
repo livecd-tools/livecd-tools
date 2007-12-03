@@ -12,10 +12,10 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 Requires: util-linux
 Requires: coreutils
 Requires: e2fsprogs
-Requires: yum >= 3.0.0
+Requires: yum >= 3.1.7
 Requires: mkisofs
 Requires: squashfs-tools
-Requires: pykickstart
+Requires: pykickstart >= 0.96
 Requires: dosfstools >= 2.11-8
 Requires: isomd5sum
 %ifarch %{ix86} x86_64
