@@ -431,11 +431,11 @@ def get_repos(ks, repo_urls = {}):
     repos = []
     for repo in ks.handler.repo.repoList:
         inc = []
-        if hasattr(repo, "inc"):
+        if hasattr(repo, "includepkgs"):
             inc.extend(repo.includepkgs)
 
         exc = []
-        if hasattr(repo, "exc"):
+        if hasattr(repo, "excludepkgs"):
             exc.extend(repo.excludepkgs)
 
         baseurl = repo.baseurl
