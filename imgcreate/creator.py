@@ -26,9 +26,6 @@ import shutil
 
 import yum
 import rpm
-import pykickstart.commands
-import pykickstart.constants
-import pykickstart.parser
 
 from imgcreate.errors import *
 from imgcreate.fs import *
