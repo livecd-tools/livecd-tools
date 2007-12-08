@@ -1,45 +1,45 @@
 %include livecd-fedora-base-desktop.ks
 
+# WARNING: Don't expect this kickstart to be working. It's an initial version
+# and also some packages are right building atm. KDE4 is also actual in a state
+# where it needs some polishing.
+# I you've ignored this warnings please fill bug report at:
+# https://bugzilla.redhat.com
+# http://bugs.kde.org/
+
 %packages
-@kde-desktop
+# don't use @kde-desktop for the moment (until it's complete kde4)
+# KDE 4
+kdelibs
+kdebase
+kdebase-workspace
+kdebase-runtime
 kdegames
-k3b
+kdeutils
+kdeaccessibility
+kdeadmin
+kdenetwork
+kdegraphics
+kde-settings
+kde-settings-kdm
+kde-settings-pulseaudio
+
+# KDE 3
+amarok
 koffice-kword
 koffice-kspread
 koffice-kpresenter
 koffice-filters
 twinkle
-filelight
-krusader
-
-
-# if it is enough space include koffice-krita (~40 megs)
-koffice-krita
-
-# some other extra packages
-gnupg
-synaptics
-hal-cups-utils
-nss-mdns
-
-# ignore comps.xml and make sure these packages are included
-kpowersave
-rhgb
-man-pages
-smolt-firstboot
+k3b
 knetworkmanager
+konversation
+digikam
+filelight
+kaffeine
+ktorrent
 
-#some changes that we don't want...
--specspo
--scribus
--kdeaddons
--kdemultimedia-extras
--kdeartwork-extras
--kmymoney2
--basket
--speedcrunch
--autofs
-
+# FIXME/TODO: recheck the removals here
 # try to remove some packages from livecd-fedora-base-desktop.ks
 -scim*
 -gdm
@@ -52,18 +52,16 @@ knetworkmanager
 -pygtkglext
 -python-devel
 -libchewing
-
-# workaround for the moment (requirements of hplip)
-python-imaging
-python-reportlab
+-firefox
 
 %end
 
 %post
+
 # create /etc/sysconfig/desktop (needed for installation)
 cat > /etc/sysconfig/desktop <<EOF
 DESKTOP="KDE"
-DISPLAYMANAGER="KDE"
+DISPLAYMANAGER="KDM"
 EOF
 
 # add initscript
@@ -88,11 +86,6 @@ sed -i 's/#AutoLoginUser=fred/AutoLoginUser=fedora/' /etc/kde/kdm/kdmrc
 sed -i 's/#PreselectUser=Default/PreselectUser=Default/' /etc/kde/kdm/kdmrc
 sed -i 's/#DefaultUser=johndoe/DefaultUser=fedora/' /etc/kde/kdm/kdmrc
 
-# disable screensaver
-sed -i 's/Enabled=true/Enabled=false/' /usr/share/kde-settings/kde-profile/default/share/config/kdesktoprc
-
-# workaround to put liveinst on desktop and in menu
-sed -i 's/NoDisplay=true/NoDisplay=false/' /usr/share/applications/liveinst.desktop
-EOF
+# FIXME/TODO: Where to put liveinst.desktop since there is no "normal" desktop anymore?
 
 %end
