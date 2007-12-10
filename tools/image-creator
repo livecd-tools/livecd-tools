@@ -1,0 +1,72 @@
+#!/usr/bin/python -tt
+#
+# image-creator: Create an ext3 system image
+#
+# Copyright 2007, Red Hat  Inc.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; version 2 of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Library General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+
+import os
+import sys
+import shutil
+import optparse
+
+import imgcreate
+
+def parse_options(args):
+    parser = optparse.OptionParser(usage = "%prog [--name=<name>] <kickstart>")
+
+    parser.add_option("-n", "--name", type="string", dest="name",
+                      help="Image name and filesystem label")
+
+    (options, args) = parser.parse_args()
+
+    if len(args) != 1:
+        parser.print_usage()
+        sys.exit(1)
+
+    return (args[0], options)
+
+def main():
+    (kscfg, options) = parse_options(sys.argv[1:])
+
+    if os.geteuid () != 0:
+        print >> sys.stderr, "You must run image-creator as root"
+        return 1
+
+    try:
+        ks = imgcreate.read_kickstart(kscfg)
+    except imgcreate.CreatorError, e:
+        print >> sys.stderr, "Error loading kickstart file '%s' : %s" % (kscfg, e)
+        return 1
+
+    if options.name:
+        name = options.name
+    else:
+        name = imgcreate.build_name(kscfg)
+
+    creator = imgcreate.LoopImageCreator(ks, name)
+
+    try:
+        creator.create()
+    except imgcreate.CreatorError, e:
+        print >> sys.stderr, "Error creating image : %s" % e
+        return 1
+    finally:
+        creator.cleanup()
+
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())

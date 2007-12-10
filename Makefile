@@ -10,6 +10,7 @@ all:
 
 install:
 	$(INSTALL_PROGRAM) -D creator/livecd-creator $(DESTDIR)/usr/bin/livecd-creator
+	$(INSTALL_PROGRAM) -D creator/image-creator $(DESTDIR)/usr/bin/image-creator
 	$(INSTALL_PROGRAM) -D tools/livecd-iso-to-disk.sh $(DESTDIR)/usr/bin/livecd-iso-to-disk
 	$(INSTALL_PROGRAM) -D tools/mayflower $(DESTDIR)/usr/lib/livecd-creator/mayflower
 	$(INSTALL_DATA) -D AUTHORS $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)/AUTHORS

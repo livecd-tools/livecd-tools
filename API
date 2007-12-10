@@ -5,9 +5,10 @@ functionality.
 
 == Image Creation Frontends ==
 
-livecd-creator is one frontend for creating images.  But really, it's
-straight-forward to build your own which deals with your own specific
-needs.  To do so, you'll want to do the following:
+livecd-creator and image-creator are both frontends for creating
+images.  But really, it's straight-forward to build your own which
+deals with your own specific needs.  To do so, you'll want to do
+the following:
 
 * Create a pykickstart handler object.  All of the image creators are
 driven by data stored in pykickstart handlers.
