@@ -382,7 +382,7 @@ class DeviceMapperSnapshot(object):
 def create_image_minimizer(path, image, minimal_size):
     imgloop = LoopbackMount(image, "None")
 
-    cowloop = SparseLoopbackMount(os.path.dirname(path) + "osmin",
+    cowloop = SparseLoopbackMount(os.path.join(os.path.dirname(path), "osmin"),
                                   None, 64L * 1024L * 1024L)
 
     snapshot = DeviceMapperSnapshot(imgloop, cowloop)
