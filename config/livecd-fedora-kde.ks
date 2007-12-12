@@ -1,12 +1,5 @@
 %include livecd-fedora-base-desktop.ks
 
-# WARNING: Don't expect this kickstart to be working. It's an initial version
-# and also some packages are right building atm. KDE4 is also actual in a state
-# where it needs some polishing.
-# I you've ignored this warnings please fill bug report at:
-# https://bugzilla.redhat.com
-# http://bugs.kde.org/
-
 %packages
 # don't use @kde-desktop for the moment (until it's complete kde4)
 # KDE 4
@@ -30,14 +23,18 @@ koffice-kword
 koffice-kspread
 koffice-kpresenter
 koffice-filters
-twinkle
 k3b
 knetworkmanager
 konversation
 digikam
 filelight
 kaffeine
-ktorrent
+kdepim
+
+# don't include these for now to fit a cd
+# twinkle
+# ktorrent
+
 
 # FIXME/TODO: recheck the removals here
 # try to remove some packages from livecd-fedora-base-desktop.ks
@@ -53,6 +50,7 @@ ktorrent
 -python-devel
 -libchewing
 -firefox
+-xulrunner
 
 %end
 
@@ -86,6 +84,13 @@ sed -i 's/#AutoLoginUser=fred/AutoLoginUser=fedora/' /etc/kde/kdm/kdmrc
 sed -i 's/#PreselectUser=Default/PreselectUser=Default/' /etc/kde/kdm/kdmrc
 sed -i 's/#DefaultUser=johndoe/DefaultUser=fedora/' /etc/kde/kdm/kdmrc
 
-# FIXME/TODO: Where to put liveinst.desktop since there is no "normal" desktop anymore?
+# FIXME/TODO: check if this really works
+# add liveinst.desktop to favorites menu
+mkdir -p /home/fedora/.kde/share/config/
+cat > /home/fedora/.kde/share/config/kickoffrc << MENU_EOF
+[Favorites]
+FavoriteURLs=/usr/share/applications/kde4/konqbrowser.desktop,/usr/share/applications/kde4/dolphin.desktop,/usr/share/applications/liveinst.desktop
+MENU_EOF
+chown -R fedora:fedora /home/fedora/.kde/share/
 
 %end
