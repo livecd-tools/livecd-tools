@@ -1,3 +1,5 @@
+%{!?python_sitelib: %define python_sitelib %(%{__python} -c "import distutils.sysconfig as d; print d.get_python_lib()")}
+
 %define debug_package %{nil}
 
 Summary: Tools for building live CD's
@@ -24,6 +26,7 @@ Requires: syslinux
 %ifarch ppc ppc64
 Requires: yaboot
 %endif
+BuildRequires: python
 
 
 %description 
@@ -53,6 +56,11 @@ rm -rf $RPM_BUILD_ROOT
 /usr/lib/livecd-creator/mayflower
 %dir %{_datadir}/livecd-tools
 %{_datadir}/livecd-tools/*
+%{_bindir}/image-creator
+%dir %{python_sitelib}/imgcreate
+%{python_sitelib}/imgcreate/*.py
+%{python_sitelib}/imgcreate/*.pyo
+%{python_sitelib}/imgcreate/*.pyc
 
 %changelog
 * Mon Oct 29 2007 Jeremy Katz <katzj@redhat.com> - 013-1
