@@ -129,6 +129,7 @@ class LiveCDYum(yum.YumBase):
             if v or not hasattr(repo, k):
                 repo.setAttribute(k, v)
         repo.basecachedir = self.conf.cachedir
+        repo.failovermethod = "priority"
         repo.metadata_expire = 0
         # disable gpg check???
         repo.gpgcheck = 0
