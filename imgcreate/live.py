@@ -296,7 +296,12 @@ class LiveImageCreatorBase(LoopImageCreator):
             if self.skip_compression:
                 shutil.move(self._image, self.__isodir + "/LiveOS/ext3fs.img")
             else:
-                mksquashfs(self._image, self.__isodir + "/LiveOS/squashfs.img")
+                makedirs(os.path.join(os.path.dirname(self._image), "LiveOS"))
+                shutil.move(self._image,
+                            os.path.join(os.path.dirname(self._image),
+                                         "LiveOS", "ext3fs.img"))
+                mksquashfs(os.path.dirname(self._image),
+                           self.__isodir + "/LiveOS/squashfs.img")
 
             self.__create_iso(self.__isodir)
         finally:
