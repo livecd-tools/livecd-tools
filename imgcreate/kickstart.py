@@ -19,7 +19,6 @@
 
 import os
 import os.path
-import string
 import subprocess
 import time
 
@@ -296,7 +295,7 @@ class NetworkConfig(KickstartConfig):
         localline = ""
         if hostname and hostname != "localhost.localdomain":
             localline += hostname + " "
-            l = string.split(hostname, ".")
+            l = hostname.split(".")
             if len(l) > 1:
                 localline += l[0] + " "
         localline += "localhost.localdomain localhost"
@@ -357,7 +356,7 @@ class NetworkConfig(KickstartConfig):
                 gateway = network.gateway
 
             if network.nameserver:
-                nameservers = string.split(network.nameserver, ",")
+                nameservers = network.nameserver.split(",")
 
         self.write_sysconfig(useipv6, hostname, gateway)
         self.write_hosts(hostname)
