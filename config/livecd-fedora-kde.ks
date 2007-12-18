@@ -56,6 +56,9 @@ kdepim
 
 %post
 
+# get rid of unwanted firefox (until this one is solved: #420101)
+rpm -e firefox
+
 # create /etc/sysconfig/desktop (needed for installation)
 cat > /etc/sysconfig/desktop <<EOF
 DESKTOP="KDE"
