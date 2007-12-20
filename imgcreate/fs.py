@@ -225,6 +225,8 @@ class SparseExtLoopbackMount(SparseLoopbackMount):
         if size > current_size:
             self.expand(size)
 
+        self.__fsck()
+
         resize2fs(self.lofile, size)
 
         if size < current_size:
