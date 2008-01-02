@@ -1,4 +1,3 @@
-#!/usr/bin/python -tt
 #
 # yum.py : yum utilities
 #

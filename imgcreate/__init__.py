@@ -1,4 +1,3 @@
-#!/usr/bin/python -tt
 #
 # imgcreate : Support for creating system images, including Live CDs
 #

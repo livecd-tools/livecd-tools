@@ -1,4 +1,3 @@
-#!/usr/bin/python -tt
 #
 # live.py : LiveImageCreator class for creating Live CD images
 #

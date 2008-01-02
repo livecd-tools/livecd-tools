@@ -1,4 +1,3 @@
-#!/usr/bin/python -tt
 #
 # kickstart.py : Apply kickstart configuration to a system
 #

@@ -1,4 +1,3 @@
-#!/usr/bin/python -tt
 #
 # creator.py : ImageCreator and LoopImageCreator base classes
 #

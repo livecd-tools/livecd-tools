@@ -1,4 +1,3 @@
-#!/usr/bin/python -tt
 #
 # fs.py : Filesystem related utilities and classes
 #

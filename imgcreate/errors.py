@@ -1,4 +1,3 @@
-#!/usr/bin/python -tt
 #
 # errors.py : exception definitions
 #
