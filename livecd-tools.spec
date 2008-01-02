@@ -6,7 +6,7 @@ Summary: Tools for building live CD's
 Name: livecd-tools
 Version: 013
 Release: 1%{?dist}
-License: GPL
+License: GPLv2
 Group: System Environment/Base
 URL: http://git.fedoraproject.org/?p=hosted/livecd
 Source0: %{name}-%{version}.tar.bz2
