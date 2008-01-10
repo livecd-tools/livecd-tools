@@ -11,6 +11,7 @@ kdegames
 kdeutils
 kdeaccessibility
 kdeadmin
+kdemultimedia
 kdenetwork
 kdegraphics
 kde-settings
@@ -18,7 +19,6 @@ kde-settings-kdm
 kde-settings-pulseaudio
 
 # KDE 3
-amarok
 koffice-kword
 koffice-kspread
 koffice-kpresenter
@@ -26,14 +26,17 @@ koffice-filters
 k3b
 knetworkmanager
 konversation
-digikam
 filelight
 kaffeine
 kdepim
 
-# don't include these for now to fit a cd
-# twinkle
-# ktorrent
+## don't include these for now to fit a cd
+## digikam (~11 megs), ktorrent (~x megs)
+##amarok
+digikam
+twinkle
+ktorrent
+
 
 
 # FIXME/TODO: recheck the removals here
@@ -51,6 +54,9 @@ kdepim
 -libchewing
 -firefox
 -xulrunner
+
+# save some space
+-autofs
 
 %end
 
@@ -87,13 +93,15 @@ sed -i 's/#AutoLoginUser=fred/AutoLoginUser=fedora/' /etc/kde/kdm/kdmrc
 sed -i 's/#PreselectUser=Default/PreselectUser=Default/' /etc/kde/kdm/kdmrc
 sed -i 's/#DefaultUser=johndoe/DefaultUser=fedora/' /etc/kde/kdm/kdmrc
 
-# FIXME/TODO: check if this really works
 # add liveinst.desktop to favorites menu
 mkdir -p /home/fedora/.kde/share/config/
 cat > /home/fedora/.kde/share/config/kickoffrc << MENU_EOF
 [Favorites]
 FavoriteURLs=/usr/share/applications/kde4/konqbrowser.desktop,/usr/share/applications/kde4/dolphin.desktop,/usr/share/applications/liveinst.desktop
 MENU_EOF
-chown -R fedora:fedora /home/fedora/.kde/share/
+chown -R fedora:fedora /home/fedora/.kde/
+
+# workaround to start nm-applet automatically
+cp /etc/xdg/autostart/nm-applet.desktop /usr/share/autostart/
 
 %end
