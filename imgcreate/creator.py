@@ -422,8 +422,8 @@ class ImageCreator(object):
         """
         self.__ensure_builddir()
 
-        os.makedirs(self._instroot)
-        os.makedirs(self._outdir)
+        makedirs(self._instroot)
+        makedirs(self._outdir)
 
         self._mount_instroot(base_on)
 
