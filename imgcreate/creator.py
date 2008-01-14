@@ -262,7 +262,7 @@ class ImageCreator(object):
             name = header['name']
             if not name in ret:
                 ret[name] = [version]
-            else:
+            elif not version in ret[name]:
                 ret[name].append(version)
 
         return ret
