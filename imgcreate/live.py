@@ -203,11 +203,11 @@ class LiveImageCreatorBase(LoopImageCreator):
         if not globals().has_key("__file__"):
             return MAYFLOWER_PATH
 
-        bindir = os.path.abspath(os.path.dirname(__file__))
-        if bindir.startswith("/usr/bin"):
+        pydir = os.path.abspath(os.path.dirname(__file__))
+        if pydir.startswith("/usr/lib"):
             return MAYFLOWER_PATH
 
-        git_mayflower = os.path.join(bindir, "mayflower")
+        git_mayflower = os.path.join(pydir, "../tools/mayflower")
         if not os.path.exists(git_mayflower):
             return MAYFLOWER_PATH
 
