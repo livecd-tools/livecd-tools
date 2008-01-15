@@ -495,10 +495,10 @@ class ImageCreator(object):
                 ayum.selectPackage(pkg)
             except yum.Errors.InstallError, e:
                 if kickstart.ignore_missing(self.ks):
+                    skipped_pkgs.append(pkg)
+                else:
                     raise CreatorError("Failed to find package '%s' : %s" %
                                        (pkg, e))
-                else:
-                    skipped_pkgs.append(pkg)
 
         for pkg in skipped_pkgs:
             print >> sys.stderr, "Skipping missing package '%s'" % (pkg,)
