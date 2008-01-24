@@ -1,22 +1,15 @@
 %include livecd-fedora-base-desktop.ks
 
 %packages
-# don't use @kde-desktop for the moment (until it's complete kde4)
-# KDE 4
-kdelibs
-kdebase
-kdebase-workspace
-kdebase-runtime
-kdegames
-kdeutils
-kdeaccessibility
-kdeadmin
-kdemultimedia
-kdenetwork
-kdegraphics
-kde-settings
-kde-settings-kdm
-kde-settings-pulseaudio
+@kde-desktop
+
+# unwanted packages from @kde-desktop
+# don't include these for now to fit on a cd
+-digikam
+-amarok
+-kdeedu
+-scribus
+#-ktorrent
 
 # KDE 3
 koffice-kword
@@ -24,19 +17,30 @@ koffice-kspread
 koffice-kpresenter
 koffice-filters
 k3b
-knetworkmanager
-konversation
 filelight
-kaffeine
-kdepim
-
-## don't include these for now to fit a cd
-## digikam (~11 megs), ktorrent (~x megs)
-##amarok
-digikam
 twinkle
-ktorrent
 
+# some extras
+fuse
+
+# additional fonts
+baekmuk-ttf-fonts-common
+baekmuk-ttf-fonts-gulim
+cjkunifonts-uming
+dejavu-lgc-fonts
+jomolhari-fonts
+kacst-fonts
+liberation-fonts
+lohit-fonts-bengali
+lohit-fonts-gujarati
+lohit-fonts-hindi
+lohit-fonts-kannada
+lohit-fonts-oriya
+lohit-fonts-punjabi
+lohit-fonts-tamil
+lohit-fonts-telugu
+paktype-fonts
+sazanami-fonts-gothic
 
 
 # FIXME/TODO: recheck the removals here
@@ -52,8 +56,6 @@ ktorrent
 -pygtkglext
 -python-devel
 -libchewing
--firefox
--xulrunner
 
 # save some space
 -autofs
@@ -61,9 +63,6 @@ ktorrent
 %end
 
 %post
-
-# get rid of unwanted firefox (until this one is solved: #420101)
-rpm -e firefox
 
 # create /etc/sysconfig/desktop (needed for installation)
 cat > /etc/sysconfig/desktop <<EOF
