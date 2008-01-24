@@ -5,8 +5,9 @@
 
 # unwanted packages from @kde-desktop
 # don't include these for now to fit on a cd
--digikam
+# digikam (~11 megs), ktorrent (~3 megs), twinkle (~10 megs)
 -amarok
+-digikam
 -kdeedu
 -scribus
 #-ktorrent
@@ -24,24 +25,13 @@ twinkle
 fuse
 
 # additional fonts
-baekmuk-ttf-fonts-common
-baekmuk-ttf-fonts-gulim
-cjkunifonts-uming
-dejavu-lgc-fonts
-jomolhari-fonts
-kacst-fonts
-liberation-fonts
-lohit-fonts-bengali
-lohit-fonts-gujarati
-lohit-fonts-hindi
-lohit-fonts-kannada
-lohit-fonts-oriya
-lohit-fonts-punjabi
-lohit-fonts-tamil
-lohit-fonts-telugu
-paktype-fonts
-sazanami-fonts-gothic
-
+@fonts
+fonts-ISO8859-2 
+#cjkunifonts-ukai 
+madan-fonts 
+fonts-KOI8-R 
+fonts-KOI8-R-100dpi 
+tibetan-machine-uni-fonts
 
 # FIXME/TODO: recheck the removals here
 # try to remove some packages from livecd-fedora-base-desktop.ks
