@@ -39,6 +39,8 @@ memtest86+
 -pinfo
 -vorbis-tools
 -wget
+# dasher is just too big
+-dasher
 # lose the compat stuff
 -compat*
 
