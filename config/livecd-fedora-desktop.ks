@@ -112,7 +112,6 @@ gnome-blog
 -scim-tables-*
 -wqy-bitmap-fonts
 -dejavu-fonts-experimental
--dejavu-fonts
 
 # more fun with space saving 
 -scim-lang-chinese
