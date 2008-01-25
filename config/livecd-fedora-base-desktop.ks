@@ -14,6 +14,7 @@ repo --name=development --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist
 @base-x
 @base
 @core
+@fonts
 @admin-tools
 @dial-up
 @hardware-support
