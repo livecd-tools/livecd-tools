@@ -12,7 +12,7 @@ NetworkManager-openvpn
 # we don't include @office so that we don't get OOo.  but some nice bits
 abiword
 gnumeric
-#evince
+# temporary until excessive deps are pruned
 -evince
 gnome-blog
 #planner
@@ -125,6 +125,7 @@ scim-pinyin
 -autofs
 -nss_db
 -vino
+-dasher
 
 %end
 
