@@ -124,6 +124,8 @@ scim-pinyin
 -nss_db
 -vino
 -dasher
+-evince-dvi
+-evince-djvu
 
 %end
 
