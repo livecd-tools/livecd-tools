@@ -125,7 +125,7 @@ gnome-blog
 # more fun with space saving 
 -scim-lang-chinese
 scim-chewing
-scim-pinyin
+scim-chinese-pinyin
 
 # save some space
 -gnome-user-docs
