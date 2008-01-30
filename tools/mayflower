@@ -447,7 +447,7 @@ echo "env{MODALIAS}\"" >> /etc/udev/rules.d/10-modprobe.rules
 echo "ACTION==\"add\", SUBSYSTEM==\"scsi_device\" RUN+=\"/sbin/modprobe sg\"" >> /etc/udev/rules.d/10-modprobe.rules
 echo "ACTION==\"add\", SUBSYSTEM==\"scsi_device\", SYSFS{type}==\"0|7|14\", RUN+=\"/sbin/modprobe sd_mod\"" >> /etc/udev/rules.d/10-modprobe.rules
 echo "ACTION==\"add\", SUBSYSTEM==\"scsi_device\", SYSFS{type}==\"[45]\", RUN+=\"/sbin/modprobe sr_mod\"" >> /etc/udev/rules.d/10-modprobe.rules
-
+echo "SUBSYSTEM==\"mmc\", RUN+=\"/sbin/modprobe mmc_block\"" >> /etc/udev/rules.d/10-modprobe.rules
 
 # FIXME: hack since sr_mod seems to fail to get loaded sometimes (#239657)
 /sbin/modprobe sr_mod

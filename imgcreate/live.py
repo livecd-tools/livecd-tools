@@ -68,7 +68,7 @@ class LiveImageCreatorBase(LoopImageCreator):
 
         self.__isodir = None
 
-        self.__modules = ["=ata", "sym53c8xx", "aic7xxx", "=usb", "=firewire"]
+        self.__modules = ["=ata", "sym53c8xx", "aic7xxx", "=usb", "=firewire", "=mmc"]
         self.__modules.extend(kickstart.get_modules(self.ks))
 
     #
@@ -226,6 +226,8 @@ class LiveImageCreatorBase(LoopImageCreator):
             elif module == "=firewire":
                 f.write('MODULES+="firewire-sbp2 firewire-ohci "\n')
                 f.write('MODULES+="sbp2 ohci1394 ieee1394 "\n')
+            elif module == "=mmc":
+                f.write('MODULES+="mmc_block sdhlc "\n')
             else:
                 f.write('MODULES+="' + module + ' "\n')
 
