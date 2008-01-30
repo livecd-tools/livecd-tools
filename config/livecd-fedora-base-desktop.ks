@@ -126,9 +126,6 @@ fi
 
 # configure X, allowing user to override xdriver
 exists system-config-display --noui --reconfig --set-depth=24 \$xdriver
-# work around broken vmmouse driver
-grep -v CorePointer /etc/X11/xorg.conf > /etc/X11/xorg.conf.x
-mv -f /etc/X11/xorg.conf.x /etc/X11/xorg.conf
 
 # add fedora user with no passwd
 useradd -c "Fedora Live" fedora
