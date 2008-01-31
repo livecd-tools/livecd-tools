@@ -227,7 +227,7 @@ class LiveImageCreatorBase(LoopImageCreator):
                 f.write('MODULES+="firewire-sbp2 firewire-ohci "\n')
                 f.write('MODULES+="sbp2 ohci1394 ieee1394 "\n')
             elif module == "=mmc":
-                f.write('MODULES+="mmc_block sdhlc "\n')
+                f.write('MODULES+="mmc_block sdhci "\n')
             else:
                 f.write('MODULES+="' + module + ' "\n')
 
