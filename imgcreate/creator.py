@@ -430,7 +430,7 @@ class ImageCreator(object):
         for d in ("/etc", "/boot", "/var/log", "/var/cache/yum"):
             makedirs(self._instroot + d)
 
-        cachesrc = (cachedir or self.__builddir) + "/yum-cache"
+        cachesrc = cachedir or (self.__builddir + "/yum-cache")
         makedirs(cachesrc)
 
         # bind mount system directories into _instroot
