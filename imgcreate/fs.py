@@ -104,9 +104,10 @@ class LoopbackMount:
     def unmount(self):
         if self.mounted:
             rc = subprocess.call(["/bin/umount", self.mountdir])
-            self.mounted = False
+            if rc == 0:
+                self.mounted = False
 
-        if self.rmdir:
+        if self.rmdir and not self.mounted:
             try:
                 os.rmdir(self.mountdir)
             except OSError, e:
