@@ -609,7 +609,7 @@ do_live_from_base_loop() {
     rm -f /dev/root
     ln -s /dev/mapper/live-rw /dev/root
 
-    mount -n -t ext3 /dev/mapper/live-rw /sysroot
+    mount -n  /dev/mapper/live-rw /sysroot
     # here you can modify the rw ext3 fs for testing if you don't want to
     # respin the entire rootfs (which takes ages). Example
     #
