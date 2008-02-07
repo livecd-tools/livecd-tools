@@ -396,6 +396,12 @@ def get_image_size(ks, default = None):
             return int(p.size) * 1024L * 1024L
     return default
 
+def get_image_fstype(ks, default = None):
+    for p in ks.handler.partition.partitions:
+        if p.mountpoint == "/" and p.fstype:
+            return p.fstype
+    return default
+
 def get_modules(ks):
     devices = []
     if isinstance(ks.handler.device, kscommands.device.FC3_Device):

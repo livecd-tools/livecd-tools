@@ -206,7 +206,7 @@ class ImageCreator(object):
         A sensible default implementation is provided.
 
         """
-        s =  "/dev/root  /         ext3    defaults,noatime 0 0\n"
+        s =  "/dev/root  /         %s    defaults,noatime 0 0\n" %(self._fstype)
         s += "devpts     /dev/pts  devpts  gid=5,mode=620   0 0\n"
         s += "tmpfs      /dev/shm  tmpfs   defaults         0 0\n"
         s += "proc       /proc     proc    defaults         0 0\n"
@@ -697,7 +697,7 @@ class LoopImageCreator(ImageCreator):
 
         self.__minsize_KB = 0
         self.__blocksize = 4096
-        self.__fstype = "ext3"
+        self.__fstype = kickstart.get_image_fstype(self.ks, "ext3")
 
         self.__instloop = None
         self.__imgdir = None
