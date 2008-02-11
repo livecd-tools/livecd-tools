@@ -122,7 +122,7 @@ class ImageCreator(object):
         mounting creating and loopback mounting a filesystem image to
         _instroot.
 
-        There is no default implmentation.
+        There is no default implementation.
 
         base_on -- this is the value passed to mount() and can be interpreted
                    as the subclass wishes; it might e.g. be the location of
@@ -138,7 +138,7 @@ class ImageCreator(object):
         in _mount_instroot(). For example, if a filesystem image was mounted
         onto _instroot, it should be unmounted here.
 
-        There is no default implmentation.
+        There is no default implementation.
 
         """
         pass
@@ -153,7 +153,7 @@ class ImageCreator(object):
         packages have been installed and the kickstart configuration has been
         applied, but before the %post scripts have been executed.
 
-        There is no default implmentation.
+        There is no default implementation.
 
         """
         pass
@@ -238,7 +238,7 @@ class ImageCreator(object):
         A dict should be returned mapping the available kernel types to a list
         of the available versions for those kernels.
 
-        The default implementation uses rpm to iterates over everything
+        The default implementation uses rpm to iterate over everything
         providing 'kernel', finds /boot/vmlinuz-* and returns the version
         obtained from the vmlinuz filename. (This can differ from the kernel
         RPM's n-v-r in the case of e.g. xen)
