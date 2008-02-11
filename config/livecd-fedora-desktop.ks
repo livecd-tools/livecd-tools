@@ -117,6 +117,7 @@ gnome-blog
 
 # dictionaries are big
 -aspell-*
+-hunspell-*
 -man-pages-*
 -scim-tables-*
 -wqy-bitmap-fonts
