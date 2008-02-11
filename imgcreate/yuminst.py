@@ -100,7 +100,15 @@ class LiveCDYum(yum.YumBase):
                 txmbrs.append(p)
 
         if len(txmbrs) > 0:
-            map(lambda x: self.tsInfo.remove(x.pkgtup), txmbrs)
+            for x in txmbrs:
+                self.tsInfo.remove(x.pkgtup)
+                # we also need to remove from the conditionals
+                # dict so that things don't get pulled back in as a result
+                # of them.  yes, this is ugly.  conditionals should die.
+                for req, pkgs in self.tsInfo.conditionals:
+                    if x in pkgs:
+                        pkgs.remove(x)
+                        self.tsInfo.conditionals[req] = pkgs
         else:
             print >> sys.stderr, "No such package %s to remove" %(pkg,)
 
