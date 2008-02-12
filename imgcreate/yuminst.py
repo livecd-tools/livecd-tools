@@ -23,7 +23,7 @@ import yum
 import rpmUtils
 import pykickstart.parser
 
-from yuminst import *
+from imgcreate.errors import *
 
 class TextProgress(object):
     def start(self, filename, url, *args, **kwargs):
