@@ -4,7 +4,7 @@
 
 Summary: Tools for building live CD's
 Name: livecd-tools
-Version: 013
+Version: 014
 Release: 1%{?dist}
 License: GPLv2
 Group: System Environment/Base
@@ -63,6 +63,15 @@ rm -rf $RPM_BUILD_ROOT
 %{python_sitelib}/imgcreate/*.pyc
 
 %changelog
+* Tue Feb 12 2008 Jeremy Katz <katzj@redhat.com> - 014-1
+- Rework to provide a python API for use by other tools (thanks to 
+  markmc for a lot of the legwork here)
+- Fix creation of images with ext2 filesystems and no SELinux
+- Don't require a yum-cache directory inside of the cachedir (#430066)
+- Many config updates for rawhide
+- Allow running live images from MMC/SD (#430444)
+- Don't let a non-standard TMPDIR break things (Jim Meyering)
+
 * Mon Oct 29 2007 Jeremy Katz <katzj@redhat.com> - 013-1
 - Lots of config updates
 - Support 'device foo' to say what modules go in the initramfs
