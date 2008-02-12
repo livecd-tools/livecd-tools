@@ -147,6 +147,7 @@ class LiveCDYum(yum.YumBase):
         return repo
             
     def runInstall(self):
+        os.environ["HOME"] = "/"
         try:
             (res, resmsg) = self.buildTransaction()
         except yum.Errors.RepoError, e:
