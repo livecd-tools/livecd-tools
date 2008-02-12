@@ -477,7 +477,8 @@ if [ "$shell" == "1" ] ; then
 fi
 
 # don't wait for "mtd0" as no device file will appear
-if [ "$root" != "mtd0" ] ; then
+# and don't worry about this if $thingtomount is a regular file
+if [ "$root" != "mtd0" -a ! -f "$thingtomount" ] ; then
 
     # If we don't have the /dev/root link.. ask the user to create..
     if [ "$waitforsymlink" != "1" ] ; then

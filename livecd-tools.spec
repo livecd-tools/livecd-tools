@@ -52,6 +52,7 @@ rm -rf $RPM_BUILD_ROOT
 %doc AUTHORS COPYING README HACKING
 %{_bindir}/livecd-creator
 %{_bindir}/livecd-iso-to-disk
+%{_bindir}/livecd-iso-to-pxeboot
 %dir /usr/lib/livecd-creator
 /usr/lib/livecd-creator/mayflower
 %dir %{_datadir}/livecd-tools
