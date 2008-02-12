@@ -55,9 +55,6 @@ memtest86+
 -xsane-gimp
 -sane-backends
 
-# lots of people want to have this
-gparted
-
 # livecd bits to set up the livecd and be able to install
 anaconda
 isomd5sum
