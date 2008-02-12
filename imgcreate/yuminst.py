@@ -105,7 +105,7 @@ class LiveCDYum(yum.YumBase):
                 # we also need to remove from the conditionals
                 # dict so that things don't get pulled back in as a result
                 # of them.  yes, this is ugly.  conditionals should die.
-                for req, pkgs in self.tsInfo.conditionals:
+                for req, pkgs in self.tsInfo.conditionals.iteritems():
                     if x in pkgs:
                         pkgs.remove(x)
                         self.tsInfo.conditionals[req] = pkgs
