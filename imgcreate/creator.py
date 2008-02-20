@@ -274,7 +274,7 @@ class ImageCreator(object):
         """Mount various system directories onto _instroot.
 
         This method is called by mount(), but may also be used by subclasses
-        in order to re-mount the bindmounts after modifying the underyling
+        in order to re-mount the bindmounts after modifying the underlying
         filesystem.
 
         """
