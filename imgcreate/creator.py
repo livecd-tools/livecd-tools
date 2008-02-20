@@ -435,9 +435,13 @@ class ImageCreator(object):
 
         # bind mount system directories into _instroot
         for (f, dest) in [("/sys", None), ("/proc", None), ("/dev", None),
-                          ("/dev/pts", None), ("/selinux", None),
+                          ("/dev/pts", None),
                           (cachesrc, "/var/cache/yum")]:
             self.__bindmounts.append(BindChrootMount(f, self._instroot, dest))
+
+        # /selinux should only be mounted if selinux is enabled (enforcing or permissive)
+        if kickstart.selinux_enabled(self.ks):
+            self.__bindmounts.append(BindChrootMount("/selinux", self._instroot, None))
 
         self._do_bindmounts()
 
@@ -551,6 +555,8 @@ class ImageCreator(object):
 
         if kickstart.exclude_docs(self.ks):
             rpm.addMacro("_excludedocs", "1")
+        if not kickstart.selinux_enabled(self.ks):
+            rpm.addMacro("__file_context_path", "%{nil}")
 
         try:
             self.__select_packages(ayum)

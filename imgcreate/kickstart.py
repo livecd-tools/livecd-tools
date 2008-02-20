@@ -370,7 +370,7 @@ class SelinuxConfig(KickstartConfig):
             f = file(path, "w+")
             os.chmod(path, 0644)
 
-        if not ksselinux.selinux:
+        if ksselinux.selinux == ksconstants.SELINUX_DISABLED:
             return
         if not os.path.exists(self.path("/sbin/restorecon")):
             return
@@ -381,9 +381,11 @@ class SelinuxConfig(KickstartConfig):
         if os.path.exists(self.path("/usr/sbin/lokkit")):
             args = ["/usr/sbin/lokkit", "-f", "--quiet", "--nostart"]
 
-            if ksselinux.selinux:
+            if ksselinux.selinux == ksconstants.SELINUX_ENFORCING:
                 args.append("--selinux=enforcing")
-            else:
+            if ksselinux.selinux == ksconstants.SELINUX_PERMISSIVE:
+                args.append("--selinux=permissive")
+            if ksselinux.selinux == ksconstants.SELINUX_DISABLED:
                 args.append("--selinux=disabled")
 
             self.call(args)
@@ -483,4 +485,4 @@ def get_post_scripts(ks):
     return scripts
 
 def selinux_enabled(ks):
-    return ks.handler.selinux.selinux
+    return ks.handler.selinux.selinux == ksconstants.SELINUX_ENFORCING
