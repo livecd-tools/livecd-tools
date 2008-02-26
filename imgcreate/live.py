@@ -26,8 +26,6 @@ from imgcreate.errors import *
 from imgcreate.fs import *
 from imgcreate.creator import *
 
-MAYFLOWER_PATH = "/usr/lib/livecd-creator/mayflower"
-
 class LiveImageCreatorBase(LoopImageCreator):
     """A base class for LiveCD image creators.
 
@@ -177,6 +175,7 @@ class LiveImageCreatorBase(LoopImageCreator):
         if not base_on is None:
             self.__base_on_iso(base_on)
         LoopImageCreator._mount_instroot(self)
+        self.__write_initrd_conf(self._instroot + "/etc/sysconfig/mkinitrd")
 
     def __ensure_isodir(self):
         if self.__isodir is None:
@@ -185,7 +184,6 @@ class LiveImageCreatorBase(LoopImageCreator):
 
     def _create_bootconfig(self):
         """Configure the image so that it's bootable."""
-        self.__create_initramfs()
         self._configure_bootloader(self.__ensure_isodir())
 
     def _get_post_scripts_env(self, in_chroot):
@@ -196,26 +194,13 @@ class LiveImageCreatorBase(LoopImageCreator):
 
         return env
 
-    #
-    # Try to use mayflower if running from git tree
-    #
-    def __mayflower_path(self):
-        if not globals().has_key("__file__"):
-            return MAYFLOWER_PATH
-
-        pydir = os.path.abspath(os.path.dirname(__file__))
-        if pydir.startswith("/usr/lib"):
-            return MAYFLOWER_PATH
-
-        git_mayflower = os.path.join(pydir, "../tools/mayflower")
-        if not os.path.exists(git_mayflower):
-            return MAYFLOWER_PATH
-
-        return git_mayflower
-
-    def __write_mayflower_conf(self, path):
+    def __write_initrd_conf(self, path):
+        if not os.path.exists(os.path.dirname(path)):
+            makedirs(os.path.dirname(path))
         f = open(path, "a")
 
+        f.write('LIVEOS="yes"\n')
+        f.write('PROBE="no"\n')
         f.write('MODULES+="squashfs ext3 ext2 vfat msdos "\n')
         f.write('MODULES+="sr_mod sd_mod ide-cd "\n')
 
@@ -232,27 +217,6 @@ class LiveImageCreatorBase(LoopImageCreator):
                 f.write('MODULES+="' + module + ' "\n')
 
         f.close()
-
-    def __create_initramfs(self):
-        mayflower = self.__mayflower_path()
-        if not os.path.isfile(mayflower):
-            raise CreatorError("livecd-creator not correctly installed : "
-                               "%s not found" % MAYFLOWER_PATH)
-
-        shutil.copy(mayflower, self._instroot + "/sbin")
-
-        self.__write_mayflower_conf(self._instroot + "/etc/mayflower.conf")
-
-        kernels = self._get_kernel_versions()
-        for kernel in kernels:
-            for version in kernels[kernel]:
-                subprocess.call(["/sbin/mayflower", "-f",
-                                 "/boot/livecd-initramfs-%s.img" % (version,), 
-                                 version],
-                                preexec_fn=self._chroot),
-
-        os.unlink(self._instroot + "/sbin/mayflower")
-        os.unlink(self._instroot + "/etc/mayflower.conf")
 
     def __create_iso(self, isodir):
         iso = self._outdir + "/" + self.name + ".iso"
@@ -371,9 +335,8 @@ class x86LiveImageCreator(LiveImageCreatorBase):
         shutil.copyfile(bootdir + "/vmlinuz-" + version,
                         isodir + "/isolinux/vmlinuz" + index)
 
-        shutil.copyfile(bootdir + "/livecd-initramfs-" + version + ".img",
+        shutil.copyfile(bootdir + "/initrd-" + version + ".img",
                         isodir + "/isolinux/initrd" + index + ".img")
-        os.unlink(bootdir + "/livecd-initramfs-" + version + ".img")
 
         is_xen = False
         if os.path.exists(bootdir + "/boot/xen.gz-" + version[:-3]):
@@ -572,9 +535,8 @@ class ppcLiveImageCreator(LiveImageCreatorBase):
         shutil.copyfile(bootdir + "/vmlinuz-" + version,
                         destdir + "/vmlinuz")
 
-        shutil.copyfile(bootdir + "/livecd-initramfs-" + version + ".img",
+        shutil.copyfile(bootdir + "/initrd-" + version + ".img",
                         destdir + "/initrd.img")
-        os.unlink(bootdir + "/livecd-initramfs-" + version + ".img")
 
     def __get_basic_yaboot_config(self, **args):
         return """
