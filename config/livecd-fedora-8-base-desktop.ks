@@ -22,6 +22,9 @@ repo --name=updates --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?rep
 kernel
 memtest86+
 
+# for live initrd
+livecd-tools
+
 # save some space
 -specspo
 -esc
@@ -158,10 +161,15 @@ chmod 755 /etc/rc.d/init.d/fedora-live
 /sbin/restorecon /etc/rc.d/init.d/fedora-live
 /sbin/chkconfig --add fedora-live
 
-# save a little bit of space at least...
-rm -f /boot/initrd*
 # make sure there aren't core files lying around
 rm -f /core*
+
+# make the initrd we care about
+rm -f /boot/initrd*.img
+cp /etc/sysconfig/mkinitrd /etc/mayflower.conf
+ver=`ls /boot/vmlinuz* |head -n 1 |sed -e 's;/boot/vmlinuz-;;'`
+/usr/lib/livecd-creator/mayflower -f /boot/initrd-$ver.img $ver
+rm -f /etc/mayflower.conf
 
 %end
 
@@ -175,4 +183,7 @@ if [ "$(uname -i)" = "i386" -o "$(uname -i)" = "x86_64" ]; then
   if [ ! -d $LIVE_ROOT/LiveOS ]; then mkdir -p $LIVE_ROOT/LiveOS ; fi
   cp /usr/bin/livecd-iso-to-disk $LIVE_ROOT/LiveOS
 fi
+
+# move the initrd we created to be the booted one
+mv $INSTALL_ROOT/boot/initrd-*.img $LIVE_ROOT/isolinux/initrd0.img
 %end
