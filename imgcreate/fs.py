@@ -201,7 +201,7 @@ class SparseExtLoopbackMount(SparseLoopbackMount):
     def __format_filesystem(self):
         rc = subprocess.call(["/sbin/mkfs." + self.fstype,
                               "-F", "-L", self.fslabel,
-                              "-m", "1", "-b", str(self.blocksize),
+                              "-m", "1", "-b", str(self.blocksize), "-I128",
                               self.lofile,
                               str(self.size / self.blocksize)])
         if rc != 0:
