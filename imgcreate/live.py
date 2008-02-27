@@ -177,6 +177,13 @@ class LiveImageCreatorBase(LoopImageCreator):
         LoopImageCreator._mount_instroot(self)
         self.__write_initrd_conf(self._instroot + "/etc/sysconfig/mkinitrd")
 
+    def _unmount_instroot(self):
+        try:
+            os.unlink(self._instroot + "/etc/sysconfig/mkinitrd")
+        except:
+            pass
+        LoopImageCreator._unmount_instroot(self)
+
     def __ensure_isodir(self):
         if self.__isodir is None:
             self.__isodir = self._mkdtemp("iso-")
