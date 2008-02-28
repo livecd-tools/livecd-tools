@@ -427,14 +427,14 @@ class ImageCreator(object):
 
         self._mount_instroot(base_on)
 
-        for d in ("/etc", "/boot", "/var/log", "/var/cache/yum"):
+        for d in ("/dev/pts", "/etc", "/boot", "/var/log", "/var/cache/yum"):
             makedirs(self._instroot + d)
 
         cachesrc = cachedir or (self.__builddir + "/yum-cache")
         makedirs(cachesrc)
 
         # bind mount system directories into _instroot
-        for (f, dest) in [("/sys", None), ("/proc", None), ("/dev", None),
+        for (f, dest) in [("/sys", None), ("/proc", None),
                           ("/dev/pts", None),
                           (cachesrc, "/var/cache/yum")]:
             self.__bindmounts.append(BindChrootMount(f, self._instroot, dest))
@@ -442,6 +442,23 @@ class ImageCreator(object):
         # /selinux should only be mounted if selinux is enabled (enforcing or permissive)
         if kickstart.selinux_enabled(self.ks):
             self.__bindmounts.append(BindChrootMount("/selinux", self._instroot, None))
+
+        # Create minimum /dev
+        origumask = os.umask(0000)
+        devices = [('null',   1, 3, 0666),
+                   ('urandom',1, 9, 0666),
+                   ('random', 1, 8, 0666),
+                   ('full',   1, 7, 0666),
+                   ('ptmx',   5, 2, 0666),
+                   ('tty',    5, 0, 0666),
+                   ('zero',   1, 5, 0666)]
+        for (node, major, minor, perm) in devices:
+            os.mknod(self._instroot + "/dev/" + node, perm | stat.S_IFCHR, os.makedev(major,minor))
+        os.symlink('/proc/self/fd',   self._instroot + "/dev/fd")
+        os.symlink('/proc/self/fd/0', self._instroot + "/dev/stdin")
+        os.symlink('/proc/self/fd/1', self._instroot + "/dev/stdout")
+        os.symlink('/proc/self/fd/2', self._instroot + "/dev/stderr")
+        os.umask(origumask)
 
         self._do_bindmounts()
 
