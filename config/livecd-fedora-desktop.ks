@@ -12,7 +12,6 @@ NetworkManager-openvpn
 # we don't include @office so that we don't get OOo.  but some nice bits
 abiword
 gnumeric
-gnome-blog
 #planner
 #inkscape
 
