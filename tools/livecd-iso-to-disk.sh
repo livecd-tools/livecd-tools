@@ -2,6 +2,8 @@
 # Convert a live CD iso so that it's bootable off of a USB stick
 # Copyright 2007  Red Hat, Inc.
 # Jeremy Katz <katzj@redhat.com>
+#
+# overlay/persistence enhancements by Douglas McClendon <dmc@viros.org>
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,7 +22,7 @@
 export PATH=/sbin:/usr/sbin:$PATH
 
 usage() {
-    echo "$0 [--reset-mbr] [--noverify] <isopath> <usbstick device>"
+    echo "$0 [--reset-mbr] [--noverify] [--overlay-size-mb <size>] <isopath> <usbstick device>"
     exit 1
 }
 
@@ -149,6 +151,10 @@ fi
 
 while [ $# -gt 2 ]; do
     case $1 in
+	--overlay-size-mb)
+	    overlaysizemb=$2
+	    shift
+	    ;;
 	--noverify)
 	    noverify=1
 	    ;;
@@ -228,6 +234,17 @@ cp $CDMNT/isolinux/* $USBMNT/$SYSLINUXPATH
 echo "Updating boot config file"
 # adjust label and fstype
 sed -i -e "s/CDLABEL=[^ ]*/$USBLABEL/" -e "s/rootfstype=[^ ]*/rootfstype=$USBFS/" $USBMNT/$SYSLINUXPATH/isolinux.cfg
+
+if [ -n "$overlaysizemb" ]; then
+    echo "Initializing persistent overlay file"
+    OVERFILE="overlay-$( /lib/udev/vol_id -l $USBDEV )-$( /lib/udev/vol_id -u $USBDEV )"
+    dd if=/dev/null of=$USBMNT/LiveOS/$OVERFILE \
+	count=1 bs=1M seek=$overlaysizemb
+    sed -i -e "s/liveimg/liveimg overlay=${USBLABEL}/" \
+	$USBMNT/$SYSLINUXPATH/isolinux.cfg
+    sed -i -e "s/\ ro\ /\ rw\ /" \
+	$USBMNT/$SYSLINUXPATH/isolinux.cfg
+fi
 
 echo "Installing boot loader"
 if [ "$USBFS" = "vfat" -o "$USBFS" = "msdos" ]; then
