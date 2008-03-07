@@ -4,7 +4,7 @@
 
 Summary: Tools for building live CD's
 Name: livecd-tools
-Version: 014
+Version: 015
 Release: 1%{?dist}
 License: GPLv2
 Group: System Environment/Base
@@ -53,8 +53,6 @@ rm -rf $RPM_BUILD_ROOT
 %{_bindir}/livecd-creator
 %{_bindir}/livecd-iso-to-disk
 %{_bindir}/livecd-iso-to-pxeboot
-%dir /usr/lib/livecd-creator
-/usr/lib/livecd-creator/mayflower
 %dir %{_datadir}/livecd-tools
 %{_datadir}/livecd-tools/*
 %{_bindir}/image-creator
@@ -64,6 +62,15 @@ rm -rf $RPM_BUILD_ROOT
 %{python_sitelib}/imgcreate/*.pyc
 
 %changelog
+* Thu Mar  6 2008 Jeremy Katz <katzj@redhat.com> - 015-1
+- Support for using live isos with pxe booting (Richard W.M. Jones and 
+  Chris Lalancette)
+- Fixes for SELinux being disabled (Warren Togami)
+- Stop using mayflower for building the initrd; mkinitrd can do it now
+- Create a minimal /dev rather than using the host /dev (Warren Togami)
+- Support for persistent overlays when using a USB stick (based on support 
+  by Douglas McClendon)
+
 * Tue Feb 12 2008 Jeremy Katz <katzj@redhat.com> - 014-1
 - Rework to provide a python API for use by other tools (thanks to 
   markmc for a lot of the legwork here)
