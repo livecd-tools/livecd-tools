@@ -197,6 +197,11 @@ checkPartActive $USBDEV
 checkMBR $USBDEV
 [ -n $resetmbr ] && resetMBR $USBDEV
 
+if [ -n "$overlaysizemb" -a "$USBFS" = "vfat" -a "$overlaysizemb" -gt 2047 ]; then
+    echo "Can't have an overlay greater than 2048MB on VFAT"
+    exitclean
+fi
+
 # FIXME: would be better if we had better mountpoints
 CDMNT=$(mktemp -d /media/cdtmp.XXXXXX)
 mount -o loop $ISO $CDMNT || exitclean
@@ -238,8 +243,12 @@ sed -i -e "s/CDLABEL=[^ ]*/$USBLABEL/" -e "s/rootfstype=[^ ]*/rootfstype=$USBFS/
 if [ -n "$overlaysizemb" ]; then
     echo "Initializing persistent overlay file"
     OVERFILE="overlay-$( /lib/udev/vol_id -l $USBDEV )-$( /lib/udev/vol_id -u $USBDEV )"
-    dd if=/dev/null of=$USBMNT/LiveOS/$OVERFILE \
-	count=1 bs=1M seek=$overlaysizemb
+    if [ "$USBFS" = "vfat" ]; then
+	# vfat can't handle sparse files
+	dd if=/dev/zero of=$USBMNT/LiveOS/$OVERFILE count=$overlaysizemb bs=1M
+    else
+	dd if=/dev/null of=$USBMNT/LiveOS/$OVERFILE count=1 bs=1M seek=$overlaysizemb
+    fi
     sed -i -e "s/liveimg/liveimg overlay=${USBLABEL}/" \
 	$USBMNT/$SYSLINUXPATH/isolinux.cfg
     sed -i -e "s/\ ro\ /\ rw\ /" \
