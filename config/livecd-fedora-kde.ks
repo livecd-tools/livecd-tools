@@ -5,13 +5,14 @@
 
 # unwanted packages from @kde-desktop
 # don't include these for now to fit on a cd
-# digikam (~11 megs), ktorrent (~3 megs), twinkle (~10 megs)
-#-amarok
+# digikam (~11 megs), ktorrent (~3 megs), amarok (~14 megs),
+# kdegames (~23 megs)
+-amarok
 -digikam
 -kdeedu
 -scribus
 #-ktorrent
-#-twinkle
+#-kdegames
 
 # KDE 3
 koffice-kword
@@ -20,7 +21,8 @@ koffice-kpresenter
 koffice-filters
 k3b
 filelight
-#twinkle
+# twinkle (~10 megs)
+twinkle
 
 # some extras
 fuse
