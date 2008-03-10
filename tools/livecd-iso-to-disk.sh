@@ -197,9 +197,11 @@ checkPartActive $USBDEV
 checkMBR $USBDEV
 [ -n $resetmbr ] && resetMBR $USBDEV
 
-if [ -n "$overlaysizemb" -a "$USBFS" = "vfat" -a "$overlaysizemb" -gt 2047 ]; then
+if [ -n "$overlaysizemb" -a "$USBFS" = "vfat" ]; then
+  if [ "$overlaysizemb" -gt 2047 ]; then
     echo "Can't have an overlay greater than 2048MB on VFAT"
     exitclean
+  fi
 fi
 
 # FIXME: would be better if we had better mountpoints
