@@ -3,6 +3,10 @@
 %packages
 @kde-desktop
 
+# include nm-applet directly 
+-knetworkmanager
+NetworkManager-gnome
+
 # unwanted packages from @kde-desktop
 # don't include these for now to fit on a cd
 # digikam (~11 megs), ktorrent (~3 megs), amarok (~14 megs),
