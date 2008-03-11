@@ -124,6 +124,7 @@ gnumeric
 
 # more fun with space saving 
 -scim-lang-chinese
+-scim-python-chinese
 scim-chewing
 scim-pinyin
 
@@ -139,6 +140,8 @@ scim-pinyin
 -evince-djvu
 # temporary - drags in many deps
 -ekiga
+-tomboy
+-f-spot
 %end
 
 %post
