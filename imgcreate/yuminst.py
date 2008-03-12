@@ -162,7 +162,10 @@ class LiveCDYum(yum.YumBase):
         self.initActionTs()
         self.populateTs(keepold=0)
         self.ts.check()
-        self.ts.order()
+        rc = self.ts.order()
+        if rc != 0:
+            raise CreatorError("ordering packages for installation failed!")
+
         # FIXME: callback should be refactored a little in yum 
         sys.path.append('/usr/share/yum-cli')
         import callback
