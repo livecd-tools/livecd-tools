@@ -66,7 +66,7 @@ class LiveImageCreatorBase(LoopImageCreator):
 
         self.__isodir = None
 
-        self.__modules = ["=ata", "sym53c8xx", "aic7xxx", "=usb", "=firewire", "=mmc"]
+        self.__modules = ["=ata", "sym53c8xx", "aic7xxx", "=usb", "=firewire", "=mmc", "=pcmcia"]
         self.__modules.extend(kickstart.get_modules(self.ks))
 
     #
@@ -209,7 +209,7 @@ class LiveImageCreatorBase(LoopImageCreator):
         f.write('LIVEOS="yes"\n')
         f.write('PROBE="no"\n')
         f.write('MODULES+="squashfs ext3 ext2 vfat msdos "\n')
-        f.write('MODULES+="sr_mod sd_mod ide-cd "\n')
+        f.write('MODULES+="sr_mod sd_mod ide-cd cdrom "\n')
 
         for module in self.__modules:
             if module == "=usb":
@@ -220,6 +220,8 @@ class LiveImageCreatorBase(LoopImageCreator):
                 f.write('MODULES+="sbp2 ohci1394 ieee1394 "\n')
             elif module == "=mmc":
                 f.write('MODULES+="mmc_block sdhci "\n')
+            elif module == "=pcmcia":
+                f.write('MODULES+="pata_pcmcia  "\n')
             else:
                 f.write('MODULES+="' + module + ' "\n')
 
