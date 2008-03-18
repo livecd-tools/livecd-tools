@@ -26,7 +26,7 @@ koffice-filters
 k3b
 filelight
 # twinkle (~10 megs)
-twinkle
+#twinkle
 
 # some extras
 fuse
@@ -56,6 +56,9 @@ tibetan-machine-uni-fonts
 
 # save some space
 -autofs
+
+# make sure, pirut isn't on the beta
+-pirut
 
 %end
 
