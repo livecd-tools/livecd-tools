@@ -152,7 +152,7 @@ class LiveCDYum(yum.YumBase):
             (res, resmsg) = self.buildTransaction()
         except yum.Errors.RepoError, e:
             raise CreatorError("Unable to download from repo : %s" %(e,))
-        if res != 2 and False:
+        if res != 2:
             raise CreatorError("Failed to build transaction : %s" % str.join("\n", resmsg))
         
         dlpkgs = map(lambda x: x.po, filter(lambda txmbr: txmbr.ts_state in ("i", "u"), self.tsInfo.getMembers()))
@@ -161,7 +161,9 @@ class LiveCDYum(yum.YumBase):
         
         self.initActionTs()
         self.populateTs(keepold=0)
-        self.ts.check()
+        deps = self.ts.check()
+        if len(deps) != 0:
+            raise CreatorError("Dependency check failed!")
         rc = self.ts.order()
         if rc != 0:
             raise CreatorError("ordering packages for installation failed!")
