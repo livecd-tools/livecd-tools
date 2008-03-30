@@ -30,6 +30,7 @@ filelight
 
 # some extras
 fuse
+dvd+rw-tools
 
 # additional fonts
 @fonts
