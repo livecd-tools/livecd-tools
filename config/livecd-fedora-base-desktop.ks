@@ -122,7 +122,7 @@ if ! strstr "\`cat /proc/cmdline\`" noswap -a [ -n "\$swaps" ] ; then
 fi
 
 # configure X, allowing user to override xdriver
-if [ -n "$xdriver" ]; then
+if [ -n "\$xdriver" ]; then
    exists system-config-display --noui --reconfig --set-depth=24 \$xdriver
 fi
 
