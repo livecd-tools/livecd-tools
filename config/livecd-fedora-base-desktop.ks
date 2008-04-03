@@ -131,7 +131,7 @@ useradd -c "Fedora Live" fedora
 passwd -d fedora > /dev/null
 
 # turn off firstboot for livecd boots
-echo "RUN_FIRSTBOOT=NO" > /etc/sysconfig/firstboot
+chkconfig --level 345 firstboot off 2>/dev/null
 
 # don't start yum-updatesd for livecd boots
 chkconfig --level 345 yum-updatesd off 2>/dev/null
