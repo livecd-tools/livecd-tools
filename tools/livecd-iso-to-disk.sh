@@ -232,8 +232,8 @@ elif [ -f $CDMNT/LiveOS/ext3fs.img ]; then
 elif [ -f $CDMNT/ext3fs.img ]; then
     cp $CDMNT/ext3fs.img $USBMNT/LiveOS/ext3fs.img || exitclean 
 fi
-if [ -f $CDMNT/osmin.img ]; then
-    cp $CDMNT/osmin.img $USBMNT/LiveOS/osmin.img || exitclean
+if [ -f $CDMNT/LiveOS/osmin.img ]; then
+    cp $CDMNT/LiveOS/osmin.img $USBMNT/LiveOS/osmin.img || exitclean
 fi
 
 cp $CDMNT/isolinux/* $USBMNT/$SYSLINUXPATH
