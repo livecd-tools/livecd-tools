@@ -4,7 +4,6 @@
 @kde-desktop
 
 # include nm-applet directly 
--knetworkmanager
 NetworkManager-gnome
 
 # unwanted packages from @kde-desktop
@@ -15,7 +14,7 @@ NetworkManager-gnome
 -digikam
 -kdeedu
 -scribus
-#-ktorrent
+-ktorrent
 #-kdegames
 
 # KDE 3
@@ -30,7 +29,6 @@ filelight
 
 # some extras
 fuse
-dvd+rw-tools
 
 # additional fonts
 @fonts
