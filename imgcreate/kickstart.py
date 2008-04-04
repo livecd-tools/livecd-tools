@@ -208,23 +208,14 @@ class ServicesConfig(KickstartConfig):
 class XConfig(KickstartConfig):
     """A class to apply a kickstart X configuration to a system."""
     def apply(self, ksxconfig):
-        if os.path.exists(self.path("/etc/inittab")) and ksxconfig.startX:
-            f = open(self.path("/etc/inittab"), "rw+")
-            buf = f.read()
-            buf = buf.replace("id:3:initdefault", "id:5:initdefault")
-            f.seek(0)
-            f.write(buf)
-            f.close()
-
-        # sigh.  with upstart, we no longer use inittab
-        if os.path.exists(self.path("/etc/sysconfig/init")) and not ksxconfig.startX:
-            f = open(self.path("/etc/sysconfig/init"), "rw+")
-            buf = f.read()
-            buf = buf.replace("GRAPHICAL=yes", "GRAPHICAL=no")
-            f.seek(0)
-            f.write(buf)
-            f.close()
-
+        if not ksxconfig.startX:
+            return
+        f = open(self.path("/etc/inittab"), "rw+")
+        buf = f.read()
+        buf = buf.replace("id:3:initdefault", "id:5:initdefault")
+        f.seek(0)
+        f.write(buf)
+        f.close()
 
 class NetworkConfig(KickstartConfig):
     """A class to apply a kickstart network configuration to a system."""
