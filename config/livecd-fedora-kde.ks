@@ -14,7 +14,7 @@ NetworkManager-gnome
 -digikam
 -kdeedu
 -scribus
--ktorrent
+#-ktorrent
 #-kdegames
 
 # KDE 3
