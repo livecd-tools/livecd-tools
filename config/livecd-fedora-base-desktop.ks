@@ -136,6 +136,11 @@ chkconfig --level 345 firstboot off 2>/dev/null
 # don't start yum-updatesd for livecd boots
 chkconfig --level 345 yum-updatesd off 2>/dev/null
 
+# don't do packagekit checking by default
+gconftool-2 --direct --config-source=xml:readwrite:/etc/gconf/gconf.xml.defaults -s -t string /apps/gnome-packagekit/frequency_get_updates never >/dev/null
+gconftool-2 --direct --config-source=xml:readwrite:/etc/gconf/gconf.xml.defaults -s -t string /apps/gnome-packagekit/frequency_refresh_cache never >/dev/null
+gconftool-2 --direct --config-source=xml:readwrite:/etc/gconf/gconf.xml.defaults -s -t bool /apps/gnome-packagekit/notify_available false >/dev/null
+
 # don't start cron/at as they tend to spawn things which are
 # disk intensive that are painful on a live image
 chkconfig --level 345 crond off 2>/dev/null
