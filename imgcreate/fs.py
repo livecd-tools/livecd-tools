@@ -285,8 +285,8 @@ class SparseExtLoopbackMount(SparseLoopbackMount):
         minsize = self.__resize_to_minimal()
 
         self.truncate(minsize)
-
-        return self.resize(size)
+        self.resize(size)
+        return minsize
 
 class DeviceMapperSnapshot(object):
     def __init__(self, imgloop, cowloop):
@@ -299,7 +299,7 @@ class DeviceMapperSnapshot(object):
     def get_path(self):
         if self.__name is None:
             return None
-        return "/dev/mapper" + self.__name
+        return os.path.join("/dev/mapper", self.__name)
     path = property(get_path)
 
     def create(self):
