@@ -166,4 +166,6 @@ class LiveCDYum(yum.YumBase):
         cb = callback.RPMInstallCallback()
         cb.tsInfo = self.tsInfo
         cb.filelog = False
-        return self.runTransaction(cb)
+        ret = self.runTransaction(cb)
+        print ""
+        return ret
