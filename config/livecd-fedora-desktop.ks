@@ -113,6 +113,9 @@ gnumeric
 -abyssinica-fonts
 -jomolhari-fonts
 
+# avoid weird case where we pull in more festival stuff than we need
+festival
+festvox-slt-arctic-hts
 
 # dictionaries are big
 -aspell-*
