@@ -59,6 +59,7 @@ class LiveCDYum(yum.YumBase):
         conf += "cachedir=/var/cache/yum\n"
         conf += "plugins=0\n"
         conf += "reposdir=\n"
+        conf += "failovermethod=priority\n"
 
         f = file(confpath, "w+")
         f.write(conf)
