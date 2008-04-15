@@ -48,18 +48,10 @@ class LiveCDYum(yum.YumBase):
             os.unlink(self.conf.installroot + "/yum.conf")
         except:
             pass
-        try:
-            yum.YumBase.close(self)
-        except AttributeError:
-            # FIXME: Make one last ditch effort to close fds still open
-            # in the install root; this is only needed when
-            # there's no way to ask yum to close its sqlite dbs,
-            # though. See https://bugzilla.redhat.com/236409
-            for i in range(3, os.sysconf("SC_OPEN_MAX")):
-                try:
-                    os.close(i)
-                except:
-                    pass
+        yum.YumBase.close(self)
+
+    def __del__(self):
+        pass
 
     def _writeConf(self, confpath, installroot):
         conf  = "[main]\n"
