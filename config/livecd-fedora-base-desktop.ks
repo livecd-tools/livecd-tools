@@ -92,38 +92,12 @@ if [ -b /dev/live ]; then
    mount -o ro /dev/live /mnt/live
 fi
 
-# read some variables out of /proc/cmdline
-for o in \`cat /proc/cmdline\` ; do
-    case \$o in
-    ks=*)
-        ks="\${o#ks=}"
-        ;;
-    xdriver=*)
-        xdriver="--set-driver=\${o#xdriver=}"
-        ;;
-    esac
-done
-
-
-# if liveinst or textinst is given, start anaconda
-if strstr "\`cat /proc/cmdline\`" liveinst ; then
-   /usr/sbin/liveinst \$ks
-fi
-if strstr "\`cat /proc/cmdline\`" textinst ; then
-   /usr/sbin/liveinst --text \$ks
-fi
-
 # enable swaps unless requested otherwise
 swaps=\`blkid -t TYPE=swap -o device\`
 if ! strstr "\`cat /proc/cmdline\`" noswap -a [ -n "\$swaps" ] ; then
   for s in \$swaps ; do
     action "Enabling swap partition \$s" swapon \$s
   done
-fi
-
-# configure X, allowing user to override xdriver
-if [ -n "\$xdriver" ]; then
-   exists system-config-display --noui --reconfig --set-depth=24 \$xdriver
 fi
 
 # add fedora user with no passwd
@@ -156,6 +130,56 @@ touch /media/.hal-mtab
 sed -i -e 's/hwclock/no-such-hwclock/g' /etc/rc.d/init.d/halt
 EOF
 
+# bah, hal starts way too late
+cat > /etc/rc.d/init.d/fedora-late-live << EOF
+#!/bin/bash
+#
+# live: Late init script for live image
+#
+# chkconfig: 345 99 01
+# description: Late init script for live image.
+
+. /etc/init.d/functions
+
+if ! strstr "\`cat /proc/cmdline\`" liveimg || [ "\$1" != "start" ] || [ -e /.liveimg-late-configured ] ; then
+    exit 0
+fi
+
+exists() {
+    which \$1 >/dev/null 2>&1 || return
+    \$*
+}
+
+touch /.liveimg-late-configured
+
+# read some variables out of /proc/cmdline
+for o in \`cat /proc/cmdline\` ; do
+    case \$o in
+    ks=*)
+        ks="\${o#ks=}"
+        ;;
+    xdriver=*)
+        xdriver="--set-driver=\${o#xdriver=}"
+        ;;
+    esac
+done
+
+
+# if liveinst or textinst is given, start anaconda
+if strstr "\`cat /proc/cmdline\`" liveinst ; then
+   /usr/sbin/liveinst \$ks
+fi
+if strstr "\`cat /proc/cmdline\`" textinst ; then
+   /usr/sbin/liveinst --text \$ks
+fi
+
+# configure X, allowing user to override xdriver
+if [ -n "\$xdriver" ]; then
+   exists system-config-display --noui --reconfig --set-depth=24 \$xdriver
+fi
+
+EOF
+
 # workaround avahi segfault (#279301)
 touch /etc/resolv.conf
 /sbin/restorecon /etc/resolv.conf
@@ -163,6 +187,10 @@ touch /etc/resolv.conf
 chmod 755 /etc/rc.d/init.d/fedora-live
 /sbin/restorecon /etc/rc.d/init.d/fedora-live
 /sbin/chkconfig --add fedora-live
+
+chmod 755 /etc/rc.d/init.d/fedora-late-live
+/sbin/restorecon /etc/rc.d/init.d/fedora-late-live
+/sbin/chkconfig --add fedora-late-live
 
 # save a little bit of space at least...
 rm -f /boot/initrd*
