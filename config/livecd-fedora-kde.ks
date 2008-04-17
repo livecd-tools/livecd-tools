@@ -16,6 +16,7 @@ NetworkManager-gnome
 -scribus
 #-ktorrent
 #-kdegames
+#-kftpgrabber*
 
 # KDE 3
 koffice-kword
@@ -95,11 +96,8 @@ sed -i 's/#DefaultUser=johndoe/DefaultUser=fedora/' /etc/kde/kdm/kdmrc
 mkdir -p /home/fedora/.kde/share/config/
 cat > /home/fedora/.kde/share/config/kickoffrc << MENU_EOF
 [Favorites]
-FavoriteURLs=/usr/share/applications/kde4/konqbrowser.desktop,/usr/share/applications/kde4/dolphin.desktop,/usr/share/applications/liveinst.desktop
+FavoriteURLs=/usr/share/applications/kde4/konqbrowser.desktop,/usr/share/applications/kde4/dolphin.desktop,/usr/share/applications/kde4/systemsettings.desktop,/usr/share/applications/liveinst.desktop
 MENU_EOF
 chown -R fedora:fedora /home/fedora/.kde/
-
-# workaround to start nm-applet automatically
-cp /etc/xdg/autostart/nm-applet.desktop /usr/share/autostart/
 
 %end
