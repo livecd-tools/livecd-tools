@@ -138,6 +138,8 @@ scim-pinyin
 -dasher
 -evince-dvi
 -evince-djvu
+# not needed for gnome
+-acpid
 # temporary - drags in many deps
 -ekiga
 -tomboy
