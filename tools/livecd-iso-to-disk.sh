@@ -168,10 +168,10 @@ while [ $# -gt 2 ]; do
     shift
 done
 
-ISO=$1
+ISO=$(readlink -f "$1")
 USBDEV=$2
 
-if [ -z "$ISO" -o ! -e "$ISO" ]; then
+if [ -z "$ISO" -o ! -f "$ISO" ]; then
     usage
 fi
 
