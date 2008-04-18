@@ -42,23 +42,13 @@ tibetan-machine-uni-fonts
 
 # FIXME/TODO: recheck the removals here
 # try to remove some packages from livecd-fedora-base-desktop.ks
--scim*
 -gdm
 -authconfig-gtk
--m17n*
--PolicyKit-gnome
--gnome-doc-utils-stylesheets
--anthy
--kasumi
--pygtkglext
--python-devel
--libchewing
 
-# save some space
+# save some space (from @base)
+-make
+-nss_db
 -autofs
-
-# make sure, pirut isn't on the beta
--pirut
 
 %end
 
