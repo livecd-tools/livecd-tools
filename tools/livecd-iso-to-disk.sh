@@ -212,6 +212,28 @@ mount $USBDEV $USBMNT || exitclean
 
 trap exitclean SIGINT SIGTERM
 
+# let's try to make sure there's enough room on the stick
+if [ -d $CDMNT/LiveOS ]; then
+  check=$CDMNT/LiveOS
+else
+  check=$CDMNT
+fi
+if [ -d $USBMNT/LiveOS ]; then
+  tbd=$(du -s -B 1M $USBMNT/LiveOS | awk {'print $1;'})
+else
+  tbd=0
+fi
+livesize=$(du -s -B 1M $check | awk {'print $1;'})
+free=$(df  -B1M $USBDEV  |tail -n 1 |awk {'print $4;'})
+
+if [ $(($overlaysizemb + $livesize)) -gt $(($free + $tbd)) ]; then
+  echo "Unable to fit live image + overlay on available space on USB stick"
+  echo "Size of live image: $livesize"
+  echo "Overlay size: $overlaysizemb"
+  echo "Available space: $(($free + $tbd))"
+  exitclean
+fi
+
 if [ -d $USBMNT/LiveOS ]; then
     echo "Already set up as live image.  Deleting old in fifteen seconds..."
     sleep 15
