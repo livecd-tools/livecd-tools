@@ -157,12 +157,6 @@ TimedLoginEnable=true
 TimedLogin=fedora
 TimedLoginDelay=60
 FOE
-if [ -e /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png ] ; then
-    cp /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png /home/fedora/.face
-    chown fedora:fedora /home/fedora/.face
-    chmod 711 /home/fedora
-    # TODO: would be nice to get e-d-s to pick this one up too... but how?
-fi
 
 EOF
 
