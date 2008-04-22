@@ -17,7 +17,9 @@ gnumeric
 
 @albanian-support
 @arabic-support
+@assamese-support
 @basque-support
+@belarusian-support
 @bengali-support
 @brazilian-support
 @british-support
@@ -41,12 +43,14 @@ gnumeric
 @indonesian-support
 @italian-support
 @japanese-support
-@khmer-support
+@kannada-support
 @korean-support
 @latvian-support
 @lithuanian-support
+@macedonian-support
 @malayalam-support
 @marathi-support
+@nepali-support
 @norwegian-support
 @oriya-support
 @persian-support
@@ -73,12 +77,11 @@ gnumeric
 
 #@afrikaans-support
 #@armenian-support
-#@assamese-support
-#@belarusian-support
 #@bhutanese-support
 #@bosnian-support
 #@breton-support
 #@croatian-support
+#@esperanto-support
 #@ethiopic-support
 #@faeroese-support
 #@filipino-support
@@ -86,10 +89,13 @@ gnumeric
 #@icelandic-support
 #@inuktitut-support
 #@irish-support
-#@kannada-support
+#@khmer-support
 #@lao-support
+#@low-saxon-support
 #@malay-support
 #@maori-support
+#@mongolian-support
+#@northern-sami-support
 #@northern-sotho-support
 #@samoan-support
 #@sinhala-support
@@ -104,12 +110,12 @@ gnumeric
 #@tswana-support
 #@urdu-support
 #@venda-support
+#@walloon-support
 #@xhosa-support
 #@zulu-support
 
 # These fonts are only used in the commented-out locales above
 -lklug-fonts
--lohit-fonts-kannada
 -abyssinica-fonts
 -jomolhari-fonts
 
