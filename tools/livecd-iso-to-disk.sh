@@ -206,7 +206,7 @@ fi
 
 # FIXME: would be better if we had better mountpoints
 CDMNT=$(mktemp -d /media/cdtmp.XXXXXX)
-mount -o loop $ISO $CDMNT || exitclean
+mount -o loop,ro $ISO $CDMNT || exitclean
 USBMNT=$(mktemp -d /media/usbdev.XXXXXX)
 mount $USBDEV $USBMNT || exitclean
 
