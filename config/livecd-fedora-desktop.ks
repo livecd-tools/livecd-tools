@@ -133,7 +133,7 @@ festvox-slt-arctic-hts
 
 # more fun with space saving 
 -scim-lang-chinese
--scim-python-chinese
+-scim-python*
 scim-chewing
 scim-pinyin
 
