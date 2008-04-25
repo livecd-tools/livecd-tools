@@ -393,10 +393,14 @@ class SelinuxConfig(KickstartConfig):
         self.relabel(ksselinux)
 
 def get_image_size(ks, default = None):
+    __size = 0
     for p in ks.handler.partition.partitions:
         if p.mountpoint == "/" and p.size:
-            return int(p.size) * 1024L * 1024L
-    return default
+            __size = p.size
+    if __size > 0:
+        return int(__size) * 1024L * 1024L
+    else:
+        return default
 
 def get_image_fstype(ks, default = None):
     for p in ks.handler.partition.partitions:
