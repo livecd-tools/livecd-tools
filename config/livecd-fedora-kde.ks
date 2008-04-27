@@ -30,6 +30,7 @@ filelight
 
 # some extras
 fuse
+pavucontrol
 
 # additional fonts
 @fonts
