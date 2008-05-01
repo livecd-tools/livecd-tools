@@ -192,6 +192,9 @@ chmod 755 /etc/rc.d/init.d/fedora-late-live
 /sbin/restorecon /etc/rc.d/init.d/fedora-late-live
 /sbin/chkconfig --add fedora-late-live
 
+# work around for poor key import UI in PackageKit
+rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-fedora
+
 # save a little bit of space at least...
 rm -f /boot/initrd*
 # make sure there aren't core files lying around
