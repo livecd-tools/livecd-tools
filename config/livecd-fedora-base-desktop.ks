@@ -115,6 +115,13 @@ gconftool-2 --direct --config-source=xml:readwrite:/etc/gconf/gconf.xml.defaults
 gconftool-2 --direct --config-source=xml:readwrite:/etc/gconf/gconf.xml.defaults -s -t string /apps/gnome-packagekit/frequency_refresh_cache never >/dev/null
 gconftool-2 --direct --config-source=xml:readwrite:/etc/gconf/gconf.xml.defaults -s -t bool /apps/gnome-packagekit/notify_available false >/dev/null
 
+# apparently, the gconf keys aren't enough
+mkdir -p /home/fedora/.config/autostart
+echo "X-GNOME-Autostart-enabled=false" >> /home/fedora/.config/autostart/gpk-update-icon.desktop
+chown -R fedora:fedora /home/fedora/.config
+
+
+
 # don't start cron/at as they tend to spawn things which are
 # disk intensive that are painful on a live image
 chkconfig --level 345 crond off 2>/dev/null
