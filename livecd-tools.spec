@@ -4,7 +4,7 @@
 
 Summary: Tools for building live CD's
 Name: livecd-tools
-Version: 015
+Version: 016
 Release: 1%{?dist}
 License: GPLv2
 Group: System Environment/Base
@@ -62,6 +62,14 @@ rm -rf $RPM_BUILD_ROOT
 %{python_sitelib}/imgcreate/*.pyc
 
 %changelog
+* Thu May  1 2008 Jeremy Katz <katzj@redhat.com> - 016-1
+- Config changes all around, including F9 final configs
+- Fix up the minimal image creation
+- Fix odd traceback error on __del__ (#442443)
+- Add late initscript and split things in half
+- livecd-iso-to-disk: Check the available space on the stick (#443046)
+- Fix partition size overriding (kanarip)
+
 * Thu Mar  6 2008 Jeremy Katz <katzj@redhat.com> - 015-1
 - Support for using live isos with pxe booting (Richard W.M. Jones and 
   Chris Lalancette)
