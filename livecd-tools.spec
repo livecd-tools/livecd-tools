@@ -4,7 +4,7 @@
 
 Summary: Tools for building live CD's
 Name: livecd-tools
-Version: 016
+Version: 017
 Release: 1%{?dist}
 License: GPLv2
 Group: System Environment/Base
@@ -62,6 +62,9 @@ rm -rf $RPM_BUILD_ROOT
 %{python_sitelib}/imgcreate/*.pyc
 
 %changelog
+* Tue May  6 2008 Bill Nottingham <notting@redhat.com> - 017-1
+- fix F9 final configs
+
 * Thu May  1 2008 Jeremy Katz <katzj@redhat.com> - 016-1
 - Config changes all around, including F9 final configs
 - Fix up the minimal image creation
