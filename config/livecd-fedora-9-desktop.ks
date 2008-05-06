@@ -1,4 +1,4 @@
-%include livecd-fedora-base-desktop.ks
+%include livecd-fedora-9-base-desktop.ks
 
 %packages
 @games
