@@ -201,6 +201,7 @@ chmod 755 /etc/rc.d/init.d/fedora-late-live
 /sbin/chkconfig --add fedora-late-live
 
 # work around for poor key import UI in PackageKit
+rm -f /var/lib/rpm/__db*
 rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-fedora
 
 # save a little bit of space at least...
