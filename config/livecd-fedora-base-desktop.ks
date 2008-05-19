@@ -130,6 +130,14 @@ chkconfig --level 345 anacron off 2>/dev/null
 chkconfig --level 345 readahead_early off 2>/dev/null
 chkconfig --level 345 readahead_later off 2>/dev/null
 
+# make it so that we don't do writing to the overlay for things which
+# are just tmpdirs/caches
+mount -t tmpfs varcache /tmp
+(cd /var/cache ; find .) | (cd /tmp ; cpio --quiet -pmdu)
+mount --move /tmp /var/cache
+mount -t tmpfs tmp /tmp
+mount -t tmpfs vartmp /var/tmp
+
 # Stopgap fix for RH #217966; should be fixed in HAL instead
 touch /media/.hal-mtab
 
