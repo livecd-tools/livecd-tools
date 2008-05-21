@@ -22,6 +22,7 @@ import os.path
 import sys
 import time
 import optparse
+import logging
 
 import imgcreate
 
@@ -52,6 +53,8 @@ def parse_options(args):
                       dest="cachedir", default=None,
                       help="Cache directory to use (default: private cache")
     parser.add_option_group(sysopt)
+
+    imgcreate.setup_logging(parser)
 
     # debug options not recommended for "production" images
     # Start a shell in the chroot for post-configuration.
@@ -101,7 +104,7 @@ def main():
                                         "livecd-",
                                         maxlen = imgcreate.FSLABEL_MAXLEN)
 
-        print "Using label '%s' and name '%s'" % (fs_label, name)
+        logging.info("Using label '%s' and name '%s'" % (fs_label, name))
 
     ks = imgcreate.read_kickstart(options.kscfg)
 
@@ -121,7 +124,7 @@ def main():
         creator.unmount()
         creator.package()
     except imgcreate.CreatorError, e:
-        print >> sys.stderr, "Error creating Live CD : %s" % e
+        logging.error("Error creating Live CD : %s" % e)
         return 1
     finally:
         creator.cleanup()

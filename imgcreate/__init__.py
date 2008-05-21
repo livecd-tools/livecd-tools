@@ -21,6 +21,7 @@ from imgcreate.creator import *
 from imgcreate.yuminst import *
 from imgcreate.kickstart import *
 from imgcreate.fs import *
+from imgcreate.debug import *
 
 """A set of classes for building Fedora system images.
 
@@ -62,5 +63,6 @@ __all__ = (
     'LoopImageCreator',
     'FSLABEL_MAXLEN',
     'read_kickstart',
-    'construct_name'
+    'construct_name',
+    'setup_logging',
 )

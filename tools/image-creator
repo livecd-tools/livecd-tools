@@ -21,6 +21,7 @@ import os
 import sys
 import shutil
 import optparse
+import logging
 
 import imgcreate
 
@@ -29,6 +30,8 @@ def parse_options(args):
 
     parser.add_option("-n", "--name", type="string", dest="name",
                       help="Image name and filesystem label")
+
+    imgcreate.setup_logging(parser)
 
     (options, args) = parser.parse_args()
 
@@ -48,7 +51,7 @@ def main():
     try:
         ks = imgcreate.read_kickstart(kscfg)
     except imgcreate.CreatorError, e:
-        print >> sys.stderr, "Error loading kickstart file '%s' : %s" % (kscfg, e)
+        logging.error("Unable to load kickstart file '%s' : %s" % (kscfg, e))
         return 1
 
     if options.name:
@@ -61,7 +64,7 @@ def main():
     try:
         creator.create()
     except imgcreate.CreatorError, e:
-        print >> sys.stderr, "Error creating image : %s" % e
+        logging.error("Unable to create image : %s" % e)
         return 1
     finally:
         creator.cleanup()

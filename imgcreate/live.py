@@ -21,6 +21,7 @@ import os.path
 import glob
 import shutil
 import subprocess
+import logging
 
 from imgcreate.errors import *
 from imgcreate.fs import *
@@ -252,8 +253,7 @@ class LiveImageCreatorBase(LoopImageCreator):
         elif os.path.exists("/usr/lib/anaconda-runtime/implantisomd5"):
             implantisomd5 = "/usr/lib/anaconda-runtime/implantisomd5"
         else:
-            print >> sys.stderr, \
-                  "isomd5sum not installed; not setting up mediacheck"
+            logging.warn("isomd5sum not installed; not setting up mediacheck")
             
         subprocess.call([implantisomd5, iso])
 

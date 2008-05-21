@@ -22,6 +22,7 @@ import stat
 import sys
 import tempfile
 import shutil
+import logging
 
 import yum
 import rpm
@@ -522,7 +523,7 @@ class ImageCreator(object):
                                        (pkg, e))
 
         for pkg in skipped_pkgs:
-            print >> sys.stderr, "Skipping missing package '%s'" % (pkg,)
+            logging.warn("Skipping missing package '%s'" % (pkg,))
 
     def __select_groups(self, ayum):
         skipped_groups = []
@@ -537,7 +538,7 @@ class ImageCreator(object):
                     skipped_groups.append(group)
 
         for group in skipped_groups:
-            print >> sys.stderr, "Skipping missing group '%s'" % (group.name,)
+            logging.warn("Skipping missing group '%s'" % (group.name,))
 
     def __deselect_packages(self, ayum):
         for pkg in kickstart.get_excluded(self.ks,

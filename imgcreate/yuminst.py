@@ -18,6 +18,7 @@
 
 import os
 import sys
+import logging
 
 import yum
 import rpmUtils
@@ -103,7 +104,7 @@ class LiveCDYum(yum.YumBase):
                         pkgs.remove(x)
                         self.tsInfo.conditionals[req] = pkgs
         else:
-            print >> sys.stderr, "No such package %s to remove" %(pkg,)
+            logging.warn("No such package %s to remove" %(pkg,))
 
     def selectGroup(self, grp, include = pykickstart.parser.GROUP_DEFAULT):
         yum.YumBase.selectGroup(self, grp)
