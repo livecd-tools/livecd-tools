@@ -132,9 +132,7 @@ chkconfig --level 345 readahead_later off 2>/dev/null
 
 # make it so that we don't do writing to the overlay for things which
 # are just tmpdirs/caches
-mount -t tmpfs varcache /tmp
-(cd /var/cache ; find .) | (cd /tmp ; cpio --quiet -pmdu)
-mount --move /tmp /var/cache
+mount -t tmpfs varcacheyum /var/cache/yum
 mount -t tmpfs tmp /tmp
 mount -t tmpfs vartmp /var/tmp
 
