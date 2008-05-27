@@ -194,7 +194,7 @@ fi
 if [ -z "$noverify" ]; then
     # verify the image
     echo "Verifying image..."
-    checkisomd5 --verbose $ISO
+    checkisomd5 --verbose "$ISO"
     if [ $? -ne 0 ]; then
 	echo "Are you SURE you want to continue?"
 	echo "Press Enter to continue or ctrl-c to abort"
@@ -219,7 +219,7 @@ fi
 
 # FIXME: would be better if we had better mountpoints
 CDMNT=$(mktemp -d /media/cdtmp.XXXXXX)
-mount -o loop,ro $ISO $CDMNT || exitclean
+mount -o loop,ro "$ISO" $CDMNT || exitclean
 USBMNT=$(mktemp -d /media/usbdev.XXXXXX)
 mount $USBDEV $USBMNT || exitclean
 
