@@ -598,6 +598,8 @@ class ImageCreator(object):
 
         # do some clean up to avoid lvm info leakage.  this sucks.
         for subdir in ("cache", "backup", "archive"):
+            if not os.path.exists("%s/install_root/etc/lvm/%s" %(self.build_Dir, subdir)):
+                continue
             for f in os.listdir("%s/install_root/etc/lvm/%s"
                                 %(self.build_dir, subdir)):
                 try:
