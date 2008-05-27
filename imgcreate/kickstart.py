@@ -107,6 +107,8 @@ class KickstartConfig(object):
         os.chdir("/")
 
     def call(self, args):
+        if not os.path.exists("%s/%s" %(self.chroot, args[0])):
+            raise errors.KickstartError("Unable to run %s!" %(args))
         subprocess.call(args, preexec_fn = self.chroot)
 
     def apply(self):
@@ -178,6 +180,10 @@ class RootPasswordConfig(KickstartConfig):
         self.call(["/usr/sbin/usermod", "-p", password, "root"])
 
     def set_unencrypted(self, password):
+        for p in ("/bin/echo", "/usr/bin/passwd"):
+            if not os.path.exists("%s/%s" %(self.chroot, p)):
+                raise errors.KickstartError("Unable to set unencrypted password due to lack of %s" % p)
+
         p1 = subprocess.Popen(["/bin/echo", password],
                               stdout = subprocess.PIPE,
                               preexec_fn = self.chroot)
@@ -331,7 +337,7 @@ class NetworkConfig(KickstartConfig):
 
         for network in ksnet.network:
             if not network.device:
-                raise errros.KickstartError("No --device specified with "
+                raise errors.KickstartError("No --device specified with "
                                             "network kickstart command")
 
             if (network.onboot and network.bootProto.lower() != "dhcp" and 
