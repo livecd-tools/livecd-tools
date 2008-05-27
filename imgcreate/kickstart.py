@@ -18,6 +18,7 @@
 
 import os
 import os.path
+import shutil
 import subprocess
 import time
 
@@ -147,6 +148,12 @@ class TimezoneConfig(KickstartConfig):
         f.write("ZONE=\"" + tz + "\"\n")
         f.write("UTC=" + utc + "\n")
         f.close()
+        try:
+            shutil.copyfile(self.path("/usr/share/zoneinfo/%s" %(tz,)),
+                            self.path("/etc/localtime"))
+	except OSError, (errno, msg):
+            log.error("Error copying timezone: %s" %(msg,))
+
 
 class AuthConfig(KickstartConfig):
     """A class to apply a kickstart authconfig configuration to a system."""
