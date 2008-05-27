@@ -151,7 +151,7 @@ class TimezoneConfig(KickstartConfig):
         try:
             shutil.copyfile(self.path("/usr/share/zoneinfo/%s" %(tz,)),
                             self.path("/etc/localtime"))
-	except OSError, (errno, msg):
+        except OSError, (errno, msg):
             log.error("Error copying timezone: %s" %(msg,))
 
 
