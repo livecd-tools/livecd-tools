@@ -144,6 +144,18 @@ checkSyslinuxVersion() {
     fi
 }
 
+checkMounted() {
+    dev=$1
+    if grep -q "^$dev " /proc/mounts ; then
+      echo "$dev is mounted, please unmount for safety"
+      exitclean
+    fi
+    if grep -q "^$dev " /proc/swaps; then
+      echo "$dev is in use as a swap device, please disable swap"
+      exitclean
+    fi
+}
+
 if [ $(id -u) != 0 ]; then 
     echo "You need to be root to run this script"
     exit 1
@@ -195,6 +207,7 @@ checkSyslinuxVersion
 checkFilesystem $USBDEV
 checkPartActive $USBDEV
 checkMBR $USBDEV
+checkMounted $USBDEV
 [ -n $resetmbr ] && resetMBR $USBDEV
 
 if [ -n "$overlaysizemb" -a "$USBFS" = "vfat" ]; then
