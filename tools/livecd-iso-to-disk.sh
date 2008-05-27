@@ -40,6 +40,11 @@ exitclean() {
 getdisk() {
     DEV=$1
 
+    if [[ "$DEV" =~ "/dev/loop*" ]; then
+       device="/dev/$device"
+       return
+    fi
+
     p=$(udevinfo -q path -n $DEV)
     if [ -e /sys/$p/device ]; then
 	device=$(basename /sys/$p)
