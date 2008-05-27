@@ -782,6 +782,11 @@ class ImageCreator(object):
         f.write("ZONE=\"%s\"\n" %(tz,))
         f.write("UTC=%s\n" %(utc,))
         f.close()
+        try:
+            shutil.copyfile("%s/usr/share/zoneinfo/%s" %(instroot, tz),
+                            "%s/etc/localtime" %(instroot,))
+	except OSError, (errno, msg):
+            print >> sys.stderr, "Error copying timezone: %s" %(msg,)
 
         # do any authconfig bits
         auth = self.ksparser.handler.authconfig.authconfig or "--useshadow --enablemd5"
