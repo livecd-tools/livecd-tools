@@ -40,7 +40,7 @@ exitclean() {
 getdisk() {
     DEV=$1
 
-    if [[ "$DEV" =~ "/dev/loop*" ]; then
+    if [[ "$DEV" =~ "/dev/loop*" ]]; then
        device="/dev/$device"
        return
     fi
