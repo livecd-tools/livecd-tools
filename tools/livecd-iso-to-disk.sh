@@ -183,7 +183,11 @@ done
 ISO=$(readlink -f "$1")
 USBDEV=$2
 
-if [ -z "$ISO" -o ! -f "$ISO" ]; then
+if [ -z "$ISO" ]; then
+    usage
+fi
+
+if [ ! -b "$ISO" -a ! -f "$ISO" ]; then
     usage
 fi
 
