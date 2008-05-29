@@ -403,6 +403,24 @@ class ImageCreator(object):
         fstab.write(self._get_fstab())
         fstab.close()
 
+    def __create_minimal_dev(self):
+        """Create a minimal /dev so that we don't corrupt the host /dev"""
+        origumask = os.umask(0000)
+        devices = (('null',   1, 3, 0666),
+                   ('urandom',1, 9, 0666),
+                   ('random', 1, 8, 0666),
+                   ('full',   1, 7, 0666),
+                   ('ptmx',   5, 2, 0666),
+                   ('tty',    5, 0, 0666),
+                   ('zero',   1, 5, 0666))
+        for (node, major, minor, perm) in devices:
+            os.mknod(self._instroot + "/dev/" + node, perm | stat.S_IFCHR, os.makedev(major,minor))
+        os.symlink('/proc/self/fd',   self._instroot + "/dev/fd")
+        os.symlink('/proc/self/fd/0', self._instroot + "/dev/stdin")
+        os.symlink('/proc/self/fd/1', self._instroot + "/dev/stdout")
+        os.symlink('/proc/self/fd/2', self._instroot + "/dev/stderr")
+        os.umask(origumask)
+
     def mount(self, base_on = None, cachedir = None):
         """Setup the target filesystem in preparation for an install.
 
@@ -444,24 +462,9 @@ class ImageCreator(object):
         if kickstart.selinux_enabled(self.ks):
             self.__bindmounts.append(BindChrootMount("/selinux", self._instroot, None))
 
-        # Create minimum /dev
-        origumask = os.umask(0000)
-        devices = [('null',   1, 3, 0666),
-                   ('urandom',1, 9, 0666),
-                   ('random', 1, 8, 0666),
-                   ('full',   1, 7, 0666),
-                   ('ptmx',   5, 2, 0666),
-                   ('tty',    5, 0, 0666),
-                   ('zero',   1, 5, 0666)]
-        for (node, major, minor, perm) in devices:
-            os.mknod(self._instroot + "/dev/" + node, perm | stat.S_IFCHR, os.makedev(major,minor))
-        os.symlink('/proc/self/fd',   self._instroot + "/dev/fd")
-        os.symlink('/proc/self/fd/0', self._instroot + "/dev/stdin")
-        os.symlink('/proc/self/fd/1', self._instroot + "/dev/stdout")
-        os.symlink('/proc/self/fd/2', self._instroot + "/dev/stderr")
-        os.umask(origumask)
-
         self._do_bindmounts()
+
+        self.__create_minimal_dev()
 
         os.symlink("../proc/mounts", self._instroot + "/etc/mtab")
 
