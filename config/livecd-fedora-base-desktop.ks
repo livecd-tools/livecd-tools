@@ -100,22 +100,28 @@ if ! strstr "\`cat /proc/cmdline\`" noswap -a [ -n "\$swaps" ] ; then
   done
 fi
 
-# if we have a persistent /home, then we want to go ahead and mount it
-if ! strstr "\`cat /proc/cmdline\`" nopersisthome -a [ -e /mnt/live/LiveOS/home.img ] ; then
+mountPersistentHome() {
   homeloop=\`losetup -f\`
   mount -o remount,rw /mnt/live
   losetup \$homeloop /mnt/live/LiveOS/home.img
   if [ "\$(/lib/udev/vol_id -t \$homeloop)" = "crypto_LUKS" ]; then
+    echo
+    echo "Setting up encrypted /home device"
     cryptsetup luksOpen \$homeloop EncHome <&1
     homeloop=/dev/mapper/EncHome
   fi
   mount \$homeloop /home
   [ -x /sbin/restorecon ] && /sbin/restorecon /home
   if [ -d /home/fedora ]; then USERADDARGS="-M" ; fi
+}
+
+# if we have a persistent /home, then we want to go ahead and mount it
+if ! strstr "\`cat /proc/cmdline\`" nopersisthome -a [ -e /mnt/live/LiveOS/home.img ] ; then
+  action "Mounting persistent /home" mountPersistentHome
 fi
 
 # add fedora user with no passwd
-useradd \$USERADDARGS -c "Fedora Live" fedora
+action "Adding fedora user" useradd \$USERADDARGS -c "Fedora Live" fedora
 passwd -d fedora > /dev/null
 
 # turn off firstboot for livecd boots
