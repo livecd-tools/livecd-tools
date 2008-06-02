@@ -22,7 +22,7 @@
 export PATH=/sbin:/usr/sbin:$PATH
 
 usage() {
-    echo "$0 [--reset-mbr] [--noverify] [--overlay-size-mb <size>] <isopath> <usbstick device>"
+    echo "$0 [--reset-mbr] [--noverify] [--overlay-size-mb <size>] [--home-size-mb <size> ] [ --unencrypted-home] <isopath> <usbstick device>"
     exit 1
 }
 
@@ -172,12 +172,23 @@ if [ $(id -u) != 0 ]; then
     exit 1
 fi
 
+cryptedhome=1
 while [ $# -gt 2 ]; do
     case $1 in
 	--overlay-size-mb)
 	    overlaysizemb=$2
 	    shift
 	    ;;
+	--home-size-mb)
+            homesizemb=$2
+            shift
+	    ;;
+        --crypted-home)
+            cryptedhome=1
+	    ;;
+        --unencrypted-home)
+            cryptedhome=""
+            ;;
 	--noverify)
 	    noverify=1
 	    ;;
@@ -232,6 +243,14 @@ if [ -n "$overlaysizemb" -a "$USBFS" = "vfat" ]; then
   fi
 fi
 
+if [ -n "$homesizemb" -a "$USBFS" = "vfat" ]; then
+  if [ "$homesizemb" -gt 2047 ]; then
+    echo "Can't have a home overlay greater than 2048MB on VFAT"
+    exitclean
+  fi
+fi
+
+
 # FIXME: would be better if we had better mountpoints
 CDMNT=$(mktemp -d /media/cdtmp.XXXXXX)
 mount -o loop,ro "$ISO" $CDMNT || exitclean
@@ -254,10 +273,11 @@ fi
 livesize=$(du -s -B 1M $check | awk {'print $1;'})
 free=$(df  -B1M $USBDEV  |tail -n 1 |awk {'print $4;'})
 
-if [ $(($overlaysizemb + $livesize)) -gt $(($free + $tbd)) ]; then
+if [ $(($overlaysizemb + $homesizemb + $livesize)) -gt $(($free + $tbd)) ]; then
   echo "Unable to fit live image + overlay on available space on USB stick"
   echo "Size of live image: $livesize"
-  echo "Overlay size: $overlaysizemb"
+  [ -n "$overlaysizemb" ] && echo "Overlay size: $overlaysizemb"
+  [ -n "$homesizemb" ] && echo "Home overlay size: $homesizemb"
   echo "Available space: $(($free + $tbd))"
   exitclean
 fi
@@ -305,6 +325,33 @@ if [ -n "$overlaysizemb" ]; then
 	$USBMNT/$SYSLINUXPATH/isolinux.cfg
     sed -i -e "s/\ ro\ /\ rw\ /" \
 	$USBMNT/$SYSLINUXPATH/isolinux.cfg
+fi
+
+if [ -n "$homesizemb" ]; then
+    echo "Initializing persistent /home"
+    HOMEFILE=home.img
+    if [ "$USBFS" = "vfat" ]; then
+	# vfat can't handle sparse files
+	dd if=/dev/zero of=$USBMNT/LiveOS/$HOMEFILE count=$homesizemb bs=1M
+    else
+	dd if=/dev/null of=$USBMNT/LiveOS/$HOMEFILE count=1 bs=1M seek=$homesizemb
+    fi
+    if [ -n "$cryptedhome" ]; then
+	loop=$(losetup -f)
+	losetup $loop $USBMNT/LiveOS/$HOMEFILE
+        echo "Encrypting persistent /home"
+        cryptsetup luksFormat -y -q $loop
+        echo "Please enter the password again to unlock the device"
+        cryptsetup luksOpen $loop EncHomeFoo
+        mke2fs -j /dev/mapper/EncHomeFoo
+	tune2fs -c0 -i0 -ouser_xattr,acl /dev/mapper/EncHomeFoo
+        cryptsetup luksClose EncHomeFoo
+        losetup -d $loop
+    else
+        echo "Formatting unencrypted /home"
+	mke2fs -F -j $USBMNT/LiveOS/$HOMEFILE
+	tune2fs -c0 -i0 -ouser_xattr,acl $USBMNT/LiveOS/$HOMEFILE
+    fi
 fi
 
 echo "Installing boot loader"
