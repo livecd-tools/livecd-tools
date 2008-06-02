@@ -87,7 +87,7 @@ exists() {
 touch /.liveimg-configured
 
 # mount live image
-if [ -b /dev/live ]; then
+if [ -b \`readlink -f /dev/live\` ]; then
    mkdir -p /mnt/live
    mount -o ro /dev/live /mnt/live
 fi
