@@ -108,7 +108,7 @@ class KickstartConfig(object):
         os.chdir("/")
 
     def call(self, args):
-        if not os.path.exists("%s/%s" %(self.chroot, args[0])):
+        if not os.path.exists("%s/%s" %(self.instroot, args[0])):
             raise errors.KickstartError("Unable to run %s!" %(args))
         subprocess.call(args, preexec_fn = self.chroot)
 
