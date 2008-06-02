@@ -101,7 +101,7 @@ if ! strstr "\`cat /proc/cmdline\`" noswap -a [ -n "\$swaps" ] ; then
 fi
 
 # if we have a persistent /home, then we want to go ahead and mount it
-if [ -e /mnt/live/LiveOS/home.img ]; then
+if ! strstr "\`cat /proc/cmdline\`" nopersisthome -a [ -e /mnt/live/LiveOS/home.img ] ; then
   homeloop=\`losetup -f\`
   mount -o remount,rw /mnt/live
   losetup \$homeloop /mnt/live/LiveOS/home.img
