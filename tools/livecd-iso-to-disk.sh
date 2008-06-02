@@ -22,7 +22,7 @@
 export PATH=/sbin:/usr/sbin:$PATH
 
 usage() {
-    echo "$0 [--reset-mbr] [--noverify] [--overlay-size-mb <size>] [--home-size-mb <size> ] [ --unencrypted-home] <isopath> <usbstick device>"
+    echo "$0 [--reset-mbr] [--noverify] [--overlay-size-mb <size>] [--home-size-mb <size>] [--unencrypted-home] <isopath> <usbstick device>"
     exit 1
 }
 
@@ -173,6 +173,7 @@ if [ $(id -u) != 0 ]; then
 fi
 
 cryptedhome=1
+keephome=1
 while [ $# -gt 2 ]; do
     case $1 in
 	--overlay-size-mb)
@@ -188,6 +189,9 @@ while [ $# -gt 2 ]; do
 	    ;;
         --unencrypted-home)
             cryptedhome=""
+            ;;
+        --delete-home)
+            keephome=""
             ;;
 	--noverify)
 	    noverify=1
@@ -250,7 +254,6 @@ if [ -n "$homesizemb" -a "$USBFS" = "vfat" ]; then
   fi
 fi
 
-
 # FIXME: would be better if we had better mountpoints
 CDMNT=$(mktemp -d /media/cdtmp.XXXXXX)
 mount -o loop,ro "$ISO" $CDMNT || exitclean
@@ -258,6 +261,12 @@ USBMNT=$(mktemp -d /media/usbdev.XXXXXX)
 mount $USBDEV $USBMNT || exitclean
 
 trap exitclean SIGINT SIGTERM
+
+if [ -f "$USBMNT/LiveOS/home.img" -a -n "$keephome" -a -n "$homesizemb" ]; then
+  echo "ERROR: Requested keeping existing /home and specified a size for /home"
+  echo "Please either don't specify a size or specify --delete-home"
+  exitclean
+fi
 
 # let's try to make sure there's enough room on the stick
 if [ -d $CDMNT/LiveOS ]; then
@@ -267,6 +276,8 @@ else
 fi
 if [ -d $USBMNT/LiveOS ]; then
   tbd=$(du -s -B 1M $USBMNT/LiveOS | awk {'print $1;'})
+  [ -f $USBMNT/LiveOS/home.img ] && homesz=$(du -s -B 1M $USBMNT/LiveOS/home.img | awk {'print $1;'})
+  [ -n "$homesz" -a -n "$keephome" ] && tbd=$(($tbd - $homesz))
 else
   tbd=0
 fi
@@ -283,8 +294,17 @@ if [ $(($overlaysizemb + $homesizemb + $livesize)) -gt $(($free + $tbd)) ]; then
 fi
 
 if [ -d $USBMNT/LiveOS ]; then
-    echo "Already set up as live image.  Deleting old in fifteen seconds..."
-    sleep 15
+    echo "Already set up as live image."  
+    if [ -z "$keephome" -a -e $USBMNT/LiveOS/home.img ]; then 
+      echo "WARNING: Persistent /home will be deleted!!!"
+      echo "Press Enter to continue or ctrl-c to abort"
+      read
+    else
+      echo "Deleting old OS in fifteen seconds..."
+      sleep 15
+
+      [ -e "$USBMNT/LiveOS/home.img" -a -n "$keephome" ] && mv $USBMNT/LiveOS/home.img $USBMNT/home.img
+    fi
 
     rm -rf $USBMNT/LiveOS
 fi
@@ -292,6 +312,7 @@ fi
 echo "Copying live image to USB stick"
 if [ ! -d $USBMNT/$SYSLINUXPATH ]; then mkdir $USBMNT/$SYSLINUXPATH ; fi
 if [ ! -d $USBMNT/LiveOS ]; then mkdir $USBMNT/LiveOS ; fi
+if [ -n "$keephome" -a -f "$USBMNT/home.img" ]; then mv $USBMNT/home.img $USBMNT/LiveOS/home.img ; fi
 # cases without /LiveOS are legacy detection, remove for F10
 if [ -f $CDMNT/LiveOS/squashfs.img ]; then
     cp $CDMNT/LiveOS/squashfs.img $USBMNT/LiveOS/squashfs.img || exitclean
