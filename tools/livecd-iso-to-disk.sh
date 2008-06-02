@@ -41,7 +41,7 @@ getdisk() {
     DEV=$1
 
     if [[ "$DEV" =~ "/dev/loop*" ]]; then
-       device="/dev/$device"
+       device="$DEV"
        return
     fi
 
@@ -60,6 +60,9 @@ getdisk() {
 }
 
 resetMBR() {
+    if [[ "$DEV" =~ "/dev/loop*" ]]; then
+       return
+    fi
     getdisk $1
     if [ -f /usr/lib/syslinux/mbr.bin ]; then
 	cat /usr/lib/syslinux/mbr.bin > $device
@@ -97,6 +100,9 @@ checkPartActive() {
     # don't need to worry about being active
     if [ "$dev" = "$device" ]; then
 	return
+    fi
+    if [[ "$dev" =~ "/dev/loop*" ]]; then
+        return
     fi
 
     if [ "$(/sbin/fdisk -l $device 2>/dev/null |grep $dev |awk {'print $2;'})" != "*" ]; then
