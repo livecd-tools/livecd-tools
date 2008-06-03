@@ -94,29 +94,54 @@ fi
 
 # enable swaps unless requested otherwise
 swaps=\`blkid -t TYPE=swap -o device\`
-if ! strstr "\`cat /proc/cmdline\`" noswap -a [ -n "\$swaps" ] ; then
+if ! strstr "\`cat /proc/cmdline\`" noswap && [ -n "\$swaps" ] ; then
   for s in \$swaps ; do
     action "Enabling swap partition \$s" swapon \$s
   done
 fi
 
 mountPersistentHome() {
-  homeloop=\`losetup -f\`
-  mount -o remount,rw /mnt/live
-  losetup \$homeloop /mnt/live/LiveOS/home.img
-  if [ "\$(/lib/udev/vol_id -t \$homeloop)" = "crypto_LUKS" ]; then
+  # if we're not given a block device, then make it one
+  if [ ! -b "\$homedev" ]; then
+    loopdev=\`losetup -f\`
+    if [ "\$\{homedev##/mnt/live\}" != "\$\{homedev\}" ]; then
+      action "Remounting live store r/w" mount -o remount,rw /mnt/live
+    fi
+    losetup \$loopdev \$homedev
+    homedev=\$loopdev
+  fi
+
+  # if it's encrypted, we need to unlock it
+  if [ "\$(/lib/udev/vol_id -t \$homedev)" = "crypto_LUKS" ]; then
     echo
     echo "Setting up encrypted /home device"
-    cryptsetup luksOpen \$homeloop EncHome <&1
-    homeloop=/dev/mapper/EncHome
+    cryptsetup luksOpen \$homedev EncHome <&1
+    homedev=/dev/mapper/EncHome
   fi
-  mount \$homeloop /home
+
+  # and finally do the mount
+  mount \$homedev /home
   [ -x /sbin/restorecon ] && /sbin/restorecon /home
   if [ -d /home/fedora ]; then USERADDARGS="-M" ; fi
 }
 
+findPersistentHome() {
+  for arg in \`cat /proc/cmdline\` ; do 
+    if [ "\${arg##persistenthome=}" != "\${arg}" ]; then
+      homedev=\${arg##persistenthome=}
+      return
+    fi
+  done
+}
+
+if strstr "\`cat /proc/cmdline\`" persistenthome= ; then
+  findPersistentHome
+elif [ -e /mnt/live/LiveOS/home.img ]; then
+  homedev=/mnt/live/LiveOS/home.img
+fi
+
 # if we have a persistent /home, then we want to go ahead and mount it
-if ! strstr "\`cat /proc/cmdline\`" nopersisthome -a [ -e /mnt/live/LiveOS/home.img ] ; then
+if ! strstr "\`cat /proc/cmdline\`" nopersistenthome && [ -n "\$homedev" ] ; then
   action "Mounting persistent /home" mountPersistentHome
 fi
 
