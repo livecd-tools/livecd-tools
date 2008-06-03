@@ -199,6 +199,10 @@ while [ $# -gt 2 ]; do
 	--reset-mbr|--resetmbr)
 	    resetmbr=1
 	    ;;
+        --extra-kernel-args)
+            kernelargs=$2
+            shift
+            ;;
 	*)
 	    usage
 	    ;;
@@ -332,6 +336,7 @@ cp $CDMNT/isolinux/* $USBMNT/$SYSLINUXPATH
 echo "Updating boot config file"
 # adjust label and fstype
 sed -i -e "s/CDLABEL=[^ ]*/$USBLABEL/" -e "s/rootfstype=[^ ]*/rootfstype=$USBFS/" $USBMNT/$SYSLINUXPATH/isolinux.cfg
+if [ -n "$kernelargs" ]; then sed -i -e "s/liveimg/liveimg ${kernelargs}/" $USBMNT/$SYSLINUXPATH/isolinux.cfg ; fi
 
 if [ -n "$overlaysizemb" ]; then
     echo "Initializing persistent overlay file"
