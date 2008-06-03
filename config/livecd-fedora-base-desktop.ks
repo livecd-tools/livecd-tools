@@ -101,10 +101,15 @@ if ! strstr "\`cat /proc/cmdline\`" noswap && [ -n "\$swaps" ] ; then
 fi
 
 mountPersistentHome() {
-  # if we're not given a block device, then make it one
+  # support label/uuid
+  if [ "\${homedev##LABEL=}" != "\${homedev}" -o "\${homedev##UUID=}" != "\${homedev}" ]; then
+    homedev=\`/sbin/blkid -o device -t "\$homedev"\`
+  fi
+
+  # if we're given a file rather than a blockdev, loopback it
   if [ ! -b "\$homedev" ]; then
     loopdev=\`losetup -f\`
-    if [ "\$\{homedev##/mnt/live\}" != "\$\{homedev\}" ]; then
+    if [ "\${homedev##/mnt/live}" != "\${homedev}" ]; then
       action "Remounting live store r/w" mount -o remount,rw /mnt/live
     fi
     losetup \$loopdev \$homedev
