@@ -598,7 +598,7 @@ class ImageCreator(object):
 
         # do some clean up to avoid lvm info leakage.  this sucks.
         for subdir in ("cache", "backup", "archive"):
-            if not os.path.exists("%s/install_root/etc/lvm/%s" %(self.build_Dir, subdir)):
+            if not os.path.exists("%s/install_root/etc/lvm/%s" %(self.build_dir, subdir)):
                 continue
             for f in os.listdir("%s/install_root/etc/lvm/%s"
                                 %(self.build_dir, subdir)):
@@ -785,7 +785,7 @@ class ImageCreator(object):
         try:
             shutil.copyfile("%s/usr/share/zoneinfo/%s" %(instroot, tz),
                             "%s/etc/localtime" %(instroot,))
-	except OSError, (errno, msg):
+        except OSError, (err, msg):
             print >> sys.stderr, "Error copying timezone: %s" %(msg,)
 
         # do any authconfig bits
