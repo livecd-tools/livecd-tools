@@ -382,6 +382,7 @@ class SelinuxConfig(KickstartConfig):
             path = self.path(fn)
             f = file(path, "w+")
             os.chmod(path, 0644)
+            f.close()
 
         if ksselinux.selinux == ksconstants.SELINUX_DISABLED:
             return
