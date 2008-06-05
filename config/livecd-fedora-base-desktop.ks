@@ -135,6 +135,7 @@ chkconfig --level 345 readahead_later off 2>/dev/null
 mount -t tmpfs varcacheyum /var/cache/yum
 mount -t tmpfs tmp /tmp
 mount -t tmpfs vartmp /var/tmp
+[ -x /sbin/restorecon ] && /sbin/restorecon /var/cache/yum /tmp /var/tmp >/dev/null 2>&1
 
 # Stopgap fix for RH #217966; should be fixed in HAL instead
 touch /media/.hal-mtab
