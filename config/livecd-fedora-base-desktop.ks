@@ -192,6 +192,20 @@ touch /media/.hal-mtab
 
 # workaround clock syncing on shutdown that we don't want (#297421)
 sed -i -e 's/hwclock/no-such-hwclock/g' /etc/rc.d/init.d/halt
+
+# and hack so that we eject the cd on shutdown if we're using a CD...
+if strstr "\`cat /proc/cmdline\`" CDLABEL= ; then
+  cat >> /sbin/halt.local << FOE
+#!/bin/bash
+# we want to eject the cd on halt, but let's also try to avoid
+# io errors due to not being able to get files...
+cat /sbin/halt > /dev/null
+cat /sbin/reboot > /dev/null
+/usr/sbin/eject -p -m \$(readlink -f /dev/live) >/dev/null 2>&1
+FOE
+chmod +x /sbin/halt.local
+fi
+
 EOF
 
 # bah, hal starts way too late
