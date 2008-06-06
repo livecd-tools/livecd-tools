@@ -23,6 +23,7 @@ import sys
 import tempfile
 import shutil
 
+import selinux
 import yum
 import rpm
 
@@ -420,6 +421,52 @@ class ImageCreator(object):
         os.symlink('/proc/self/fd/2', self._instroot + "/dev/stderr")
         os.umask(origumask)
 
+    def __create_selinuxfs(self):
+        # if selinux exists on the host we need to lie to the chroot
+        if os.path.exists("/selinux/enforce"):
+            selinux_dir = self._instroot + "/selinux"
+
+            # enforce=0 tells the chroot selinux is not enforcing
+            # policyvers=999 tell the chroot to make the highest version of policy it can
+            files = (('/enforce', '0'),
+                     ('/policyvers', '999'))
+            for (file, value) in files:
+                fd = os.open(selinux_dir + file, os.O_WRONLY | os.O_TRUNC | os.O_CREAT)
+                os.write(fd, value)
+                os.close(fd)
+
+            # we steal mls from the host system for now, might be best to always set it to 1????
+            files = ("/mls",)
+            for file in files:
+                shutil.copyfile("/selinux" + file, selinux_dir + file)
+
+            # make /load -> /dev/null so chroot policy loads don't hurt anything
+            os.mknod(selinux_dir + "/load", 0666 | stat.S_IFCHR, os.makedev(1, 3))
+
+        # selinux is on in the kickstart, so clean up as best we can to start
+        if kickstart.selinux_enabled(self.ks):
+            # label the fs like it is a root before the bind mounting
+            arglist = ["/sbin/setfiles", "-F", "-r", self._instroot, selinux.selinux_file_context_path(), self._instroot]
+            subprocess.call(arglist, close_fds = True)
+            # these dumb things don't get magically fixed, so make the user generic
+            for f in ("/proc", "/sys", "/selinux"):
+                arglist = ["/usr/bin/chcon", "-u", "system_u", self._instroot + f]
+                subprocess.call(arglist, close_fds = True)
+
+    def __destroy_selinuxfs(self):
+        # if the system was running selinux clean up our lies
+        if os.path.exists("/selinux/enforce"):
+            files = ('/enforce',
+                     '/policyvers',
+                     '/mls',
+                     '/load')
+            for file in files:
+                try:
+                    os.unlink(self._instroot + "/selinux" + file)
+                except OSError:
+                    pass
+
+
     def mount(self, base_on = None, cachedir = None):
         """Setup the target filesystem in preparation for an install.
 
@@ -445,7 +492,7 @@ class ImageCreator(object):
 
         self._mount_instroot(base_on)
 
-        for d in ("/dev/pts", "/etc", "/boot", "/var/log", "/var/cache/yum"):
+        for d in ("/dev/pts", "/etc", "/boot", "/var/log", "/var/cache/yum", "/sys", "/proc", "/selinux"):
             makedirs(self._instroot + d)
 
         cachesrc = cachedir or (self.__builddir + "/yum-cache")
@@ -457,9 +504,7 @@ class ImageCreator(object):
                           (cachesrc, "/var/cache/yum")]:
             self.__bindmounts.append(BindChrootMount(f, self._instroot, dest))
 
-        # /selinux should only be mounted if selinux is enabled (enforcing or permissive)
-        if kickstart.selinux_enabled(self.ks):
-            self.__bindmounts.append(BindChrootMount("/selinux", self._instroot, None))
+        self.__create_selinuxfs()
 
         self._do_bindmounts()
 
@@ -481,6 +526,8 @@ class ImageCreator(object):
             os.unlink(self._instroot + "/etc/mtab")
         except OSError:
             pass
+
+        self.__destroy_selinuxfs()
 
         self._undo_bindmounts()
 
