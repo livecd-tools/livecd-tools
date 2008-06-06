@@ -139,6 +139,16 @@ class LiveCDYum(yum.YumBase):
         repo.setCallback(TextProgress())
         self.repos.add(repo)
         return repo
+
+    def installHasFile(self, file):
+        provides_pkg = self.whatProvides(file, None, None)
+        dlpkgs = map(lambda x: x.po, filter(lambda txmbr: txmbr.ts_state in ("i", "u"), self.tsInfo.getMembers()))
+        for p in dlpkgs:
+            for q in provides_pkg:
+                if (p == q):
+                    return True
+        return False
+
             
     def runInstall(self):
         os.environ["HOME"] = "/"
