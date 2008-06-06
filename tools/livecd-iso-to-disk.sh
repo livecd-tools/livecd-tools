@@ -57,6 +57,9 @@ getdisk() {
     fi
 
     device="/dev/$device"
+    # FIXME: weird dev names could mess this up I guess
+    p=/dev/`basename $p`
+    partnum=${p##$device}
 }
 
 resetMBR() {
@@ -115,6 +118,51 @@ checkPartActive() {
     fi
 }
 
+createGPTLayout() {
+    dev=$1
+    getdisk $dev
+
+    echo "WARNING: THIS WILL DESTROY ANY DATA ON $device!!!"
+    echo "Press Enter to continue or ctrl-c to abort"
+    read
+
+    /sbin/parted --script $device mklabel gpt
+    partinfo=$(/sbin/parted --script -m $device "unit b print" |grep ^$device:)
+    size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/B$//')
+    /sbin/parted --script $device unit b mkpart '"EFI System Partition"' fat32 17408 $(($size - 17408)) set 1 boot on
+    USBDEV=${device}1
+    /sbin/udevsettle
+    /sbin/mkdosfs -n LIVE $USBDEV
+}
+
+checkGPT() {
+    dev=$1
+    getdisk $dev
+
+    if [ "$(/sbin/fdisk -l $device 2>/dev/null |grep -c GPT)" -eq "0" ]; then
+       echo "EFI boot requires a GPT partition table."
+       echo "This can be done manually or you can run with --reset-mbr"
+       exitclean
+    fi
+
+    partinfo=$(/sbin/parted --script -m $device "print" |grep ^$partnum:)
+    volname=$(echo $partinfo |cut -d : -f 6)
+    flags=$(echo $partinfo |cut -d : -f 7)
+    if [ "$volname" != "EFI System Partition" ]; then
+	echo "Partition name must be 'EFI System Partition'"
+	echo "This can be set in parted or you can run with --reset-mbr"
+	exitclean
+    fi
+    if [ "$(echo $flags |grep -c boot)" = "0" ]; then
+	echo "Partition isn't marked bootable!"
+	echo "You can mark the partition as bootable with "
+        echo "    # /sbin/parted $device"
+	echo "    (parted) toggle N boot"
+	echo "    (parted) quit"
+	exitclean
+    fi
+}
+
 checkFilesystem() {
     dev=$1
 
@@ -140,6 +188,10 @@ checkFilesystem() {
 	    fi
 	    exitclean
 	fi
+    fi
+
+    if [ "$USBFS" = "vfat" -o "$USBFS" = "msdos" ]; then
+	mountopts="-o shortname=winnt,umask=0077"
     fi
 }
 
@@ -199,6 +251,9 @@ while [ $# -gt 2 ]; do
 	--reset-mbr|--resetmbr)
 	    resetmbr=1
 	    ;;
+	--mactel)
+	    mactel=1
+	    ;;
         --extra-kernel-args)
             kernelargs=$2
             shift
@@ -237,12 +292,18 @@ if [ -z "$noverify" ]; then
 fi
 
 # do some basic sanity checks.  
-checkSyslinuxVersion 
-checkFilesystem $USBDEV
-checkPartActive $USBDEV
-checkMBR $USBDEV
 checkMounted $USBDEV
-[ -n $resetmbr ] && resetMBR $USBDEV
+if [ -z "$mactel" ]; then
+  checkSyslinuxVersion
+  checkPartActive $USBDEV
+  [ -n "$resetmbr" ] && resetMBR $USBDEV
+  checkMBR $USBDEV
+else
+  [ -n "$resetmbr" ] && createGPTLayout $USBDEV
+  checkGPT $USBDEV
+fi
+checkFilesystem $USBDEV
+
 
 if [ -n "$overlaysizemb" -a "$USBFS" = "vfat" ]; then
   if [ "$overlaysizemb" -gt 2047 ]; then
@@ -262,7 +323,7 @@ fi
 CDMNT=$(mktemp -d /media/cdtmp.XXXXXX)
 mount -o loop,ro "$ISO" $CDMNT || exitclean
 USBMNT=$(mktemp -d /media/usbdev.XXXXXX)
-mount $USBDEV $USBMNT || exitclean
+mount $mountopts $USBDEV $USBMNT || exitclean
 
 trap exitclean SIGINT SIGTERM
 
@@ -314,9 +375,10 @@ if [ -d $USBMNT/LiveOS ]; then
 fi
 
 echo "Copying live image to USB stick"
-if [ ! -d $USBMNT/$SYSLINUXPATH ]; then mkdir $USBMNT/$SYSLINUXPATH ; fi
-if [ ! -d $USBMNT/LiveOS ]; then mkdir $USBMNT/LiveOS ; fi
-if [ -n "$keephome" -a -f "$USBMNT/home.img" ]; then mv $USBMNT/home.img $USBMNT/LiveOS/home.img ; fi
+[ -z "$mactel" -a ! -d $USBMNT/$SYSLINUXPATH ] && mkdir -p $USBMNT/$SYSLINUXPATH
+[ -n "$mactel" -a ! -d $USBMNT/EFI/boot ] && mkdir -p $USBMNT/EFI/boot
+[ ! -d $USBMNT/LiveOS ] && mkdir $USBMNT/LiveOS
+[ -n "$keephome" -a -f "$USBMNT/home.img" ] && mv $USBMNT/home.img $USBMNT/LiveOS/home.img
 # cases without /LiveOS are legacy detection, remove for F10
 if [ -f $CDMNT/LiveOS/squashfs.img ]; then
     cp $CDMNT/LiveOS/squashfs.img $USBMNT/LiveOS/squashfs.img || exitclean
@@ -331,12 +393,19 @@ if [ -f $CDMNT/LiveOS/osmin.img ]; then
     cp $CDMNT/LiveOS/osmin.img $USBMNT/LiveOS/osmin.img || exitclean
 fi
 
-cp $CDMNT/isolinux/* $USBMNT/$SYSLINUXPATH
+if [ -z "$mactel" ]; then
+  cp $CDMNT/isolinux/* $USBMNT/$SYSLINUXPATH
+  BOOTCONFIG=$USBMNT/$SYSLINUXPATH/isolinux.cfg
+else
+  cp $CDMNT/EFI/boot/* $USBMNT/EFI/boot
+  # this is a little ugly, but it gets the "interesting" named config file
+  BOOTCONFIG=$USBMNT/EFI/boot/boot?*.conf
+fi
 
 echo "Updating boot config file"
 # adjust label and fstype
-sed -i -e "s/CDLABEL=[^ ]*/$USBLABEL/" -e "s/rootfstype=[^ ]*/rootfstype=$USBFS/" $USBMNT/$SYSLINUXPATH/isolinux.cfg
-if [ -n "$kernelargs" ]; then sed -i -e "s/liveimg/liveimg ${kernelargs}/" $USBMNT/$SYSLINUXPATH/isolinux.cfg ; fi
+sed -i -e "s/CDLABEL=[^ ]*/$USBLABEL/" -e "s/rootfstype=[^ ]*/rootfstype=$USBFS/" $BOOTCONFIG
+if [ -n "$kernelargs" ]; then sed -i -e "s/liveimg/liveimg ${kernelargs}/" $BOOTCONFIG.cfg ; fi
 
 if [ -n "$overlaysizemb" ]; then
     echo "Initializing persistent overlay file"
@@ -347,10 +416,8 @@ if [ -n "$overlaysizemb" ]; then
     else
 	dd if=/dev/null of=$USBMNT/LiveOS/$OVERFILE count=1 bs=1M seek=$overlaysizemb
     fi
-    sed -i -e "s/liveimg/liveimg overlay=${USBLABEL}/" \
-	$USBMNT/$SYSLINUXPATH/isolinux.cfg
-    sed -i -e "s/\ ro\ /\ rw\ /" \
-	$USBMNT/$SYSLINUXPATH/isolinux.cfg
+    sed -i -e "s/liveimg/liveimg overlay=${USBLABEL}/" $BOOTCONFIG
+    sed -i -e "s/\ ro\ /\ rw\ /" $BOOTCONFIG
 fi
 
 if [ -n "$homesizemb" ]; then
@@ -381,7 +448,11 @@ if [ -n "$homesizemb" ]; then
 fi
 
 echo "Installing boot loader"
-if [ "$USBFS" = "vfat" -o "$USBFS" = "msdos" ]; then
+if [ -n "$mactel" ]; then
+    # replace the ia32 hack
+    if [ -f "$USBMNT/EFI/boot/boot.conf" ]; then cp -f $USBMNT/EFI/boot/bootia32.conf $USBMNT/EFI/boot/boot.conf ; fi
+    cleanup
+elif [ "$USBFS" = "vfat" -o "$USBFS" = "msdos" ]; then
     # syslinux expects the config to be named syslinux.cfg 
     # and has to run with the file system unmounted
     mv $USBMNT/$SYSLINUXPATH/isolinux.cfg $USBMNT/$SYSLINUXPATH/syslinux.cfg

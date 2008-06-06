@@ -325,7 +325,7 @@ class x86LiveImageCreator(LiveImageCreatorBase):
 
             shutil.copy(path, isodir + "/isolinux/")
 
-    def __copy_background(self, isodest):
+    def __copy_syslinux_background(self, isodest):
         background_path = self._instroot + \
                           "/usr/lib/anaconda-runtime/syslinux-vesa-splash.jpg"
 
@@ -469,7 +469,7 @@ menu hiddenrow 5
   localboot 0xffff
 """
 
-    def _configure_bootloader(self, isodir):
+    def _configure_syslinux_bootloader(self, isodir):
         """configure the boot loader"""
         makedirs(isodir + "/isolinux")
 
@@ -479,7 +479,7 @@ menu hiddenrow 5
                                    self.__find_syslinux_mboot())
 
         background = ""
-        if self.__copy_background(isodir + "/isolinux/splash.jpg"):
+        if self.__copy_syslinux_background(isodir + "/isolinux/splash.jpg"):
             background = "menu background splash.jpg"
 
         cfg = self.__get_basic_syslinux_config(menu = menu,
@@ -495,6 +495,94 @@ menu hiddenrow 5
         cfgf = open(isodir + "/isolinux/isolinux.cfg", "w")
         cfgf.write(cfg)
         cfgf.close()
+
+    def __copy_efi_files(self, isodir):
+        if not os.path.exists(self._instroot + "/boot/efi/EFI/redhat/grub.efi"):
+            return False
+        shutil.copy(self._instroot + "/boot/efi/EFI/redhat/grub.efi",
+                    isodir + "/EFI/boot/grub.efi")
+        shutil.copy(self._instroot + "/boot/grub/splash.xpm.gz",
+                    isodir + "/EFI/boot/splash.xpm.gz")
+
+        return True
+
+    def __get_basic_efi_config(self, **args):
+        return """
+default=0
+splashimage=/EFI/boot/splash.xpm.gz
+timeout %(timeout)d
+hiddenmenu
+
+""" %args
+
+    def __get_efi_image_stanza(self, **args):
+        return """title %(long)s
+  kernel /EFI/boot/vmlinuz%(index)s root=CDLABEL=%(fslabel)s rootfstype=iso9660 %(liveargs)s %(extra)s
+  initrd /EFI/boot/initrd%(index)s.img
+""" %args
+
+    def __get_efi_image_stanzas(self, isodir, name):
+        # FIXME: this only supports one kernel right now...
+
+        kernel_options = self._get_kernel_options()
+        checkisomd5 = self._has_checkisomd5()
+
+        cfg = ""
+
+        for index in range(0, 9):
+            # we don't support xen kernels
+            if os.path.exists("%s/EFI/boot/xen%d.gz" %(isodir, index)):
+                continue
+            cfg += self.__get_efi_image_stanza(fslabel = self.fslabel,
+                                               liveargs = kernel_options,
+                                               long = name,
+                                               extra = "", index = index)
+            if checkisomd5:
+                cfg += self.__get_efi_image_stanza(fslabel = self.fslabel,
+                                                   liveargs = kernel_options,
+                                                   long = "Verify and Boot " + name,
+                                                   extra = "check",
+                                                   index = index)
+            break
+
+        return cfg
+
+    def _configure_efi_bootloader(self, isodir):
+        """Set up the configuration for an EFI bootloader"""
+        makedirs(isodir + "/EFI/boot")
+
+        if not self.__copy_efi_files(isodir):
+            shutil.rmtree(isodir + "/EFI")
+            return
+
+        for f in os.listdir(isodir + "/isolinux"):
+            os.link("%s/isolinux/%s" %(isodir, f),
+                    "%s/EFI/boot/%s" %(isodir, f))
+
+
+        cfg = self.__get_basic_efi_config(name = self.name,
+                                          timeout = self._timeout)
+        cfg += self.__get_efi_image_stanzas(isodir, self.name)
+
+        cfgf = open(isodir + "/EFI/boot/grub.conf", "w")
+        cfgf.write(cfg)
+        cfgf.close()
+
+        # first gen mactel machines get the bootloader name wrong apparently
+        if rpmUtils.arch.getBaseArch() == "i386":
+            os.link(isodir + "/EFI/boot/grub.efi", isodir + "/EFI/boot/boot.efi")
+            os.link(isodir + "/EFI/boot/grub.conf", isodir + "/EFI/boot/boot.conf")
+
+        # for most things, we want them named boot$efiarch
+        efiarch = {"i386": "ia32", "x86_64": "x64"}
+        efiname = efiarch[rpmUtils.arch.getBaseArch()]
+        os.rename(isodir + "/EFI/boot/grub.efi", isodir + "/EFI/boot/boot%s.efi" %(efiname,))
+        os.link(isodir + "/EFI/boot/grub.conf", isodir + "/EFI/boot/boot%s.conf" %(efiname,))
+
+
+    def _configure_bootloader(self, isodir):
+        self._configure_syslinux_bootloader(isodir)
+        self._configure_efi_bootloader(isodir)
 
 class ppcLiveImageCreator(LiveImageCreatorBase):
     def _get_mkisofs_options(self, isodir):
