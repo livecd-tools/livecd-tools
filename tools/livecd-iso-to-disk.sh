@@ -292,6 +292,7 @@ if [ -z "$noverify" ]; then
 fi
 
 # do some basic sanity checks.  
+checkFilesystem $USBDEV
 checkMounted $USBDEV
 if [ -z "$mactel" ]; then
   checkSyslinuxVersion
@@ -302,7 +303,6 @@ else
   [ -n "$resetmbr" ] && createGPTLayout $USBDEV
   checkGPT $USBDEV
 fi
-checkFilesystem $USBDEV
 
 
 if [ -n "$overlaysizemb" -a "$USBFS" = "vfat" ]; then
@@ -397,7 +397,36 @@ if [ -z "$mactel" ]; then
   cp $CDMNT/isolinux/* $USBMNT/$SYSLINUXPATH
   BOOTCONFIG=$USBMNT/$SYSLINUXPATH/isolinux.cfg
 else
-  cp $CDMNT/EFI/boot/* $USBMNT/EFI/boot
+  if [ -d $CDMNT/EFI/boot ]; then
+    cp $CDMNT/EFI/boot/* $USBMNT/EFI/boot
+  else
+    # whee!  this image wasn't made with grub.efi bits.  so we get to create
+    # them here.  isn't life grand?
+    cp $CDMNT/isolinux/* $USBMNT/EFI/boot
+    mount -o loop,ro -t squashfs $CDMNT/LiveOS/squashfs.img $CDMNT
+    mount -o loop,ro -t ext3 $CDMNT/LiveOS/ext3fs.img $CDMNT
+    cp $CDMNT/boot/efi/EFI/redhat/grub.efi $USBMNT/EFI/boot/boot.efi
+    cp $CDMNT/boot/grub/splash.xpm.gz $USBMNT/EFI/boot/splash.xpm.gz
+    if [ -d $CDMNT/lib64 ]; then efiarch="x64" ; else efiarch="ia32"; fi
+    umount $CDMNT
+    umount $CDMNT
+
+    # magic config...
+    cat > $USBMNT/EFI/boot/boot.conf <<EOF
+default=0
+splashimage=/EFI/boot/splash.xpm.gz
+timeout 10
+hiddenmenu
+
+title Live
+  kernel /EFI/boot/vmlinuz0 root=CDLABEL=live rootfstype=iso9660 ro quiet liveimg
+  initrd /EFI/boot/initrd0.img
+EOF
+
+    cp $USBMNT/EFI/boot/boot.conf $USBMNT/EFI/boot/boot${efiarch}.conf
+    cp $USBMNT/EFI/boot/boot.efi $USBMNT/EFI/boot/boot${efiarch}.efi
+  fi
+
   # this is a little ugly, but it gets the "interesting" named config file
   BOOTCONFIG=$USBMNT/EFI/boot/boot?*.conf
 fi
