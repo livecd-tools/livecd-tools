@@ -188,7 +188,7 @@ class RootPasswordConfig(KickstartConfig):
 
     def set_unencrypted(self, password):
         for p in ("/bin/echo", "/usr/bin/passwd"):
-            if not os.path.exists("%s/%s" %(self.chroot, p)):
+            if not os.path.exists("%s/%s" %(self.instroot, p)):
                 raise errors.KickstartError("Unable to set unencrypted password due to lack of %s" % p)
 
         p1 = subprocess.Popen(["/bin/echo", password],
