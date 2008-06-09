@@ -15,7 +15,12 @@ PYTHONDIR := $(shell python -c "import distutils.sysconfig as d; print d.get_pyt
 
 all: 
 
-install:
+man:
+	pod2man --section=8 --release="livecd-tools $(VERSION)" --center "LiveCD Tools" docs/livecd-creator.pod > docs/livecd-creator.8
+	pod2man --section=8 --release="livecd-tools $(VERSION)" --center "LiveCD Tools" docs/livecd-iso-to-disk.pod > docs/livecd-iso-to-disk.8
+
+
+install: man
 	$(INSTALL_PROGRAM) -D tools/livecd-creator $(DESTDIR)/usr/bin/livecd-creator
 	$(INSTALL_PROGRAM) -D tools/image-creator $(DESTDIR)/usr/bin/image-creator
 	$(INSTALL_PROGRAM) -D tools/livecd-iso-to-disk.sh $(DESTDIR)/usr/bin/livecd-iso-to-disk
@@ -29,6 +34,8 @@ install:
 	mkdir -p $(DESTDIR)/$(PYTHONDIR)/imgcreate
 	$(INSTALL_PYTHON) -D imgcreate/*.py $(DESTDIR)/$(PYTHONDIR)/imgcreate/
 	$(call COMPILE_PYTHON,$(DESTDIR)/$(PYTHONDIR)/imgcreate)
+	mkdir -p $(DESTDIR)/usr/share/man/man8
+	$(INSTALL_DATA) -D docs/*.8 $(DESTDIR)/usr/share/man/man8
 
 uninstall:
 	rm -f $(DESTDIR)/usr/bin/livecd-creator
@@ -40,4 +47,4 @@ dist : all
 	git-archive --format=tar --prefix=livecd-tools-$(VERSION)/ HEAD | bzip2 -9v > livecd-tools-$(VERSION).tar.bz2
 
 clean:
-	rm -f *~ creator/*~ installer/*~ config/*~
+	rm -f *~ creator/*~ installer/*~ config/*~ docs/*.8

@@ -27,6 +27,7 @@ Requires: syslinux
 Requires: yaboot
 %endif
 BuildRequires: python
+BuildRequires: /usr/bin/pod2man
 
 
 %description 
@@ -50,6 +51,7 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(-,root,root,-)
 %doc AUTHORS COPYING README HACKING
+%{_mandir}/man*/*
 %{_bindir}/livecd-creator
 %{_bindir}/livecd-iso-to-disk
 %{_bindir}/livecd-iso-to-pxeboot

@@ -1,0 +1,49 @@
+=pod
+
+=head1 NAME
+
+livecd-iso-to-disk, install livecd-creator images in usb stick
+
+=head1 SYNOPSIS
+
+B<livecd-iso-to-disk> [--reset-mbr] [--noverify] [--overlay-size-mb <size>] <isopath> <usbstick device>
+
+=head1 DESCRIPTION
+
+B<livecd-iso-to-disk> converts a live cd or dvd image into a bootable USB stick. This is not a destructive process; any data you currently have on your USB stick will be preserved.
+
+=head1 OPTIONS
+
+=over 4
+
+=item --reset-mbr
+
+Resets Master Boot Record of usb stick by copying syslinux's mbr.bin.
+
+=item --noverify
+
+Disables image validation before installing it.
+
+=item --overlay-size-mb
+
+Overlay's size in megabytes. Note that you'll need to have space on your USB stick for the live image plus your overlay plus any other data you want on the stick.
+
+=back
+
+=head1 CONTRIBUTORS
+
+David Zeuthen, Jeremy Katz, Douglas McClendon and a team of many other contributors. See the AUTHORS file in the source distribution for the complete list of credits. 
+
+=head1 BUGS
+
+Report bugs to the mailing list C<http://www.redhat.com/mailman/listinfo/fedora-livecd-list> or directly to BugZilla C<http://bugzilla.redhat.com/bugzilla/> against the C<Fedora> product, and the C<lived-tools> component. 
+
+=head1 COPYRIGHT
+
+Copyright (C) Fedora Project 2008, and various contributors. This is free software. You may redistribute copies of it under the terms of the GNU General Public License C<http://www.gnu.org/licenses/gpl.html>. There is NO WARRANTY, to the extent permitted by law. 
+
+=head1 SEE ALSO
+
+C<livecd-creator(1)>, project website C<http://fedoraproject.org/wiki/FedoraLiveCD>
+
+=cut
