@@ -2,7 +2,7 @@
 
 Summary: Tools for building live CD's
 Name: livecd-tools
-Version: 013
+Version: 013.1
 Release: 1%{?dist}
 License: GPL
 Group: System Environment/Base
@@ -55,6 +55,10 @@ rm -rf $RPM_BUILD_ROOT
 %{_datadir}/livecd-tools/*
 
 %changelog
+* Mon Jun 16 2008 Jeremy Katz <katzj@redhat.com> - 013.1-1
+- Fix traceback running without LVM (#442633)
+- Copy timezone to /etc/localtime (#445624)
+
 * Mon Oct 29 2007 Jeremy Katz <katzj@redhat.com> - 013-1
 - Lots of config updates
 - Support 'device foo' to say what modules go in the initramfs
