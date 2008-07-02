@@ -266,7 +266,7 @@ while [ $# -gt 2 ]; do
 done
 
 ISO=$(readlink -f "$1")
-USBDEV=$2
+USBDEV=$(readlink -f "$2")
 
 if [ -z "$ISO" ]; then
     usage
