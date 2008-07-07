@@ -94,7 +94,7 @@ class LiveImageCreatorBase(LoopImageCreator):
         A sensible default implementation is provided.
 
         """
-        r = "ro quiet liveimg"
+        r = kickstart.get_kernel_args(self.ks)
         if os.path.exists(self._instroot + "/usr/bin/rhgb"):
             r += " rhgb"
         return r
