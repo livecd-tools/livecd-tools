@@ -498,6 +498,9 @@ def get_groups(ks, required = []):
 def get_excluded(ks, required = []):
     return ks.handler.packages.excludedList + required
 
+def get_partitions(ks, required = []):
+    return ks.handler.partition.partitions
+
 def ignore_missing(ks):
     return ks.handler.packages.handleMissing == ksconstants.KS_MISSING_IGNORE
 
