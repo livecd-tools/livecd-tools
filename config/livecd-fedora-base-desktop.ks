@@ -21,6 +21,7 @@ repo --name=development --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist
 @printing
 kernel
 memtest86+
+firstaidkit-plugin-all
 
 # save some space
 -specspo
