@@ -67,7 +67,7 @@ class LiveImageCreatorBase(LoopImageCreator):
 
         self.__isodir = None
 
-        self.__modules = ["=ata", "sym53c8xx", "aic7xxx", "=usb", "=firewire", "=mmc", "=pcmcia"]
+        self.__modules = ["=ata", "sym53c8xx", "aic7xxx", "=usb", "=firewire", "=mmc", "=pcmcia", "mptsas"]
         self.__modules.extend(kickstart.get_modules(self.ks))
 
     #
