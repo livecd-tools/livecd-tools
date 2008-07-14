@@ -3,26 +3,26 @@
 %packages
 @kde-desktop
 
-# include nm-applet directly 
-NetworkManager-gnome
-
 # unwanted packages from @kde-desktop
 # don't include these for now to fit on a cd
 # digikam (~11 megs), ktorrent (~3 megs), amarok (~14 megs),
-# kdegames (~23 megs)
+# kdegames (~31 megs), koffice-* (~51 megs), kftpgrabber (~1 megs)
+# kaffeine-* (~3 megs)
 -amarok
 -digikam
 -kdeedu
 -scribus
-#-ktorrent
+-ktorrent
 #-kdegames
 #-kftpgrabber*
+-kaffeine*
 
-# KDE 3
-koffice-kword
-koffice-kspread
-koffice-kpresenter
-koffice-filters
+-koffice-*
+# KDE 3 
+#koffice-kword
+#koffice-kspread
+#koffice-kpresenter
+#koffice-filters
 k3b
 filelight
 # twinkle (~10 megs)
@@ -90,5 +90,10 @@ cat > /home/fedora/.kde/share/config/kickoffrc << MENU_EOF
 FavoriteURLs=/usr/share/applications/kde4/konqbrowser.desktop,/usr/share/applications/kde4/dolphin.desktop,/usr/share/applications/kde4/systemsettings.desktop,/usr/share/applications/liveinst.desktop
 MENU_EOF
 chown -R fedora:fedora /home/fedora/.kde/
+
+# show liveinst.desktop on and in menu
+sed -i 's/NoDisplay=true/NoDisplay=false/' /usr/share/applications/liveinst.desktop
+
+EOF
 
 %end
