@@ -307,7 +307,7 @@ fi
 
 if [ -n "$overlaysizemb" -a "$USBFS" = "vfat" ]; then
   if [ "$overlaysizemb" -gt 2047 ]; then
-    echo "Can't have an overlay greater than 2048MB on VFAT"
+    echo "Can't have an overlay of 2048MB or greater on VFAT"
     exitclean
   fi
 fi
