@@ -171,12 +171,15 @@ class FirewallConfig(KickstartConfig):
         #
         # FIXME: should handle the rest of the options
         #
-        if not ksfirewall.enabled:
-            return
         if not os.path.exists(self.path("/usr/sbin/lokkit")):
             return
+        if ksfirewall.enabled:
+            status = "--enabled"
+        else:
+            status = "--disabled"
+
         self.call(["/usr/sbin/lokkit",
-                   "-f", "--quiet", "--nostart", "--enabled"])
+                   "-f", "--quiet", "--nostart", status])
         
 class RootPasswordConfig(KickstartConfig):
     """A class to apply a kickstart root password configuration to a system."""

@@ -703,13 +703,12 @@ class ImageCreator(object):
         kickstart.KeyboardConfig(self._instroot).apply(ksh.keyboard)
         kickstart.TimezoneConfig(self._instroot).apply(ksh.timezone)
         kickstart.AuthConfig(self._instroot).apply(ksh.authconfig)
-        kickstart.FirewallConfig(self._instroot).apply(ksh.firewall)
         kickstart.SelinuxConfig(self._instroot).apply(ksh.selinux)
+        kickstart.FirewallConfig(self._instroot).apply(ksh.firewall)
         kickstart.RootPasswordConfig(self._instroot).apply(ksh.rootpw)
         kickstart.ServicesConfig(self._instroot).apply(ksh.services)
         kickstart.XConfig(self._instroot).apply(ksh.xconfig)
         kickstart.NetworkConfig(self._instroot).apply(ksh.network)
-        kickstart.SelinuxConfig(self._instroot).apply(ksh.selinux)
 
         self._create_bootconfig()
 
