@@ -290,28 +290,11 @@ class SparseExtLoopbackMount(SparseLoopbackMount):
         return minsize
 
 class Disk:
-    """
-    With the new disk API the image being produced can be partitioned into
-    multiple chunks, with many filesystems.  Furthermore, not all of them
-    require loopback mounts, as the partitions themselves are already
-    visible via /dev/mapper/
-
-    There are now classes which deal with accessing / creating disks:
-
-      Disk               - generic base for disks
-      RawDisk            - a disk backed by a block device
-      LoopbackDisk       - a disk backed by a file
-      SparseLoopbackDisk - a disk backed by a sparse file
+    """Generic base object for a disk
 
     The 'create' method must make the disk visible as a block device - eg
     by calling losetup. For RawDisk, this is obviously a no-op. The 'cleanup'
     method must undo the 'create' operation.
-
-    There are then classes which deal with mounting things:
-
-       Mount        - generic base for mounts
-       DiskMount    -  able to mount a Disk object
-       ExtDiskMount - able to format/resize ext3 filesystems when mounting
     """
     def __init__(self, size, device = None):
         self._device = device
@@ -335,6 +318,9 @@ class Disk:
 
 
 class RawDisk(Disk):
+    """A Disk backed by a block device.
+    Note that create() is a no-op.
+    """  
     def __init__(self, size, device):
         Disk.__init__(self, size, device)
 
@@ -345,6 +331,7 @@ class RawDisk(Disk):
         return True
 
 class LoopbackDisk(Disk):
+    """A Disk backed by a file via the loop module."""
     def __init__(self, lofile, size):
         Disk.__init__(self, size)
         self.lofile = lofile
@@ -386,6 +373,7 @@ class LoopbackDisk(Disk):
 
 
 class SparseLoopbackDisk(LoopbackDisk):
+    """A Disk backed by a sparse file via the loop module."""
     def __init__(self, lofile, size):
         LoopbackDisk.__init__(self, lofile, size)
 
@@ -419,6 +407,7 @@ class SparseLoopbackDisk(LoopbackDisk):
         LoopbackDisk.create(self)
 
 class Mount:
+    """A generic base class to deal with mounting things."""
     def __init__(self, mountdir):
         self.mountdir = mountdir
 
@@ -432,6 +421,7 @@ class Mount:
         pass
 
 class DiskMount(Mount):
+    """A Mount object that handles mounting of a Disk."""
     def __init__(self, disk, mountdir, fstype = None, rmmountdir = True):
         Mount.__init__(self, mountdir)
 
@@ -489,6 +479,7 @@ class DiskMount(Mount):
         self.mounted = True
 
 class ExtDiskMount(DiskMount):
+    """A DiskMount object that is able to format/resize ext[23] filesystems."""
     def __init__(self, disk, mountdir, fstype, blocksize, fslabel, rmmountdir=True):
         DiskMount.__init__(self, disk, mountdir, fstype, rmmountdir)
         self.blocksize = blocksize
