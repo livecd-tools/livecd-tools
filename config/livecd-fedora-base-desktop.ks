@@ -275,6 +275,9 @@ chmod 755 /etc/rc.d/init.d/fedora-late-live
 rm -f /var/lib/rpm/__db*
 rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-fedora
 
+# go ahead and pre-make the man -k cache (#455968)
+/usr/sbin/makewhatis -w
+
 # save a little bit of space at least...
 rm -f /boot/initrd*
 # make sure there aren't core files lying around
