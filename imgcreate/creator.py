@@ -903,12 +903,11 @@ class LoopImageCreator(ImageCreator):
             self.__base_on(base_on)
             shutil.copyfile(base_on, self._image)
 
-        self.__instloop = SparseExtLoopbackMount(self._image,
-                                                 self._instroot,
-                                                 self.__image_size,
-                                                 self.__fstype,
-                                                 self.__blocksize,
-                                                 self.fslabel)
+        self.__instloop = ExtDiskMount(SparseLoopbackDisk(self._image, self.__image_size),
+                                       self._instroot,
+                                       self.__fstype,
+                                       self.__blocksize,
+                                       self.fslabel)
 
         try:
             self.__instloop.mount()
