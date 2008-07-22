@@ -14,7 +14,7 @@
 -scribus
 -ktorrent
 #-kdegames
-#-kftpgrabber*
+-kftpgrabber*
 -kaffeine*
 
 -koffice-*
@@ -24,13 +24,13 @@
 #koffice-kpresenter
 #koffice-filters
 k3b
-filelight
+#filelight
 # twinkle (~10 megs)
 #twinkle
 
 # some extras
 fuse
-pavucontrol
+#pavucontrol
 
 # additional fonts
 @fonts
