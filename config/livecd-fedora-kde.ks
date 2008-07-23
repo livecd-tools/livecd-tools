@@ -1,36 +1,45 @@
 %include livecd-fedora-base-desktop.ks
 
 %packages
+
 @kde-desktop
 
 # unwanted packages from @kde-desktop
 # don't include these for now to fit on a cd
-# digikam (~11 megs), ktorrent (~3 megs), amarok (~14 megs),
-# kdegames (~31 megs), koffice-* (~51 megs), kftpgrabber (~1 megs)
-# kaffeine-* (~3 megs)
--amarok
--digikam
--kdeedu
--scribus
--ktorrent
-#-kdegames
--kftpgrabber*
--kaffeine*
 
--koffice-*
-# KDE 3 
-#koffice-kword
-#koffice-kspread
-#koffice-kpresenter
-#koffice-filters
+### amarok has duplicate functionality with juk (~14 megs)
+-amarok
+### digikam has duplicate functionality with gwenview (~11 megs)
+-digikam
+### kdeedu is too big for the live images
+-kdeedu
+### scribus is too big for the live images
+-scribus
+### kget has also basic torrent features (~3 megs)
+-ktorrent
+### konqueror is also able to browse ftp shares (~1 megs)
+#-kftpgrabber*
+### kaffeine has duplicate functionality with dragonplayer (~3 megs)
+-kaffeine*
+### the removal of kdegames will free ~31 megs
+#-kdegames
+
+
+# Useful additional KDE3 applications
+koffice-kword
+koffice-kspread
+koffice-kpresenter
+koffice-filters
 k3b
-#filelight
+filelight
 # twinkle (~10 megs)
 #twinkle
 
+
 # some extras
 fuse
-#pavucontrol
+pavucontrol
+
 
 # additional fonts
 @fonts
@@ -40,6 +49,7 @@ madan-fonts
 fonts-KOI8-R 
 fonts-KOI8-R-100dpi 
 tibetan-machine-uni-fonts
+
 
 # FIXME/TODO: recheck the removals here
 # try to remove some packages from livecd-fedora-base-desktop.ks
