@@ -8,7 +8,7 @@
 # don't include these for now to fit on a cd
 
 ### amarok has duplicate functionality with juk (~14 megs)
--amarok
+#-amarok
 ### digikam has duplicate functionality with gwenview (~11 megs)
 -digikam
 ### kdeedu is too big for the live images
