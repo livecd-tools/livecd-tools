@@ -121,7 +121,7 @@ mountPersistentHome() {
   if [ "\$(/lib/udev/vol_id -t \$homedev)" = "crypto_LUKS" ]; then
     echo
     echo "Setting up encrypted /home device"
-    cryptsetup luksOpen \$homedev EncHome <&1
+    plymouth ask-for-password --command="cryptsetup luksOpen \$homedev EncHome"
     homedev=/dev/mapper/EncHome
   fi
 
