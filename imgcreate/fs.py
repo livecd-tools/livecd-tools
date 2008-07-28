@@ -88,32 +88,16 @@ class BindChrootMount:
         self.mounted = False
 
 class LoopbackMount:
+    """LoopbackMount  compatibility layer for old API"""
     def __init__(self, lofile, mountdir, fstype = None):
-        self.lofile = lofile
-        self.mountdir = mountdir
-        self.fstype = fstype
-
-        self.mounted = False
+        self.diskmount = DiskMount(LoopbackDisk(lofile,size = 0),mountdir,fstype,rmmountdir = True)
         self.losetup = False
-        self.rmdir   = False
-        self.loopdev = None
-
+        
     def cleanup(self):
-        self.unmount()
-        self.lounsetup()
+        self.diskmount.cleanup()
 
     def unmount(self):
-        if self.mounted:
-            rc = subprocess.call(["/bin/umount", self.mountdir])
-            if rc == 0:
-                self.mounted = False
-
-        if self.rmdir and not self.mounted:
-            try:
-                os.rmdir(self.mountdir)
-            except OSError, e:
-                pass
-            self.rmdir = False
+        self.diskmount.unmount()
 
     def lounsetup(self):
         if self.losetup:
@@ -143,152 +127,52 @@ class LoopbackMount:
         self.losetup = True
 
     def mount(self):
-        if self.mounted:
-            return
-
-        self.loopsetup()
-
-        if not os.path.isdir(self.mountdir):
-            os.makedirs(self.mountdir)
-            self.rmdir = True
-
-        args = [ "/bin/mount", self.loopdev, self.mountdir ]
-        if self.fstype:
-            args.extend(["-t", self.fstype])
-
-        rc = subprocess.call(args)
-        if rc != 0:
-            raise MountError("Failed to mount '%s' to '%s'" %
-                             (self.loopdev, self.mountdir))
-
-        self.mounted = True
+        self.diskmount.mount()
 
 class SparseLoopbackMount(LoopbackMount):
+    """SparseLoopbackMount  compatibility layer for old API"""
     def __init__(self, lofile, mountdir, size, fstype = None):
-        LoopbackMount.__init__(self, lofile, mountdir, fstype)
-        self.size = size
+        self.diskmount = DiskMount(SparseLoopbackDisk(lofile,size),mountdir,fstype,rmmountdir = True)
 
     def expand(self, create = False, size = None):
-        flags = os.O_WRONLY
-        if create:
-            flags |= os.O_CREAT
-            makedirs(os.path.dirname(self.lofile))
-
-        if size is None:
-            size = self.size
-
-        fd = os.open(self.lofile, flags)
-
-        os.lseek(fd, size, 0)
-        os.write(fd, '\x00')
-        os.close(fd)
+        self.diskmount.disk.expand(create, size)
 
     def truncate(self, size = None):
-        if size is None:
-            size = self.size
-        fd = os.open(self.lofile, os.O_WRONLY)
-        os.ftruncate(fd, size)
-        os.close(fd)
+        self.diskmount.disk.truncate(size)
 
     def create(self):
-        self.expand(create = True)
+        self.diskmount.disk.create()
 
 class SparseExtLoopbackMount(SparseLoopbackMount):
+    """SparseExtLoopbackMount  compatibility layer for old API"""
     def __init__(self, lofile, mountdir, size, fstype, blocksize, fslabel):
-        SparseLoopbackMount.__init__(self, lofile, mountdir, size, fstype)
-        self.blocksize = blocksize
-        self.fslabel = fslabel
+        self.diskmount = ExtDiskMount(SparseLoopbackDisk(lofile,size), mountdir, fstype, blocksize, fslabel, rmmountdir = True)
+
 
     def __format_filesystem(self):
-        rc = subprocess.call(["/sbin/mkfs." + self.fstype,
-                              "-F", "-L", self.fslabel,
-                              "-m", "1", "-b", str(self.blocksize),
-                              self.lofile,
-                              str(self.size / self.blocksize)])
-        if rc != 0:
-            raise MountError("Error creating %s filesystem" % (self.fstype,))
-        subprocess.call(["/sbin/tune2fs", "-c0", "-i0", "-Odir_index",
-                         "-ouser_xattr,acl", self.lofile])
+        self.diskmount.__format_filesystem()
 
     def create(self):
-        SparseLoopbackMount.create(self)
-        self.__format_filesystem()
+        self.diskmount.disk.create()
 
     def resize(self, size = None):
-        current_size = os.stat(self.lofile)[stat.ST_SIZE]
-
-        if size is None:
-            size = self.size
-
-        if size == current_size:
-            return
-
-        if size > current_size:
-            self.expand(size)
-
-        self.__fsck()
-
-        resize2fs(self.lofile, size)
-
-        if size < current_size:
-            self.truncate(size)
-        return size
+        self.diskmount.__resize_filesystem(size)
 
     def mount(self):
-        if not os.path.isfile(self.lofile):
-            self.create()
-        else:
-            self.resize()
-        return SparseLoopbackMount.mount(self)
-
+        self.diskmount.mount()
+        
     def __fsck(self):
-        subprocess.call(["/sbin/e2fsck", "-f", "-y", self.lofile])
+        self.extdiskmount.__fsck()
 
     def __get_size_from_filesystem(self):
-        def parse_field(output, field):
-            for line in output.split("\n"):
-                if line.startswith(field + ":"):
-                    return line[len(field) + 1:].strip()
-
-            raise KeyError("Failed to find field '%s' in output" % field)
-
-        dev_null = os.open("/dev/null", os.O_WRONLY)
-        try:
-            out = subprocess.Popen(['/sbin/dumpe2fs', '-h', self.lofile],
-                                   stdout = subprocess.PIPE,
-                                   stderr = dev_null).communicate()[0]
-        finally:
-            os.close(dev_null)
-
-        return int(parse_field(out, "Block count")) * self.blocksize
-
-    def __resize_to_minimal(self):
-        self.__fsck()
-
-        #
-        # Use a binary search to find the minimal size
-        # we can resize the image to
-        #
-        bot = 0
-        top = self.__get_size_from_filesystem()
-        while top != (bot + 1):
-            t = bot + ((top - bot) / 2)
-
-            if not resize2fs(self.lofile, t):
-                top = t
-            else:
-                bot = t
-        return top
-
-    def resparse(self, size = None):
-        self.cleanup()
+        self.diskmount.__get_size_from_filesystem()
         
-        minsize = self.__resize_to_minimal()
-
-        self.truncate(minsize)
-        self.resize(size)
-        return minsize
-
+    def __resize_to_minimal(self):
+        self.diskmount.__resize_to_minimal()
+        
+    def resparse(self, size = None):
+        return self.diskmount.resparse(size)
+        
 class Disk:
     """Generic base object for a disk
 
