@@ -20,6 +20,7 @@
 import os
 import os.path
 import sys
+import time
 import optparse
 import logging
 
@@ -101,7 +102,8 @@ def main():
 
         fs_label = imgcreate.build_name(options.kscfg,
                                         "livecd-",
-                                        maxlen = imgcreate.FSLABEL_MAXLEN)
+                                        maxlen = imgcreate.FSLABEL_MAXLEN,
+                                        suffix = "%s-%s" %(os.uname()[4], time.strftime("%Y%m%d%H%M")))
 
         logging.info("Using label '%s' and name '%s'" % (fs_label, name))
 
