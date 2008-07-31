@@ -153,6 +153,12 @@ scim-pinyin
 -ekiga
 -tomboy
 -f-spot
+
+# try to get down to cd sized for the alpha
+-gnumeric
+-isdn4k-utils
+# hack to deal with conditionals + multiarch blargh
+-scim-bridge-gtk.i386
 %end
 
 %post
