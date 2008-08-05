@@ -413,12 +413,17 @@ class ImageCreator(object):
                    ('ptmx',   5, 2, 0666),
                    ('tty',    5, 0, 0666),
                    ('zero',   1, 5, 0666))
+        links = (("/proc/self/fd", "/dev/fd"),
+                 ("/proc/self/fd/0", "/dev/stdin"),
+                 ("/proc/self/fd/1", "/dev/stdout"),
+                 ("/proc/self/fd/2", "/dev/stderr"))
+
         for (node, major, minor, perm) in devices:
-            os.mknod(self._instroot + "/dev/" + node, perm | stat.S_IFCHR, os.makedev(major,minor))
-        os.symlink('/proc/self/fd',   self._instroot + "/dev/fd")
-        os.symlink('/proc/self/fd/0', self._instroot + "/dev/stdin")
-        os.symlink('/proc/self/fd/1', self._instroot + "/dev/stdout")
-        os.symlink('/proc/self/fd/2', self._instroot + "/dev/stderr")
+            if not os.path.exists(self._instroot + "/dev/" + node):
+                os.mknod(self._instroot + "/dev/" + node, perm | stat.S_IFCHR, os.makedev(major,minor))
+        for (src, dest) in links:
+            if not os.path.exists(self._instroot + dest):
+                os.symlink(src, self._instroot + dest)
         os.umask(origumask)
 
     def __create_selinuxfs(self):
