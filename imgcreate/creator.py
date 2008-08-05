@@ -895,7 +895,7 @@ class LoopImageCreator(ImageCreator):
         """
         return self.__instloop.resparse(size)
 
-    def __base_on(self, base_on):
+    def _base_on(self, base_on):
         shutil.copyfile(base_on, self._image)
         
     #
@@ -905,8 +905,7 @@ class LoopImageCreator(ImageCreator):
         self.__imgdir = self._mkdtemp()
 
         if not base_on is None:
-            self.__base_on(base_on)
-            shutil.copyfile(base_on, self._image)
+            self._base_on(base_on)
 
         self.__instloop = SparseExtLoopbackMount(self._image,
                                                  self._instroot,

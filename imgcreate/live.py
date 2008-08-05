@@ -129,7 +129,7 @@ class LiveImageCreatorBase(LoopImageCreator):
     #
     # Actual implementation
     #
-    def __base_on(self, base_on):
+    def _base_on(self, base_on):
         """helper function to extract ext3 file system from a live CD ISO"""
         isoloop = LoopbackMount(base_on, self._mkdtemp())
 
@@ -175,7 +175,7 @@ class LiveImageCreatorBase(LoopImageCreator):
             isoloop.cleanup()
 
     def _mount_instroot(self, base_on = None):
-        LoopImageCreator._mount_instroot(self)
+        LoopImageCreator._mount_instroot(self, base_on)
         self.__write_initrd_conf(self._instroot + "/etc/sysconfig/mkinitrd")
 
     def _unmount_instroot(self):
