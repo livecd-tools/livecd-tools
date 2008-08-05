@@ -16,6 +16,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
+import glob
 import os
 import sys
 import logging
@@ -70,6 +71,8 @@ class LiveCDYum(yum.YumBase):
 
     def setup(self, confpath, installroot):
         self._writeConf(confpath, installroot)
+        for f in glob.glob(installroot + "/var/lib/rpm/__db*"):
+            os.unlink(f)
         self.doConfigSetup(fn = confpath, root = installroot)
         self.conf.cache = 0
         self.doTsSetup()
