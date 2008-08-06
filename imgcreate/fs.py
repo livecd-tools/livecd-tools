@@ -156,7 +156,7 @@ class SparseExtLoopbackMount(SparseLoopbackMount):
         self.diskmount.disk.create()
 
     def resize(self, size = None):
-        self.diskmount.__resize_filesystem(size)
+        return self.diskmount.__resize_filesystem(size)
 
     def mount(self):
         self.diskmount.mount()
@@ -165,10 +165,10 @@ class SparseExtLoopbackMount(SparseLoopbackMount):
         self.extdiskmount.__fsck()
 
     def __get_size_from_filesystem(self):
-        self.diskmount.__get_size_from_filesystem()
+        return self.diskmount.__get_size_from_filesystem()
         
     def __resize_to_minimal(self):
-        self.diskmount.__resize_to_minimal()
+        return self.diskmount.__resize_to_minimal()
         
     def resparse(self, size = None):
         return self.diskmount.resparse(size)
@@ -386,13 +386,13 @@ class ExtDiskMount(DiskMount):
         current_size = os.stat(self.disk.lofile)[stat.ST_SIZE]
 
         if size is None:
-            size = self.size
+            size = self.disk.size
 
         if size == current_size:
             return
 
         if size > current_size:
-            self.expand(size)
+            self.disk.expand(size)
 
         self.__fsck()
 
@@ -459,6 +459,7 @@ class ExtDiskMount(DiskMount):
         self.cleanup()
         minsize = self.__resize_to_minimal()
         self.disk.truncate(minsize)
+        self.__resize_filesystem(size)
         return minsize
 
 class DeviceMapperSnapshot(object):
