@@ -101,6 +101,11 @@ else
     echo "Warning: You need to add pxelinux.0 to tftpboot/ subdirectory"
 fi
 
+# Get boot append line from original cd image.
+if [ -f $CDMNT/isolinux/isolinux.cfg ]; then
+    APPEND=$(grep -m1 append isolinux.cfg | sed -e "s#CDLABEL=[^ ]*#/$ISOBASENAME#" -e "s/ *append *//")
+fi
+
 # pxelinux configuration.
 mkdir tftpboot/pxelinux.cfg
 cat > tftpboot/pxelinux.cfg/default <<EOF
@@ -109,7 +114,7 @@ TIMEOUT 20
 PROMPT 0
 LABEL pxeboot
 	KERNEL vmlinuz0
-	APPEND initrd=initrd0.img root=/$ISOBASENAME rootfstype=iso9660 rootflags=loop
+	APPEND rootflags=loop $APPEND
 ONERROR LOCALBOOT 0
 EOF
 
