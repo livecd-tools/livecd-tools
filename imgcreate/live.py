@@ -99,10 +99,6 @@ class LiveImageCreatorBase(LoopImageCreator):
             r += " rhgb"
         if os.path.exists(self._instroot + "/usr/bin/plymouth"):
             r += " rhgb"
-        # Get --append line from kickstart bootloader option.
-        append_line = kickstart.get_kernel_append_line(self.ks)
-        if append_line:
-            r += " " + append_line
         return r
         
     def _get_mkisofs_options(self, isodir):

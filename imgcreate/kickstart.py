@@ -461,13 +461,6 @@ def get_default_kernel(ks, default = None):
         return default
     return ks.handler.bootloader.default
 
-def get_kernel_append_line(ks, default = None):
-    if not hasattr(ks.handler.bootloader, "appendLine"):
-        return default
-    if not ks.handler.bootloader.appendLine:
-        return default
-    return ks.handler.bootloader.appendLine
-
 def get_repos(ks, repo_urls = {}):
     repos = []
     for repo in ks.handler.repo.repoList:
