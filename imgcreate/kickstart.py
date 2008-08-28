@@ -21,6 +21,7 @@ import os.path
 import shutil
 import subprocess
 import time
+import logging
 
 import pykickstart.commands as kscommands
 import pykickstart.constants as ksconstants
@@ -462,7 +463,7 @@ def get_default_kernel(ks, default = None):
     return ks.handler.bootloader.default
 
 def get_repos(ks, repo_urls = {}):
-    repos = []
+    repos = {}
     for repo in ks.handler.repo.repoList:
         inc = []
         if hasattr(repo, "includepkgs"):
@@ -479,9 +480,11 @@ def get_repos(ks, repo_urls = {}):
             baseurl = repo_urls[repo.name]
             mirrorlist = None
 
-        repos.append((repo.name, baseurl, mirrorlist, inc, exc))
+        if repos.has_key(repo.name):
+            logging.warn("Overriding already specified repo %s" %(repo.name,))
+        repos[repo.name] = (repo.name, baseurl, mirrorlist, inc, exc)
 
-    return repos
+    return repos.values()
 
 def convert_method_to_repo(ks):
     try:
