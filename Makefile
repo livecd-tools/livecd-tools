@@ -30,7 +30,6 @@ install: man
 	$(INSTALL_DATA) -D README $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)/README
 	$(INSTALL_DATA) -D HACKING $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)/HACKING
 	mkdir -p $(DESTDIR)/usr/share/livecd-tools/
-	$(INSTALL_DATA) -D config/*.ks $(DESTDIR)/usr/share/livecd-tools/
 	mkdir -p $(DESTDIR)/$(PYTHONDIR)/imgcreate
 	$(INSTALL_PYTHON) -D imgcreate/*.py $(DESTDIR)/$(PYTHONDIR)/imgcreate/
 	$(call COMPILE_PYTHON,$(DESTDIR)/$(PYTHONDIR)/imgcreate)
@@ -41,7 +40,6 @@ uninstall:
 	rm -f $(DESTDIR)/usr/bin/livecd-creator
 	rm -rf $(DESTDIR)/usr/lib/livecd-creator
 	rm -rf $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)
-	rm -rf $(DESTDIR)/usr/share/livecd-tools
 
 dist : all
 	git-archive --format=tar --prefix=livecd-tools-$(VERSION)/ HEAD | bzip2 -9v > livecd-tools-$(VERSION).tar.bz2

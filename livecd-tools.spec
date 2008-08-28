@@ -50,13 +50,12 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-,root,root,-)
-%doc AUTHORS COPYING README HACKING
+%doc AUTHORS COPYING README HACKING API
+%doc config/livecd-fedora-minimal.ks
 %{_mandir}/man*/*
 %{_bindir}/livecd-creator
 %{_bindir}/livecd-iso-to-disk
 %{_bindir}/livecd-iso-to-pxeboot
-%dir %{_datadir}/livecd-tools
-%{_datadir}/livecd-tools/*
 %{_bindir}/image-creator
 %dir %{python_sitelib}/imgcreate
 %{python_sitelib}/imgcreate/*.py
