@@ -254,6 +254,9 @@ while [ $# -gt 2 ]; do
 	--mactel)
 	    mactel=1
 	    ;;
+	--xo)
+	    xo=1
+	    ;;
         --extra-kernel-args)
             kernelargs=$2
             shift
@@ -302,7 +305,7 @@ if [ -z "$mactel" ]; then
   checkPartActive $USBDEV
   [ -n "$resetmbr" ] && resetMBR $USBDEV
   checkMBR $USBDEV
-else
+elif [ -n "$mactel" ]; then
   [ -n "$resetmbr" ] && createGPTLayout $USBDEV
   checkGPT $USBDEV
 fi
@@ -477,6 +480,31 @@ if [ -n "$homesizemb" ]; then
 	mke2fs -F -j $USBMNT/LiveOS/$HOMEFILE
 	tune2fs -c0 -i0 -ouser_xattr,acl $USBMNT/LiveOS/$HOMEFILE
     fi
+fi
+
+# create the forth files for booting on the XO if requested
+# we'd do this unconditionally, but you have to have a kernel that will
+# boot on the XO anyway.
+if [ -n "$xo" ]; then
+    echo "Setting up /olpc-usb.fth file"
+    args=$(egrep "^[ ]*append" $USBMNT/$SYSLINUXPATH/isolinux.cfg |head -n1 |sed -e 's/.*initrd=[^ ]*//')
+    cat > $USBMNT/olpc-usb.fth <<EOF
+\ Boot script for USB boot
+" $args" to boot-file
+" u:\syslinux\initrd0.img" to ramdisk
+unfreeze
+boot u:\syslinux\vmlinuz0
+EOF
+
+    echo "Setting up /olpc-sd.fth file"
+    cat > $USBMNT/olpc-sd.fth <<EOF
+\ Boot script for SD boot
+" $args" to boot-file
+" sd:\syslinux\initrd0.img" to ramdisk
+unfreeze
+boot sd:\syslinux\vmlinuz0
+EOF
+
 fi
 
 echo "Installing boot loader"
