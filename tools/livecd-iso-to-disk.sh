@@ -258,6 +258,9 @@ while [ $# -gt 2 ]; do
             kernelargs=$2
             shift
             ;;
+        --force)
+            force=1
+            ;;
 	*)
 	    usage
 	    ;;
@@ -358,7 +361,7 @@ if [ $(($overlaysizemb + $homesizemb + $livesize)) -gt $(($free + $tbd)) ]; then
   exitclean
 fi
 
-if [ -d $USBMNT/LiveOS ]; then
+if [ -d $USBMNT/LiveOS -a -z "$force" ]; then
     echo "Already set up as live image."  
     if [ -z "$keephome" -a -e $USBMNT/LiveOS/home.img ]; then 
       echo "WARNING: Persistent /home will be deleted!!!"
