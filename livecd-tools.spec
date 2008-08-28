@@ -4,7 +4,7 @@
 
 Summary: Tools for building live CD's
 Name: livecd-tools
-Version: 017
+Version: 018
 Release: 1%{?dist}
 License: GPLv2
 Group: System Environment/Base
@@ -63,6 +63,24 @@ rm -rf $RPM_BUILD_ROOT
 %{python_sitelib}/imgcreate/*.pyc
 
 %changelog
+* Thu Aug 28 2008 Jeremy Katz <katzj@redhat.com> - 018-1
+- Use logging API for debugging messages (dhuff)
+- Some initial support for booting live images on an XO
+- Refactoring of mount code for appliance-creator (danpb, dhuff)
+- Make --base-on actually work again
+- Drop the image configs; these are now in the spin-kickstarts repo
+- plymouth support
+- Listen to bootloader --append in config
+- Add man pages (Pedro Silva)
+- Support booting from Intel based Macs via EFI on USB (#450193)
+- Fixes for SELinux enforcing (eparis)
+- Eject the CD on shutdown (#239928)
+- Allow adding extra kernel args with livecd-iso-to-disk
+- Support for persistent /home (#445218)
+- Copy timezone to /etc/localtime (#445624)
+- Ensure that commands run by livecd-creator exist
+- Mount a tmpfs for some dirs (#447127)
+
 * Tue May  6 2008 Bill Nottingham <notting@redhat.com> - 017-1
 - fix F9 final configs
 
