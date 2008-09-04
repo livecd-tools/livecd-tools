@@ -720,6 +720,7 @@ class ImageCreator(object):
         kickstart.ServicesConfig(self._instroot).apply(ksh.services)
         kickstart.XConfig(self._instroot).apply(ksh.xconfig)
         kickstart.NetworkConfig(self._instroot).apply(ksh.network)
+        kickstart.RPMMacroConfig(self._instroot).apply(self.ks)
 
         self._create_bootconfig()
 

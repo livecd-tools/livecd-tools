@@ -234,6 +234,22 @@ class XConfig(KickstartConfig):
         f.write(buf)
         f.close()
 
+class RPMMacroConfig(KickstartConfig):
+    """A class to apply the specified rpm macros to the filesystem"""
+    def apply(self, ks):
+        if not ks:
+            return
+        f = open(self.path("/etc/rpm/macros.imgcreate"), "w+")
+        if exclude_docs(ks):
+            f.write("%_exludedocs 1\n")
+        if not selinux_enabled(ks):
+            f.write("%__file_context_path %{nil}\n")
+        if inst_langs(ks) != None:
+            f.write("%_install_langs ")
+            f.write(inst_langs(ks))
+            f.write("\n")
+        f.close()
+
 class NetworkConfig(KickstartConfig):
     """A class to apply a kickstart network configuration to a system."""
     def write_ifcfg(self, network):
