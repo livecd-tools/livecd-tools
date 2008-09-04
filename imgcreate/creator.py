@@ -641,6 +641,8 @@ class ImageCreator(object):
             rpm.addMacro("_excludedocs", "1")
         if not kickstart.selinux_enabled(self.ks):
             rpm.addMacro("__file_context_path", "%{nil}")
+        if kickstart.inst_langs(self.ks) != None:
+            rpm.addMacro("_install_langs", kickstart.inst_langs(self.ks))
 
         try:
             self.__select_packages(ayum)

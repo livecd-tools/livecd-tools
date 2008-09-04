@@ -510,6 +510,9 @@ def ignore_missing(ks):
 def exclude_docs(ks):
     return ks.handler.packages.excludeDocs
 
+def inst_langs(ks):
+    return ks.handler.packages.instLange
+
 def get_post_scripts(ks):
     scripts = []
     for s in ks.handler.scripts:
