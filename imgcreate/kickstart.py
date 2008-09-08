@@ -529,6 +529,8 @@ def exclude_docs(ks):
 def inst_langs(ks):
     if hasattr(ks.handler.packages, "instLangs"):
         return ks.handler.packages.instLangs
+    elif hasattr(ks.handler.packages, "instLange"):
+        return ks.handler.packages.instLange
     return ""
 
 def get_post_scripts(ks):
