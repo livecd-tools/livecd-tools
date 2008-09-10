@@ -257,6 +257,14 @@ while [ $# -gt 2 ]; do
 	--xo)
 	    xo=1
 	    ;;
+        --xo-sd)
+            xo=1
+            xosd=1
+            ;;
+        --xo-usb)
+            xo=1
+            xousb=1
+            ;;
         --extra-kernel-args)
             kernelargs=$2
             shift
@@ -505,6 +513,13 @@ unfreeze
 boot sd:\syslinux\vmlinuz0
 EOF
 
+    if [ -n "$xosd" ]; then
+      mkdir $USBMNT/boot
+      cp $USBMNT/olpc-sd.fth $USBMNT/boot/olpc.fth
+    elif [ -n "$xousb" ]; then
+      mkdir $USBMNT/boot
+      cp $USBMNT/olpc-usb.fth $USBMNT/boot/olpc.fth
+    fi
 fi
 
 echo "Installing boot loader"
