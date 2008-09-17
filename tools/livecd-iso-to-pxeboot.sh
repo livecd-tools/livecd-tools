@@ -103,7 +103,7 @@ fi
 
 # Get boot append line from original cd image.
 if [ -f $CDMNT/isolinux/isolinux.cfg ]; then
-    APPEND=$(grep -m1 append isolinux.cfg | sed -e "s#CDLABEL=[^ ]*#/$ISOBASENAME#" -e "s/ *append *//")
+    APPEND=$(grep -m1 append $CDMNT/isolinux/isolinux.cfg | sed -e "s#CDLABEL=[^ ]*#/$ISOBASENAME#" -e "s/ *append *//")
 fi
 
 # pxelinux configuration.
