@@ -498,6 +498,15 @@ if [ -n "$xo" ]; then
     args=$(egrep "^[ ]*append" $USBMNT/$SYSLINUXPATH/isolinux.cfg |head -n1 |sed -e 's/.*initrd=[^ ]*//')
     cat > $USBMNT/olpc-usb.fth <<EOF
 \ Boot script for USB boot
+patch 2drop erase claim-params
+: high-ramdisk  ( -- )
+   cv-load-ramdisk
+   h# 22c +lp l@ 1+   memory-limit  umin  /ramdisk -  ( new-ramdisk-adr )
+   ramdisk-adr over  /ramdisk move                    ( new-ramdisk-adr )
+   to ramdisk-adr
+;
+' high-ramdisk to load-ramdisk
+
 " $args" to boot-file
 " u:\syslinux\initrd0.img" to ramdisk
 unfreeze
@@ -507,6 +516,15 @@ EOF
     echo "Setting up /olpc-sd.fth file"
     cat > $USBMNT/olpc-sd.fth <<EOF
 \ Boot script for SD boot
+patch 2drop erase claim-params
+: high-ramdisk  ( -- )
+   cv-load-ramdisk
+   h# 22c +lp l@ 1+   memory-limit  umin  /ramdisk -  ( new-ramdisk-adr )
+   ramdisk-adr over  /ramdisk move                    ( new-ramdisk-adr )
+   to ramdisk-adr
+;
+' high-ramdisk to load-ramdisk
+
 " $args" to boot-file
 " sd:\syslinux\initrd0.img" to ramdisk
 unfreeze
