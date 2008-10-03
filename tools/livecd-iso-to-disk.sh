@@ -226,6 +226,7 @@ fi
 
 cryptedhome=1
 keephome=1
+HOMEFILE="home.img"
 while [ $# -gt 2 ]; do
     case $1 in
 	--overlay-size-mb)
@@ -341,7 +342,7 @@ mount $mountopts $USBDEV $USBMNT || exitclean
 
 trap exitclean SIGINT SIGTERM
 
-if [ -f "$USBMNT/LiveOS/home.img" -a -n "$keephome" -a -n "$homesizemb" ]; then
+if [ -f "$USBMNT/LiveOS/$HOMEFILE" -a -n "$keephome" -a -n "$homesizemb" ]; then
   echo "ERROR: Requested keeping existing /home and specified a size for /home"
   echo "Please either don't specify a size or specify --delete-home"
   exitclean
@@ -355,7 +356,7 @@ else
 fi
 if [ -d $USBMNT/LiveOS ]; then
   tbd=$(du -s -B 1M $USBMNT/LiveOS | awk {'print $1;'})
-  [ -f $USBMNT/LiveOS/home.img ] && homesz=$(du -s -B 1M $USBMNT/LiveOS/home.img | awk {'print $1;'})
+  [ -f $USBMNT/LiveOS/$HOMEFILE ] && homesz=$(du -s -B 1M $USBMNT/LiveOS/$HOMEFILE | awk {'print $1;'})
   [ -n "$homesz" -a -n "$keephome" ] && tbd=$(($tbd - $homesz))
 else
   tbd=0
@@ -374,7 +375,7 @@ fi
 
 if [ -d $USBMNT/LiveOS -a -z "$force" ]; then
     echo "Already set up as live image."  
-    if [ -z "$keephome" -a -e $USBMNT/LiveOS/home.img ]; then 
+    if [ -z "$keephome" -a -e $USBMNT/LiveOS/$HOMEFILE ]; then
       echo "WARNING: Persistent /home will be deleted!!!"
       echo "Press Enter to continue or ctrl-c to abort"
       read
@@ -382,7 +383,7 @@ if [ -d $USBMNT/LiveOS -a -z "$force" ]; then
       echo "Deleting old OS in fifteen seconds..."
       sleep 15
 
-      [ -e "$USBMNT/LiveOS/home.img" -a -n "$keephome" ] && mv $USBMNT/LiveOS/home.img $USBMNT/home.img
+      [ -e "$USBMNT/LiveOS/$HOMEFILE" -a -n "$keephome" ] && mv $USBMNT/LiveOS/$HOMEFILE $USBMNT/$HOMEFILE
     fi
 
     rm -rf $USBMNT/LiveOS
@@ -392,7 +393,7 @@ echo "Copying live image to USB stick"
 [ -z "$mactel" -a ! -d $USBMNT/$SYSLINUXPATH ] && mkdir -p $USBMNT/$SYSLINUXPATH
 [ -n "$mactel" -a ! -d $USBMNT/EFI/boot ] && mkdir -p $USBMNT/EFI/boot
 [ ! -d $USBMNT/LiveOS ] && mkdir $USBMNT/LiveOS
-[ -n "$keephome" -a -f "$USBMNT/home.img" ] && mv $USBMNT/home.img $USBMNT/LiveOS/home.img
+[ -n "$keephome" -a -f "$USBMNT/$HOMEFILE" ] && mv $USBMNT/$HOMEFILE $USBMNT/LiveOS/$HOMEFILE
 # cases without /LiveOS are legacy detection, remove for F10
 if [ -f $CDMNT/LiveOS/squashfs.img ]; then
     cp $CDMNT/LiveOS/squashfs.img $USBMNT/LiveOS/squashfs.img || exitclean
@@ -465,7 +466,6 @@ fi
 
 if [ -n "$homesizemb" ]; then
     echo "Initializing persistent /home"
-    HOMEFILE=home.img
     if [ "$USBFS" = "vfat" ]; then
 	# vfat can't handle sparse files
 	dd if=/dev/zero of=$USBMNT/LiveOS/$HOMEFILE count=$homesizemb bs=1M
