@@ -258,14 +258,6 @@ while [ $# -gt 2 ]; do
 	--xo)
 	    xo=1
 	    ;;
-        --xo-sd)
-            xo=1
-            xosd=1
-            ;;
-        --xo-usb)
-            xo=1
-            xousb=1
-            ;;
 	--xo-no-home)
 	    xonohome=1
 	    ;;
@@ -497,12 +489,13 @@ fi
 # we'd do this unconditionally, but you have to have a kernel that will
 # boot on the XO anyway.
 if [ -n "$xo" ]; then
-    echo "Setting up /olpc-usb.fth file"
+    echo "Setting up /boot/olpc.fth file"
     args=$(egrep "^[ ]*append" $USBMNT/$SYSLINUXPATH/isolinux.cfg |head -n1 |sed -e 's/.*initrd=[^ ]*//')
     if [ -n "$xonohome" -a ! -f $USBMNT/LiveOS/$HOMEFILE ]; then
 	args="$args persistenthome=mtd0"
     fi
-    cat > $USBMNT/olpc-usb.fth <<EOF
+    if [ ! -d $USBMNT/boot ]; then mkdir -p $USBMNT/boot ; fi
+    cat > $USBMNT/boot/olpc.fth <<EOF
 \ Boot script for USB boot
 patch 2drop erase claim-params
 : high-ramdisk  ( -- )
@@ -513,37 +506,31 @@ patch 2drop erase claim-params
 ;
 ' high-ramdisk to load-ramdisk
 
-" $args" to boot-file
-" u:\syslinux\initrd0.img" to ramdisk
-unfreeze
-boot u:\syslinux\vmlinuz0
-EOF
+: set-bootpath-dev  ( -- )
+   " /chosen" find-package  if                       ( phandle )
+      " bootpath" rot  get-package-property  0=  if  ( propval$ )
+         get-encoded-string                          ( bootpath$ )
+         [char] \ left-parse-string  2nip            ( dn$ )
+         dn-buf place                                ( )
+      then
+   then
 
-    echo "Setting up /olpc-sd.fth file"
-    cat > $USBMNT/olpc-sd.fth <<EOF
-\ Boot script for SD boot
-patch 2drop erase claim-params
-: high-ramdisk  ( -- )
-   cv-load-ramdisk
-   h# 22c +lp l@ 1+   memory-limit  umin  /ramdisk -  ( new-ramdisk-adr )
-   ramdisk-adr over  /ramdisk move                    ( new-ramdisk-adr )
-   to ramdisk-adr
+   " /sd"  dn-buf  count  sindex  0>=   if
+          " sd:"
+   else
+          " u:"
+   then
+   " BOOTPATHDEV" \$set-macro
 ;
-' high-ramdisk to load-ramdisk
 
+set-bootpath-dev
 " $args" to boot-file
-" sd:\syslinux\initrd0.img" to ramdisk
+" \${BOOTPATHDEV}\syslinux\initrd0.img" expand$ to ramdisk
+" \${BOOTPATHDEV}\syslinux\vmlinuz0" expand$ to boot-device
 unfreeze
-boot sd:\syslinux\vmlinuz0
+boot
 EOF
 
-    if [ -n "$xosd" ]; then
-      mkdir $USBMNT/boot
-      cp $USBMNT/olpc-sd.fth $USBMNT/boot/olpc.fth
-    elif [ -n "$xousb" ]; then
-      mkdir $USBMNT/boot
-      cp $USBMNT/olpc-usb.fth $USBMNT/boot/olpc.fth
-    fi
 fi
 
 echo "Installing boot loader"
