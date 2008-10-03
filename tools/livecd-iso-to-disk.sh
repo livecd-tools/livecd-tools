@@ -266,6 +266,9 @@ while [ $# -gt 2 ]; do
             xo=1
             xousb=1
             ;;
+	--xo-no-home)
+	    xonohome=1
+	    ;;
         --extra-kernel-args)
             kernelargs=$2
             shift
@@ -496,6 +499,9 @@ fi
 if [ -n "$xo" ]; then
     echo "Setting up /olpc-usb.fth file"
     args=$(egrep "^[ ]*append" $USBMNT/$SYSLINUXPATH/isolinux.cfg |head -n1 |sed -e 's/.*initrd=[^ ]*//')
+    if [ -n "$xonohome" -a ! -f $USBMNT/LiveOS/$HOMEFILE ]; then
+	args="$args persistenthome=mtd0"
+    fi
     cat > $USBMNT/olpc-usb.fth <<EOF
 \ Boot script for USB boot
 patch 2drop erase claim-params
