@@ -110,11 +110,14 @@ class LiveCDYum(yum.YumBase):
             logging.warn("No such package %s to remove" %(pkg,))
 
     def selectGroup(self, grp, include = pykickstart.parser.GROUP_DEFAULT):
-        yum.YumBase.selectGroup(self, grp)
+        # default to getting mandatory and default packages from a group
+        # unless we have specific options from kickstart
+        package_types = ['mandatory', 'default']
         if include == pykickstart.parser.GROUP_REQUIRED:
-            map(lambda p: self.deselectPackage(p), grp.default_packages.keys())
+            package_types.remove('default')
         elif include == pykickstart.parser.GROUP_ALL:
-            map(lambda p: self.selectPackage(p), grp.optional_packages.keys())
+            package_types.append('optional')
+        yum.YumBase.selectGroup(self, grp, group_package_types=package_types)
 
     def addRepository(self, name, url = None, mirrorlist = None):
         def _varSubstitute(option):
