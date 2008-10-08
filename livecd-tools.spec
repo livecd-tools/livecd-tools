@@ -20,6 +20,7 @@ Requires: squashfs-tools
 Requires: pykickstart >= 0.96
 Requires: dosfstools >= 2.11-8
 Requires: isomd5sum
+Requires: rhpl
 %ifarch %{ix86} x86_64
 Requires: syslinux
 %endif

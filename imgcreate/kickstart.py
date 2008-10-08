@@ -23,6 +23,8 @@ import subprocess
 import time
 import logging
 
+import rhpl.keyboard
+
 import pykickstart.commands as kscommands
 import pykickstart.constants as ksconstants
 import pykickstart.errors as kserrors
@@ -133,7 +135,6 @@ class KeyboardConfig(KickstartConfig):
         #   should this impact the X keyboard config too?
         #   or do we want to make X be able to do this mapping?
         #
-        import rhpl.keyboard
         k = rhpl.keyboard.Keyboard()
         if kskeyboard.keyboard:
             k.set(kskeyboard.keyboard)
