@@ -14,7 +14,7 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 Requires: util-linux
 Requires: coreutils
 Requires: e2fsprogs
-Requires: yum >= 3.1.7
+Requires: yum >= 3.2.18
 Requires: mkisofs
 Requires: squashfs-tools
 Requires: pykickstart >= 0.96
