@@ -444,7 +444,7 @@ fi
 echo "Updating boot config file"
 # adjust label and fstype
 sed -i -e "s/CDLABEL=[^ ]*/$USBLABEL/" -e "s/rootfstype=[^ ]*/rootfstype=$USBFS/" $BOOTCONFIG
-if [ -n "$kernelargs" ]; then sed -i -e "s/liveimg/liveimg ${kernelargs}/" $BOOTCONFIG.cfg ; fi
+if [ -n "$kernelargs" ]; then sed -i -e "s/liveimg/liveimg ${kernelargs}/" $BOOTCONFIG ; fi
 
 if [ -n "$overlaysizemb" ]; then
     echo "Initializing persistent overlay file"
