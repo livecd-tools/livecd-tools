@@ -4,7 +4,7 @@
 
 Summary: Tools for building live CD's
 Name: livecd-tools
-Version: 018
+Version: 019
 Release: 1%{?dist}
 License: GPLv2
 Group: System Environment/Base
@@ -64,6 +64,18 @@ rm -rf $RPM_BUILD_ROOT
 %{python_sitelib}/imgcreate/*.pyc
 
 %changelog
+* Fri Oct 10 2008 Jeremy Katz <katzj@redhat.com> - 019-1
+- livecd-iso-to-disk: Various other XO fixes
+- Cleanup rpmdb locks after package installation
+- Fix traceback due to lazy rhpl.keyboard import
+- Fix using groups with options (jkeating)
+- Support persistent /home on XO's internal flash
+- Fix ramdisk load addr in boot/olpc.fth for XO
+- Fix up boot from SD
+- Fix extracting boot parameters for pxe (apevec)
+- Make rpm macro information persist into the image (bkearney)
+- Support %packages --instLangs (bkearney)
+
 * Thu Aug 28 2008 Jeremy Katz <katzj@redhat.com> - 018-1
 - Use logging API for debugging messages (dhuff)
 - Some initial support for booting live images on an XO
