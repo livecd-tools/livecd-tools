@@ -69,10 +69,15 @@ class LiveCDYum(yum.YumBase):
 
         os.chmod(confpath, 0644)
 
-    def setup(self, confpath, installroot):
-        self._writeConf(confpath, installroot)
+    def _cleanupRpmdbLocks(self, installroot):
+        # cleans up temporary files left by bdb so that differing
+        # versions of rpm don't cause problems
         for f in glob.glob(installroot + "/var/lib/rpm/__db*"):
             os.unlink(f)
+
+    def setup(self, confpath, installroot):
+        self._writeConf(confpath, installroot)
+        self._cleanupRpmdbLocks(installroot)
         self.doConfigSetup(fn = confpath, root = installroot)
         self.conf.cache = 0
         self.doTsSetup()
@@ -186,4 +191,5 @@ class LiveCDYum(yum.YumBase):
         cb.filelog = False
         ret = self.runTransaction(cb)
         print ""
+        self._cleanupRpmdbLocks(self.conf.installroot)
         return ret
