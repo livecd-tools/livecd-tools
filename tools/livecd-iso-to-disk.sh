@@ -226,6 +226,9 @@ fi
 
 cryptedhome=1
 keephome=1
+homesizemb=0
+swapsizemb=0
+
 HOMEFILE="home.img"
 while [ $# -gt 2 ]; do
     case $1 in
@@ -236,6 +239,10 @@ while [ $# -gt 2 ]; do
 	--home-size-mb)
             homesizemb=$2
             shift
+	    ;;
+	--swap-size-mb)
+	    swapsizemb=$2
+	    shift
 	    ;;
         --crypted-home)
             cryptedhome=1
@@ -329,6 +336,13 @@ if [ -n "$homesizemb" -a "$USBFS" = "vfat" ]; then
   fi
 fi
 
+if [ -n "$swapsizemb" -a "$USBFS" = "vfat" ]; then
+  if [ "$swapsizemb" -gt 2047 ]; then
+    echo "Can't have a swap file greater than 2048MB on VFAT"
+    exitclean
+  fi
+fi
+
 # FIXME: would be better if we had better mountpoints
 CDMNT=$(mktemp -d /media/cdtmp.XXXXXX)
 mount -o loop,ro "$ISO" $CDMNT || exitclean
@@ -337,7 +351,7 @@ mount $mountopts $USBDEV $USBMNT || exitclean
 
 trap exitclean SIGINT SIGTERM
 
-if [ -f "$USBMNT/LiveOS/$HOMEFILE" -a -n "$keephome" -a -n "$homesizemb" ]; then
+if [ -f "$USBMNT/LiveOS/$HOMEFILE" -a -n "$keephome" -a "$homesizemb" -gt 0 ]; then
   echo "ERROR: Requested keeping existing /home and specified a size for /home"
   echo "Please either don't specify a size or specify --delete-home"
   exitclean
@@ -359,11 +373,12 @@ fi
 livesize=$(du -s -B 1M $check | awk {'print $1;'})
 free=$(df  -B1M $USBDEV  |tail -n 1 |awk {'print $4;'})
 
-if [ $(($overlaysizemb + $homesizemb + $livesize)) -gt $(($free + $tbd)) ]; then
+if [ $(($overlaysizemb + $homesizemb + $livesize + $swapsizemb)) -gt $(($free + $tbd)) ]; then
   echo "Unable to fit live image + overlay on available space on USB stick"
   echo "Size of live image: $livesize"
   [ -n "$overlaysizemb" ] && echo "Overlay size: $overlaysizemb"
-  [ -n "$homesizemb" ] && echo "Home overlay size: $homesizemb"
+  [ "$homesizemb" -gt 0 ] && echo "Home overlay size: $homesizemb"
+  [ "$swapsizemb" -gt 0 ] && echo "Home overlay size: $swapsizemb"
   echo "Available space: $(($free + $tbd))"
   exitclean
 fi
@@ -459,7 +474,13 @@ if [ -n "$overlaysizemb" ]; then
     sed -i -e "s/\ ro\ /\ rw\ /" $BOOTCONFIG
 fi
 
-if [ -n "$homesizemb" ]; then
+if [ "$swapsizemb" -gt 0 ]; then
+    echo "Initializing swap file"
+    dd if=/dev/zero of=$USBMNT/LiveOS/swap.img count=$swapsizemb bs=1M
+    mkswap -f $USBMNT/LiveOS/swap.img
+fi
+
+if [ "$homesizemb" -gt 0 ]; then
     echo "Initializing persistent /home"
     if [ "$USBFS" = "vfat" ]; then
 	# vfat can't handle sparse files
