@@ -226,14 +226,17 @@ class ServicesConfig(KickstartConfig):
 class XConfig(KickstartConfig):
     """A class to apply a kickstart X configuration to a system."""
     def apply(self, ksxconfig):
-        if not ksxconfig.startX:
-            return
-        f = open(self.path("/etc/inittab"), "rw+")
-        buf = f.read()
-        buf = buf.replace("id:3:initdefault", "id:5:initdefault")
-        f.seek(0)
-        f.write(buf)
-        f.close()
+        if ksxconfig.startX:
+            f = open(self.path("/etc/inittab"), "rw+")
+            buf = f.read()
+            buf = buf.replace("id:3:initdefault", "id:5:initdefault")
+            f.seek(0)
+            f.write(buf)
+            f.close()
+        if ksxconfig.defaultdesktop:
+            f = open(self.path("/etc/sysconfig/desktop"), "w")
+            f.write("DESKTOP="+ksxconfig.defaultdesktop+"\n")
+            f.close()
 
 class RPMMacroConfig(KickstartConfig):
     """A class to apply the specified rpm macros to the filesystem"""
