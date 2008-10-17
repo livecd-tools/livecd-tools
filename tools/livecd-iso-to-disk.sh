@@ -228,6 +228,7 @@ cryptedhome=1
 keephome=1
 homesizemb=0
 swapsizemb=0
+overlaysizemb=0
 
 HOMEFILE="home.img"
 while [ $# -gt 2 ]; do
@@ -322,21 +323,21 @@ elif [ -n "$mactel" ]; then
 fi
 
 
-if [ -n "$overlaysizemb" -a "$USBFS" = "vfat" ]; then
+if [ "$overlaysizemb" -gt 0 -a "$USBFS" = "vfat" ]; then
   if [ "$overlaysizemb" -gt 2047 ]; then
     echo "Can't have an overlay of 2048MB or greater on VFAT"
     exitclean
   fi
 fi
 
-if [ -n "$homesizemb" -a "$USBFS" = "vfat" ]; then
+if [ "$homesizemb" -gt 0 -a "$USBFS" = "vfat" ]; then
   if [ "$homesizemb" -gt 2047 ]; then
     echo "Can't have a home overlay greater than 2048MB on VFAT"
     exitclean
   fi
 fi
 
-if [ -n "$swapsizemb" -a "$USBFS" = "vfat" ]; then
+if [ "$swapsizemb" -gt 0 -a "$USBFS" = "vfat" ]; then
   if [ "$swapsizemb" -gt 2047 ]; then
     echo "Can't have a swap file greater than 2048MB on VFAT"
     exitclean
@@ -376,7 +377,7 @@ free=$(df  -B1M $USBDEV  |tail -n 1 |awk {'print $4;'})
 if [ $(($overlaysizemb + $homesizemb + $livesize + $swapsizemb)) -gt $(($free + $tbd)) ]; then
   echo "Unable to fit live image + overlay on available space on USB stick"
   echo "Size of live image: $livesize"
-  [ -n "$overlaysizemb" ] && echo "Overlay size: $overlaysizemb"
+  [ "$overlaysizemb" -gt 0 ] && echo "Overlay size: $overlaysizemb"
   [ "$homesizemb" -gt 0 ] && echo "Home overlay size: $homesizemb"
   [ "$swapsizemb" -gt 0 ] && echo "Home overlay size: $swapsizemb"
   echo "Available space: $(($free + $tbd))"
@@ -461,7 +462,7 @@ echo "Updating boot config file"
 sed -i -e "s/CDLABEL=[^ ]*/$USBLABEL/" -e "s/rootfstype=[^ ]*/rootfstype=$USBFS/" $BOOTCONFIG
 if [ -n "$kernelargs" ]; then sed -i -e "s/liveimg/liveimg ${kernelargs}/" $BOOTCONFIG ; fi
 
-if [ -n "$overlaysizemb" ]; then
+if [ "$overlaysizemb" -gt 0 ]; then
     echo "Initializing persistent overlay file"
     OVERFILE="overlay-$( /lib/udev/vol_id -l $USBDEV )-$( /lib/udev/vol_id -u $USBDEV )"
     if [ "$USBFS" = "vfat" ]; then
