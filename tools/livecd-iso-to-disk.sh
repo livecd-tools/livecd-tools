@@ -513,7 +513,7 @@ fi
 if [ -n "$xo" ]; then
     echo "Setting up /boot/olpc.fth file"
     args=$(egrep "^[ ]*append" $USBMNT/$SYSLINUXPATH/isolinux.cfg |head -n1 |sed -e 's/.*initrd=[^ ]*//')
-    if [ -n "$xonohome" -a ! -f $USBMNT/LiveOS/$HOMEFILE ]; then
+    if [ -z "$xonohome" -a ! -f $USBMNT/LiveOS/$HOMEFILE ]; then
 	args="$args persistenthome=mtd0"
     fi
     if [ ! -d $USBMNT/boot ]; then mkdir -p $USBMNT/boot ; fi
