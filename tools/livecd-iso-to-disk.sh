@@ -274,9 +274,13 @@ while [ $# -gt 2 ]; do
 	    ;;
 	--xo)
 	    xo=1
+	    skipcompress=1
 	    ;;
 	--xo-no-home)
 	    xonohome=1
+	    ;;
+	--skipcompress)
+	    skipcompress=1
 	    ;;
         --extra-kernel-args)
             kernelargs=$2
@@ -381,6 +385,11 @@ else
   tbd=0
 fi
 livesize=$(du -s -B 1M $check | awk {'print $1;'})
+if [ -n "$skipcompress" ]; then
+    mount -o loop $CDMNT/LiveOS/squashfs.img $CDMNT
+    livesize=$(du -s -B 1M $CDMNT/LiveOS/ext3fs.img | awk {'print $1;'})
+    umount $CDMNT
+fi
 free=$(df  -B1M $USBDEV  |tail -n 1 |awk {'print $4;'})
 
 if [ $(($overlaysizemb + $homesizemb + $livesize + $swapsizemb)) -gt $(($free + $tbd)) ]; then
@@ -415,7 +424,11 @@ echo "Copying live image to USB stick"
 [ ! -d $USBMNT/LiveOS ] && mkdir $USBMNT/LiveOS
 [ -n "$keephome" -a -f "$USBMNT/$HOMEFILE" ] && mv $USBMNT/$HOMEFILE $USBMNT/LiveOS/$HOMEFILE
 # cases without /LiveOS are legacy detection, remove for F10
-if [ -f $CDMNT/LiveOS/squashfs.img ]; then
+if [ -n "$skipcompress" -a -f $CDMNT/LiveOS/squashfs.img ]; then
+    mount -o loop $CDMNT/LiveOS/squashfs.img $CDMNT
+    cp $CDMNT/LiveOS/ext3fs.img $USBMNT/LiveOS/ext3fs.img || (umount $CDMNT ; exitclean)
+    umount $CDMNT
+elif [ -f $CDMNT/LiveOS/squashfs.img ]; then
     cp $CDMNT/LiveOS/squashfs.img $USBMNT/LiveOS/squashfs.img || exitclean
 elif [ -f $CDMNT/squashfs.img ]; then
     cp $CDMNT/squashfs.img $USBMNT/LiveOS/squashfs.img || exitclean 
