@@ -219,6 +219,12 @@ checkMounted() {
     fi
 }
 
+checkint() {
+    if ! test $1 -gt 0 2>/dev/null ; then
+	usage
+    fi
+}
+
 if [ $(id -u) != 0 ]; then 
     echo "You need to be root to run this script"
     exit 1
@@ -234,14 +240,17 @@ HOMEFILE="home.img"
 while [ $# -gt 2 ]; do
     case $1 in
 	--overlay-size-mb)
+	    checkint $2
 	    overlaysizemb=$2
 	    shift
 	    ;;
 	--home-size-mb)
+	    checkint $2
             homesizemb=$2
             shift
 	    ;;
 	--swap-size-mb)
+	    checkint $2
 	    swapsizemb=$2
 	    shift
 	    ;;
