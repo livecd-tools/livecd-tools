@@ -525,6 +525,7 @@ if [ -n "$xo" ]; then
     if [ -z "$xonohome" -a ! -f $USBMNT/LiveOS/$HOMEFILE ]; then
 	args="$args persistenthome=mtd0"
     fi
+    args="$args reset_overlay"
     if [ ! -d $USBMNT/boot ]; then mkdir -p $USBMNT/boot ; fi
     cat > $USBMNT/boot/olpc.fth <<EOF
 \ Boot script for USB boot
