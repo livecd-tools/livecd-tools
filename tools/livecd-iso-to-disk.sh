@@ -133,6 +133,7 @@ createGPTLayout() {
     USBDEV=${device}1
     /sbin/udevsettle
     /sbin/mkdosfs -n LIVE $USBDEV
+    USBLABEL="UUID=$(/lib/udev/vol_id -u $dev)"
 }
 
 checkGPT() {
@@ -477,6 +478,7 @@ EOF
 
   # this is a little ugly, but it gets the "interesting" named config file
   BOOTCONFIG=$USBMNT/EFI/boot/boot?*.conf
+  rm -f $USBMNT/EFI/boot/grub.conf
 fi
 
 echo "Updating boot config file"
