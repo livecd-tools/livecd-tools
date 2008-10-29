@@ -280,6 +280,9 @@ while [ $# -gt 2 ]; do
 	--xo-no-home)
 	    xonohome=1
 	    ;;
+    --compress)
+        skipcompress=""
+        ;;
 	--skipcompress)
 	    skipcompress=1
 	    ;;
