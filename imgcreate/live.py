@@ -316,7 +316,7 @@ class x86LiveImageCreator(LiveImageCreatorBase):
     def __copy_syslinux_files(self, isodir, menu, mboot = None):
         files = ["isolinux.bin", menu]
         if mboot:
-            files += mboot
+            files += [mboot]
 
         for f in files:
             path = self._instroot + "/usr/lib/syslinux/" + f
@@ -348,8 +348,8 @@ class x86LiveImageCreator(LiveImageCreatorBase):
                         isodir + "/isolinux/initrd" + index + ".img")
 
         is_xen = False
-        if os.path.exists(bootdir + "/boot/xen.gz-" + version[:-3]):
-            shutil.copyfile(bootdir + "/boot/xen.gz-" + version[:-3],
+        if os.path.exists(bootdir + "/xen.gz-" + version[:-3]):
+            shutil.copyfile(bootdir + "/xen.gz-" + version[:-3],
                             isodir + "/isolinux/xen" + index + ".gz")
             is_xen = True
 
@@ -399,7 +399,7 @@ menu hiddenrow 5
             template = """label %(short)s
   menu label %(long)s
   kernel mboot.c32
-  append xen%(index)s.gz --- vmlinuz%(index)s --- initrd%(index)s.img  root=CDLABEL=%(fslabel)s rootfstype=iso9660 %(liveargs)s %(extra)s
+  append xen%(index)s.gz --- vmlinuz%(index)s root=CDLABEL=%(fslabel)s rootfstype=iso9660 %(liveargs)s %(extra)s --- initrd%(index)s.img
 """
         return template % args
 
