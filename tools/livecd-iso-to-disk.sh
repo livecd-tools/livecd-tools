@@ -550,7 +550,7 @@ if [ -n "$xo" ]; then
 patch 2drop erase claim-params
 : high-ramdisk  ( -- )
    cv-load-ramdisk
-   h# 22c +lp l@ 1+   memory-limit  umin  /ramdisk -  ( new-ramdisk-adr )
+   h# 22c +lp l@ 1+   memory-limit  umin  /ramdisk - ffff.f000 and ( new-ramdisk-adr )
    ramdisk-adr over  /ramdisk move                    ( new-ramdisk-adr )
    to ramdisk-adr
 ;
