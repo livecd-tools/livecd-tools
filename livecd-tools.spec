@@ -4,7 +4,7 @@
 
 Summary: Tools for building live CD's
 Name: livecd-tools
-Version: 019
+Version: 020
 Release: 1%{?dist}
 License: GPLv2
 Group: System Environment/Base
@@ -64,6 +64,18 @@ rm -rf $RPM_BUILD_ROOT
 %{python_sitelib}/imgcreate/*.pyc
 
 %changelog
+* Wed Nov 12 2008 Jeremy Katz <katzj@redhat.com> - 020-1
+- Support setting up a swap file
+- Verify integer args in livecd-iso-to-disk (#467257)
+- Set up persistent /home on internal mtd0 for XO
+- Default to resetting the overlay on XO
+- Support copying the raw ext3fs to the usb stick instead of the squash
+- Mactel fixes
+- Align initrd properly on XO (#467093)
+- Make initrd load addr work on newer XO firmwares
+- Fix up Xen paths for Xen live images (Michael Ansel)
+- Support --defaultdesktop (Orion Poplawski)
+
 * Fri Oct 10 2008 Jeremy Katz <katzj@redhat.com> - 019-1
 - livecd-iso-to-disk: Various other XO fixes
 - Cleanup rpmdb locks after package installation
