@@ -24,7 +24,7 @@ Requires: rhpl
 %ifarch %{ix86} x86_64
 Requires: syslinux
 %endif
-%ifarch ppc ppc64
+%ifarch ppc
 Requires: yaboot
 %endif
 BuildRequires: python
