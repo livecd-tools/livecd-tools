@@ -131,7 +131,7 @@ class LiveImageCreatorBase(LoopImageCreator):
     #
     def _base_on(self, base_on):
         """helper function to extract ext3 file system from a live CD ISO"""
-        isoloop = Mount(LoopbackDisk(base_on), self._mkdtemp())
+        isoloop = DiskMount(LoopbackDisk(base_on, 0), self._mkdtemp())
 
         try:
             isoloop.mount()
@@ -145,7 +145,7 @@ class LiveImageCreatorBase(LoopImageCreator):
         else:
             squashimg = isoloop.mountdir + "/LiveOS/squashfs.img"
             
-        squashloop = Mount(LoopbackDisk(squashimg), self._mkdtemp(), "squashfs")
+        squashloop = DiskMount(LoopbackDisk(squashimg, 0), self._mkdtemp(), "squashfs")
 
         try:
             if not squashloop.disk.exists():
