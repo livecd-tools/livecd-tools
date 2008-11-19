@@ -245,7 +245,7 @@ class RPMMacroConfig(KickstartConfig):
             return
         f = open(self.path("/etc/rpm/macros.imgcreate"), "w+")
         if exclude_docs(ks):
-            f.write("%_exludedocs 1\n")
+            f.write("%_excludedocs 1\n")
         if not selinux_enabled(ks):
             f.write("%__file_context_path %{nil}\n")
         if inst_langs(ks) != None:
