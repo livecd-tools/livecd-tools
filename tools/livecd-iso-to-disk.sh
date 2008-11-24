@@ -547,7 +547,7 @@ if [ -n "$xo" ]; then
     if [ ! -d $USBMNT/boot ]; then mkdir -p $USBMNT/boot ; fi
     cat > $USBMNT/boot/olpc.fth <<EOF
 \ Boot script for USB boot
-hex  rom-pa fffc7 + 4 $number drop  h# 2e19 < [if]
+hex  rom-pa fffc7 + 4 \$number drop  h# 2e19 < [if]
   patch 2drop erase claim-params
   : high-ramdisk  ( -- )
      cv-load-ramdisk
