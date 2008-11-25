@@ -22,6 +22,7 @@ import shutil
 import subprocess
 import time
 import logging
+import urlgrabber
 
 import rhpl.keyboard
 
@@ -47,7 +48,8 @@ def read_kickstart(path):
     version = ksversion.makeVersion()
     ks = ksparser.KickstartParser(version)
     try:
-        ks.readKickstart(path)
+        ksfile = urlgrabber.urlgrab(path)
+        ks.readKickstart(ksfile)
     except IOError, (err, msg):
         raise errors.KickstartError("Failed to read kickstart file "
                                     "'%s' : %s" % (path, msg))
