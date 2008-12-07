@@ -450,7 +450,7 @@ def get_image_fstype(ks, default = None):
 
 def get_modules(ks):
     devices = []
-    if isinstance(ks.handler.device, kscommands.device.FC3_Device):
+    if not hasattr(ks.handler.device, "deviceList"):
         devices.append(ks.handler.device)
     else:
         devices.extend(ks.handler.device.deviceList)
