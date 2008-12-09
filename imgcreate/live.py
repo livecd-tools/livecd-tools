@@ -209,7 +209,7 @@ class LiveImageCreatorBase(LoopImageCreator):
 
         f.write('LIVEOS="yes"\n')
         f.write('PROBE="no"\n')
-        f.write('MODULES+="squashfs ext3 ext2 vfat msdos "\n')
+        f.write('MODULES+="squashfs ext4 ext3 ext2 vfat msdos "\n')
         f.write('MODULES+="sr_mod sd_mod ide-cd cdrom "\n')
 
         for module in self.__modules:

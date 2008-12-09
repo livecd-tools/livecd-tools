@@ -865,7 +865,7 @@ class LoopImageCreator(ImageCreator):
     def __get_fstype(self):
         return self.__fstype
     def __set_fstype(self, val):
-        if val != "ext2" and val != "ext3":
+        if val not in ("ext2", "ext3", "ext4"):
             raise CreatorError("Unknown _fstype '%s' supplied" % val)
         self.__fstype = val
     _fstype = property(__get_fstype, __set_fstype)
@@ -874,7 +874,7 @@ class LoopImageCreator(ImageCreator):
     This is the filesystem type used when creating the filesystem image.
     Subclasses may change this if they wish to use something other ext3.
 
-    Note, only ext2 and ext3 are currently supported.
+    Note, only ext2, ext3, ext4 are currently supported.
 
     Note also, this attribute may only be set before calling mount().
 
