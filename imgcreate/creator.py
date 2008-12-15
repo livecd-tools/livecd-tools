@@ -382,7 +382,7 @@ class ImageCreator(object):
             return
 
         try:
-            self.__builddir = tempfile.mkdtemp(dir = self.tmpdir,
+            self.__builddir = tempfile.mkdtemp(dir =  os.path.abspath(self.tmpdir),
                                                prefix = "imgcreate-")
         except OSError, (err, msg):
             raise CreatorError("Failed create build directory in %s: %s" %
