@@ -4,7 +4,7 @@
 
 Summary: Tools for building live CD's
 Name: livecd-tools
-Version: 017.1
+Version: 017.2
 Release: 1%{?dist}
 License: GPLv2
 Group: System Environment/Base
@@ -62,6 +62,12 @@ rm -rf $RPM_BUILD_ROOT
 %{python_sitelib}/imgcreate/*.pyc
 
 %changelog
+* Fri Dec 19 2008 Jeremy Katz <katzj@redhat.com> - 017.2-1
+- Add newkey repo (#477067)
+- Fix --base-on even more
+- Don't fail if devices exist
+- Remove old rpmdb locks
+
 * Mon Jun 16 2008 Jeremy Katz <katzj@redhat.com> - 017.1-1
 - Handle copying timezone to /etc/localtime (#445624)
 - livecd-iso-to-disk: Ensure disk isn't mounted before writing to it (#446472)
