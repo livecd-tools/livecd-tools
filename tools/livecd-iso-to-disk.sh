@@ -510,19 +510,29 @@ fi
 
 if [ "$homesizemb" -gt 0 ]; then
     echo "Initializing persistent /home"
+    homesource=/dev/zero
+    [ -n "$cryptedhome" ] && homesource=/dev/urandom
     if [ "$USBFS" = "vfat" ]; then
 	# vfat can't handle sparse files
-	dd if=/dev/zero of=$USBMNT/LiveOS/$HOMEFILE count=$homesizemb bs=1M
+	dd if=${homesource} of=$USBMNT/LiveOS/$HOMEFILE count=$homesizemb bs=1M
     else
 	dd if=/dev/null of=$USBMNT/LiveOS/$HOMEFILE count=1 bs=1M seek=$homesizemb
     fi
     if [ -n "$cryptedhome" ]; then
 	loop=$(losetup -f)
 	losetup $loop $USBMNT/LiveOS/$HOMEFILE
-        echo "Encrypting persistent /home"
-        cryptsetup luksFormat -y -q $loop
-        echo "Please enter the password again to unlock the device"
-        cryptsetup luksOpen $loop EncHomeFoo
+	setupworked=1
+	until [ ${setupworked} == 0 ]; do
+            echo "Encrypting persistent /home"
+            cryptsetup luksFormat -y -q $loop
+	    setupworked=$?
+	done
+	setupworked=1
+	until [ ${setupworked} == 0 ]; do
+            echo "Please enter the password again to unlock the device"
+            cryptsetup luksOpen $loop EncHomeFoo
+	    setupworked=$?
+	done
         mke2fs -j /dev/mapper/EncHomeFoo
 	tune2fs -c0 -i0 -ouser_xattr,acl /dev/mapper/EncHomeFoo
         cryptsetup luksClose EncHomeFoo
