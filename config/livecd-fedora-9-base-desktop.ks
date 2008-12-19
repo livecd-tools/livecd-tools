@@ -10,6 +10,7 @@ services --enabled=NetworkManager --disabled=network,sshd
 
 repo --name=released --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=fedora-9&arch=$basearch
 repo --name=updates --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=updates-released-f9&arch=$basearch
+repo --name=updates.newkey --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=updates-released-f9.newkey&arch=$basearch
 
 %packages
 @base-x
