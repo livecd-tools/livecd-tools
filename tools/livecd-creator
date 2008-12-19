@@ -73,6 +73,8 @@ def parse_options(args):
         raise Usage("Live CD ISO '%s' does not exist" %(options.base_on,))
     if options.fs_label and len(options.fs_label) > imgcreate.FSLABEL_MAXLEN:
         raise Usage("CD labels are limited to 32 characters")
+    if options.fs_label and options.fs_label.find(" ") != -1:
+        raise Usage("CD labels cannot contain spaces.")
 
     return options
 
