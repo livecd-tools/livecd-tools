@@ -67,7 +67,7 @@ class LiveImageCreatorBase(LoopImageCreator):
 
         self.__isodir = None
 
-        self.__modules = ["=ata", "sym53c8xx", "aic7xxx", "=usb", "=firewire", "=mmc", "=pcmcia", "mptsas"]
+        self.__modules = ["=ata", "sym53c8xx", "aic7xxx", "=usb", "=firewire", "=mmc", "=pcmcia", "mptsas", "udf"]
         self.__modules.extend(kickstart.get_modules(self.ks))
 
     #
@@ -239,6 +239,17 @@ class LiveImageCreatorBase(LoopImageCreator):
 
         args.extend(self._get_mkisofs_options(isodir))
 
+        # Switch to udf if any file on the image will be 4 GiB or more
+        for path, dirs, files in os.walk(isodir):
+          for name in files:
+            if os.stat(os.path.join(path, name)).st_size >= 4*1024*1024*1024:
+              args.append("-allow-limited-size")
+              logging.warn('%(file)s has a size of %(size)d, which is greater than or equal to %(fourgib)d, requiring a switch from iso9660 to udf.' %
+                      {'file': os.path.join(path, name),
+                      'size': os.stat(os.path.join(path, name)).st_size,
+                      'fourgib': 4*1024*1024*1024})
+              break
+
         args.append(isodir)
 
         if subprocess.call(args) != 0:
@@ -393,13 +404,13 @@ menu hiddenrow 5
             template = """label %(short)s
   menu label %(long)s
   kernel vmlinuz%(index)s
-  append initrd=initrd%(index)s.img root=CDLABEL=%(fslabel)s rootfstype=iso9660 %(liveargs)s %(extra)s
+  append initrd=initrd%(index)s.img root=CDLABEL=%(fslabel)s rootfstype=udf,iso9660 %(liveargs)s %(extra)s
 """
         else:
             template = """label %(short)s
   menu label %(long)s
   kernel mboot.c32
-  append xen%(index)s.gz --- vmlinuz%(index)s root=CDLABEL=%(fslabel)s rootfstype=iso9660 %(liveargs)s %(extra)s --- initrd%(index)s.img
+  append xen%(index)s.gz --- vmlinuz%(index)s root=CDLABEL=%(fslabel)s rootfstype=udf,iso9660 %(liveargs)s %(extra)s --- initrd%(index)s.img
 """
         return template % args
 
@@ -519,7 +530,7 @@ hiddenmenu
 
     def __get_efi_image_stanza(self, **args):
         return """title %(long)s
-  kernel /EFI/boot/vmlinuz%(index)s root=CDLABEL=%(fslabel)s rootfstype=iso9660 %(liveargs)s %(extra)s
+  kernel /EFI/boot/vmlinuz%(index)s root=CDLABEL=%(fslabel)s rootfstype=udf,iso9660 %(liveargs)s %(extra)s
   initrd /EFI/boot/initrd%(index)s.img
 """ %args
 
@@ -648,7 +659,7 @@ image=/ppc/ppc%(bit)s/vmlinuz
   label=%(short)s
   initrd=/ppc/ppc%(bit)s/initrd.img
   read-only
-  append="root=CDLABEL=%(fslabel)s rootfstype=iso9660 %(liveargs)s %(extra)s"
+  append="root=CDLABEL=%(fslabel)s rootfstype=udf,iso9660 %(liveargs)s %(extra)s"
 """ % args
 
 
