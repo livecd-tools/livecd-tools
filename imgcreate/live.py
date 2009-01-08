@@ -70,6 +70,8 @@ class LiveImageCreatorBase(LoopImageCreator):
         self.__modules = ["=ata", "sym53c8xx", "aic7xxx", "=usb", "=firewire", "=mmc", "=pcmcia", "mptsas", "udf"]
         self.__modules.extend(kickstart.get_modules(self.ks))
 
+        self.__isofstype = "iso9660"
+
     #
     # Hooks for subclasses
     #
@@ -248,6 +250,7 @@ class LiveImageCreatorBase(LoopImageCreator):
                       {'file': os.path.join(path, name),
                       'size': os.stat(os.path.join(path, name)).st_size,
                       'fourgib': 4*1024*1024*1024})
+              self.__isofstype = "udf"
               break
 
         args.append(isodir)
@@ -404,13 +407,13 @@ menu hiddenrow 5
             template = """label %(short)s
   menu label %(long)s
   kernel vmlinuz%(index)s
-  append initrd=initrd%(index)s.img root=CDLABEL=%(fslabel)s rootfstype=udf,iso9660 %(liveargs)s %(extra)s
+  append initrd=initrd%(index)s.img root=CDLABEL=%(fslabel)s rootfstype=%(isofstype) %(liveargs)s %(extra)s
 """
         else:
             template = """label %(short)s
   menu label %(long)s
   kernel mboot.c32
-  append xen%(index)s.gz --- vmlinuz%(index)s root=CDLABEL=%(fslabel)s rootfstype=udf,iso9660 %(liveargs)s %(extra)s --- initrd%(index)s.img
+  append xen%(index)s.gz --- vmlinuz%(index)s root=CDLABEL=%(fslabel)s rootfstype=%(isofstype) %(liveargs)s %(extra)s --- initrd%(index)s.img
 """
         return template % args
 
@@ -442,6 +445,7 @@ menu hiddenrow 5
 
             cfg += self.__get_image_stanza(is_xen,
                                            fslabel = self.fslabel,
+                                           isofstype = self.__isofstype,
                                            liveargs = kernel_options,
                                            long = long,
                                            short = "linux" + index,
@@ -454,6 +458,7 @@ menu hiddenrow 5
             if checkisomd5:
                 cfg += self.__get_image_stanza(is_xen,
                                                fslabel = self.fslabel,
+                                               isofstype = self.__isofstype,
                                                liveargs = kernel_options,
                                                long = "Verify and " + long,
                                                short = "check" + index,
@@ -530,7 +535,7 @@ hiddenmenu
 
     def __get_efi_image_stanza(self, **args):
         return """title %(long)s
-  kernel /EFI/boot/vmlinuz%(index)s root=CDLABEL=%(fslabel)s rootfstype=udf,iso9660 %(liveargs)s %(extra)s
+  kernel /EFI/boot/vmlinuz%(index)s root=CDLABEL=%(fslabel)s rootfstype=%(isofstype) %(liveargs)s %(extra)s
   initrd /EFI/boot/initrd%(index)s.img
 """ %args
 
@@ -547,11 +552,13 @@ hiddenmenu
             if os.path.exists("%s/EFI/boot/xen%d.gz" %(isodir, index)):
                 continue
             cfg += self.__get_efi_image_stanza(fslabel = self.fslabel,
+                                               isofstype = self.__isofstype,
                                                liveargs = kernel_options,
                                                long = name,
                                                extra = "", index = index)
             if checkisomd5:
                 cfg += self.__get_efi_image_stanza(fslabel = self.fslabel,
+                                                   isofstype = self.__isofstype,
                                                    liveargs = kernel_options,
                                                    long = "Verify and Boot " + name,
                                                    extra = "check",
@@ -670,6 +677,7 @@ image=/ppc/ppc%(bit)s/vmlinuz
         kernel_options = self._get_kernel_options()
 
         cfg += self.__get_image_stanza(fslabel = self.fslabel,
+                                       isofstype = self.__isofstype,
                                        short = "linux",
                                        long = "Run from image",
                                        extra = "",
@@ -678,6 +686,7 @@ image=/ppc/ppc%(bit)s/vmlinuz
 
         if self._has_checkisomd5():
             cfg += self.__get_image_stanza(fslabel = self.fslabel,
+                                           isofstype = self.__isofstype,
                                            short = "check",
                                            long = "Verify and run from image",
                                            extra = "check",
