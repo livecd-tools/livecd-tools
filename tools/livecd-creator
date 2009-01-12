@@ -112,7 +112,7 @@ def main():
     ks = imgcreate.read_kickstart(options.kscfg)
 
     creator = imgcreate.LiveImageCreator(ks, name, fs_label)
-    creator.tmpdir = options.tmpdir
+    creator.tmpdir = os.path.abspath(options.tmpdir)
     creator.skip_compression = options.skip_compression
     creator.skip_minimize = options.skip_minimize
 
