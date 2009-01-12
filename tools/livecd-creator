@@ -117,7 +117,7 @@ def main():
     creator.skip_minimize = options.skip_minimize
 
     try:
-        creator.mount(options.base_on, options.cachedir)
+        creator.mount(options.base_on, os.path.abspath(options.cachedir))
         creator.install()
         creator.configure()
         if options.give_shell:
