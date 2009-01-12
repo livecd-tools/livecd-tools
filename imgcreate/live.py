@@ -404,13 +404,13 @@ menu hiddenrow 5
             template = """label %(short)s
   menu label %(long)s
   kernel vmlinuz%(index)s
-  append initrd=initrd%(index)s.img root=CDLABEL=%(fslabel)s rootfstype=%(isofstype) %(liveargs)s %(extra)s
+  append initrd=initrd%(index)s.img root=CDLABEL=%(fslabel)s rootfstype=%(isofstype)s %(liveargs)s %(extra)s
 """
         else:
             template = """label %(short)s
   menu label %(long)s
   kernel mboot.c32
-  append xen%(index)s.gz --- vmlinuz%(index)s root=CDLABEL=%(fslabel)s rootfstype=%(isofstype) %(liveargs)s %(extra)s --- initrd%(index)s.img
+  append xen%(index)s.gz --- vmlinuz%(index)s root=CDLABEL=%(fslabel)s rootfstype=%(isofstype)s %(liveargs)s %(extra)s --- initrd%(index)s.img
 """
         return template % args
 
@@ -532,7 +532,7 @@ hiddenmenu
 
     def __get_efi_image_stanza(self, **args):
         return """title %(long)s
-  kernel /EFI/boot/vmlinuz%(index)s root=CDLABEL=%(fslabel)s rootfstype=%(isofstype) %(liveargs)s %(extra)s
+  kernel /EFI/boot/vmlinuz%(index)s root=CDLABEL=%(fslabel)s rootfstype=%(isofstype)s %(liveargs)s %(extra)s
   initrd /EFI/boot/initrd%(index)s.img
 """ %args
 
