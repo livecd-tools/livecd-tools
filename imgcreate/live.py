@@ -240,18 +240,8 @@ class LiveImageCreatorBase(LoopImageCreator):
                 "-o", iso]
 
         args.extend(self._get_mkisofs_options(isodir))
-
-        # Switch to udf if any file on the image will be 4 GiB or more
-        for path, dirs, files in os.walk(isodir):
-          for name in files:
-            if os.stat(os.path.join(path, name)).st_size >= 4*1024*1024*1024:
-              args.append("-allow-limited-size")
-              logging.warn('%(file)s has a size of %(size)d, which is greater than or equal to %(fourgib)d, requiring a switch from iso9660 to udf.' %
-                      {'file': os.path.join(path, name),
-                      'size': os.stat(os.path.join(path, name)).st_size,
-                      'fourgib': 4*1024*1024*1024})
-              self._isofstype = "udf"
-              break
+        if self._isofstype == "udf":
+            args.append("-allow-limited-size")
 
         args.append(isodir)
 
@@ -283,6 +273,9 @@ class LiveImageCreatorBase(LoopImageCreator):
 
             if self.skip_compression:
                 shutil.move(self._image, self.__isodir + "/LiveOS/ext3fs.img")
+                if os.stat(self.__isodir + "/LiveOS/ext3fs.img").st_size >= 4*1024*1024*1024:
+                    self._isofstype = "udf"
+                    logging.warn("Switching to UDF due to size of LiveOS/ext3fs.img")
             else:
                 makedirs(os.path.join(os.path.dirname(self._image), "LiveOS"))
                 shutil.move(self._image,
@@ -290,6 +283,10 @@ class LiveImageCreatorBase(LoopImageCreator):
                                          "LiveOS", "ext3fs.img"))
                 mksquashfs(os.path.dirname(self._image),
                            self.__isodir + "/LiveOS/squashfs.img")
+                if os.stat(self.__isodir + "/LiveOS/squashfs.img").st_size >= 4*1024*1024*1024:
+                    self._isofstype = "udf"
+                    logging.warn("Switching to UDF due to size of LiveOS/squashfs.img")
+
 
             self.__create_iso(self.__isodir)
         finally:
