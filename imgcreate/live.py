@@ -70,7 +70,7 @@ class LiveImageCreatorBase(LoopImageCreator):
         self.__modules = ["=ata", "sym53c8xx", "aic7xxx", "=usb", "=firewire", "=mmc", "=pcmcia", "mptsas", "udf"]
         self.__modules.extend(kickstart.get_modules(self.ks))
 
-        self.__isofstype = "iso9660"
+        self._isofstype = "iso9660"
 
     #
     # Hooks for subclasses
@@ -250,7 +250,7 @@ class LiveImageCreatorBase(LoopImageCreator):
                       {'file': os.path.join(path, name),
                       'size': os.stat(os.path.join(path, name)).st_size,
                       'fourgib': 4*1024*1024*1024})
-              self.__isofstype = "udf"
+              self._isofstype = "udf"
               break
 
         args.append(isodir)
@@ -445,7 +445,7 @@ menu hiddenrow 5
 
             cfg += self.__get_image_stanza(is_xen,
                                            fslabel = self.fslabel,
-                                           isofstype = self.__isofstype,
+                                           isofstype = self._isofstype,
                                            liveargs = kernel_options,
                                            long = long,
                                            short = "linux" + index,
@@ -458,7 +458,7 @@ menu hiddenrow 5
             if checkisomd5:
                 cfg += self.__get_image_stanza(is_xen,
                                                fslabel = self.fslabel,
-                                               isofstype = self.__isofstype,
+                                               isofstype = self._isofstype,
                                                liveargs = kernel_options,
                                                long = "Verify and " + long,
                                                short = "check" + index,
@@ -552,13 +552,13 @@ hiddenmenu
             if os.path.exists("%s/EFI/boot/xen%d.gz" %(isodir, index)):
                 continue
             cfg += self.__get_efi_image_stanza(fslabel = self.fslabel,
-                                               isofstype = self.__isofstype,
+                                               isofstype = self._isofstype,
                                                liveargs = kernel_options,
                                                long = name,
                                                extra = "", index = index)
             if checkisomd5:
                 cfg += self.__get_efi_image_stanza(fslabel = self.fslabel,
-                                                   isofstype = self.__isofstype,
+                                                   isofstype = self._isofstype,
                                                    liveargs = kernel_options,
                                                    long = "Verify and Boot " + name,
                                                    extra = "check",
@@ -677,7 +677,7 @@ image=/ppc/ppc%(bit)s/vmlinuz
         kernel_options = self._get_kernel_options()
 
         cfg += self.__get_image_stanza(fslabel = self.fslabel,
-                                       isofstype = self.__isofstype,
+                                       isofstype = self._isofstype,
                                        short = "linux",
                                        long = "Run from image",
                                        extra = "",
@@ -686,7 +686,7 @@ image=/ppc/ppc%(bit)s/vmlinuz
 
         if self._has_checkisomd5():
             cfg += self.__get_image_stanza(fslabel = self.fslabel,
-                                           isofstype = self.__isofstype,
+                                           isofstype = self._isofstype,
                                            short = "check",
                                            long = "Verify and run from image",
                                            extra = "check",
