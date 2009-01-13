@@ -663,7 +663,7 @@ image=/ppc/ppc%(bit)s/vmlinuz
   label=%(short)s
   initrd=/ppc/ppc%(bit)s/initrd.img
   read-only
-  append="root=CDLABEL=%(fslabel)s rootfstype=udf,iso9660 %(liveargs)s %(extra)s"
+  append="root=CDLABEL=%(fslabel)s rootfstype=%(isofstype)s %(liveargs)s %(extra)s"
 """ % args
 
 
