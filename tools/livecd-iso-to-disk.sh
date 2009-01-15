@@ -45,7 +45,7 @@ getdisk() {
        return
     fi
 
-    p=$(udevinfo -q path -n $DEV)
+    p=$(udevadm info -q path -n $DEV)
     if [ -e /sys/$p/device ]; then
 	device=$(basename /sys/$p)
     else
@@ -131,7 +131,7 @@ createGPTLayout() {
     size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/B$//')
     /sbin/parted --script $device unit b mkpart '"EFI System Partition"' fat32 17408 $(($size - 17408)) set 1 boot on
     USBDEV=${device}1
-    /sbin/udevsettle
+    /sbin/udevadm settle
     /sbin/mkdosfs -n LIVE $USBDEV
     USBLABEL="UUID=$(/lib/udev/vol_id -u $dev)"
 }
