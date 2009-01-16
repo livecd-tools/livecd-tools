@@ -4,6 +4,7 @@
 # Jeremy Katz <katzj@redhat.com>
 #
 # overlay/persistence enhancements by Douglas McClendon <dmc@viros.org>
+# GPT+MBR hybrid enhancements by Stewart Adam <s.adam@diffingo.com>
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,7 +23,7 @@
 export PATH=/sbin:/usr/sbin:$PATH
 
 usage() {
-    echo "$0 [--reset-mbr] [--noverify] [--overlay-size-mb <size>] [--home-size-mb <size>] [--unencrypted-home] <isopath> <usbstick device>"
+    echo "$0 [--format] [--reset-mbr] [--noverify] [--overlay-size-mb <size>] [--home-size-mb <size>] [--unencrypted-home] [--skipcopy] <isopath> <usbstick device>"
     exit 1
 }
 
@@ -67,12 +68,25 @@ resetMBR() {
        return
     fi
     getdisk $1
-    if [ -f /usr/lib/syslinux/mbr.bin ]; then
-	cat /usr/lib/syslinux/mbr.bin > $device
-    elif [ -f /usr/share/syslinux/mbr.bin ]; then
-	cat /usr/share/syslinux/mbr.bin > $device
+    # if mactel, we need to use the hybrid MBR
+    if [ -n "$mactel" ];then
+      if [ -f /usr/lib/syslinux/gptmbr.bin ]; then
+        cat /usr/lib/syslinux/gptmbr.bin > $device
+      elif [ -f /usr/share/syslinux/gptmbr.bin ]; then
+        cat /usr/share/syslinux/gptmbr.bin > $device
+      else
+        echo "Could not find gptmbr.bin (syslinux)"
+        exitclean
+      fi
     else
-	exitclean
+      if [ -f /usr/lib/syslinux/mbr.bin ]; then
+        cat /usr/lib/syslinux/mbr.bin > $device
+      elif [ -f /usr/share/syslinux/mbr.bin ]; then
+        cat /usr/share/syslinux/mbr.bin > $device
+      else
+        echo "Could not find mbr.bin (syslinux)"
+        exitclean
+      fi
     fi
 }
 
@@ -131,9 +145,35 @@ createGPTLayout() {
     size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/B$//')
     /sbin/parted --script $device unit b mkpart '"EFI System Partition"' fat32 17408 $(($size - 17408)) set 1 boot on
     USBDEV=${device}1
+    # Sometimes automount can be _really_ annoying.
+    echo "Waiting for devices to settle..."
     /sbin/udevadm settle
+    sleep 5
+    umount $USBDEV &> /dev/null
     /sbin/mkdosfs -n LIVE $USBDEV
-    USBLABEL="UUID=$(/lib/udev/vol_id -u $dev)"
+    USBLABEL="UUID=$(/lib/udev/vol_id -u $USBDEV)"
+}
+
+createMSDOSLayout() {
+    dev=$1
+    getdisk $dev
+
+    echo "WARNING: THIS WILL DESTROY ANY DATA ON $device!!!"
+    echo "Press Enter to continue or ctrl-c to abort"
+    read
+
+    /sbin/parted --script $device mklabel msdos
+    partinfo=$(/sbin/parted --script -m $device "unit b print" |grep ^$device:)
+    size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/B$//')
+    /sbin/parted --script $device unit b mkpart primary fat32 17408 $(($size - 17408)) set 1 boot on
+    USBDEV=${device}1
+    # Sometimes automount can be _really_ annoying.
+    echo "Waiting for devices to settle..."
+    /sbin/udevadm settle
+    sleep 5
+    umount $USBDEV &> /dev/null
+    /sbin/mkdosfs -n LIVE $USBDEV
+    USBLABEL="UUID=$(/lib/udev/vol_id -u $USBDEV)"
 }
 
 checkGPT() {
@@ -142,7 +182,7 @@ checkGPT() {
 
     if [ "$(/sbin/fdisk -l $device 2>/dev/null |grep -c GPT)" -eq "0" ]; then
        echo "EFI boot requires a GPT partition table."
-       echo "This can be done manually or you can run with --reset-mbr"
+       echo "This can be done manually or you can run with --format"
        exitclean
     fi
 
@@ -273,6 +313,12 @@ while [ $# -gt 2 ]; do
 	--mactel)
 	    mactel=1
 	    ;;
+	--format)
+	    format=1
+	    ;;
+	--skipcopy)
+	    skipcopy=1
+	    ;;
 	--xo)
 	    xo=1
 	    skipcompress=1
@@ -311,6 +357,7 @@ if [ ! -b "$ISO" -a ! -f "$ISO" ]; then
     usage
 fi
 
+# FIXME: If --format is given, we shouldn't care and just use /dev/foo1
 if [ -z "$USBDEV" -o ! -b "$USBDEV" ]; then
     usage
 fi
@@ -327,17 +374,24 @@ if [ -z "$noverify" ]; then
 fi
 
 # do some basic sanity checks.  
-checkFilesystem $USBDEV
 checkMounted $USBDEV
-if [ -z "$mactel" ]; then
-  checkSyslinuxVersion
-  checkPartActive $USBDEV
-  [ -n "$resetmbr" ] && resetMBR $USBDEV
-  checkMBR $USBDEV
-elif [ -n "$mactel" ]; then
-  [ -n "$resetmbr" ] && createGPTLayout $USBDEV
+if [ -n "$format" ];then
+  # checks for a valid filesystem
+  if [ -n "$mactel" ];then
+    createGPTLayout $USBDEV
+  else
+    createMSDOSLayout $USBDEV
+  fi
+fi
+checkFilesystem $USBDEV
+if [ -n "$mactel" ]; then
   checkGPT $USBDEV
 fi
+checkSyslinuxVersion
+# Because we can't set boot flag for EFI Protective on msdos partition tables
+[ -z "$mactel" ] && checkPartActive $USBDEV
+[ -n "$resetmbr" ] && resetMBR $USBDEV
+checkMBR $USBDEV
 
 
 if [ "$overlaysizemb" -gt 0 -a "$USBFS" = "vfat" ]; then
@@ -406,49 +460,54 @@ if [ $(($overlaysizemb + $homesizemb + $livesize + $swapsizemb)) -gt $(($free + 
   exitclean
 fi
 
-if [ -d $USBMNT/LiveOS -a -z "$force" ]; then
-    echo "Already set up as live image."  
-    if [ -z "$keephome" -a -e $USBMNT/LiveOS/$HOMEFILE ]; then
-      echo "WARNING: Persistent /home will be deleted!!!"
-      echo "Press Enter to continue or ctrl-c to abort"
-      read
-    else
-      echo "Deleting old OS in fifteen seconds..."
-      sleep 15
+if [ -z "$skipcopy" ];then
+  if [ -d $USBMNT/LiveOS -a -z "$force" ]; then
+      echo "Already set up as live image."  
+      if [ -z "$keephome" -a -e $USBMNT/LiveOS/$HOMEFILE ]; then
+        echo "WARNING: Persistent /home will be deleted!!!"
+        echo "Press Enter to continue or ctrl-c to abort"
+        read
+      else
+        echo "Deleting old OS in fifteen seconds..."
+        sleep 15
 
-      [ -e "$USBMNT/LiveOS/$HOMEFILE" -a -n "$keephome" ] && mv $USBMNT/LiveOS/$HOMEFILE $USBMNT/$HOMEFILE
-    fi
+        [ -e "$USBMNT/LiveOS/$HOMEFILE" -a -n "$keephome" ] && mv $USBMNT/LiveOS/$HOMEFILE $USBMNT/$HOMEFILE
+      fi
 
-    rm -rf $USBMNT/LiveOS
+      rm -rf $USBMNT/LiveOS
+  fi
 fi
 
-echo "Copying live image to USB stick"
-[ -z "$mactel" -a ! -d $USBMNT/$SYSLINUXPATH ] && mkdir -p $USBMNT/$SYSLINUXPATH
+# Bootloader is always reconfigured, so keep these out of the if skipcopy stuff.
+[ ! -d $USBMNT/$SYSLINUXPATH ] && mkdir -p $USBMNT/$SYSLINUXPATH
 [ -n "$mactel" -a ! -d $USBMNT/EFI/boot ] && mkdir -p $USBMNT/EFI/boot
-[ ! -d $USBMNT/LiveOS ] && mkdir $USBMNT/LiveOS
-[ -n "$keephome" -a -f "$USBMNT/$HOMEFILE" ] && mv $USBMNT/$HOMEFILE $USBMNT/LiveOS/$HOMEFILE
-# cases without /LiveOS are legacy detection, remove for F10
-if [ -n "$skipcompress" -a -f $CDMNT/LiveOS/squashfs.img ]; then
-    mount -o loop $CDMNT/LiveOS/squashfs.img $CDMNT
-    cp $CDMNT/LiveOS/ext3fs.img $USBMNT/LiveOS/ext3fs.img || (umount $CDMNT ; exitclean)
-    umount $CDMNT
-elif [ -f $CDMNT/LiveOS/squashfs.img ]; then
-    cp $CDMNT/LiveOS/squashfs.img $USBMNT/LiveOS/squashfs.img || exitclean
-elif [ -f $CDMNT/squashfs.img ]; then
-    cp $CDMNT/squashfs.img $USBMNT/LiveOS/squashfs.img || exitclean 
-elif [ -f $CDMNT/LiveOS/ext3fs.img ]; then
-    cp $CDMNT/LiveOS/ext3fs.img $USBMNT/LiveOS/ext3fs.img || exitclean
-elif [ -f $CDMNT/ext3fs.img ]; then
-    cp $CDMNT/ext3fs.img $USBMNT/LiveOS/ext3fs.img || exitclean 
-fi
-if [ -f $CDMNT/LiveOS/osmin.img ]; then
-    cp $CDMNT/LiveOS/osmin.img $USBMNT/LiveOS/osmin.img || exitclean
+
+if [ -z "$skipcopy" ];then
+  echo "Copying live image to USB stick"
+  [ ! -d $USBMNT/LiveOS ] && mkdir $USBMNT/LiveOS
+  [ -n "$keephome" -a -f "$USBMNT/$HOMEFILE" ] && mv $USBMNT/$HOMEFILE $USBMNT/LiveOS/$HOMEFILE
+  # cases without /LiveOS are legacy detection, remove for F10
+  if [ -n "$skipcompress" -a -f $CDMNT/LiveOS/squashfs.img ]; then
+      mount -o loop $CDMNT/LiveOS/squashfs.img $CDMNT
+      cp $CDMNT/LiveOS/ext3fs.img $USBMNT/LiveOS/ext3fs.img || (umount $CDMNT ; exitclean)
+      umount $CDMNT
+  elif [ -f $CDMNT/LiveOS/squashfs.img ]; then
+      cp $CDMNT/LiveOS/squashfs.img $USBMNT/LiveOS/squashfs.img || exitclean
+  elif [ -f $CDMNT/squashfs.img ]; then
+      cp $CDMNT/squashfs.img $USBMNT/LiveOS/squashfs.img || exitclean 
+  elif [ -f $CDMNT/LiveOS/ext3fs.img ]; then
+      cp $CDMNT/LiveOS/ext3fs.img $USBMNT/LiveOS/ext3fs.img || exitclean
+  elif [ -f $CDMNT/ext3fs.img ]; then
+      cp $CDMNT/ext3fs.img $USBMNT/LiveOS/ext3fs.img || exitclean 
+  fi
+  if [ -f $CDMNT/LiveOS/osmin.img ]; then
+      cp $CDMNT/LiveOS/osmin.img $USBMNT/LiveOS/osmin.img || exitclean
+  fi
 fi
 
-if [ -z "$mactel" ]; then
-  cp $CDMNT/isolinux/* $USBMNT/$SYSLINUXPATH
-  BOOTCONFIG=$USBMNT/$SYSLINUXPATH/isolinux.cfg
-else
+cp $CDMNT/isolinux/* $USBMNT/$SYSLINUXPATH
+BOOTCONFIG=$USBMNT/$SYSLINUXPATH/isolinux.cfg
+if [ -n "$mactel" ];then
   if [ -d $CDMNT/EFI/boot ]; then
     cp $CDMNT/EFI/boot/* $USBMNT/EFI/boot
   else
@@ -599,8 +658,9 @@ echo "Installing boot loader"
 if [ -n "$mactel" ]; then
     # replace the ia32 hack
     if [ -f "$USBMNT/EFI/boot/boot.conf" ]; then cp -f $USBMNT/EFI/boot/bootia32.conf $USBMNT/EFI/boot/boot.conf ; fi
-    cleanup
-elif [ "$USBFS" = "vfat" -o "$USBFS" = "msdos" ]; then
+fi
+
+if [ "$USBFS" = "vfat" -o "$USBFS" = "msdos" ]; then
     # syslinux expects the config to be named syslinux.cfg 
     # and has to run with the file system unmounted
     mv $USBMNT/$SYSLINUXPATH/isolinux.cfg $USBMNT/$SYSLINUXPATH/syslinux.cfg
