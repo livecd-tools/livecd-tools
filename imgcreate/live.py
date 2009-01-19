@@ -442,7 +442,7 @@ menu hiddenrow 5
 
             cfg += self.__get_image_stanza(is_xen,
                                            fslabel = self.fslabel,
-                                           isofstype = self._isofstype,
+                                           isofstype = "auto",
                                            liveargs = kernel_options,
                                            long = long,
                                            short = "linux" + index,
@@ -455,7 +455,7 @@ menu hiddenrow 5
             if checkisomd5:
                 cfg += self.__get_image_stanza(is_xen,
                                                fslabel = self.fslabel,
-                                               isofstype = self._isofstype,
+                                               isofstype = "auto",
                                                liveargs = kernel_options,
                                                long = "Verify and " + long,
                                                short = "check" + index,
@@ -549,13 +549,13 @@ hiddenmenu
             if os.path.exists("%s/EFI/boot/xen%d.gz" %(isodir, index)):
                 continue
             cfg += self.__get_efi_image_stanza(fslabel = self.fslabel,
-                                               isofstype = self._isofstype,
+                                               isofstype = "auto",
                                                liveargs = kernel_options,
                                                long = name,
                                                extra = "", index = index)
             if checkisomd5:
                 cfg += self.__get_efi_image_stanza(fslabel = self.fslabel,
-                                                   isofstype = self._isofstype,
+                                                   isofstype = "auto",
                                                    liveargs = kernel_options,
                                                    long = "Verify and Boot " + name,
                                                    extra = "check",
@@ -674,7 +674,7 @@ image=/ppc/ppc%(bit)s/vmlinuz
         kernel_options = self._get_kernel_options()
 
         cfg += self.__get_image_stanza(fslabel = self.fslabel,
-                                       isofstype = self._isofstype,
+                                       isofstype = "auto",
                                        short = "linux",
                                        long = "Run from image",
                                        extra = "",
@@ -683,7 +683,7 @@ image=/ppc/ppc%(bit)s/vmlinuz
 
         if self._has_checkisomd5():
             cfg += self.__get_image_stanza(fslabel = self.fslabel,
-                                           isofstype = self._isofstype,
+                                           isofstype = "auto",
                                            short = "check",
                                            long = "Verify and run from image",
                                            extra = "check",
