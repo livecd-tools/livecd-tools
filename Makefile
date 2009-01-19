@@ -1,5 +1,5 @@
 
-VERSION = 020
+VERSION = 021
 
 INSTALL = /usr/bin/install -c
 INSTALL_PROGRAM = ${INSTALL}
@@ -42,7 +42,7 @@ uninstall:
 	rm -rf $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)
 
 dist : all
-	git-archive --format=tar --prefix=livecd-tools-$(VERSION)/ HEAD | bzip2 -9v > livecd-tools-$(VERSION).tar.bz2
+	git archive --format=tar --prefix=livecd-tools-$(VERSION)/ HEAD | bzip2 -9v > livecd-tools-$(VERSION).tar.bz2
 
 clean:
 	rm -f *~ creator/*~ installer/*~ config/*~ docs/*.8
