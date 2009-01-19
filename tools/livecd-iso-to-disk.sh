@@ -74,9 +74,6 @@ resetMBR() {
         cat /usr/lib/syslinux/gptmbr.bin > $device
       elif [ -f /usr/share/syslinux/gptmbr.bin ]; then
         cat /usr/share/syslinux/gptmbr.bin > $device
-      else
-        echo "Could not find gptmbr.bin (syslinux)"
-        exitclean
       fi
     else
       if [ -f /usr/lib/syslinux/mbr.bin ]; then
