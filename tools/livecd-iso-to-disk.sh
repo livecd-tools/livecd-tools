@@ -71,10 +71,15 @@ resetMBR() {
     # if mactel, we need to use the hybrid MBR
     if [ -n "$mactel" ];then
       if [ -f /usr/lib/syslinux/gptmbr.bin ]; then
-        cat /usr/lib/syslinux/gptmbr.bin > $device
+        gptmbr='/usr/lib/syslinux/gptmbr.bin'
       elif [ -f /usr/share/syslinux/gptmbr.bin ]; then
-        cat /usr/share/syslinux/gptmbr.bin > $device
+        gptmbr='/usr/share/syslinux/gptmbr.bin'
+      else
+        echo "Could not find gptmbr.bin (syslinux)"
+        exitclean
       fi
+      # our magic number is LBA-2, offset 16 - (512+512+16)/$bs
+      dd if=$device bs=16 skip=65 count=1 | cat $gptmbr - > $device
     else
       if [ -f /usr/lib/syslinux/mbr.bin ]; then
         cat /usr/lib/syslinux/mbr.bin > $device
@@ -136,7 +141,7 @@ createGPTLayout() {
     echo "WARNING: THIS WILL DESTROY ANY DATA ON $device!!!"
     echo "Press Enter to continue or ctrl-c to abort"
     read
-
+    umount ${device}? &> /dev/null
     /sbin/parted --script $device mklabel gpt
     partinfo=$(/sbin/parted --script -m $device "unit b print" |grep ^$device:)
     size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/B$//')
@@ -158,7 +163,7 @@ createMSDOSLayout() {
     echo "WARNING: THIS WILL DESTROY ANY DATA ON $device!!!"
     echo "Press Enter to continue or ctrl-c to abort"
     read
-
+    umount ${device}? &> /dev/null
     /sbin/parted --script $device mklabel msdos
     partinfo=$(/sbin/parted --script -m $device "unit b print" |grep ^$device:)
     size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/B$//')
