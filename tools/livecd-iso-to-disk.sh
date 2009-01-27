@@ -509,6 +509,8 @@ fi
 
 cp $CDMNT/isolinux/* $USBMNT/$SYSLINUXPATH
 BOOTCONFIG=$USBMNT/$SYSLINUXPATH/isolinux.cfg
+# Set this to nothing so sed doesn't care
+BOOTCONFIG_EFI=
 if [ -n "$mactel" ];then
   if [ -d $CDMNT/EFI/boot ]; then
     cp $CDMNT/EFI/boot/* $USBMNT/EFI/boot
@@ -541,14 +543,14 @@ EOF
   fi
 
   # this is a little ugly, but it gets the "interesting" named config file
-  BOOTCONFIG=$USBMNT/EFI/boot/boot?*.conf
+  BOOTCONFIG_EFI=$USBMNT/EFI/boot/boot?*.conf
   rm -f $USBMNT/EFI/boot/grub.conf
 fi
 
 echo "Updating boot config file"
 # adjust label and fstype
-sed -i -e "s/CDLABEL=[^ ]*/$USBLABEL/" -e "s/rootfstype=[^ ]*/rootfstype=$USBFS/" $BOOTCONFIG
-if [ -n "$kernelargs" ]; then sed -i -e "s/liveimg/liveimg ${kernelargs}/" $BOOTCONFIG ; fi
+sed -i -e "s/CDLABEL=[^ ]*/$USBLABEL/" -e "s/rootfstype=[^ ]*/rootfstype=$USBFS/" $BOOTCONFIG  $BOOTCONFIG_EFI
+if [ -n "$kernelargs" ]; then sed -i -e "s/liveimg/liveimg ${kernelargs}/" $BOOTCONFIG $BOOTCONFIG_EFI ; fi
 
 if [ "$overlaysizemb" -gt 0 ]; then
     echo "Initializing persistent overlay file"
@@ -559,8 +561,8 @@ if [ "$overlaysizemb" -gt 0 ]; then
     else
 	dd if=/dev/null of=$USBMNT/LiveOS/$OVERFILE count=1 bs=1M seek=$overlaysizemb
     fi
-    sed -i -e "s/liveimg/liveimg overlay=${USBLABEL}/" $BOOTCONFIG
-    sed -i -e "s/\ ro\ /\ rw\ /" $BOOTCONFIG
+    sed -i -e "s/liveimg/liveimg overlay=${USBLABEL}/" $BOOTCONFIG $BOOTCONFIG_EFI
+    sed -i -e "s/\ ro\ /\ rw\ /" $BOOTCONFIG  $BOOTCONFIG_EFI
 fi
 
 if [ "$swapsizemb" -gt 0 ]; then
