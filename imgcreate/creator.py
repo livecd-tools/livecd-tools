@@ -431,6 +431,13 @@ class ImageCreator(object):
                 os.symlink(src, self._instroot + dest)
         os.umask(origumask)
 
+    def __getbooleans(self):
+        booleans = []
+        for i in  selinux.security_get_boolean_names()[1]:
+            on = selinux.security_get_boolean_active(i)
+            booleans.append(("/booleans/%s" % i, "%d %d" % (on, on)))
+        return booleans
+
     def __create_selinuxfs(self):
         # if selinux exists on the host we need to lie to the chroot
         if os.path.exists("/selinux/enforce"):
@@ -438,18 +445,18 @@ class ImageCreator(object):
 
             # enforce=0 tells the chroot selinux is not enforcing
             # policyvers=999 tell the chroot to make the highest version of policy it can
-            files = (('/enforce', '0'),
-                     ('/policyvers', '999'))
-            for (file, value) in files:
+
+            files = [('/enforce', '0'),
+                     ('/policyvers', '999'),
+                     ('/commit_pending_bools', ''),
+                     ('/mls', str(selinux.is_selinux_mls_enabled()))]
+
+            for (file, value) in files + self.__getbooleans():
                 fd = os.open(selinux_dir + file, os.O_WRONLY | os.O_TRUNC | os.O_CREAT)
                 os.write(fd, value)
                 os.close(fd)
 
             # we steal mls from the host system for now, might be best to always set it to 1????
-            files = ("/mls",)
-            for file in files:
-                shutil.copyfile("/selinux" + file, selinux_dir + file)
-
             # make /load -> /dev/null so chroot policy loads don't hurt anything
             os.mknod(selinux_dir + "/load", 0666 | stat.S_IFCHR, os.makedev(1, 3))
 
@@ -466,13 +473,11 @@ class ImageCreator(object):
     def __destroy_selinuxfs(self):
         # if the system was running selinux clean up our lies
         if os.path.exists("/selinux/enforce"):
-            files = ('/enforce',
-                     '/policyvers',
-                     '/mls',
-                     '/load')
-            for file in files:
+            for root, dirs, files in os.walk(self._instroot + "/selinux"):
+                if root == self._instroot + "/selinux":
+                    continue
                 try:
-                    os.unlink(self._instroot + "/selinux" + file)
+                    os.unlink(root)
                 except OSError:
                     pass
 
@@ -502,7 +507,7 @@ class ImageCreator(object):
 
         self._mount_instroot(base_on)
 
-        for d in ("/dev/pts", "/etc", "/boot", "/var/log", "/var/cache/yum", "/sys", "/proc", "/selinux"):
+        for d in ("/dev/pts", "/etc", "/boot", "/var/log", "/var/cache/yum", "/sys", "/proc", "/selinux/booleans"):
             makedirs(self._instroot + d)
 
         cachesrc = cachedir or (self.__builddir + "/yum-cache")
