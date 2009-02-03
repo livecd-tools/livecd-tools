@@ -246,7 +246,7 @@ checkSyslinuxVersion() {
     if ! syslinux 2>&1 | grep -qe -d; then
 	SYSLINUXPATH=""
     else
-	SYSLINUXPATH="syslinux"
+	SYSLINUXPATH="LiveOS/syslinux"
     fi
 }
 
