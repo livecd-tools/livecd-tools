@@ -2,15 +2,17 @@
 
 =head1 NAME
 
-livecd-iso-to-disk, install livecd-creator images in usb stick
+livecd-iso-to-disk - installs bootable CD images on a USB storage devices.
 
 =head1 SYNOPSIS
 
-B<livecd-iso-to-disk> [--reset-mbr] [--noverify] [--overlay-size-mb <size>] <isopath> <usbstick device>
+B<livecd-iso-to-disk> [--reset-mbr] [--noverify] [--overlay-size-mb <size>] <path-to-iso> <usb storage device>
 
 =head1 DESCRIPTION
 
-B<livecd-iso-to-disk> converts a live cd or dvd image into a bootable USB stick. This is not a destructive process; any data you currently have on your USB stick will be preserved.
+B<livecd-iso-to-disk> installs a live CD or DVD image(ISO image) onto a USB storage device. The USB storage device can then boot the installed operating system on systems which support booting via USB. B<livecd-iso-to-disk> requires an ISO image and a USB storage device. ISO images can be created with B<livecd-creator>.
+
+B<livecd-iso-to-disk> is not a destructive process; any data you currently have on your USB stick is preserved.
 
 =head1 OPTIONS
 
@@ -18,29 +20,29 @@ B<livecd-iso-to-disk> converts a live cd or dvd image into a bootable USB stick.
 
 =item --reset-mbr
 
-Resets Master Boot Record of usb stick by copying syslinux's mbr.bin.
+Sets the Master Boot Record(MBR) of the USB storage device to the mbr.bin file from the image's syslinux directory.
 
 =item --noverify
 
-Disables image validation before installing it.
+Disables the image validation process which occurs before the image is installed. When this option is enabled the image is not verified before installation on the USB storage device.
 
 =item --overlay-size-mb
 
-Overlay's size in megabytes. Note that you'll need to have space on your USB stick for the live image plus your overlay plus any other data you want on the stick.
+This option sets the overlay size in megabytes. The overlay is additional storage available to the live operating system if the operating system supports it. The USB storage device must have enough free space for the image and the overlay.
 
 =back
 
 =head1 CONTRIBUTORS
 
-David Zeuthen, Jeremy Katz, Douglas McClendon and a team of many other contributors. See the AUTHORS file in the source distribution for the complete list of credits. 
+David Zeuthen, Jeremy Katz, Douglas McClendon, Chris Curran and other contributors. See the AUTHORS file in the source distribution for the complete list of credits.
 
 =head1 BUGS
 
-Report bugs to the mailing list C<http://www.redhat.com/mailman/listinfo/fedora-livecd-list> or directly to BugZilla C<http://bugzilla.redhat.com/bugzilla/> against the C<Fedora> product, and the C<lived-tools> component. 
+Report bugs to the mailing list C<http://www.redhat.com/mailman/listinfo/fedora-livecd-list> or directly to Bugzilla C<http://bugzilla.redhat.com/bugzilla/> against the C<Fedora> product, and the C<lived-tools> component.
 
 =head1 COPYRIGHT
 
-Copyright (C) Fedora Project 2008, and various contributors. This is free software. You may redistribute copies of it under the terms of the GNU General Public License C<http://www.gnu.org/licenses/gpl.html>. There is NO WARRANTY, to the extent permitted by law. 
+Copyright (C) Fedora Project 2008,2009, and various contributors. This is free software. You may redistribute copies of it under the terms of the GNU General Public License C<http://www.gnu.org/licenses/gpl.html>. There is NO WARRANTY, to the extent permitted by law.
 
 =head1 SEE ALSO
 

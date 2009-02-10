@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-livecd-creator, creates live cd or dvd images.
+livecd-creator - creates live CD or DVD images.
 
 =head1 SYNOPSIS
 
@@ -10,7 +10,7 @@ B<livecd-creator> [OPTIONS]
 
 =head1 DESCRIPTION
 
-B<livecd-creator> creates live cd or dvd images from kickstart files. Kickstart files contain the information about packages and configurations that are built into the image.
+B<livecd-creator> creates live CD or DVD images(ISO images) from kickstart files. Kickstart files contain information about packages and configuration settings which are used to build the image.
 
 =head1 OPTIONS
 
@@ -18,7 +18,7 @@ B<livecd-creator> creates live cd or dvd images from kickstart files. Kickstart 
 
 =item -h, --help
 
-Shows a help message and exits.
+Shows the help message and exits.
 
 =back
 
@@ -30,7 +30,7 @@ These options define the created image.
 
 =item -c KSCFG, --config=KSCFG
 
-Path to kickstart config file
+Path to kickstart configuration file.
 
 =item -b BASE_ON, --base-on=BASE_ON
 
@@ -38,23 +38,23 @@ Add packages to an existing live CD iso9660 image.
 
 =item -f FS_LABEL, --fslabel=FS_LABEL
 
-File system label (default based on config name)
+Defines the file system label. The default is based on the configuration name.
 
 =back
 
 =head1 SYSTEM DIRECTORY OPTIONS
 
-These options define directories used on your system for creating the live image
+These options define directories used on your system for creating the live image.
 
 =over 4
 
 =item -t TMPDIR, --tmpdir=TMPDIR
 
-Temporary directory to use (default: /var/tmp)
+defines the temporary directory to use. The default directory is /var/tmp.
 
 =item --cache=CACHEDIR
 
-Cache directory to use (default: private cache)
+Defines the cache directory to use (default: private cache).
 
 =back
 
@@ -77,11 +77,11 @@ David Zeuthen, Jeremy Katz, Douglas McClendon and a team of many other contribut
 
 =head1 BUGS
 
-Report bugs to the mailing list C<http://www.redhat.com/mailman/listinfo/fedora-livecd-list> or directly to BugZilla C<http://bugzilla.redhat.com/bugzilla/> against the C<Fedora> product, and the C<livecd-tools> component. 
+Report bugs to the mailing list C<http://www.redhat.com/mailman/listinfo/fedora-livecd-list> or directly to Bugzilla C<http://bugzilla.redhat.com/bugzilla/> against the C<Fedora> product, and the C<livecd-tools> component.
 
 =head1 COPYRIGHT
 
-Copyright (C) Fedora Project 2008, and various contributors. This is free software. You may redistribute copies of it under the terms of the GNU General Public License C<http://www.gnu.org/licenses/gpl.html>. There is NO WARRANTY, to the extent permitted by law. 
+Copyright (C) Fedora Project 2008,2009, and various contributors. This is free software. You may redistribute copies of it under the terms of the GNU General Public License C<http://www.gnu.org/licenses/gpl.html>. There is NO WARRANTY, to the extent permitted by law.
 
 =head1 SEE ALSO
 
