@@ -612,6 +612,7 @@ if [ -n "$xo" ]; then
 	args="$args persistenthome=mtd0"
     fi
     args="$args reset_overlay"
+    xosyspath=$(echo $SYSLINUXPATH | sed -e 's;/;\;')
     if [ ! -d $USBMNT/boot ]; then mkdir -p $USBMNT/boot ; fi
     cat > $USBMNT/boot/olpc.fth <<EOF
 \ Boot script for USB boot
@@ -645,8 +646,8 @@ hex  rom-pa fffc7 + 4 \$number drop  h# 2e19 < [if]
 
 set-bootpath-dev
 " $args" to boot-file
-" \${BOOTPATHDEV}\syslinux\initrd0.img" expand$ to ramdisk
-" \${BOOTPATHDEV}\syslinux\vmlinuz0" expand$ to boot-device
+" \${BOOTPATHDEV}\$xosyspath\initrd0.img" expand$ to ramdisk
+" \${BOOTPATHDEV}\$xosyspath\vmlinuz0" expand$ to boot-device
 unfreeze
 boot
 EOF
