@@ -245,6 +245,8 @@ checkSyslinuxVersion() {
     fi
     if ! syslinux 2>&1 | grep -qe -d; then
 	SYSLINUXPATH=""
+    elif [ -n "$multi" ]; then
+	SYSLINUXPATH="$LIVEOS/syslinux"
     else
 	SYSLINUXPATH="syslinux"
     fi
@@ -346,7 +348,11 @@ while [ $# -gt 2 ]; do
 	    LIVEOS=$2
 	    shift
 	    ;;
+	--multi)
+	    multi=1
+	    ;;
 	*)
+	    echo "invalid arg -- $1"
 	    usage
 	    ;;
     esac
@@ -637,28 +643,33 @@ EOF
 
 fi
 
-echo "Installing boot loader"
-if [ -n "$efi" ]; then
+if [ -z "$multi" ]; then
+  echo "Installing boot loader"
+  if [ -n "$efi" ]; then
     # replace the ia32 hack
     if [ -f "$USBMNT/EFI/boot/boot.conf" ]; then cp -f $USBMNT/EFI/boot/bootia32.conf $USBMNT/EFI/boot/boot.conf ; fi
-fi
+  fi
 
-if [ "$USBFS" = "vfat" -o "$USBFS" = "msdos" ]; then
+  if [ "$USBFS" = "vfat" -o "$USBFS" = "msdos" ]; then
     # syslinux expects the config to be named syslinux.cfg 
     # and has to run with the file system unmounted
     mv $USBMNT/$SYSLINUXPATH/isolinux.cfg $USBMNT/$SYSLINUXPATH/syslinux.cfg
     cleanup
     if [ -n "$SYSLINUXPATH" ]; then
-	syslinux -d $SYSLINUXPATH $USBDEV
+      syslinux -d $SYSLINUXPATH $USBDEV
     else
-	syslinux $USBDEV
+      syslinux $USBDEV
     fi
-elif [ "$USBFS" = "ext2" -o "$USBFS" = "ext3" ]; then
+  elif [ "$USBFS" = "ext2" -o "$USBFS" = "ext3" ]; then
     # extlinux expects the config to be named extlinux.conf
     # and has to be run with the file system mounted
     mv $USBMNT/$SYSLINUXPATH/isolinux.cfg $USBMNT/$SYSLINUXPATH/extlinux.conf
     extlinux -i $USBMNT/$SYSLINUXPATH
     cleanup
+  fi
+else
+  cleanup
+  echo "Multi-image mode selected; not setting up bootloader"
 fi
 
 echo "USB stick set up as live image!"
