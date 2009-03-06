@@ -278,6 +278,7 @@ keephome=1
 homesizemb=0
 swapsizemb=0
 overlaysizemb=0
+LIVEOS=LiveOS
 
 HOMEFILE="home.img"
 while [ $# -gt 2 ]; do
@@ -341,6 +342,10 @@ while [ $# -gt 2 ]; do
         --force)
             force=1
             ;;
+	--livedir)
+	    LIVEOS=$2
+	    shift
+	    ;;
 	*)
 	    usage
 	    ;;
@@ -425,7 +430,7 @@ mount $mountopts $USBDEV $USBMNT || exitclean
 
 trap exitclean SIGINT SIGTERM
 
-if [ -f "$USBMNT/LiveOS/$HOMEFILE" -a -n "$keephome" -a "$homesizemb" -gt 0 ]; then
+if [ -f "$USBMNT/$LIVEOS/$HOMEFILE" -a -n "$keephome" -a "$homesizemb" -gt 0 ]; then
   echo "ERROR: Requested keeping existing /home and specified a size for /home"
   echo "Please either don't specify a size or specify --delete-home"
   exitclean
@@ -437,9 +442,9 @@ if [ -d $CDMNT/LiveOS ]; then
 else
   check=$CDMNT
 fi
-if [ -d $USBMNT/LiveOS ]; then
-  tbd=$(du -s -B 1M $USBMNT/LiveOS | awk {'print $1;'})
-  [ -f $USBMNT/LiveOS/$HOMEFILE ] && homesz=$(du -s -B 1M $USBMNT/LiveOS/$HOMEFILE | awk {'print $1;'})
+if [ -d $USBMNT/$LIVEOS ]; then
+  tbd=$(du -s -B 1M $USBMNT/$LIVEOS | awk {'print $1;'})
+  [ -f $USBMNT/$LIVEOS/$HOMEFILE ] && homesz=$(du -s -B 1M $USBMNT/$LIVEOS/$HOMEFILE | awk {'print $1;'})
   [ -n "$homesz" -a -n "$keephome" ] && tbd=$(($tbd - $homesz))
 else
   tbd=0
@@ -463,9 +468,9 @@ if [ $(($overlaysizemb + $homesizemb + $livesize + $swapsizemb)) -gt $(($free + 
 fi
 
 if [ -z "$skipcopy" ];then
-  if [ -d $USBMNT/LiveOS -a -z "$force" ]; then
+  if [ -d $USBMNT/$LIVEOS -a -z "$force" ]; then
       echo "Already set up as live image."  
-      if [ -z "$keephome" -a -e $USBMNT/LiveOS/$HOMEFILE ]; then
+      if [ -z "$keephome" -a -e $USBMNT/$LIVEOS/$HOMEFILE ]; then
         echo "WARNING: Persistent /home will be deleted!!!"
         echo "Press Enter to continue or ctrl-c to abort"
         read
@@ -473,10 +478,10 @@ if [ -z "$skipcopy" ];then
         echo "Deleting old OS in fifteen seconds..."
         sleep 15
 
-        [ -e "$USBMNT/LiveOS/$HOMEFILE" -a -n "$keephome" ] && mv $USBMNT/LiveOS/$HOMEFILE $USBMNT/$HOMEFILE
+        [ -e "$USBMNT/$LIVEOS/$HOMEFILE" -a -n "$keephome" ] && mv $USBMNT/$LIVEOS/$HOMEFILE $USBMNT/$HOMEFILE
       fi
 
-      rm -rf $USBMNT/LiveOS
+      rm -rf $USBMNT/$LIVEOS
   fi
 fi
 
@@ -486,19 +491,19 @@ fi
 
 if [ -z "$skipcopy" ];then
   echo "Copying live image to USB stick"
-  [ ! -d $USBMNT/LiveOS ] && mkdir $USBMNT/LiveOS
-  [ -n "$keephome" -a -f "$USBMNT/$HOMEFILE" ] && mv $USBMNT/$HOMEFILE $USBMNT/LiveOS/$HOMEFILE
+  [ ! -d $USBMNT/$LIVEOS ] && mkdir $USBMNT/$LIVEOS
+  [ -n "$keephome" -a -f "$USBMNT/$HOMEFILE" ] && mv $USBMNT/$HOMEFILE $USBMNT/$LIVEOS/$HOMEFILE
   if [ -n "$skipcompress" -a -f $CDMNT/LiveOS/squashfs.img ]; then
       mount -o loop $CDMNT/LiveOS/squashfs.img $CDMNT
-      cp $CDMNT/LiveOS/ext3fs.img $USBMNT/LiveOS/ext3fs.img || (umount $CDMNT ; exitclean)
+      cp $CDMNT/LiveOS/ext3fs.img $USBMNT/$LIVEOS/ext3fs.img || (umount $CDMNT ; exitclean)
       umount $CDMNT
   elif [ -f $CDMNT/LiveOS/squashfs.img ]; then
-      cp $CDMNT/LiveOS/squashfs.img $USBMNT/LiveOS/squashfs.img || exitclean
+      cp $CDMNT/LiveOS/squashfs.img $USBMNT/$LIVEOS/squashfs.img || exitclean
   elif [ -f $CDMNT/LiveOS/ext3fs.img ]; then
-      cp $CDMNT/LiveOS/ext3fs.img $USBMNT/LiveOS/ext3fs.img || exitclean
+      cp $CDMNT/LiveOS/ext3fs.img $USBMNT/$LIVEOS/ext3fs.img || exitclean
   fi
   if [ -f $CDMNT/LiveOS/osmin.img ]; then
-      cp $CDMNT/LiveOS/osmin.img $USBMNT/LiveOS/osmin.img || exitclean
+      cp $CDMNT/LiveOS/osmin.img $USBMNT/$LIVEOS/osmin.img || exitclean
   fi
 fi
 
@@ -513,8 +518,8 @@ if [ -n "$mactel" ];then
     # whee!  this image wasn't made with grub.efi bits.  so we get to create
     # them here.  isn't life grand?
     cp $CDMNT/isolinux/* $USBMNT/EFI/boot
-    mount -o loop,ro -t squashfs $CDMNT/LiveOS/squashfs.img $CDMNT
-    mount -o loop,ro -t ext3 $CDMNT/LiveOS/ext3fs.img $CDMNT
+    mount -o loop,ro -t squashfs $CDMNT/$LIVEOS/squashfs.img $CDMNT
+    mount -o loop,ro -t ext3 $CDMNT/$LIVEOS/ext3fs.img $CDMNT
     cp $CDMNT/boot/efi/EFI/redhat/grub.efi $USBMNT/EFI/boot/boot.efi
     cp $CDMNT/boot/grub/splash.xpm.gz $USBMNT/EFI/boot/splash.xpm.gz
     if [ -d $CDMNT/lib64 ]; then efiarch="x64" ; else efiarch="ia32"; fi
@@ -546,15 +551,16 @@ echo "Updating boot config file"
 # adjust label and fstype
 sed -i -e "s/CDLABEL=[^ ]*/$USBLABEL/" -e "s/rootfstype=[^ ]*/rootfstype=$USBFS/" $BOOTCONFIG  $BOOTCONFIG_EFI
 if [ -n "$kernelargs" ]; then sed -i -e "s/liveimg/liveimg ${kernelargs}/" $BOOTCONFIG $BOOTCONFIG_EFI ; fi
+if [ "$LIVEOS" != "LiveOS" ]; then sed -i -e "s;liveimg;liveimg live_dir=$LIVEOS;" $BOOTCONFIG $BOOTCONFIG_EFI ; fi
 
 if [ "$overlaysizemb" -gt 0 ]; then
     echo "Initializing persistent overlay file"
     OVERFILE="overlay-$( /lib/udev/vol_id -l $USBDEV )-$( /lib/udev/vol_id -u $USBDEV )"
     if [ "$USBFS" = "vfat" ]; then
 	# vfat can't handle sparse files
-	dd if=/dev/zero of=$USBMNT/LiveOS/$OVERFILE count=$overlaysizemb bs=1M
+	dd if=/dev/zero of=$USBMNT/$LIVEOS/$OVERFILE count=$overlaysizemb bs=1M
     else
-	dd if=/dev/null of=$USBMNT/LiveOS/$OVERFILE count=1 bs=1M seek=$overlaysizemb
+	dd if=/dev/null of=$USBMNT/$LIVEOS/$OVERFILE count=1 bs=1M seek=$overlaysizemb
     fi
     sed -i -e "s/liveimg/liveimg overlay=${USBLABEL}/" $BOOTCONFIG $BOOTCONFIG_EFI
     sed -i -e "s/\ ro\ /\ rw\ /" $BOOTCONFIG  $BOOTCONFIG_EFI
@@ -562,8 +568,8 @@ fi
 
 if [ "$swapsizemb" -gt 0 ]; then
     echo "Initializing swap file"
-    dd if=/dev/zero of=$USBMNT/LiveOS/swap.img count=$swapsizemb bs=1M
-    mkswap -f $USBMNT/LiveOS/swap.img
+    dd if=/dev/zero of=$USBMNT/$LIVEOS/swap.img count=$swapsizemb bs=1M
+    mkswap -f $USBMNT/$LIVEOS/swap.img
 fi
 
 if [ "$homesizemb" -gt 0 ]; then
@@ -572,13 +578,13 @@ if [ "$homesizemb" -gt 0 ]; then
     [ -n "$cryptedhome" ] && homesource=/dev/urandom
     if [ "$USBFS" = "vfat" ]; then
 	# vfat can't handle sparse files
-	dd if=${homesource} of=$USBMNT/LiveOS/$HOMEFILE count=$homesizemb bs=1M
+	dd if=${homesource} of=$USBMNT/$LIVEOS/$HOMEFILE count=$homesizemb bs=1M
     else
-	dd if=/dev/null of=$USBMNT/LiveOS/$HOMEFILE count=1 bs=1M seek=$homesizemb
+	dd if=/dev/null of=$USBMNT/$LIVEOS/$HOMEFILE count=1 bs=1M seek=$homesizemb
     fi
     if [ -n "$cryptedhome" ]; then
 	loop=$(losetup -f)
-	losetup $loop $USBMNT/LiveOS/$HOMEFILE
+	losetup $loop $USBMNT/$LIVEOS/$HOMEFILE
 	setupworked=1
 	until [ ${setupworked} == 0 ]; do
             echo "Encrypting persistent /home"
@@ -597,8 +603,8 @@ if [ "$homesizemb" -gt 0 ]; then
         losetup -d $loop
     else
         echo "Formatting unencrypted /home"
-	mke2fs -F -j $USBMNT/LiveOS/$HOMEFILE
-	tune2fs -c0 -i0 -ouser_xattr,acl $USBMNT/LiveOS/$HOMEFILE
+	mke2fs -F -j $USBMNT/$LIVEOS/$HOMEFILE
+	tune2fs -c0 -i0 -ouser_xattr,acl $USBMNT/$LIVEOS/$HOMEFILE
     fi
 fi
 
@@ -608,7 +614,7 @@ fi
 if [ -n "$xo" ]; then
     echo "Setting up /boot/olpc.fth file"
     args=$(egrep "^[ ]*append" $USBMNT/$SYSLINUXPATH/isolinux.cfg |head -n1 |sed -e 's/.*initrd=[^ ]*//')
-    if [ -z "$xonohome" -a ! -f $USBMNT/LiveOS/$HOMEFILE ]; then
+    if [ -z "$xonohome" -a ! -f $USBMNT/$LIVEOS/$HOMEFILE ]; then
 	args="$args persistenthome=mtd0"
     fi
     args="$args reset_overlay"
