@@ -673,7 +673,7 @@ elif [ "$USBFS" = "ext2" -o "$USBFS" = "ext3" ]; then
     # extlinux expects the config to be named extlinux.conf
     # and has to be run with the file system mounted
     mv $USBMNT/$SYSLINUXPATH/isolinux.cfg $USBMNT/$SYSLINUXPATH/extlinux.conf
-    extlinux -i $USBMNT/syslinux
+    extlinux -i $USBMNT/$SYSLINUXPATH
     cleanup
 fi
 
