@@ -488,19 +488,14 @@ if [ -z "$skipcopy" ];then
   echo "Copying live image to USB stick"
   [ ! -d $USBMNT/LiveOS ] && mkdir $USBMNT/LiveOS
   [ -n "$keephome" -a -f "$USBMNT/$HOMEFILE" ] && mv $USBMNT/$HOMEFILE $USBMNT/LiveOS/$HOMEFILE
-  # cases without /LiveOS are legacy detection, remove for F10
   if [ -n "$skipcompress" -a -f $CDMNT/LiveOS/squashfs.img ]; then
       mount -o loop $CDMNT/LiveOS/squashfs.img $CDMNT
       cp $CDMNT/LiveOS/ext3fs.img $USBMNT/LiveOS/ext3fs.img || (umount $CDMNT ; exitclean)
       umount $CDMNT
   elif [ -f $CDMNT/LiveOS/squashfs.img ]; then
       cp $CDMNT/LiveOS/squashfs.img $USBMNT/LiveOS/squashfs.img || exitclean
-  elif [ -f $CDMNT/squashfs.img ]; then
-      cp $CDMNT/squashfs.img $USBMNT/LiveOS/squashfs.img || exitclean 
   elif [ -f $CDMNT/LiveOS/ext3fs.img ]; then
       cp $CDMNT/LiveOS/ext3fs.img $USBMNT/LiveOS/ext3fs.img || exitclean
-  elif [ -f $CDMNT/ext3fs.img ]; then
-      cp $CDMNT/ext3fs.img $USBMNT/LiveOS/ext3fs.img || exitclean 
   fi
   if [ -f $CDMNT/LiveOS/osmin.img ]; then
       cp $CDMNT/LiveOS/osmin.img $USBMNT/LiveOS/osmin.img || exitclean
