@@ -68,8 +68,8 @@ resetMBR() {
        return
     fi
     getdisk $1
-    # if mactel, we need to use the hybrid MBR
-    if [ -n "$mactel" ];then
+    # if efi, we need to use the hybrid MBR
+    if [ -n "$efi" ];then
       if [ -f /usr/lib/syslinux/gptmbr.bin ]; then
         gptmbr='/usr/lib/syslinux/gptmbr.bin'
       elif [ -f /usr/share/syslinux/gptmbr.bin ]; then
@@ -313,8 +313,8 @@ while [ $# -gt 2 ]; do
 	--reset-mbr|--resetmbr)
 	    resetmbr=1
 	    ;;
-	--mactel)
-	    mactel=1
+	--efi|--mactel)
+	    efi=1
 	    ;;
 	--format)
 	    format=1
@@ -384,19 +384,19 @@ fi
 checkMounted $USBDEV
 if [ -n "$format" ];then
   # checks for a valid filesystem
-  if [ -n "$mactel" ];then
+  if [ -n "$efi" ];then
     createGPTLayout $USBDEV
   else
     createMSDOSLayout $USBDEV
   fi
 fi
 checkFilesystem $USBDEV
-if [ -n "$mactel" ]; then
+if [ -n "$efi" ]; then
   checkGPT $USBDEV
 fi
 checkSyslinuxVersion
 # Because we can't set boot flag for EFI Protective on msdos partition tables
-[ -z "$mactel" ] && checkPartActive $USBDEV
+[ -z "$efi" ] && checkPartActive $USBDEV
 [ -n "$resetmbr" ] && resetMBR $USBDEV
 checkMBR $USBDEV
 
@@ -436,7 +436,7 @@ if [ -f "$USBMNT/$LIVEOS/$HOMEFILE" -a -n "$keephome" -a "$homesizemb" -gt 0 ]; 
   exitclean
 fi
 
-if [ -n "$mactel" -a ! -d $CDMNT/EFI/boot ]; then
+if [ -n "$efi" -a ! -d $CDMNT/EFI/boot ]; then
   echo "ERROR: This live image does not support EFI booting"
   exitclean
 fi
@@ -492,7 +492,7 @@ fi
 
 # Bootloader is always reconfigured, so keep these out of the if skipcopy stuff.
 [ ! -d $USBMNT/$SYSLINUXPATH ] && mkdir -p $USBMNT/$SYSLINUXPATH
-[ -n "$mactel" -a ! -d $USBMNT/EFI/boot ] && mkdir -p $USBMNT/EFI/boot
+[ -n "$efi" -a ! -d $USBMNT/EFI/boot ] && mkdir -p $USBMNT/EFI/boot
 
 if [ -z "$skipcopy" ];then
   echo "Copying live image to USB stick"
@@ -516,7 +516,7 @@ cp $CDMNT/isolinux/* $USBMNT/$SYSLINUXPATH
 BOOTCONFIG=$USBMNT/$SYSLINUXPATH/isolinux.cfg
 # Set this to nothing so sed doesn't care
 BOOTCONFIG_EFI=
-if [ -n "$mactel" ];then
+if [ -n "$efi" ];then
   cp $CDMNT/EFI/boot/* $USBMNT/EFI/boot
 
   # this is a little ugly, but it gets the "interesting" named config file
@@ -638,7 +638,7 @@ EOF
 fi
 
 echo "Installing boot loader"
-if [ -n "$mactel" ]; then
+if [ -n "$efi" ]; then
     # replace the ia32 hack
     if [ -f "$USBMNT/EFI/boot/boot.conf" ]; then cp -f $USBMNT/EFI/boot/bootia32.conf $USBMNT/EFI/boot/boot.conf ; fi
 fi
