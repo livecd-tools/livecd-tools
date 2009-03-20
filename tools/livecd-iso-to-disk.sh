@@ -654,6 +654,8 @@ if [ -z "$multi" ]; then
     # syslinux expects the config to be named syslinux.cfg 
     # and has to run with the file system unmounted
     mv $USBMNT/$SYSLINUXPATH/isolinux.cfg $USBMNT/$SYSLINUXPATH/syslinux.cfg
+    # deal with mtools complaining about ldlinux.sys
+    if [ -f $USBMNT/$SYSLINUXPATH/ldlinux.sys ] ; then rm -f $USBMNT/$SYSLINUXPATH/ldlinux.sys ; fi
     cleanup
     if [ -n "$SYSLINUXPATH" ]; then
       syslinux -d $SYSLINUXPATH $USBDEV
