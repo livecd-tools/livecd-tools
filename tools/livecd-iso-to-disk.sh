@@ -635,8 +635,8 @@ hex  rom-pa fffc7 + 4 \$number drop  h# 2e19 < [if]
 
 set-bootpath-dev
 " $args" to boot-file
-" \${BOOTPATHDEV}\$xosyspath\initrd0.img" expand$ to ramdisk
-" \${BOOTPATHDEV}\$xosyspath\vmlinuz0" expand$ to boot-device
+" \${BOOTPATHDEV}$xosyspath\initrd0.img" expand$ to ramdisk
+" \${BOOTPATHDEV}$xosyspath\vmlinuz0" expand$ to boot-device
 unfreeze
 boot
 EOF
