@@ -191,11 +191,6 @@ checkGPT() {
     partinfo=$(/sbin/parted --script -m $device "print" |grep ^$partnum:)
     volname=$(echo $partinfo |cut -d : -f 6)
     flags=$(echo $partinfo |cut -d : -f 7)
-    if [ "$volname" != "EFI System Partition" ]; then
-	echo "Partition name must be 'EFI System Partition'"
-	echo "This can be set in parted or you can run with --reset-mbr"
-	exitclean
-    fi
     if [ "$(echo $flags |grep -c boot)" = "0" ]; then
 	echo "Partition isn't marked bootable!"
 	echo "You can mark the partition as bootable with "
