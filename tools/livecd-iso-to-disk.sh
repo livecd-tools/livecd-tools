@@ -191,6 +191,11 @@ checkGPT() {
     partinfo=$(/sbin/parted --script -m $device "print" |grep ^$partnum:)
     volname=$(echo $partinfo |cut -d : -f 6)
     flags=$(echo $partinfo |cut -d : -f 7)
+    if [ "$volname" != "EFI System Partition" ]; then
+	echo "Partition name must be 'EFI System Partition'"
+	echo "This can be set in parted or you can run with --reset-mbr"
+	exitclean
+    fi
     if [ "$(echo $flags |grep -c boot)" = "0" ]; then
 	echo "Partition isn't marked bootable!"
 	echo "You can mark the partition as bootable with "
@@ -457,9 +462,17 @@ else
 fi
 livesize=$(du -s -B 1M $check | awk {'print $1;'})
 if [ -n "$skipcompress" ]; then
-    mount -o loop $CDMNT/LiveOS/squashfs.img $CDMNT
-    livesize=$(du -s -B 1M $CDMNT/LiveOS/ext3fs.img | awk {'print $1;'})
-    umount $CDMNT
+    if [ -e $CDMNT/LiveOS/squashfs.img ]; then
+	if mount -o loop $CDMNT/LiveOS/squashfs.img $CDMNT; then
+	    livesize=$(du -s -B 1M $CDMNT/LiveOS/ext3fs.img | awk {'print $1;'})
+	    umount $CDMNT
+	else
+	    echo "WARNING: --skipcompress or --xo was specified but the currently"
+	    echo "running kernel can not mount the squashfs from the ISO file to extract"
+	    echo "it. The compressed squashfs will be copied to the USB stick."
+	    skipcompress=""
+	fi
+    fi
 fi
 free=$(df  -B1M $USBDEV  |tail -n 1 |awk {'print $4;'})
 
@@ -500,7 +513,7 @@ if [ -z "$skipcopy" ];then
   [ ! -d $USBMNT/$LIVEOS ] && mkdir $USBMNT/$LIVEOS
   [ -n "$keephome" -a -f "$USBMNT/$HOMEFILE" ] && mv $USBMNT/$HOMEFILE $USBMNT/$LIVEOS/$HOMEFILE
   if [ -n "$skipcompress" -a -f $CDMNT/LiveOS/squashfs.img ]; then
-      mount -o loop $CDMNT/LiveOS/squashfs.img $CDMNT
+      mount -o loop $CDMNT/LiveOS/squashfs.img $CDMNT || exitclean
       cp $CDMNT/LiveOS/ext3fs.img $USBMNT/$LIVEOS/ext3fs.img || (umount $CDMNT ; exitclean)
       umount $CDMNT
   elif [ -f $CDMNT/LiveOS/squashfs.img ]; then
