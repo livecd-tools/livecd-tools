@@ -596,7 +596,7 @@ if [ -n "$xo" ]; then
 	args="$args persistenthome=mtd0"
     fi
     args="$args reset_overlay"
-    xosyspath=$(echo $SYSLINUXPATH | sed -e 's;/;\;')
+    xosyspath=$(echo $SYSLINUXPATH | sed -e 's;/;\\;')
     if [ ! -d $USBMNT/boot ]; then mkdir -p $USBMNT/boot ; fi
     cat > $USBMNT/boot/olpc.fth <<EOF
 \ Boot script for USB boot
