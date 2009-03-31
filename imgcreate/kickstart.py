@@ -172,18 +172,22 @@ class AuthConfig(KickstartConfig):
 class FirewallConfig(KickstartConfig):
     """A class to apply a kickstart firewall configuration to a system."""
     def apply(self, ksfirewall):
-        #
-        # FIXME: should handle the rest of the options
-        #
         if not os.path.exists(self.path("/usr/sbin/lokkit")):
             return
+        args = ["/usr/sbin/lokkit", "-f", "--quiet", "--nostart"]
         if ksfirewall.enabled:
-            status = "--enabled"
-        else:
-            status = "--disabled"
+            args.append("--enabled")
 
-        self.call(["/usr/sbin/lokkit",
-                   "-f", "--quiet", "--nostart", status])
+            for port in ksfirewall.ports:
+                args.append("--port=%s" %(port,))
+            for svc in ksfirewall.services:
+                args.append("--service=%s" %(svc,))
+            for dev in ksfirewall.trusts:
+                args.append("--trust=%s" %(dev,))
+        else:
+            args.append("--disabled")
+
+        self.call(args)
         
 class RootPasswordConfig(KickstartConfig):
     """A class to apply a kickstart root password configuration to a system."""
