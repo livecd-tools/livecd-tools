@@ -658,6 +658,17 @@ if [ -z "$multi" ]; then
     if [ -f "$USBMNT/EFI/boot/boot.conf" ]; then cp -f $USBMNT/EFI/boot/bootia32.conf $USBMNT/EFI/boot/boot.conf ; fi
   fi
 
+  # this is a bit of a kludge, but syslinux doesn't guarantee the API for its com32 modules :/
+  if [ -f $USBMNT/$SYSLINUXPATH/vesamenu.c32 -a -f /usr/share/syslinux/vesamenu.c32 ]; then
+    cp /usr/share/syslinux/vesamenu.c32 $USBMNT/$SYSLINUXPATH/vesamenu.c32
+  elif [ -f $USBMNT/$SYSLINUXPATH/vesamenu.c32 -a -f /usr/lib/syslinux/vesamenu.c32 ]; then
+    cp /usr/lib/syslinux/vesamenu.c32 $USBMNT/$SYSLINUXPATH/vesamenu.c32
+  elif [ -f $USBMNT/$SYSLINUXPATH/menu.c32 -a -f /usr/share/syslinux/menu.c32 ]; then
+    cp /usr/share/syslinux/menu.c32 $USBMNT/$SYSLINUXPATH/menu.c32
+  elif [ -f $USBMNT/$SYSLINUXPATH/menu.c32 -a -f /usr/lib/syslinux/menu.c32 ]; then
+    cp /usr/lib/syslinux/menu.c32 $USBMNT/$SYSLINUXPATH/menu.c32
+  fi
+
   if [ "$USBFS" = "vfat" -o "$USBFS" = "msdos" ]; then
     # syslinux expects the config to be named syslinux.cfg 
     # and has to run with the file system unmounted
