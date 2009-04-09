@@ -419,7 +419,7 @@ class SelinuxConfig(KickstartConfig):
         if not os.path.exists(self.path("/sbin/restorecon")):
             return
 
-        self.call(["/sbin/restorecon", "-l", "-v", "-r", "-F", "-e", "/proc", "-e", "/sys", "-e", "/dev", "-e", "/selinux", "/"])
+        self.call(["/sbin/restorecon", "-l", "-r", "-F", "-e", "/proc", "-e", "/sys", "-e", "/dev", "-e", "/selinux", "/"])
 
     def apply(self, ksselinux):
         if os.path.exists(self.path("/usr/sbin/lokkit")):
