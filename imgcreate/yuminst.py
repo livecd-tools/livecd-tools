@@ -144,6 +144,8 @@ class LiveCDYum(yum.YumBase):
         repo.basecachedir = self.conf.cachedir
         repo.failovermethod = "priority"
         repo.metadata_expire = 0
+        repo.mirrorlist_expire = 0
+        repo.timestamp_check = 0
         # disable gpg check???
         repo.gpgcheck = 0
         repo.enable()
