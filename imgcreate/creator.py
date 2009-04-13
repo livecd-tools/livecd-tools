@@ -433,6 +433,8 @@ class ImageCreator(object):
 
     def __getbooleans(self):
         booleans = []
+        if not kickstart.selinux_enabled(self.ks):
+            return booleans
         for i in  selinux.security_get_boolean_names()[1]:
             on = selinux.security_get_boolean_active(i)
             booleans.append(("/booleans/%s" % i, "%d %d" % (on, on)))
