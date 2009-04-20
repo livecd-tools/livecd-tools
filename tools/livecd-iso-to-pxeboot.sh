@@ -87,7 +87,7 @@ fi
 # filesystem.
 ISOBASENAME=`basename "$ISO"`
 ISODIRNAME=`dirname "$ISO"`
-( cd "$ISODIRNAME" && echo "$ISOBASENAME" | cpio -H newc --quiet -o ) |
+( cd "$ISODIRNAME" && echo "$ISOBASENAME" | cpio -H newc --quiet -L -o ) |
   gzip -9 |
   cat $CDMNT/isolinux/initrd0.img - > tftpboot/initrd0.img
 
