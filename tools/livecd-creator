@@ -60,6 +60,9 @@ def parse_options(args):
     # Start a shell in the chroot for post-configuration.
     parser.add_option("-l", "--shell", action="store_true", dest="give_shell",
                       help=optparse.SUPPRESS_HELP)
+    parser.add_option("-d", "--debug", action="store_true", dest="debug",
+                      help="Enable debugging during the build")
+
     # Don't compress the image.
     parser.add_option("-s", "--skip-compression", action="store_true", dest="skip_compression",
                       help=optparse.SUPPRESS_HELP)
@@ -117,6 +120,9 @@ def main():
     creator.skip_minimize = options.skip_minimize
     if options.cachedir:
         options.cachedir = os.path.abspath(options.cachedir)
+
+    if options.debug:
+        creator.setdebug()
 
     try:
         creator.mount(options.base_on, options.cachedir)
