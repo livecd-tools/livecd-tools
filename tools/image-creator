@@ -30,8 +30,6 @@ def parse_options(args):
 
     parser.add_option("-n", "--name", type="string", dest="name",
                       help="Image name and filesystem label")
-    parser.add_option("-d", "--debug", action="store_true", dest="debug",
-                      help="Enable debug mode")
 
     imgcreate.setup_logging(parser)
 
@@ -62,9 +60,6 @@ def main():
         name = imgcreate.build_name(kscfg)
 
     creator = imgcreate.LoopImageCreator(ks, name)
-
-    if options.debug:
-        creator.setdebug()
 
     try:
         creator.create()

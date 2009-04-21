@@ -760,9 +760,6 @@ class ImageCreator(object):
             shutil.move(os.path.join(self._outdir, f),
                         os.path.join(destdir, f))
 
-    def setdebug(self):
-        rpm.setVerbosity(rpm.RPMLOG_DEBUG)
-
     def create(self):
         """Install, configure and package an image.
 
