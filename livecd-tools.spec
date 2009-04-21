@@ -4,7 +4,7 @@
 
 Summary: Tools for building live CD's
 Name: livecd-tools
-Version: 020
+Version: 020.1
 Release: 1%{?dist}
 License: GPLv2
 Group: System Environment/Base
@@ -64,6 +64,14 @@ rm -rf $RPM_BUILD_ROOT
 %{python_sitelib}/imgcreate/*.pyc
 
 %changelog
+* Tue Apr 21 2009 Jeremy Katz <katzj@redhat.com> - 020.1-1
+- Fix up --base-on (#471656)
+- Fix macro name for excludedocs (bkearney)
+- Fix device command (apevec)
+- Fix unicode errors (Felix Schwarz)
+- Support syslinux in /usr/share
+- Use our syslinux's menu com32 modules in livecd-iso-to-disk (#492370)
+
 * Wed Nov 12 2008 Jeremy Katz <katzj@redhat.com> - 020-1
 - Support setting up a swap file
 - Verify integer args in livecd-iso-to-disk (#467257)
