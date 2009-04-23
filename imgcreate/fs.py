@@ -419,7 +419,8 @@ class ExtDiskMount(DiskMount):
 
     def __fsck(self):
         logging.debug("Checking filesystem %s" % self.disk.lofile)
-        subprocess.call(["/sbin/e2fsck", "-f", "-y", self.disk.lofile])
+        rc = subprocess.call(["/sbin/e2fsck", "-f", "-y", self.disk.lofile])
+        return rc
 
     def __get_size_from_filesystem(self):
         def parse_field(output, field):
