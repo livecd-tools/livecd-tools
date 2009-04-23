@@ -397,6 +397,8 @@ class ExtDiskMount(DiskMount):
         self.__fsck()
 
         resize2fs(self.disk.lofile, size)
+
+        self.__fsck()
         return size
 
     def __create(self):
@@ -453,6 +455,8 @@ class ExtDiskMount(DiskMount):
                 top = t
             else:
                 bot = t
+        
+        self.__fsck()
         return top
 
     def resparse(self, size = None):
