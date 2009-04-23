@@ -733,9 +733,9 @@ image=/ppc/ppc32/vmlinuz
         """configure the boot loader"""
         havekernel = { 32: False, 64: False }
 
-        self.__copy_boot_file("mapping", isodir + "/ppc")
-        self.__copy_boot_file("bootinfo.txt", isodir + "/ppc")
-        self.__copy_boot_file("ofboot.b", isodir + "/ppc/mac")
+        self.__copy_boot_file(isodir + "/ppc", "mapping")
+        self.__copy_boot_file(isodir + "/ppc", "bootinfo.txt")
+        self.__copy_boot_file(isodir + "/ppc/mac", "ofboot.b")
 
         shutil.copyfile(self._instroot + "/usr/lib/yaboot/yaboot",
                         isodir + "/ppc/mac/yaboot")
