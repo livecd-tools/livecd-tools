@@ -457,7 +457,8 @@ class ExtDiskMount(DiskMount):
             else:
                 bot = t
         
-        self.__fsck()
+        if self.__fsck() != 0:
+            raise CreatorError("fsck returned an error!")
         return top
 
     def resparse(self, size = None):
