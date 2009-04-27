@@ -670,7 +670,7 @@ image=/ppc/ppc%(bit)s/vmlinuz
 """ % args
 
 
-    def __write_yaboot_config(isodir, bit):
+    def __write_yaboot_config(self, isodir, bit):
         cfg = self.__get_basic_yaboot_config(name = self.name,
                                              timeout = self._timeout * 100)
 
