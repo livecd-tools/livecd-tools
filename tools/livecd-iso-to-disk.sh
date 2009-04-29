@@ -686,6 +686,7 @@ if [ -z "$multi" ]; then
     # and has to be run with the file system mounted
     mv $USBMNT/$SYSLINUXPATH/isolinux.cfg $USBMNT/$SYSLINUXPATH/extlinux.conf
     extlinux -i $USBMNT/$SYSLINUXPATH
+    chattr -i $USBMNT/$SYSLINUXPATH/extlinux.sys
     cleanup
   fi
 else
