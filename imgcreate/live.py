@@ -606,7 +606,7 @@ hiddenmenu
 
 class ppcLiveImageCreator(LiveImageCreatorBase):
     def _get_mkisofs_options(self, isodir):
-        return [ "-hfs", "-nodesktop", "-part"
+        return [ "-hfs", "-no-desktop", "-part",
                  "-map", isodir + "/ppc/mapping",
                  "-hfs-bless", isodir + "/ppc/mac",
                  "-hfs-volid", self.fslabel ]
@@ -697,7 +697,7 @@ image=/ppc/ppc%(bit)s/vmlinuz
         f.write(cfg)
         f.close()
 
-    def __write_not_supported(isodir, bit):
+    def __write_not_supported(self, isodir, bit):
         makedirs(isodir + "/ppc/ppc" + bit)
 
         message = "Sorry, this LiveCD does not support your hardware"

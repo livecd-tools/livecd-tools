@@ -11,6 +11,7 @@ repo --name=development --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist
 
 %packages
 @core
+anaconda-runtime
 bash
 kernel
 passwd
