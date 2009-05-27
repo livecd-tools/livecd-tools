@@ -4,7 +4,7 @@
 
 Summary: Tools for building live CD's
 Name: livecd-tools
-Version: 017.2
+Version: 017.3
 Release: 1%{?dist}
 License: GPLv2
 Group: System Environment/Base
@@ -62,6 +62,10 @@ rm -rf $RPM_BUILD_ROOT
 %{python_sitelib}/imgcreate/*.pyc
 
 %changelog
+* Wed May 27 2009 Jeremy Katz <katzj@redhat.com> - 017.3-1
+- Backport livecd-iso-to-disk change to work around com32's lack of
+  abi guarantees (#492370, #498155)
+
 * Fri Dec 19 2008 Jeremy Katz <katzj@redhat.com> - 017.2-1
 - Add newkey repo (#477067)
 - Fix --base-on even more
