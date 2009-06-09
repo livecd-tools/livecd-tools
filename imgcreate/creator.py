@@ -517,7 +517,7 @@ class ImageCreator(object):
 
         # bind mount system directories into _instroot
         for (f, dest) in [("/sys", None), ("/proc", None),
-                          ("/dev/pts", None),
+                          ("/dev/pts", None), ("/dev/shm", None),
                           (cachesrc, "/var/cache/yum")]:
             self.__bindmounts.append(BindChrootMount(f, self._instroot, dest))
 
