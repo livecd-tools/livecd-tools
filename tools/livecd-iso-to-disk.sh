@@ -696,8 +696,8 @@ if [ -z "$multi" ]; then
   fi
 else
   # we need to do some more config file tweaks for multi-image mode
-  sed -i -e "s;kernel vm;kernel $LIVEOS/syslinux/vm;" $USBMNT/$SYSLINUXPATH/isolinux.cfg
-  sed -i -e "s;initrd i;initrd $LIVEOS/syslinux/i;" $USBMNT/$SYSLINUXPATH/isolinux.cfg
+  sed -i -e "s;kernel vm;kernel /$LIVEOS/syslinux/vm;" $USBMNT/$SYSLINUXPATH/isolinux.cfg
+  sed -i -e "s;initrd=i;initrd=/$LIVEOS/syslinux/i;" $USBMNT/$SYSLINUXPATH/isolinux.cfg
   mv $USBMNT/$SYSLINUXPATH/isolinux.cfg $USBMNT/$SYSLINUXPATH/syslinux.cfg
   cleanup
 fi
