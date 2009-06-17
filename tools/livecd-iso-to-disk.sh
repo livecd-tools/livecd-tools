@@ -476,13 +476,18 @@ if [ -n "$skipcompress" ]; then
 fi
 free=$(df  -B1M $USBDEV  |tail -n 1 |awk {'print $4;'})
 
-if [ $(($overlaysizemb + $homesizemb + $livesize + $swapsizemb)) -gt $(($free + $tbd)) ]; then
+  tba=$(($overlaysizemb + $homesizemb + $livesize + $swapsizemb))
+if [ $tba -gt $(($free + $tbd)) ]; then
   echo "Unable to fit live image + overlay on available space on USB stick"
-  echo "Size of live image: $livesize"
-  [ "$overlaysizemb" -gt 0 ] && echo "Overlay size: $overlaysizemb"
-  [ "$homesizemb" -gt 0 ] && echo "Home overlay size: $homesizemb"
-  [ "$swapsizemb" -gt 0 ] && echo "Home overlay size: $swapsizemb"
-  echo "Available space: $(($free + $tbd))"
+  echo "+ Size of live image:  $livesize"
+  [ "$overlaysizemb" -gt 0 ] && echo "+ Overlay size:  $overlaysizemb"
+  [ "$homesizemb" -gt 0 ] && echo "+ Home overlay size:  $homesizemb"
+  [ "$swapsizemb" -gt 0 ] && echo "+ Swap overlay size:  $swapsizemb"
+  echo "---------------------------"
+  echo "= Requested:  $tba"
+  echo "- Available:  $(($free + $tbd))"
+  echo "---------------------------"
+  echo "= To fit, free or decrease requested size total by:  $(($tba - $free + $tbd))"
   exitclean
 fi
 
