@@ -153,7 +153,7 @@ createGPTLayout() {
     sleep 5
     umount $USBDEV &> /dev/null
     /sbin/mkdosfs -n LIVE $USBDEV
-    USBLABEL="UUID=$(/lib/udev/vol_id -u $USBDEV)"
+    USBLABEL="UUID=$(/sbin/blkid -s UUID -o value $USBDEV)"
 }
 
 createMSDOSLayout() {
@@ -175,7 +175,7 @@ createMSDOSLayout() {
     sleep 5
     umount $USBDEV &> /dev/null
     /sbin/mkdosfs -n LIVE $USBDEV
-    USBLABEL="UUID=$(/lib/udev/vol_id -u $USBDEV)"
+    USBLABEL="UUID=$(/sbin/blkid -s UUID -o value $USBDEV)"
 }
 
 checkGPT() {
@@ -209,17 +209,17 @@ checkGPT() {
 checkFilesystem() {
     dev=$1
 
-    USBFS=$(/lib/udev/vol_id -t $dev)
+    USBFS=$(/sbin/blkid -s TYPE -o value $dev)
     if [ "$USBFS" != "vfat" -a "$USBFS" != "msdos" -a "$USBFS" != "ext2" -a "$USBFS" != "ext3" ]; then
 	echo "USB filesystem must be vfat or ext[23]"
 	exitclean
     fi
 
-    USBLABEL=$(/lib/udev/vol_id -u $dev)
+    USBLABEL=$(/sbin/blkid -s UUID -o value $dev)
     if [ -n "$USBLABEL" ]; then 
 	USBLABEL="UUID=$USBLABEL" ; 
     else
-	USBLABEL=$(/lib/udev/vol_id -l $dev)
+	USBLABEL=$(/sbin/blkid -s LABEL -o value $dev)
 	if [ -n "$USBLABEL" ]; then 
 	    USBLABEL="LABEL=$USBLABEL" 
 	else
@@ -546,7 +546,7 @@ if [ "$LIVEOS" != "LiveOS" ]; then sed -i -e "s;liveimg;liveimg live_dir=$LIVEOS
 
 if [ "$overlaysizemb" -gt 0 ]; then
     echo "Initializing persistent overlay file"
-    OVERFILE="overlay-$( /lib/udev/vol_id -l $USBDEV )-$( /lib/udev/vol_id -u $USBDEV )"
+    OVERFILE="overlay-$( /sbin/blkid -s LABEL -o value $USBDEV )-$( /sbin/blkid -s UUID -o value $USBDEV )"
     if [ "$USBFS" = "vfat" ]; then
 	# vfat can't handle sparse files
 	dd if=/dev/zero of=$USBMNT/$LIVEOS/$OVERFILE count=$overlaysizemb bs=1M
