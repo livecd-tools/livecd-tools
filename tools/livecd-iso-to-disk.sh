@@ -93,6 +93,9 @@ resetMBR() {
 }
 
 checkMBR() {
+    if [[ "$DEV" =~ "/dev/loop*" ]]; then
+       return 0
+    fi
     getdisk $1
 
     bs=$(mktemp /tmp/bs.XXXXXX)
