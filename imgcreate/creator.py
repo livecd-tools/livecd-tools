@@ -433,7 +433,7 @@ class ImageCreator(object):
 
     def __getbooleans(self):
         booleans = []
-        if not kickstart.selinux_enabled(self.ks):
+        if not kickstart.selinux_enabled(self.ks) or not os.path.exists("/selinux/enforce"):
             return booleans
         for i in  selinux.security_get_boolean_names()[1]:
             on = selinux.security_get_boolean_active(i)
