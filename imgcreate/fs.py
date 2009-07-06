@@ -52,9 +52,9 @@ def mksquashfs(in_img, out_img):
 
 def resize2fs(fs, size = None, minimal = False):
     if minimal and size is not None:
-        raise RuntimeError("Can't specify both minimal and a size for resize!")
+        raise ResizeError("Can't specify both minimal and a size for resize!")
     if not minimal and size is None:
-        raise RuntimeError("Must specify either a size or minimal for resize!")
+        raise ResizeError("Must specify either a size or minimal for resize!")
 
     e2fsck(fs)
     (fd, saved_image) = tempfile.mkstemp("", "resize-image-", "/tmp")
@@ -76,7 +76,7 @@ def resize2fs(fs, size = None, minimal = False):
         return ret
 
     if e2fsck(fs) != 0:
-        raise CreatorError("fsck after resize returned an error!  image to debug at %s" %(saved_image,))
+        raise ResizeError("fsck after resize returned an error!  image to debug at %s" %(saved_image,))
     os.unlink(saved_image)
     return 0
 
