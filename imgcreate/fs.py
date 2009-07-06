@@ -54,6 +54,9 @@ def resize2fs(fs, size = None, minimal = False):
         raise RuntimeError("Can't specify both minimal and a size for resize!")
     if not minimal and size is None:
         raise RuntimeError("Must specify either a size or minimal for resize!")
+
+    e2fsck(fs)
+
     dev_null = os.open("/dev/null", os.O_WRONLY)
     args = ["/sbin/resize2fs", fs]
     if minimal:
@@ -61,9 +64,21 @@ def resize2fs(fs, size = None, minimal = False):
     else:
         args.append("%sK" %(size / 1024,))
     try:
-        return subprocess.call(args, stdout = dev_null, stderr = dev_null)
+        ret = subprocess.call(args, stdout = dev_null, stderr = dev_null)
     finally:
         os.close(dev_null)
+    
+    if ret != 0:
+        return ret
+
+    if e2fsck(fs) != 0:
+        raise CreatorError("fsck after resize returned an error!")
+    return 0
+
+def e2fsck(fs):
+    logging.debug("Checking filesystem %s" % fs)
+    rc = subprocess.call(["/sbin/e2fsck", "-f", "-y", fs])
+    return rc
 
 class BindChrootMount:
     """Represents a bind mount of a directory into a chroot."""
@@ -402,11 +417,7 @@ class ExtDiskMount(DiskMount):
         if size > current_size:
             self.disk.expand(size)
 
-        self.__fsck()
-
         resize2fs(self.disk.lofile, size)
-
-        self.__fsck()
         return size
 
     def __create(self):
@@ -426,8 +437,7 @@ class ExtDiskMount(DiskMount):
         DiskMount.mount(self)
 
     def __fsck(self):
-        logging.debug("Checking filesystem %s" % self.disk.lofile)
-        rc = subprocess.call(["/sbin/e2fsck", "-f", "-y", self.disk.lofile])
+        return e2fsck(self.disk.lofile)
         return rc
 
     def __get_size_from_filesystem(self):
@@ -449,12 +459,8 @@ class ExtDiskMount(DiskMount):
         return int(parse_field(out, "Block count")) * self.blocksize
 
     def __resize_to_minimal(self):
-        self.__fsck()
         resize2fs(self.disk.lofile, minimal = True)
-        min = self.__get_size_from_filesystem()
-        if self.__fsck() != 0:
-            raise CreatorError("fsck returned an error!")
-        return min
+        return self.__get_size_from_filesystem()
 
     def resparse(self, size = None):
         self.cleanup()
