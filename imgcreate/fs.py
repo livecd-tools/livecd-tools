@@ -25,6 +25,7 @@ import subprocess
 import random
 import string
 import logging
+import tempfile
 
 from imgcreate.errors import *
 
@@ -56,6 +57,9 @@ def resize2fs(fs, size = None, minimal = False):
         raise RuntimeError("Must specify either a size or minimal for resize!")
 
     e2fsck(fs)
+    (fd, saved_image) = tempfile.mkstemp("", "resize-image-", "/tmp")
+    os.close(fd)
+    subprocess.call(["/sbin/e2image", "-r", fs, saved_image])
 
     dev_null = os.open("/dev/null", os.O_WRONLY)
     args = ["/sbin/resize2fs", fs]
@@ -72,7 +76,8 @@ def resize2fs(fs, size = None, minimal = False):
         return ret
 
     if e2fsck(fs) != 0:
-        raise CreatorError("fsck after resize returned an error!")
+        raise CreatorError("fsck after resize returned an error!  image to debug at %s" %(saved_image,))
+    os.unlink(saved_image)
     return 0
 
 def e2fsck(fs):
