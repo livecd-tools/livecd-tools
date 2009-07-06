@@ -49,11 +49,19 @@ def mksquashfs(in_img, out_img):
         raise SquashfsError("'%s' exited with error (%d)" %
                             (string.join(args, " "), ret))
 
-def resize2fs(fs, size):
+def resize2fs(fs, size = None, minimal = False):
+    if minimal and size is not None:
+        raise RuntimeError("Can't specify both minimal and a size for resize!")
+    if not minimal and size is None:
+        raise RuntimeError("Must specify either a size or minimal for resize!")
     dev_null = os.open("/dev/null", os.O_WRONLY)
+    args = ["/sbin/resize2fs", fs]
+    if minimal:
+        args.append("-M")
+    else:
+        args.append("%sK" %(size / 1024,))
     try:
-        return subprocess.call(["/sbin/resize2fs", fs, "%sK" % (size / 1024,)],
-                               stdout = dev_null, stderr = dev_null)
+        return subprocess.call(args, stdout = dev_null, stderr = dev_null)
     finally:
         os.close(dev_null)
 
@@ -442,24 +450,11 @@ class ExtDiskMount(DiskMount):
 
     def __resize_to_minimal(self):
         self.__fsck()
-
-        #
-        # Use a binary search to find the minimal size
-        # we can resize the image to
-        #
-        bot = 0
-        top = self.__get_size_from_filesystem()
-        while top != (bot + 1):
-            t = bot + ((top - bot) / 2)
-
-            if not resize2fs(self.disk.lofile, t):
-                top = t
-            else:
-                bot = t
-        
+        resize2fs(self.disk.lofile, minimal = True)
+        min = self.__get_size_from_filesystem()
         if self.__fsck() != 0:
             raise CreatorError("fsck returned an error!")
-        return top
+        return min
 
     def resparse(self, size = None):
         self.cleanup()
