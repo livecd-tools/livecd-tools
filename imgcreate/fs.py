@@ -61,17 +61,12 @@ def resize2fs(fs, size = None, minimal = False):
     os.close(fd)
     subprocess.call(["/sbin/e2image", "-r", fs, saved_image])
 
-    dev_null = os.open("/dev/null", os.O_WRONLY)
     args = ["/sbin/resize2fs", fs]
     if minimal:
         args.append("-M")
     else:
         args.append("%sK" %(size / 1024,))
-    try:
-        ret = subprocess.call(args, stdout = dev_null, stderr = dev_null)
-    finally:
-        os.close(dev_null)
-    
+    ret = subprocess.call(args)
     if ret != 0:
         return ret
 
