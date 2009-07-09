@@ -52,3 +52,5 @@ class SnapshotError(CreatorError):
     pass
 class SquashfsError(CreatorError):
     pass
+class ResizeError(CreatorError):
+    pass
