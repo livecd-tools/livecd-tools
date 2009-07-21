@@ -248,6 +248,9 @@ class LiveImageCreatorBase(LoopImageCreator):
         if subprocess.call(args) != 0:
             raise CreatorError("ISO creation failed!")
 
+        if os.path.exists("/usr/bin/isohybrid"):
+            subprocess.call(["/usr/bin/isohybrid", iso])
+
         self.__implant_md5sum(iso)
 
     def __implant_md5sum(self, iso):
