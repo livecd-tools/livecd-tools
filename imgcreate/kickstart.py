@@ -24,7 +24,10 @@ import time
 import logging
 import urlgrabber
 
-import rhpl.keyboard
+try:
+    import system_config_keyboard.keyboard as keyboard
+except ImportError:
+    import rhpl.keyboard as keyboard
 
 import pykickstart.commands as kscommands
 import pykickstart.constants as ksconstants
@@ -132,12 +135,7 @@ class LanguageConfig(KickstartConfig):
 class KeyboardConfig(KickstartConfig):
     """A class to apply a kickstart keyboard configuration to a system."""
     def apply(self, kskeyboard):
-        #
-        # FIXME:
-        #   should this impact the X keyboard config too?
-        #   or do we want to make X be able to do this mapping?
-        #
-        k = rhpl.keyboard.Keyboard()
+        k = keyboard.Keyboard()
         if kskeyboard.keyboard:
             k.set(kskeyboard.keyboard)
         k.write(self.instroot)
