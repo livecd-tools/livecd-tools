@@ -68,7 +68,7 @@ def resize2fs(fs, size = None, minimal = False):
         args.append("%sK" %(size / 1024,))
     ret = subprocess.call(args)
     if ret != 0:
-        return ret
+        raise ResizeError("resize2fs returned an error (%d)!  image to debug at %s" %(ret, saved_image))
 
     if e2fsck(fs) != 0:
         raise ResizeError("fsck after resize returned an error!  image to debug at %s" %(saved_image,))
