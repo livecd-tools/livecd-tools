@@ -173,7 +173,7 @@ class LiveImageCreatorBase(LoopImageCreator):
 
             try:
                 shutil.copyfile(os_image, self._image)
-            except IOError, e
+            except IOError, e:
                 raise CreatorError("Failed to copy base live image to %s for modification: %s" %(self._image, e))
         finally:
             squashloop.cleanup()
