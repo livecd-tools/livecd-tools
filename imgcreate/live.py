@@ -171,7 +171,10 @@ class LiveImageCreatorBase(LoopImageCreator):
                                    "LiveOS/ext3fs.img nor os.img exist" %
                                    base_on)
 
-            shutil.copyfile(os_image, self._image)
+            try:
+                shutil.copyfile(os_image, self._image)
+            except IOError, e
+                raise CreatorError("Failed to copy base live image to %s for modification: %s" %(self._image, e))
         finally:
             squashloop.cleanup()
             isoloop.cleanup()
