@@ -26,6 +26,7 @@ import random
 import string
 import logging
 import tempfile
+import time
 
 from imgcreate.errors import *
 
@@ -516,6 +517,8 @@ class DeviceMapperSnapshot(object):
         if not self.__created:
             return
 
+        # sleep to try to avoid any dm shenanigans
+        time.sleep(2)
         rc = subprocess.call(["/sbin/dmsetup", "remove", self.__name])
         if not ignore_errors and rc != 0:
             raise SnapshotError("Could not remove snapshot device")
