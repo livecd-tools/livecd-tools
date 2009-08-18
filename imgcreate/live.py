@@ -364,8 +364,14 @@ class x86LiveImageCreator(LiveImageCreatorBase):
         shutil.copyfile(bootdir + "/vmlinuz-" + version,
                         isodir + "/isolinux/vmlinuz" + index)
 
-        shutil.copyfile(bootdir + "/initrd-" + version + ".img",
-                        isodir + "/isolinux/initrd" + index + ".img")
+        isDracut = False
+        if os.path.exists(bootdir + "/initrd-generic-" + version + ".img"):
+            shutil.copyfile(bootdir + "/initrd-generic-" + version + ".img",
+                            isodir + "/isolinux/initrd" + index + ".img")
+            isDracut = True
+        else:
+            shutil.copyfile(bootdir + "/initrd-" + version + ".img",
+                            isodir + "/isolinux/initrd" + index + ".img")
 
         is_xen = False
         if os.path.exists(bootdir + "/xen.gz-" + version[:-3]):
@@ -373,7 +379,7 @@ class x86LiveImageCreator(LiveImageCreatorBase):
                             isodir + "/isolinux/xen" + index + ".gz")
             is_xen = True
 
-        return is_xen
+        return (is_xen, isDracut)
 
     def __is_default_kernel(self, kernel, kernels):
         if len(kernels) == 1:
@@ -408,18 +414,23 @@ menu hidden
 menu hiddenrow 5
 """ % args
 
-    def __get_image_stanza(self, is_xen, **args):
+    def __get_image_stanza(self, is_xen, isDracut, **args):
+        if isDracut:
+            args["rootlabel"] = "live:LABEL=%(fslabel)s" % args
+        else:
+            args["rootlabel"] = "CDLABEL=%(fslabel)s" % args
+
         if not is_xen:
             template = """label %(short)s
   menu label %(long)s
   kernel vmlinuz%(index)s
-  append initrd=initrd%(index)s.img root=CDLABEL=%(fslabel)s rootfstype=%(isofstype)s %(liveargs)s %(extra)s
+  append initrd=initrd%(index)s.img root=%(rootlabel)s rootfstype=%(isofstype)s %(liveargs)s %(extra)s
 """
         else:
             template = """label %(short)s
   menu label %(long)s
   kernel mboot.c32
-  append xen%(index)s.gz --- vmlinuz%(index)s root=CDLABEL=%(fslabel)s rootfstype=%(isofstype)s %(liveargs)s %(extra)s --- initrd%(index)s.img
+  append xen%(index)s.gz --- vmlinuz%(index)s root=%(rootlabel)s rootfstype=%(isofstype)s %(liveargs)s %(extra)s --- initrd%(index)s.img
 """
         return template % args
 
@@ -438,7 +449,9 @@ menu hiddenrow 5
 
         index = "0"
         for version in versions:
-            is_xen = self.__copy_kernel_and_initramfs(isodir, version, index)
+            (is_xen, isDracut) = self.__copy_kernel_and_initramfs(isodir, version, index)
+            if index == "0":
+                self._isDracut = isDracut
 
             default = self.__is_default_kernel(kernel, kernels)
 
@@ -449,7 +462,7 @@ menu hiddenrow 5
             else:
                 long = "Boot %s(%s)" % (self.name, kernel)
 
-            cfg += self.__get_image_stanza(is_xen,
+            cfg += self.__get_image_stanza(is_xen, isDracut,
                                            fslabel = self.fslabel,
                                            isofstype = "auto",
                                            liveargs = kernel_options,
@@ -462,7 +475,7 @@ menu hiddenrow 5
                 cfg += "menu default\n"
 
             if checkisomd5:
-                cfg += self.__get_image_stanza(is_xen,
+                cfg += self.__get_image_stanza(is_xen, isDracut,
                                                fslabel = self.fslabel,
                                                isofstype = "auto",
                                                liveargs = kernel_options,
@@ -540,8 +553,12 @@ hiddenmenu
 """ %args
 
     def __get_efi_image_stanza(self, **args):
+        if self._isDracut:
+            args["rootlabel"] = "live:LABEL=%(fslabel)s" % args
+        else:
+            args["rootlabel"] = "CDLABEL=%(fslabel)s" % args
         return """title %(long)s
-  kernel /EFI/boot/vmlinuz%(index)s root=CDLABEL=%(fslabel)s rootfstype=%(isofstype)s %(liveargs)s %(extra)s
+  kernel /EFI/boot/vmlinuz%(index)s root=%(rootlabel)s rootfstype=%(isofstype)s %(liveargs)s %(extra)s
   initrd /EFI/boot/initrd%(index)s.img
 """ %args
 
@@ -649,6 +666,7 @@ class ppcLiveImageCreator(LiveImageCreatorBase):
             return { "32" : False, "64" : True }
 
     def __copy_kernel_and_initramfs(self, destdir, version):
+        isDracut = False
         bootdir = self._instroot + "/boot"
 
         makedirs(destdir)
@@ -656,8 +674,15 @@ class ppcLiveImageCreator(LiveImageCreatorBase):
         shutil.copyfile(bootdir + "/vmlinuz-" + version,
                         destdir + "/vmlinuz")
 
-        shutil.copyfile(bootdir + "/initrd-" + version + ".img",
-                        destdir + "/initrd.img")
+        if os.path.exists(bootdir + "/initrd-generic-" + version + ".img"):
+            shutil.copyfile(bootdir + "/initrd-" + version + ".img",
+                            destdir + "/initrd.img")
+            isDracut = True
+        else:
+            shutil.copyfile(bootdir + "/initrd-" + version + ".img",
+                            destdir + "/initrd.img")
+
+        return isDracut
 
     def __get_basic_yaboot_config(self, **args):
         return """
@@ -666,17 +691,21 @@ timeout=%(timeout)d
 """ % args
 
     def __get_image_stanza(self, **args):
+        if args["isDracut"]:
+            args["rootlabel"] = "live:LABEL=%(fslabel)s" % args
+        else:
+            args["rootlabel"] = "CDLABEL=%(fslabel)s" % args
         return """
 
 image=/ppc/ppc%(bit)s/vmlinuz
   label=%(short)s
   initrd=/ppc/ppc%(bit)s/initrd.img
   read-only
-  append="root=CDLABEL=%(fslabel)s rootfstype=%(isofstype)s %(liveargs)s %(extra)s"
+  append="root=%(rootlabel)s rootfstype=%(isofstype)s %(liveargs)s %(extra)s"
 """ % args
 
 
-    def __write_yaboot_config(self, isodir, bit):
+    def __write_yaboot_config(self, isodir, bit, isDracut = False):
         cfg = self.__get_basic_yaboot_config(name = self.name,
                                              timeout = self._timeout * 100)
 
@@ -688,7 +717,8 @@ image=/ppc/ppc%(bit)s/vmlinuz
                                        long = "Run from image",
                                        extra = "",
                                        bit = bit,
-                                       liveargs = kernel_options)
+                                       liveargs = kernel_options,
+                                       isDracut = isDracut)
 
         if self._has_checkisomd5():
             cfg += self.__get_image_stanza(fslabel = self.fslabel,
@@ -697,7 +727,8 @@ image=/ppc/ppc%(bit)s/vmlinuz
                                            long = "Verify and run from image",
                                            extra = "check",
                                            bit = bit,
-                                           liveargs = kernel_options)
+                                           liveargs = kernel_options,
+                                           isDracut = isDracut)
 
         f = open(isodir + "/ppc/ppc" + bit + "/yaboot.conf", "w")
         f.write(cfg)
@@ -764,8 +795,8 @@ image=/ppc/ppc32/vmlinuz
                 self.__write_not_supported(isodir, bit)
                 continue
 
-            self.__copy_kernel_and_initramfs(isodir + "/ppc/ppc" + bit, kernel)
-            self.__write_yaboot_config(isodir, bit)
+            isDracut = self.__copy_kernel_and_initramfs(isodir + "/ppc/ppc" + bit, kernel)
+            self.__write_yaboot_config(isodir, bit, isDracut)
 
         makedirs(isodir + "/etc")
         if kernel_bits["32"] and not kernel_bits["64"]:
