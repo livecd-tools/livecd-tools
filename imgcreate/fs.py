@@ -553,7 +553,7 @@ class DeviceMapperSnapshot(object):
         except ValueError:
             raise SnapshotError("Failed to parse dmsetup status: " + out)
 
-def create_image_minimizer(path, image, minimal_size):
+def create_image_minimizer(path, image, target_size = None):
     """
     Builds a copy-on-write image which can be used to
     create a device-mapper snapshot of an image where
@@ -580,7 +580,10 @@ def create_image_minimizer(path, image, minimal_size):
     try:
         snapshot.create()
 
-        resize2fs(snapshot.path, minimal_size)
+        if target_size is not None:
+            resize2fs(snapshot.path, target_size)
+        else:
+            resize2fs(snapshot.path, minimal = True)
 
         cow_used = snapshot.get_cow_used()
     finally:
