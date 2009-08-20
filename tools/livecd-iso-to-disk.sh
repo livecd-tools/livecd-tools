@@ -28,6 +28,7 @@ usage() {
 }
 
 cleanup() {
+    sleep 2
     [ -d "$CDMNT" ] && umount $CDMNT && rmdir $CDMNT
     [ -d "$USBMNT" ] && umount $USBMNT && rmdir $USBMNT
 }
@@ -598,6 +599,7 @@ if [ "$homesizemb" -gt 0 ]; then
 	done
         mke2fs -j /dev/mapper/EncHomeFoo
 	tune2fs -c0 -i0 -ouser_xattr,acl /dev/mapper/EncHomeFoo
+	sleep 2
         cryptsetup luksClose EncHomeFoo
         losetup -d $loop
     else
