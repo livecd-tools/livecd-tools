@@ -264,6 +264,7 @@ class LiveImageCreatorBase(LoopImageCreator):
             implantisomd5 = "/usr/lib/anaconda-runtime/implantisomd5"
         else:
             logging.warn("isomd5sum not installed; not setting up mediacheck")
+            return
             
         subprocess.call([implantisomd5, iso])
 
