@@ -476,13 +476,18 @@ class ImageCreator(object):
         # if the system was running selinux clean up our lies
         if os.path.exists("/selinux/enforce"):
             for root, dirs, files in os.walk(self._instroot + "/selinux"):
-                if root == self._instroot + "/selinux":
-                    continue
-                try:
-                    os.unlink(root)
-                except OSError:
-                    pass
-
+                for name in files:
+                    try:
+                        os.remove(os.path.join(root, name))
+                    except OSError:
+                        pass
+                for name in dirs:
+                    if os.path.join(root, name) == self._instroot + "/selinux":
+                        continue
+                    try:
+                        os.rmdir(os.path.join(root, name))
+                    except OSError:
+                        pass
 
     def mount(self, base_on = None, cachedir = None):
         """Setup the target filesystem in preparation for an install.
