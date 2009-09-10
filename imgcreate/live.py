@@ -675,7 +675,7 @@ class ppcLiveImageCreator(LiveImageCreatorBase):
                         destdir + "/vmlinuz")
 
         if os.path.exists(bootdir + "/initramfs-" + version + ".img"):
-            shutil.copyfile(bootdir + "/initrd-" + version + ".img",
+            shutil.copyfile(bootdir + "/initramfs-" + version + ".img",
                             destdir + "/initrd.img")
             isDracut = True
         else:
