@@ -365,8 +365,8 @@ class x86LiveImageCreator(LiveImageCreatorBase):
                         isodir + "/isolinux/vmlinuz" + index)
 
         isDracut = False
-        if os.path.exists(bootdir + "/initrd-generic-" + version + ".img"):
-            shutil.copyfile(bootdir + "/initrd-generic-" + version + ".img",
+        if os.path.exists(bootdir + "/initramfs-" + version + ".img"):
+            shutil.copyfile(bootdir + "/initramfs-" + version + ".img",
                             isodir + "/isolinux/initrd" + index + ".img")
             isDracut = True
         else:
@@ -674,7 +674,7 @@ class ppcLiveImageCreator(LiveImageCreatorBase):
         shutil.copyfile(bootdir + "/vmlinuz-" + version,
                         destdir + "/vmlinuz")
 
-        if os.path.exists(bootdir + "/initrd-generic-" + version + ".img"):
+        if os.path.exists(bootdir + "/initramfs-" + version + ".img"):
             shutil.copyfile(bootdir + "/initrd-" + version + ".img",
                             destdir + "/initrd.img")
             isDracut = True
