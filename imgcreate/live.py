@@ -416,7 +416,7 @@ menu hiddenrow 5
 
     def __get_image_stanza(self, is_xen, isDracut, **args):
         if isDracut:
-            args["rootlabel"] = "live:LABEL=%(fslabel)s" % args
+            args["rootlabel"] = "live:CDLABEL=%(fslabel)s" % args
         else:
             args["rootlabel"] = "CDLABEL=%(fslabel)s" % args
 
