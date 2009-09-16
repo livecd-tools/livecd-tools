@@ -491,7 +491,7 @@ if [ $tba -gt $(($free + $tbd)) ]; then
   echo "= Requested:  $tba"
   echo "- Available:  $(($free + $tbd))"
   echo "---------------------------"
-  echo "= To fit, free or decrease requested size total by:  $(($tba - $free + $tbd))"
+  echo "= To fit, free or decrease requested size total by:  $(($tba - $free - $tbd))"
   exitclean
 fi
 
