@@ -462,10 +462,17 @@ menu hiddenrow 5
             else:
                 long = "Boot %s(%s)" % (self.name, kernel)
 
+
+            # tell dracut not to ask for LUKS passwords or activate mdraid sets
+            if isDracut:
+                kern_opts = kernel_options + " rd_NO_LUKS rd_NO_MD"
+            else:
+                kern_opts = kernel_options
+
             cfg += self.__get_image_stanza(is_xen, isDracut,
                                            fslabel = self.fslabel,
                                            isofstype = "auto",
-                                           liveargs = kernel_options,
+                                           liveargs = kern_opts,
                                            long = long,
                                            short = "linux" + index,
                                            extra = "",
