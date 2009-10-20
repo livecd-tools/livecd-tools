@@ -406,7 +406,7 @@ class SelinuxConfig(KickstartConfig):
     """A class to apply a kickstart selinux configuration to a system."""
     def relabel(self, ksselinux):
         # touch some files which get unhappy if they're not labeled correctly
-        for fn in ("/etc/resolv.conf"):
+        for fn in ("/etc/resolv.conf",):
             path = self.path(fn)
             f = file(path, "w+")
             os.chmod(path, 0644)
