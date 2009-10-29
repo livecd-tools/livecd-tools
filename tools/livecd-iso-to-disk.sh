@@ -279,11 +279,25 @@ if [ $(id -u) != 0 ]; then
     exit 1
 fi
 
+detectisotype() {
+    if [ -e $CDMNT/LiveOS/squashfs.img ]; then
+        isotype=live
+        return
+    fi
+    if [ -e $CDMNT/images/install.img ]; then
+        isotype=installer
+        return
+    fi
+    echo "ERROR: $ISO does not appear to be a Live image or DVD installer."
+    exitclean
+}
+
 cryptedhome=1
 keephome=1
 homesizemb=0
 swapsizemb=0
 overlaysizemb=0
+isotype=
 LIVEOS=LiveOS
 
 HOMEFILE="home.img"
@@ -440,6 +454,8 @@ mount $mountopts $USBDEV $USBMNT || exitclean
 
 trap exitclean SIGINT SIGTERM
 
+detectisotype
+
 if [ -f "$USBMNT/$LIVEOS/$HOMEFILE" -a -n "$keephome" -a "$homesizemb" -gt 0 ]; then
   echo "ERROR: Requested keeping existing /home and specified a size for /home"
   echo "Please either don't specify a size or specify --delete-home"
@@ -480,7 +496,8 @@ if [ -n "$skipcompress" ]; then
 fi
 free=$(df  -B1M $USBDEV  |tail -n 1 |awk {'print $4;'})
 
-  tba=$(($overlaysizemb + $homesizemb + $livesize + $swapsizemb))
+if [ "$isotype" = "live" ]; then
+tba=$(($overlaysizemb + $homesizemb + $livesize + $swapsizemb))
 if [ $tba -gt $(($free + $tbd)) ]; then
   echo "Unable to fit live image + overlay on available space on USB stick"
   echo "+ Size of live image:  $livesize"
@@ -494,8 +511,29 @@ if [ $tba -gt $(($free + $tbd)) ]; then
   echo "= To fit, free or decrease requested size total by:  $(($tba - $free - $tbd))"
   exitclean
 fi
+fi
 
-if [ -z "$skipcopy" ];then
+# Verify available space for DVD installer 
+if [ "$isotype" = "installer" ]; then
+  isosize=$(du -s -B 1M $ISO | awk {'print $1;'})
+  installimgsize=$(du -s -B 1M $CDMNT/images/install.img | awk {'print $1;'})
+  tbd=0
+  if [ -e $USBMNT/images/install.img ]; then
+    tbd=$(du -s -B 1M $USBMNT/images/install.img | awk {'print $1;'})
+  fi
+  if [ -e $USBMNT/$(basename $ISO) ]; then
+    tbd=$(($tbd + $(du -s -B 1M $USBMNT/$(basename $ISO) | awk {'print $1;'})))
+  fi
+  echo "Size of DVD image: $isosize"
+  echo "Size of install.img: $installimgsize"
+  echo "Available space: $(($free + $tbd))"
+  if [ $(($isosize + $installimgsize)) -gt $(($free + $tbd)) ]; then
+    echo "ERROR: Unable to fit DVD image + install.img on available space on USB stick"
+    exitclean
+  fi
+fi
+
+if [ -z "$skipcopy" ] && [ "$isotype" = "live" ]; then
   if [ -d $USBMNT/$LIVEOS -a -z "$force" ]; then
       echo "Already set up as live image."  
       if [ -z "$keephome" -a -e $USBMNT/$LIVEOS/$HOMEFILE ]; then
@@ -517,7 +555,8 @@ fi
 [ ! -d $USBMNT/$SYSLINUXPATH ] && mkdir -p $USBMNT/$SYSLINUXPATH
 [ -n "$efi" -a ! -d $USBMNT/EFI/boot ] && mkdir -p $USBMNT/EFI/boot
 
-if [ -z "$skipcopy" ];then
+# Live image copy
+if [ -z "$skipcopy" ] && [ "$isotype" = "live" ]; then
   echo "Copying live image to USB stick"
   [ ! -d $USBMNT/$LIVEOS ] && mkdir $USBMNT/$LIVEOS
   [ -n "$keephome" -a -f "$USBMNT/$HOMEFILE" ] && mv $USBMNT/$HOMEFILE $USBMNT/$LIVEOS/$HOMEFILE
@@ -533,6 +572,14 @@ if [ -z "$skipcopy" ];then
   if [ -f $CDMNT/LiveOS/osmin.img ]; then
       cp $CDMNT/LiveOS/osmin.img $USBMNT/$LIVEOS/osmin.img || exitclean
   fi
+fi
+
+# DVD installer copy
+if [ "$isotype" = "installer" ] && [ -z "$skipcopy" ]; then
+      echo "Copying DVD image to USB stick"
+      mkdir -p $USBMNT/images/
+      cp $CDMNT/images/install.img $USBMNT/images/install.img || exitclean
+      cp $ISO $USBMNT/
 fi
 
 cp $CDMNT/isolinux/* $USBMNT/$SYSLINUXPATH
@@ -552,6 +599,12 @@ echo "Updating boot config file"
 sed -i -e "s/CDLABEL=[^ ]*/$USBLABEL/" -e "s/rootfstype=[^ ]*/rootfstype=$USBFS/" $BOOTCONFIG  $BOOTCONFIG_EFI
 if [ -n "$kernelargs" ]; then sed -i -e "s/liveimg/liveimg ${kernelargs}/" $BOOTCONFIG $BOOTCONFIG_EFI ; fi
 if [ "$LIVEOS" != "LiveOS" ]; then sed -i -e "s;liveimg;liveimg live_dir=$LIVEOS;" $BOOTCONFIG $BOOTCONFIG_EFI ; fi
+
+# DVD Installer
+if [ "$isotype" = "installer" ]; then
+  sed -i -e "s;initrd=initrd.img;initrd=initrd.img repo=hd:$USBLABEL:/;g" $BOOTCONFIG $BOOTCONFIG_EFI
+  sed -i -e "s;stage2=\S*;;g" $BOOTCONFIG $BOOTCONFIG_EFI
+fi
 
 if [ "$overlaysizemb" -gt 0 ]; then
     echo "Initializing persistent overlay file"
