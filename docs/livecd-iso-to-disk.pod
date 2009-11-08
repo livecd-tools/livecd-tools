@@ -6,7 +6,7 @@ livecd-iso-to-disk - installs bootable CD images on a USB storage devices.
 
 =head1 SYNOPSIS
 
-B<livecd-iso-to-disk> [--format] [--reset-mbr] [--noverify] [--overlay-size-mb <size>] [\-\-home\-size\-mb <size>] [\-\-unencrypted\-home] [\-\-skipcopy]  <path-to-iso> <usb storage device>
+B<livecd-iso-to-disk> [--format] [--reset-mbr] [--noverify] [--efi] [--overlay-size-mb <size>] [\-\-home\-size\-mb <size>] [\-\-unencrypted\-home] [\-\-skipcopy]  <path-to-iso> <usb storage device>
 
 =head1 DESCRIPTION
 
@@ -20,7 +20,7 @@ B<livecd-iso-to-disk> is not a destructive process; any data you currently have 
 
 =item --format
 
-Formats the USB stick and creates a GPT partition table.
+Formats the USB stick and creates an MS-DOS partition table (or GPT partition table if --efi is passed).
 
 =item --reset-mbr
 
@@ -45,6 +45,10 @@ Disables the encryption of the home directory.
 =item --skipcopy
 
 Skips the copy of the live image to the USB stick.
+
+=item --efi
+
+Create a GPT partition table when --format is passed, and install an hybrid EFI/MBR bootloader on the disk. This is necessary for most Intel Macs.
 
 =back
 
