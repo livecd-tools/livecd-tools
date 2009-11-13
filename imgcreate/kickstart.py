@@ -22,6 +22,7 @@ import shutil
 import subprocess
 import time
 import logging
+import selinux
 import urlgrabber
 
 try:
@@ -420,7 +421,7 @@ class SelinuxConfig(KickstartConfig):
         if not os.path.exists(self.path("/sbin/setfiles")):
             return
 
-        self.call(["/sbin/setfiles", "-e", "/proc", "-e", "/sys", "-e", "/dev", "-e", "/selinux", "/etc/selinux/targeted/contexts/files/file_contexts", "/"])
+        self.call(["/sbin/setfiles", selinux.selinux_file_context_path(), "/"])
 
     def apply(self, ksselinux):
         if os.path.exists(self.path("/usr/sbin/lokkit")):

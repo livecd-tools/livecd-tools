@@ -467,10 +467,6 @@ class ImageCreator(object):
             # label the fs like it is a root before the bind mounting
             arglist = ["/sbin/setfiles", "-F", "-r", self._instroot, selinux.selinux_file_context_path(), self._instroot]
             subprocess.call(arglist, close_fds = True)
-            # these dumb things don't get magically fixed, so make the user generic
-            for f in ("/proc", "/sys", "/selinux"):
-                arglist = ["/usr/bin/chcon", "-u", "system_u", self._instroot + f]
-                subprocess.call(arglist, close_fds = True)
 
     def __destroy_selinuxfs(self):
         # if the system was running selinux clean up our lies
