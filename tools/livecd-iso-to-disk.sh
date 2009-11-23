@@ -147,7 +147,7 @@ createGPTLayout() {
     read
     umount ${device}? &> /dev/null
     /sbin/parted --script $device mklabel gpt
-    partinfo=$(/sbin/parted --script -m $device "unit b print" |grep ^$device:)
+    partinfo=$(LANG=C /sbin/parted --script -m $device "unit b print" |grep ^$device:)
     size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/B$//')
     /sbin/parted --script $device unit b mkpart '"EFI System Partition"' fat32 17408 $(($size - 17408)) set 1 boot on
     USBDEV=${device}1
@@ -169,7 +169,7 @@ createMSDOSLayout() {
     read
     umount ${device}? &> /dev/null
     /sbin/parted --script $device mklabel msdos
-    partinfo=$(/sbin/parted --script -m $device "unit b print" |grep ^$device:)
+    partinfo=$(LANG=C /sbin/parted --script -m $device "unit b print" |grep ^$device:)
     size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/B$//')
     /sbin/parted --script $device unit b mkpart primary fat32 17408 $(($size - 17408)) set 1 boot on
     USBDEV=${device}1
@@ -192,7 +192,7 @@ checkGPT() {
        exitclean
     fi
 
-    partinfo=$(/sbin/parted --script -m $device "print" |grep ^$partnum:)
+    partinfo=$(LANG=C /sbin/parted --script -m $device "print" |grep ^$partnum:)
     volname=$(echo $partinfo |cut -d : -f 6)
     flags=$(echo $partinfo |cut -d : -f 7)
     if [ "$volname" != "EFI System Partition" ]; then
