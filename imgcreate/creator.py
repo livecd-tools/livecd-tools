@@ -23,6 +23,7 @@ import sys
 import tempfile
 import shutil
 import logging
+import subprocess
 
 import selinux
 import yum
@@ -702,11 +703,17 @@ class ImageCreator(object):
                 script = "/tmp/" + os.path.basename(path)
 
             try:
-                subprocess.call([s.interp, script],
-                                preexec_fn = preexec, env = env)
+                subprocess.check_call([s.interp, script],
+                                      preexec_fn = preexec, env = env)
             except OSError, (err, msg):
                 raise CreatorError("Failed to execute %%post script "
                                    "with '%s' : %s" % (s.interp, msg))
+            except subprocess.CalledProcessError, err:
+                if s.errorOnFail:
+                    raise CreatorError("%%post script failed with code %d "
+                                       % err.returncode)
+                logging.warning("ignoring %%post failure (code %d)"
+                                % err.returncode)
             finally:
                 os.unlink(path)
 
