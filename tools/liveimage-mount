@@ -1,0 +1,94 @@
+#!/usr/bin/python -tt
+#
+# livecd-mount: Mount a live CD at the specified point, and log
+# into a shell. 
+# 
+# Copyright 2010, Red Hat  Inc.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; version 2 of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Library General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+
+import os
+import sys
+import getopt
+import tempfile
+import subprocess
+
+def usage(ecode):
+    print "Usage: %s ISO.iso MOUNTPOINT [COMMAND] [ARGS]"
+    sys.exit(ecode)
+
+def main():
+    try:
+        opts,args = getopt.getopt(sys.argv[1:], 'h', ['help', 'chroot', 'proc'])
+    except getopt.GetoptError, e:
+        usage(1)
+        
+    chroot = False
+    proc = False
+    for o,a in opts:
+        if o in ('-h', '--help'):
+            usage(0)
+        elif o in ('--chroot', ):
+            chroot = True
+        elif o in ('--proc', ):
+            proc = True
+    
+    if len(args) < 2:
+        usage(1)
+        
+    isopath = args[0]
+    destmnt = args[1]
+    
+    command = args[2:]
+    verbose = not command
+        
+    isomnt = tempfile.mkdtemp(prefix='livemnt-iso')
+    squashmnt = tempfile.mkdtemp(prefix='livemnt-squash')
+    
+    try:
+        subprocess.check_call(['mount', '-o', 'loop,ro', isopath, isomnt], stderr=sys.stderr)
+        squash_img_path = os.path.join(isomnt, 'LiveOS', 'squashfs.img')
+        subprocess.check_call(['mount', '-o', 'loop,ro', squash_img_path, squashmnt], stderr=sys.stderr)
+        ext3_img_path = os.path.join(squashmnt, 'LiveOS', 'ext3fs.img')
+        subprocess.check_call(['mount', '-o', 'loop,ro', ext3_img_path, destmnt], stderr=sys.stderr)
+        
+        if proc:
+            subprocess.check_call(['mount', '-t', 'proc', 'proc', os.path.join(destmnt, 'proc')], stderr=sys.stderr)
+            
+        if len(command) > 0:
+            args = ['chroot', destmnt]
+            args.extend(command)
+            ecode = subprocess.call(args, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
+        elif chroot:
+            print "Starting subshell in chroot, press Ctrl-D to exit..."
+            ecode = subprocess.call(['chroot', destmnt], stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
+        else:
+            print "Starting subshell, press Ctrl-D to exit..."
+            ecode = subprocess.call([os.environ['SHELL']], cwd=destmnt, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
+    finally:
+        if verbose:
+            print "Cleaning up..."
+        subprocess.call(['umount', os.path.join(destmnt, 'proc')])
+        subprocess.call(['umount', destmnt])
+        subprocess.call(['umount', squashmnt])
+        os.rmdir(squashmnt)
+        subprocess.call(['umount', isomnt])
+        os.rmdir(isomnt)
+        if verbose:
+            print "Cleanup complete"
+   
+    sys.exit(ecode)
+
+if __name__ == '__main__':
+    main()

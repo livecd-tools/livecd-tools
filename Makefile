@@ -22,6 +22,7 @@ man:
 
 install: man
 	$(INSTALL_PROGRAM) -D tools/livecd-creator $(DESTDIR)/usr/bin/livecd-creator
+	$(INSTALL_PROGRAM) -D tools/liveimage-mount $(DESTDIR)/usr/bin/liveimage-mount
 	$(INSTALL_PROGRAM) -D tools/image-creator $(DESTDIR)/usr/bin/image-creator
 	$(INSTALL_PROGRAM) -D tools/livecd-iso-to-disk.sh $(DESTDIR)/usr/bin/livecd-iso-to-disk
 	$(INSTALL_PROGRAM) -D tools/livecd-iso-to-pxeboot.sh $(DESTDIR)/usr/bin/livecd-iso-to-pxeboot
