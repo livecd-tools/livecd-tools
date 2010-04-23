@@ -181,11 +181,11 @@ class LiveImageCreatorBase(LoopImageCreator):
 
     def _mount_instroot(self, base_on = None):
         LoopImageCreator._mount_instroot(self, base_on)
-        self.__write_initrd_conf(self._instroot + "/etc/sysconfig/mkinitrd")
+        self.__write_initrd_conf(self._instroot + "/etc/dracut.conf")
 
     def _unmount_instroot(self):
         try:
-            os.unlink(self._instroot + "/etc/sysconfig/mkinitrd")
+            os.unlink(self._instroot + "/etc/dracut.conf")
         except:
             pass
         LoopImageCreator._unmount_instroot(self)
@@ -212,24 +212,23 @@ class LiveImageCreatorBase(LoopImageCreator):
             makedirs(os.path.dirname(path))
         f = open(path, "a")
 
-        f.write('LIVEOS="yes"\n')
         f.write('PROBE="no"\n')
-        f.write('MODULES+="squashfs ext4 ext3 ext2 vfat msdos "\n')
-        f.write('MODULES+="sr_mod sd_mod ide-cd cdrom "\n')
+        f.write('add_drivers+="squashfs ext4 ext3 ext2 vfat msdos "\n')
+        f.write('add_drivers+="sr_mod sd_mod ide-cd cdrom "\n')
 
         for module in self.__modules:
             if module == "=usb":
-                f.write('MODULES+="ehci_hcd uhci_hcd ohci_hcd "\n')
-                f.write('MODULES+="usb_storage usbhid "\n')
+                f.write('add_drivers+="ehci_hcd uhci_hcd ohci_hcd "\n')
+                f.write('add_drivers+="usb_storage usbhid "\n')
             elif module == "=firewire":
-                f.write('MODULES+="firewire-sbp2 firewire-ohci "\n')
-                f.write('MODULES+="sbp2 ohci1394 ieee1394 "\n')
+                f.write('add_drivers+="firewire-sbp2 firewire-ohci "\n')
+                f.write('add_drivers+="sbp2 ohci1394 ieee1394 "\n')
             elif module == "=mmc":
-                f.write('MODULES+="mmc_block sdhci sdhci-pci "\n')
+                f.write('add_drivers+="mmc_block sdhci sdhci-pci "\n')
             elif module == "=pcmcia":
-                f.write('MODULES+="pata_pcmcia  "\n')
+                f.write('add_drivers+="pata_pcmcia  "\n')
             else:
-                f.write('MODULES+="' + module + ' "\n')
+                f.write('add_drivers+="' + module + ' "\n')
 
         f.close()
 
