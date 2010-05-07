@@ -138,6 +138,18 @@ checkPartActive() {
     fi
 }
 
+checkLVM() {
+    dev=$1
+
+    if [ -x /sbin/pvs -a \
+	"$(/sbin/pvs -o vg_name --noheadings $dev* 2>/dev/null)" ]; then
+	echo "Device, $dev, contains a volume group and cannot be formated!"
+	echo "You can remove the volume group using vgremove."
+	exitclean
+    fi
+    return 0
+}
+
 createGPTLayout() {
     dev=$1
     getdisk $dev
@@ -407,6 +419,7 @@ fi
 # do some basic sanity checks.  
 checkMounted $USBDEV
 if [ -n "$format" ];then
+  checkLVM $USBDEV
   # checks for a valid filesystem
   if [ -n "$efi" ];then
     createGPTLayout $USBDEV
