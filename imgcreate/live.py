@@ -484,7 +484,7 @@ menu hiddenrow 5
 
             # tell dracut not to ask for LUKS passwords or activate mdraid sets
             if isDracut:
-                kern_opts = kernel_options + " rd_NO_LUKS rd_NO_MD"
+                kern_opts = kernel_options + " rd_NO_LUKS rd_NO_MD rd_NO_DM"
             else:
                 kern_opts = kernel_options
 
