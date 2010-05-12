@@ -182,12 +182,11 @@ class LiveImageCreatorBase(LoopImageCreator):
     def _mount_instroot(self, base_on = None):
         LoopImageCreator._mount_instroot(self, base_on)
         self.__write_initrd_conf(self._instroot + "/etc/sysconfig/mkinitrd")
+        self.__write_dracut_conf(self._instroot + "/etc/dracut.conf")
 
     def _unmount_instroot(self):
-        try:
-            os.unlink(self._instroot + "/etc/sysconfig/mkinitrd")
-        except:
-            pass
+        self.__restore_file(self._instroot + "/etc/sysconfig/mkinitrd")
+        self.__restore_file(self._instroot + "/etc/dracut.conf")
         LoopImageCreator._unmount_instroot(self)
 
     def __ensure_isodir(self):
@@ -207,30 +206,50 @@ class LiveImageCreatorBase(LoopImageCreator):
 
         return env
 
+    def __extra_filesystems(self):
+        return "squashfs ext4 ext3 ext2 vfat msdos ";
+
+    def __extra_drivers(self):
+        retval = "sr_mod sd_mod ide-cd cdrom "
+        for module in self.__modules:
+            if module == "=usb":
+                retval = retval + "ehci_hcd uhci_hcd ohci_hcd "
+                retval = retval + "usb_storage usbhid "
+            elif module == "=firewire":
+                retval = retval + "firewire-sbp2 firewire-ohci "
+                retval = retval + "sbp2 ohci1394 ieee1394 "
+            elif module == "=mmc":
+                retval = retval + "mmc_block sdhci sdhci-pci "
+            elif module == "=pcmcia":
+                retval = retval + "pata_pcmcia "
+            else:
+                retval = retval + module + " "
+        return retval
+
+    def __restore_file(self,path):
+        try:
+            os.unlink(path)
+        except:
+            pass
+        if os.path.exists(path + '.rpmnew'):
+            os.rename(path + '.rpmnew', path)
+
     def __write_initrd_conf(self, path):
         if not os.path.exists(os.path.dirname(path)):
             makedirs(os.path.dirname(path))
         f = open(path, "a")
-
         f.write('LIVEOS="yes"\n')
         f.write('PROBE="no"\n')
-        f.write('MODULES+="squashfs ext4 ext3 ext2 vfat msdos "\n')
-        f.write('MODULES+="sr_mod sd_mod ide-cd cdrom "\n')
+        f.write('MODULES+="' + self.__extra_filesystems() + '"\n')
+        f.write('MODULES+="' + self.__extra_drivers() + '"\n')
+        f.close()
 
-        for module in self.__modules:
-            if module == "=usb":
-                f.write('MODULES+="ehci_hcd uhci_hcd ohci_hcd "\n')
-                f.write('MODULES+="usb_storage usbhid "\n')
-            elif module == "=firewire":
-                f.write('MODULES+="firewire-sbp2 firewire-ohci "\n')
-                f.write('MODULES+="sbp2 ohci1394 ieee1394 "\n')
-            elif module == "=mmc":
-                f.write('MODULES+="mmc_block sdhci sdhci-pci "\n')
-            elif module == "=pcmcia":
-                f.write('MODULES+="pata_pcmcia  "\n')
-            else:
-                f.write('MODULES+="' + module + ' "\n')
-
+    def __write_dracut_conf(self, path):
+        if not os.path.exists(os.path.dirname(path)):
+            makedirs(os.path.dirname(path))
+        f = open(path, "a")
+        f.write('filesystems+="' + self.__extra_filesystems() + ' "\n')
+        f.write('drivers+="' + self.__extra_drivers() + ' "\n')
         f.close()
 
     def __create_iso(self, isodir):
