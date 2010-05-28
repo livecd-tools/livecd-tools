@@ -395,7 +395,7 @@ class ExtDiskMount(DiskMount):
     def __init__(self, disk, mountdir, fstype, blocksize, fslabel, rmmountdir=True):
         DiskMount.__init__(self, disk, mountdir, fstype, rmmountdir)
         self.blocksize = blocksize
-        self.fslabel = fslabel
+        self.fslabel = "_" + fslabel
 
     def __format_filesystem(self):
         logging.debug("Formating %s filesystem on %s" % (self.fstype, self.disk.device))
