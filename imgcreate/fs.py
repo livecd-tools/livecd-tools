@@ -40,8 +40,12 @@ def makedirs(dirname):
         if err != errno.EEXIST:
             raise
 
-def mksquashfs(in_img, out_img):
-    args = ["/sbin/mksquashfs", in_img, out_img]
+def mksquashfs(in_img, out_img, compress_type):
+# Allow zlib to work for older versions of mksquashfs
+    if compress_type == "zlib":
+        args = ["/sbin/mksquashfs", in_img, out_img]
+    else:
+        args = ["/sbin/mksquashfs", in_img, out_img, "-comp", compress_type]
 
     if not sys.stdout.isatty():
         args.append("-no-progress")
@@ -553,7 +557,7 @@ class DeviceMapperSnapshot(object):
         except ValueError:
             raise SnapshotError("Failed to parse dmsetup status: " + out)
 
-def create_image_minimizer(path, image, target_size = None):
+def create_image_minimizer(path, image, compress_type, target_size = None):
     """
     Builds a copy-on-write image which can be used to
     create a device-mapper snapshot of an image where
@@ -591,7 +595,7 @@ def create_image_minimizer(path, image, target_size = None):
 
     cowloop.truncate(cow_used)
 
-    mksquashfs(cowloop.lofile, path)
+    mksquashfs(cowloop.lofile, path, compress_type)
 
     os.unlink(cowloop.lofile)
 

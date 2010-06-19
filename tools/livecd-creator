@@ -41,6 +41,9 @@ def parse_options(args):
                       help="Add packages to an existing live CD iso9660 image.")
     imgopt.add_option("-f", "--fslabel", type="string", dest="fs_label",
                       help="File system label (default based on config name)")
+    imgopt.add_option("", "--compression-type", type="string", dest="compress_type",
+                      help="Compression type recognized by mksquashfs (default zlib, lzma needs custom kernel)",
+                      default="zlib")
     parser.add_option_group(imgopt)
 
     # options related to the config of your system
@@ -113,6 +116,7 @@ def main():
 
     creator = imgcreate.LiveImageCreator(ks, name, fs_label)
     creator.tmpdir = os.path.abspath(options.tmpdir)
+    creator.compress_type = options.compress_type
     creator.skip_compression = options.skip_compression
     creator.skip_minimize = options.skip_minimize
     if options.cachedir:

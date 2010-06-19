@@ -46,6 +46,9 @@ class LiveImageCreatorBase(LoopImageCreator):
         """
         LoopImageCreator.__init__(self, *args)
 
+        self.compress_type = "zlib"
+        """mksquashfs compressor to use."""
+
         self.skip_compression = False
         """Controls whether to use squashfs to compress the image."""
 
@@ -294,7 +297,7 @@ class LiveImageCreatorBase(LoopImageCreator):
             self._resparse()
 
             if not self.skip_minimize:
-                create_image_minimizer(self.__isodir + "/LiveOS/osmin.img", self._image)
+                create_image_minimizer(self.__isodir + "/LiveOS/osmin.img", self._image, self.compress_type)
 
             if self.skip_compression:
                 shutil.move(self._image, self.__isodir + "/LiveOS/ext3fs.img")
@@ -307,7 +310,8 @@ class LiveImageCreatorBase(LoopImageCreator):
                             os.path.join(os.path.dirname(self._image),
                                          "LiveOS", "ext3fs.img"))
                 mksquashfs(os.path.dirname(self._image),
-                           self.__isodir + "/LiveOS/squashfs.img")
+                           self.__isodir + "/LiveOS/squashfs.img",
+                           self.compress_type)
                 if os.stat(self.__isodir + "/LiveOS/squashfs.img").st_size >= 4*1024*1024*1024:
                     self._isofstype = "udf"
                     logging.warn("Switching to UDF due to size of LiveOS/squashfs.img")

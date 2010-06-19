@@ -40,6 +40,13 @@ Add packages to an existing live CD iso9660 image.
 
 Defines the file system label. The default is based on the configuration name.
 
+=item --compression-type=COMPRESSOR
+
+Specify a compressor recognized by mksquashfs. The default is zlib. lzma
+currently requires a custom kernel to produce a functional image. If zlib
+is used, the -comp option is not passed to mksquashfs to allow the use of
+older versions of mksquashfs.
+
 =back
 
 =head1 SYSTEM DIRECTORY OPTIONS
