@@ -112,7 +112,7 @@ class BindChrootMount:
         if not self.mounted:
             return
 
-        rc = subprocess.call(["/bin/umount", self.dest])
+        rc = subprocess.call(["/bin/umount", "-l", self.dest])
         if rc != 0:
             raise MountError("Unable to unmount filesystem at %s" % self.dest)
         self.mounted = False
@@ -353,7 +353,7 @@ class DiskMount(Mount):
     def unmount(self):
         if self.mounted:
             logging.debug("Unmounting directory %s" % self.mountdir)
-            rc = subprocess.call(["/bin/umount", self.mountdir])
+            rc = subprocess.call(["/bin/umount", "-l", self.mountdir])
             if rc == 0:
                 self.mounted = False
             else:
