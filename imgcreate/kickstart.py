@@ -53,9 +53,11 @@ def read_kickstart(path):
     try:
         ksfile = urlgrabber.urlgrab(path)
         ks.readKickstart(ksfile)
-    except IOError, (err, msg):
+# Fallback to e.args[0] is a workaround for bugs in urlgragger and pykickstart.
+    except IOError, e:
         raise errors.KickstartError("Failed to read kickstart file "
-                                    "'%s' : %s" % (path, msg))
+                                    "'%s' : %s" % (path, e.strerror or
+                                    e.args[0]))
     except kserrors.KickstartError, e:
         raise errors.KickstartError("Failed to parse kickstart file "
                                     "'%s' : %s" % (path, e))
@@ -153,8 +155,8 @@ class TimezoneConfig(KickstartConfig):
         try:
             shutil.copyfile(self.path("/usr/share/zoneinfo/%s" %(tz,)),
                             self.path("/etc/localtime"))
-        except OSError, (errno, msg):
-            log.error("Error copying timezone: %s" %(msg,))
+        except OSError, e:
+            log.error("Error copying timezone: %s" %(e.strerror,))
 
 
 class AuthConfig(KickstartConfig):

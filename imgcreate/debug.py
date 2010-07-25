@@ -30,9 +30,9 @@ def handle_logging(option, opt, val, parser, logger, level):
 def handle_logfile(option, opt, val, parser, logger, stream):
     try:
         logfile = logging.FileHandler(val,"a")
-    except IOError, (err, msg):
+    except IOError, e:
         raise optparse.OptionValueError("Cannot open file '%s' : %s" %
-                                        (val, msg))
+                                        (val, e.strerror))
 
 
     logger.removeHandler(stream)

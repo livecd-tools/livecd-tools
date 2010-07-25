@@ -385,9 +385,9 @@ class ImageCreator(object):
         try:
             self.__builddir = tempfile.mkdtemp(dir =  os.path.abspath(self.tmpdir),
                                                prefix = "imgcreate-")
-        except OSError, (err, msg):
+        except OSError, e:
             raise CreatorError("Failed create build directory in %s: %s" %
-                               (self.tmpdir, msg))
+                               (self.tmpdir, e.strerror))
 
     def __sanity_check(self):
         """Ensure that the config we've been given is sane."""
@@ -705,9 +705,9 @@ class ImageCreator(object):
             try:
                 subprocess.check_call([s.interp, script],
                                       preexec_fn = preexec, env = env)
-            except OSError, (err, msg):
+            except OSError, e:
                 raise CreatorError("Failed to execute %%post script "
-                                   "with '%s' : %s" % (s.interp, msg))
+                                   "with '%s' : %s" % (s.interp, e.strerror))
             except subprocess.CalledProcessError, err:
                 if s.errorOnFail:
                     raise CreatorError("%%post script failed with code %d "
