@@ -41,8 +41,8 @@ def makedirs(dirname):
             raise
 
 def mksquashfs(in_img, out_img, compress_type):
-# Allow zlib to work for older versions of mksquashfs
-    if compress_type == "zlib":
+# Allow gzip to work for older versions of mksquashfs
+    if compress_type == "gzip":
         args = ["/sbin/mksquashfs", in_img, out_img]
     else:
         args = ["/sbin/mksquashfs", in_img, out_img, "-comp", compress_type]
