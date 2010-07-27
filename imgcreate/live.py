@@ -372,10 +372,15 @@ class x86LiveImageCreator(LiveImageCreatorBase):
 
     def __copy_syslinux_background(self, isodest):
         background_path = self._instroot + \
-                          "/usr/lib/anaconda-runtime/syslinux-vesa-splash.jpg"
+                          "/usr/share/anaconda/syslinux-vesa-splash.jpg"
 
         if not os.path.exists(background_path):
-            return False
+            # fallback to F13 location
+            background_path = self._instroot + \
+                              "/usr/lib/anaconda-runtime/syslinux-vesa-splash.jpg"
+
+            if not os.path.exists(background_path):
+                return False
 
         shutil.copyfile(background_path, isodest)
 
