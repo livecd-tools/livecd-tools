@@ -400,10 +400,6 @@ class ImageCreator(object):
         if not kickstart.get_repos(self.ks):
             raise CreatorError("No repositories specified")
 
-        if (kickstart.selinux_enabled(self.ks) and
-            not os.path.exists("/selinux/enforce")):
-            raise CreatorError("SELinux requested but not enabled on host")
-
     def __write_fstab(self):
         fstab = open(self._instroot + "/etc/fstab", "w")
         fstab.write(self._get_fstab())

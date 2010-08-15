@@ -416,10 +416,11 @@ class SelinuxConfig(KickstartConfig):
 
         if ksselinux.selinux == ksconstants.SELINUX_DISABLED:
             return
-        if not os.path.exists(self.path("/sbin/restorecon")):
+
+        if not os.path.exists(self.path("/sbin/setfiles")):
             return
 
-        self.call(["/sbin/restorecon", "-l", "-r", "-F", "-e", "/proc", "-e", "/sys", "-e", "/dev", "-e", "/selinux", "/"])
+        self.call(["/sbin/setfiles", "/etc/selinux/targeted/contexts/files/file_contexts", "-e", "/proc", "-e", "/sys", "-e", "/dev", "-e", "/selinux", "/"])
 
     def apply(self, ksselinux):
         if os.path.exists(self.path("/usr/sbin/lokkit")):
