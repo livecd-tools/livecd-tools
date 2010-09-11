@@ -453,12 +453,24 @@ menu hiddenrow 5
   menu label %(long)s
   kernel vmlinuz%(index)s
   append initrd=initrd%(index)s.img root=%(rootlabel)s rootfstype=%(isofstype)s %(liveargs)s %(extra)s
+
+
+  label %(short)s
+  menu label %(long)s %(basicvideo)s
+  kernel vmlinuz%(index)s
+  append initrd=initrd%(index)s.img root=%(rootlabel)s rootfstype=%(isofstype)s %(liveargs)s %(xdriver)s %(extra)s
 """
         else:
             template = """label %(short)s
   menu label %(long)s
   kernel mboot.c32
   append xen%(index)s.gz --- vmlinuz%(index)s root=%(rootlabel)s rootfstype=%(isofstype)s %(liveargs)s %(extra)s --- initrd%(index)s.img
+
+
+  label %(short)s
+  menu label %(long)s %(basicvideo)s
+  kernel mboot.c32
+  append xen%(index)s.gz --- vmlinuz%(index)s root=%(rootlabel)s rootfstype=%(isofstype)s %(liveargs)s %(xdriver)s %(extra)s --- initrd%(index)s.img
 """
         return template % args
 
@@ -490,6 +502,10 @@ menu hiddenrow 5
             else:
                 long = "Boot %s(%s)" % (self.name, kernel)
 
+            # Basic video driver
+            basic = "system with basic video driver"
+            xdriver = "xdriver=vesa"
+
 
             # tell dracut not to ask for LUKS passwords or activate mdraid sets
             if isDracut:
@@ -503,6 +519,8 @@ menu hiddenrow 5
                                            liveargs = kern_opts,
                                            long = long,
                                            short = "linux" + index,
+                                           basicvideo = basic,
+                                           xdriver = xdriver,
                                            extra = "",
                                            index = index)
 
@@ -516,6 +534,8 @@ menu hiddenrow 5
                                                liveargs = kernel_options,
                                                long = "Verify and " + long,
                                                short = "check" + index,
+                                               basicvideo = "",
+                                               xdriver = "",
                                                extra = "check",
                                                index = index)
 
