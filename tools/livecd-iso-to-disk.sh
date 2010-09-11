@@ -304,6 +304,36 @@ detectisotype() {
     exitclean
 }
 
+cp_p() {
+	strace -q -ewrite cp -- "${1}" "${2}" 2>&1 \
+	| awk '{
+	count += $NF
+	if (count % 10 == 0) {
+		percent = count / total_size * 100
+		printf "%3d%% [", percent
+		for (i=0;i<=percent;i++)
+			printf "="
+			printf ">"
+			for (i=percent;i<100;i++)
+				printf " "
+				printf "]\r"
+			}
+		}
+		END { print "" }' total_size=$(stat -c '%s' "${1}") count=0
+}
+
+copyFile() {
+	if [ -x /usr/bin/gvfs-copy ]; then
+	    gvfs-copy -p "$1" "$2"
+	    return
+	fi
+	if [ -x /usr/bin/strace -a -x /bin/awk ]; then
+	    cp_p "$1" "$2"
+	    return
+	fi
+	cp "$1" "$2"
+}
+
 cryptedhome=1
 keephome=1
 homesizemb=0
@@ -575,15 +605,15 @@ if [ -z "$skipcopy" ] && [ "$isotype" = "live" ]; then
   [ -n "$keephome" -a -f "$USBMNT/$HOMEFILE" ] && mv $USBMNT/$HOMEFILE $USBMNT/$LIVEOS/$HOMEFILE
   if [ -n "$skipcompress" -a -f $CDMNT/LiveOS/squashfs.img ]; then
       mount -o loop $CDMNT/LiveOS/squashfs.img $CDMNT || exitclean
-      cp $CDMNT/LiveOS/ext3fs.img $USBMNT/$LIVEOS/ext3fs.img || (umount $CDMNT ; exitclean)
+      copyFile $CDMNT/LiveOS/ext3fs.img $USBMNT/$LIVEOS/ext3fs.img || (umount $CDMNT ; exitclean)
       umount $CDMNT
   elif [ -f $CDMNT/LiveOS/squashfs.img ]; then
-      cp $CDMNT/LiveOS/squashfs.img $USBMNT/$LIVEOS/squashfs.img || exitclean
+      copyFile $CDMNT/LiveOS/squashfs.img $USBMNT/$LIVEOS/squashfs.img || exitclean
   elif [ -f $CDMNT/LiveOS/ext3fs.img ]; then
-      cp $CDMNT/LiveOS/ext3fs.img $USBMNT/$LIVEOS/ext3fs.img || exitclean
+      copyFile $CDMNT/LiveOS/ext3fs.img $USBMNT/$LIVEOS/ext3fs.img || exitclean
   fi
   if [ -f $CDMNT/LiveOS/osmin.img ]; then
-      cp $CDMNT/LiveOS/osmin.img $USBMNT/$LIVEOS/osmin.img || exitclean
+      copyFile $CDMNT/LiveOS/osmin.img $USBMNT/$LIVEOS/osmin.img || exitclean
   fi
 fi
 
@@ -591,8 +621,8 @@ fi
 if [ "$isotype" = "installer" ] && [ -z "$skipcopy" ]; then
       echo "Copying DVD image to USB stick"
       mkdir -p $USBMNT/images/
-      cp $CDMNT/images/install.img $USBMNT/images/install.img || exitclean
-      cp $ISO $USBMNT/
+      copyFile $CDMNT/images/install.img $USBMNT/images/install.img || exitclean
+      copyFile $ISO $USBMNT/
 fi
 
 cp $CDMNT/isolinux/* $USBMNT/$SYSLINUXPATH
