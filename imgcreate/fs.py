@@ -112,9 +112,16 @@ class BindChrootMount:
         if not self.mounted:
             return
 
-        rc = subprocess.call(["/bin/umount", "-l", self.dest])
+        rc = subprocess.call(["/bin/umount", self.dest])
         if rc != 0:
-            raise MountError("Unable to unmount filesystem at %s" % self.dest)
+            logging.debug("Unable to unmount %s normally, using lazy unmount" % self.dest)
+            rc = subprocess.call(["/bin/umount", "-l", self.dest])
+            if rc != 0:
+                raise MountError("Unable to unmount fs at %s" % self.dest)
+            else:
+                logging.debug("lazy umount succeeded on %s" % self.dest)
+                print >> sys.stdout, "lazy umount succeeded on %s" % self.dest
+ 
         self.mounted = False
 
 class LoopbackMount:
@@ -353,11 +360,19 @@ class DiskMount(Mount):
     def unmount(self):
         if self.mounted:
             logging.debug("Unmounting directory %s" % self.mountdir)
-            rc = subprocess.call(["/bin/umount", "-l", self.mountdir])
+            rc = subprocess.call(["/bin/umount", self.mountdir])
             if rc == 0:
                 self.mounted = False
             else:
-                raise MountError("Unable to unmount filesystem at %s" % self.mountdir)
+                logging.debug("Unmounting directory %s failed, using lazy umount" % self.mountdir)
+                print >> sys.stdout, "Unmounting directory %s failed, using lazy umount" %self.mountdir
+                rc = subprocess.call(["/bin/umount", "-l", self.mountdir])
+                if rc != 0:
+                    raise MountError("Unable to unmount filesystem at %s" % self.mountdir)
+                else:
+                    logging.debug("lazy umount succeeded on %s" % self.mountdir)
+                    print >> sys.stdout, "lazy umount succeeded on %s" % self.mountdir
+                    self.mounted = False
 
         if self.rmdir and not self.mounted:
             try:
