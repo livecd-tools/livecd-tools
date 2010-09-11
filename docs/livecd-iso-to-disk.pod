@@ -44,7 +44,9 @@ Disables the encryption of the home directory.
 
 =item --skipcopy
 
-Skips the copy of the live image to the USB stick.
+Skips the copy of the live image to the USB stick and disables the --forma, --home-size-mb, and --swap-size-mb options. The --overlay-size-mb option is changed to only reinitialize the existing overlay area, to recreate it from scratch.
+
+The intended use of this option is to speed up testing of the boot configuration of live images.
 
 =item --efi
 

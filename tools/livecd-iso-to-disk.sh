@@ -448,7 +448,7 @@ fi
 
 # do some basic sanity checks.  
 checkMounted $USBDEV
-if [ -n "$format" ];then
+if [ -n "$format" -a -z "$skipcopy" ];then
   checkLVM $USBDEV
   # checks for a valid filesystem
   if [ -n "$efi" ];then
@@ -599,7 +599,7 @@ fi
 [ -n "$efi" -a ! -d $USBMNT/EFI/boot ] && mkdir -p $USBMNT/EFI/boot
 
 # Live image copy
-if [ -z "$skipcopy" ] && [ "$isotype" = "live" ]; then
+if [ "$isotype" = "live" -a -z "$skipcopy" ]; then
   echo "Copying live image to USB stick"
   [ ! -d $USBMNT/$LIVEOS ] && mkdir $USBMNT/$LIVEOS
   [ -n "$keephome" -a -f "$USBMNT/$HOMEFILE" ] && mv $USBMNT/$HOMEFILE $USBMNT/$LIVEOS/$HOMEFILE
@@ -655,23 +655,25 @@ fi
 if [ "$overlaysizemb" -gt 0 ]; then
     echo "Initializing persistent overlay file"
     OVERFILE="overlay-$( /sbin/blkid -s LABEL -o value $USBDEV )-$( /sbin/blkid -s UUID -o value $USBDEV )"
-    if [ "$USBFS" = "vfat" ]; then
-	# vfat can't handle sparse files
-	dd if=/dev/zero of=$USBMNT/$LIVEOS/$OVERFILE count=$overlaysizemb bs=1M
-    else
+    if [ -z "$skipcopy" ]; then
+      if [ "$USBFS" = "vfat" ]; then
+        # vfat can't handle sparse files
+        dd if=/dev/zero of=$USBMNT/$LIVEOS/$OVERFILE count=$overlaysizemb bs=1M
+      else
 	dd if=/dev/null of=$USBMNT/$LIVEOS/$OVERFILE count=1 bs=1M seek=$overlaysizemb
+      fi
     fi
     sed -i -e "s/liveimg/liveimg overlay=${USBLABEL}/" $BOOTCONFIG $BOOTCONFIG_EFI
     sed -i -e "s/\ ro\ /\ rw\ /" $BOOTCONFIG  $BOOTCONFIG_EFI
 fi
 
-if [ "$swapsizemb" -gt 0 ]; then
+if [ "$swapsizemb" -gt 0 -a -z "$skipcopy" ]; then
     echo "Initializing swap file"
     dd if=/dev/zero of=$USBMNT/$LIVEOS/swap.img count=$swapsizemb bs=1M
     mkswap -f $USBMNT/$LIVEOS/swap.img
 fi
 
-if [ "$homesizemb" -gt 0 ]; then
+if [ "$homesizemb" -gt 0 -a -z "$skipcopy" ]; then
     echo "Initializing persistent /home"
     homesource=/dev/zero
     [ -n "$cryptedhome" ] && homesource=/dev/urandom
