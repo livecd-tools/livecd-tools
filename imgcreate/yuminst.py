@@ -188,6 +188,8 @@ class LiveCDYum(yum.YumBase):
 
         # FIXME: callback should be refactored a little in yum 
         sys.path.append('/usr/share/yum-cli')
+        import yum.misc
+        yum.misc.setup_locale()
         import callback
         cb = callback.RPMInstallCallback()
         cb.tsInfo = self.tsInfo
