@@ -680,7 +680,7 @@ fi
 # boot on the XO anyway.
 if [ -n "$xo" ]; then
     echo "Setting up /boot/olpc.fth file"
-    args=$(egrep "^[ ]*append" $USBMNT/$SYSLINUXPATH/isolinux.cfg |head -n1 |sed -e 's/.*initrd=[^ ]*//')
+    args=$(grep "^ *append" $USBMNT/$SYSLINUXPATH/isolinux.cfg |head -n1 |sed -e 's/.*initrd=[^ ]*//')
     if [ -z "$xonohome" -a ! -f $USBMNT/$LIVEOS/$HOMEFILE ]; then
 	args="$args persistenthome=mtd0"
     fi
