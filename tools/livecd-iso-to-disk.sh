@@ -609,13 +609,16 @@ fi
 
 echo "Updating boot config file"
 # adjust label and fstype
+if [ -n "$LANG" ]; then
+	kernelargs="$kernelargs LANG=$LANG"
+fi
 sed -i -e "s/CDLABEL=[^ ]*/$USBLABEL/" -e "s/rootfstype=[^ ]*/rootfstype=$USBFS/" -e "s/LABEL=[^ ]*/$USBLABEL/" $BOOTCONFIG  $BOOTCONFIG_EFI
 if [ -n "$kernelargs" ]; then sed -i -e "s/liveimg/liveimg ${kernelargs}/" $BOOTCONFIG $BOOTCONFIG_EFI ; fi
 if [ "$LIVEOS" != "LiveOS" ]; then sed -i -e "s;liveimg;liveimg live_dir=$LIVEOS;" $BOOTCONFIG $BOOTCONFIG_EFI ; fi
 
 # DVD Installer
 if [ "$isotype" = "installer" ]; then
-  sed -i -e "s;initrd=initrd.img;initrd=initrd.img repo=hd:$USBLABEL:/;g" $BOOTCONFIG $BOOTCONFIG_EFI
+  sed -i -e "s;initrd=initrd.img;initrd=initrd.img ${LANG:+LANG=$LANG} repo=hd:$USBLABEL:/;g" $BOOTCONFIG $BOOTCONFIG_EFI
   sed -i -e "s;stage2=\S*;;g" $BOOTCONFIG $BOOTCONFIG_EFI
 fi
 
