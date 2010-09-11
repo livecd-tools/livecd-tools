@@ -310,7 +310,9 @@ class SparseLoopbackDisk(LoopbackDisk):
         logging.debug("Extending sparse file %s to %d" % (self.lofile, size))
         fd = os.open(self.lofile, flags)
 
-        os.lseek(fd, size, 0)
+        if size <= 0:
+            size = 1
+        os.lseek(fd, size-1, 0)
         os.write(fd, '\x00')
         os.close(fd)
 
