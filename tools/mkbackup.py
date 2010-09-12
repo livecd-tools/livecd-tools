@@ -1,0 +1,99 @@
+#!/usr/bin/python
+
+import os
+import sys
+import subprocess
+import shutil
+import tempfile
+import re
+
+#dump -0 / -f dump.img && dd if=/dev/zero of=filesystem.img bs=2M count=1000 && losetup /dev/loop0 filesystem.img && mkdir filesystem && mke2fs -j /dev/loop0 && mount -t ext3 /dev/loop0 -o loop filesystem && cd filesystem && restore -r -f ../dump.img && cd ../ && umount filesystem && losetup -d /dev/loop0
+
+
+
+def main():
+    def usage():
+        sys.exit(1)
+
+   
+    def mktmpdir():
+        tmpdir = tempfile.mkdtemp()
+        return tmpdir
+
+    def mktmpfile():
+        tmpfile = tempfile.mkstemp()
+        return tmpfile[1]
+
+    def size(ent):
+        current = os.stat(ent).st_size
+        return current
+        
+    def mkempty(bs, count):
+        image = tempfile.mkstemp()
+        args = ("/bin/dd", "if=/dev/zero", "of=%s"%image, "bs=%s"%bs, "count=%s"%count)
+        execute(args)
+        return image
+
+    def dump(ent, file):
+        args = ("/sbin/dump", "-0", ent, "-f", file)
+        execute(args)
+ 
+    def restore():
+        pass
+        
+
+    def mkcopy():
+        pass
+
+    def getrootents():
+        ents = list()
+        args = ("/bin/df", "-lh")
+        data = execute(args, needdata=True)
+        lines = data.split('\n')
+ 
+        for line in lines:
+            if re.search(r"/dev/", line) and not re.search(r"tmpfs", line):
+                ent = re.search(r"/dev/[-0-9A-Za-z]+", line)
+                ents.append(ent.group())
+        return ents
+        
+
+        
+
+    def execute(args, needdata=False):
+        if needdata is False:
+            rc = subprocess.call(args)
+        else:
+            rc = subprocess.Popen(args, stdout=subprocess.PIPE).communicate()[0]
+        
+        return rc    
+
+
+    def setup():
+
+        dumpfiles = list()
+        ents = getrootents()
+        for ent in ents:
+            dumpfile = mktmpfile()
+            dump(ent, dumpfile)
+            dumpfiles.append(dumpfile)
+
+        tsize = 0
+        for dumpfile in dumpfiles:
+            tsize = size(dumpfile) + tsize
+ 
+        bs = 2048
+        count = (tsize / 2048)
+
+        target = mkempty(bs, count)
+
+    setup()
+    rc = 0
+    return rc
+
+
+
+
+
+if __name__ == "__main__":
+    sys.exit(main()) 
