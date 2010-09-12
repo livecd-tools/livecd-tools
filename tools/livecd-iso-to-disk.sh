@@ -162,7 +162,7 @@ createGPTLayout() {
     echo "WARNING: THIS WILL DESTROY ANY DATA ON $device!!!"
     echo "Press Enter to continue or ctrl-c to abort"
     read
-    umount ${device}? &> /dev/null
+    umount ${device}* &> /dev/null
     /sbin/parted --script $device mklabel gpt
     partinfo=$(LC_ALL=C /sbin/parted --script -m $device "unit b print" |grep ^$device:)
     size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/B$//')
@@ -184,7 +184,7 @@ createMSDOSLayout() {
     echo "WARNING: THIS WILL DESTROY ANY DATA ON $device!!!"
     echo "Press Enter to continue or ctrl-c to abort"
     read
-    umount ${device}? &> /dev/null
+    umount ${device}* &> /dev/null
     /sbin/parted --script $device mklabel msdos
     partinfo=$(LC_ALL=C /sbin/parted --script -m $device "unit b print" |grep ^$device:)
     size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/B$//')
@@ -206,7 +206,7 @@ createEXTFSLayout() {
     echo "WARNING: THIS WILL DESTROY ANY DATA ON $device!!!"
     echo "Press Enter to continue or ctrl-c to abort"
     read
-    umount ${device}? &> /dev/null
+    umount ${device}* &> /dev/null
     /sbin/parted --script $device mklabel msdos
     partinfo=$(LC_ALL=C /sbin/parted --script -m $device "unit b print" |grep ^$device:)
     size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/B$//')
