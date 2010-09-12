@@ -701,6 +701,13 @@ if [ "$isotype" = "netinst" ]; then
   sed -i -e "s;stage2=\S*;stage2=hd:$USBLABEL:/images/install.img;g" $BOOTCONFIG $BOOTCONFIG_EFI
 fi
 
+# Use repo if the .iso has the repository on it, otherwise use stage2 which
+# will default to using the network mirror
+if [ -e "$CDMNT/.discinfo" ]; then
+  METHODSTR=repo
+else
+  METHODSTR=stage2
+fi
 
 if [ "$overlaysizemb" -gt 0 ]; then
     echo "Initializing persistent overlay file"
