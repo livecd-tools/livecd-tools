@@ -1,40 +1,34 @@
-#!/usr/bin/env python
-
-__author__ = "Jasper Hartline"
-__credits__ = ""
-__license__ = "GPL?"
-__version__ = "Alpha"
-__description__ = "Attempts to create a 32/64 bit combination live Fedora image."
-
+#!/usr/bin/python
 import os
 import sys
+
 import shutil
 import parted
 import subprocess
+import optparse
 import tempfile
-import math
+import re
 
-from optparse import OptionParser
 
 def main():
 
-    def cleanup():
-        pass
+
+    def usage():
+        usage = 'usage: mkbiarch.py <x86 Live ISO File> <x64 Live ISO File> <Target Multi Arch Image File>'
+        print >> sys.stdout, usage
 
 
     def mount(src, dst, options=None):
-        if os.path.exists(src):         # Is src the lodev device?
-            if not os.path.exists(dst): 
+        if os.path.exists(src):
+            if not os.path.exists(dst):
                 os.makedir(dst)
-            if options:                 # None is the same as Null so you can test for existence instead.
-                args = ("/bin/mount", options, src, dst)
-            else:
+            if options is None:
                 args = ("/bin/mount", src, dst)
-                
+            else:
+                args = ("/bin/mount", options, src, dst)
             rc = subprocess.call(args)
             return rc
-        else:                           # Let's make sure only one return statement get's triggered.
-            return False                # Might as well return something useful so we can test for failure.
+        return
 
 
     def umount(src):
@@ -42,111 +36,268 @@ def main():
                 args = ("/bin/umount", src)
                 rc = subprocess.call(args)
                 return rc
-        else:
-            return False
+        return
 
 
     def copy(src, dst):
         if os.path.exists(src):
+            if not os.path.exists(dst):
+                if not os.path.isfile(src):
+                    mkdir(dst)
             shutil.copy(src, dst)
-            return True
-        else:
-            return False
 
 
     def move(src, dst):
         if os.path.exists(src):
-            shutil.mopve(src, dst)
-            return True
+            shutil.move(src, dst)
+
+    def mkdir(dir=None):
+        if dir is None:
+            tmp = tempfile.mkdtemp()
+            return tmp
         else:
-            return False
+            args = ("/bin/mkdir", "-p", dir)
+            rc = subprocess.call(args)
 
 
     def losetup(src, dst, offset=None):
-        if os.path.exists(src) and os.path.exists(dst):
-            if offset:
-                args = ("/sbin/losetup", "-o", offset, src, dst)
-            else:
-                args = ("/sbin/losetup", src, dst)
-                    
-            rc = subprocess.call(args)
-            return rc
-        else:
-            return False
-        
+        if os.path.exists(src):
+            if os.path.exists(dst):
+                if offset is None:
+                    args = ("/sbin/losetup", src, dst)
+                else:
+                    args = ("/sbin/losetup", "-o", str(offset), src, dst)
+                rc = subprocess.call(args)
+        return rc
+
+    def lounset(device):
+        args = ("/sbin/losetup", "-d", device)
+        rc = subprocess.call(args) 
 
     def null():
-        fd = open("/dev/null", "w")
+        fd = open(os.devnull, 'w')
         return fd
+
+    def dd(file, target):
+        args = ("/bin/dd", "if=%s"%file, "of=%s"%target)
+        rc = subprocess.call(args)
 
     def lo():
         args = ("/sbin/losetup", "--find")
-        rc = subprocess.call(args, stdout=open(null())).communicate()[0].rstrip()
+        rc = subprocess.Popen(args, stdout=subprocess.PIPE).communicate()[0].rstrip()
         return rc
+
+    def lodev(file):
+        args = ("/sbin/losetup", "-j", file)
+        rc = subprocess.Popen(args, stdout=subprocess.PIPE).communicate()[0].split(":")
+        return rc[0]
 
 
     def mkimage(bs, count):
         tmp = tempfile.mkstemp()
         image = tmp[1]
-        args = ("/bin/dd",
-                "if=/dev/zero",
-                "of=%s" % image,
-                "bs=%s" % bs,
-                "count=%s" % count)
+        args = ("/bin/dd", "if=/dev/zero",
+                 "of=%s"%image, "bs=%s"%bs,
+                 "count=%s"%count)
         rc = subprocess.call(args)
         return image
 
 
     def size(ent):
-        size = os.path.getsize(ent)
-        if size >= 0:
-            return os.path.getsize(ent)
-        else:
-            print "Something is wrong, %s has no size." % ent
-            return False
+        if os.path.exists(ent):
+            return os.stat(ent).st_size
 
+    def bs(size):
+        return size / 2048
 
-    def blocks(block_size, size):
-        # Round up to nearest block
-        # Make sure floating math, not integer math or we don't get remainders.
-        # Turn back into an integer for return statement.
-        return int(math.ceil(size / float(block_size)))
+    def partition(device):
+        dev = parted.Device(path=device)
+        disk = parted.freshDisk(dev, 'msdos')
+        constraint = parted.Constraint(device=dev)
 
+        new_geom = parted.Geometry(device=dev,
+                                   start=1,
+                                   end=(constraint.maxSize - 1))
+        filesystem = parted.FileSystem(type="ext2",
+                                       geometry=new_geom)
+        partition = parted.Partition(disk=disk,
+                                     fs=filesystem,
+                                     type=parted.PARTITION_NORMAL,
+                                     geometry=new_geom)
+        constraint = parted.Constraint(exactGeom=new_geom)
+        partition.setFlag(parted.PARTITION_BOOT)
+        disk.addPartition(partition=partition,
+                          constraint=constraint)
+        
+        disk.commit()
+
+    def format(partition):
+        args = ("/sbin/mke2fs", "-j", partition)
+        rc = subprocess.call(args)
+
+    def mbr(target):
+        mbr = "/usr/share/syslinux/mbr.bin"
+        dd(mbr, target)
+
+    def getuuid(device):
+        args = ("/sbin/blkid", "-s", "UUID", "-o", "value", device)
+        rc = subprocess.Popen(args, stdout=subprocess.PIPE).communicate()[0].rstrip()
+        return rc
+
+    def syslinux(multitmp, config, **args):
+        arg = ("/sbin/extlinux", "--install", multitmp + "/extlinux/")
+        rc = subprocess.call(arg)
+
+        content = """
+        default vesamenu.c32
+        timeout 100
+
+        menu background splash.jpg
+        menu title Welcome to Fedora 13
+        menu color border 0 #ffffffff #00000000
+        menu color sel 7 #ffffffff #ff000000
+        menu color title 0 #ffffffff #00000000
+        menu color tabmsg 0 #ffffffff #00000000
+        menu color unsel 0 #ffffffff #00000000
+        menu color hotsel 0 #ff000000 #ffffffff
+        menu color hotkey 7 #ffffffff #ff000000
+        menu color timeout_msg 0 #ffffffff #00000000
+        menu color timeout 0 #ffffffff #00000000
+        menu color cmdline 0 #ffffffff #00000000
+        menu hidden
+        menu hiddenrow 5
+
+        label Fedora-13-x86
+        menu label Fedora-13-x86
+        kernel vmlinuz0
+        append initrd=initrd0.img root=UUID=%(uuid)s rootfstype=auto ro live_dir=/x86/LiveOS liveimg
+        
+        label Fedora-13-x64
+        menu label Fedora-13-x64
+        kernel vmlinuz1
+        append initrd=initrd1.img root=UUID=%(uuid)s rootfstype=auto ro live_dir=/x64/LiveOS liveimg
+        """ % args
+        fd = open(config, 'w')
+        fd.write(content)
+        fd.close()
+
+    def verify():
+        # use md5 module to verify image files
+        pass
 
     def setup(x86, x64, multi):
-        # Reworked the logic a bit.
-        block_size = 2048               # Should this be a global constant instead?
+
         sz = size(x86) + size(x64)
-        count = blocks(block_size, sz)
+        count = bs(sz)
+        blsz = str(2048)
+
+        count = count + 102400
+
+        multi = mkimage(blsz, count)    
+        losetup(lo(), multi)
+ 
+        mbr(lodev(multi))
+        partition(lodev(multi))
+ 
+        lounset(lodev(multi))
+     
+        losetup(lo(), multi, offset=512)
+        format(lodev(multi))
+
+        multitmp = mkdir()
+        mount(lodev(multi), multitmp)
+
+        losetup(lo(), x86)
+        losetup(lo(), x64)
+ 
+        x86tmp = mkdir()
+        x64tmp = mkdir()
+
+        mount(lodev(x86), x86tmp)
+        mount(lodev(x64), x64tmp)
+
+
+        dirs = ("/extlinux/", "/x86/", "/x64/")
+        for dir in dirs:
+            mkdir(multitmp + dir)
+        dirs = ("/x86/", "/x64/")
+        for dir in dirs:
+            mkdir(multitmp + dir + "/LiveOS/")
+
+        intermediate = tempfile.mkdtemp() # loopdev performance is slow
+                                          # copy to here first then back
+                                          # to multitmp + dir which is looback also
+
+        imgs = ("squashfs.img", "osmin.img")
+        for img in imgs:
+            copy(x86tmp + "/LiveOS/" + img, intermediate)
+            copy(intermediate + "/" + img, multitmp + "/x86/LiveOS/")
+        for img in imgs:
+            copy(x64tmp + "/LiveOS/" + img, intermediate)
+            copy(intermediate + "/" + img, multitmp + "/x64/LiveOS/")
+
+        for file in os.listdir(x86tmp + "/isolinux/"):
+            copy(x86tmp + "/isolinux/" + file, multitmp + "/extlinux/")
+
+        copy(x64tmp + "/isolinux/vmlinuz0", multitmp + "/extlinux/vmlinuz1")
+        copy(x64tmp + "/isolinux/initrd0.img", multitmp + "/extlinux/initrd1.img")
+            
+
+       
+        uuid = getuuid(lodev(multi))
+
+  
+        config = (multitmp + "/extlinux/extlinux.conf")
+        syslinux(multitmp,
+                 config,
+                 uuid=uuid)
+
+
+
+        umount(x86tmp)
+        umount(x64tmp)
+        umount(multitmp)
+
+        lounset(lodev(x86))
+        lounset(lodev(x64))
+        lounset(lodev(multi))
+
+        shutil.rmtree(x86tmp)
+        shutil.rmtree(x64tmp)
+        shutil.rmtree(multitmp)
+        shutil.rmtree(intermediate)   
         
-        multi = mkimage(str(blsz), count)
-        losetup(multi, lo())         
+
+
+        if os.path.exists(sys.argv[3]):
+            os.unlink(sys.argv[3])
+        move(multi, sys.argv[3])
  
 
     def parse(x86, x64, multi):
-        for file in x86, x64, multi:    # Do we expect that multi exists yet?
-            if os.path.exists(file):    # Should we test for existance or isfile?
+        for file in x86, x64:
+            if os.path.exists(file):
                 pass
             else:
-                parser.error("One of the images does not exist.")
+                usage()
+        if not multi:
+            usage()
         setup(x86, x64, multi)
 
-    # Generate parser and fill with options.
-    usage = "usage: %prog [options] <32bit image> <64bit image> <biarch image>"
-    version = "%prog " + __version__
-    parser = OptionParser(usage=usage, description=__description__, version=version)
-    parser.add_option("--test", action="store_true", default=False,
-                      dest="test", help="Doesn't do anything yet.")
-    (options, args) = parser.parse_args()
-    if len(args) != 3:
-        parser.error("You must specify all three arguments.")
-        sys.exit(0)
-        
-    try:                                # Any reason this would fail?
-        parse(args[0], args[1], args[2])
+
+
+
+
+    try: 
+        parse(sys.argv[1], sys.argv[2], sys.argv[3])
     except:
-        parser.error("Something failed. Better luck next time!")
-        sys.exit(1)
-               
+        usage()
+
+
+
+        
+        
+
+
 if __name__ == "__main__":
     sys.exit(main())

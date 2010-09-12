@@ -26,6 +26,7 @@ install: man
 	$(INSTALL_PROGRAM) -D tools/image-creator $(DESTDIR)/usr/bin/image-creator
 	$(INSTALL_PROGRAM) -D tools/livecd-iso-to-disk.sh $(DESTDIR)/usr/bin/livecd-iso-to-disk
 	$(INSTALL_PROGRAM) -D tools/livecd-iso-to-pxeboot.sh $(DESTDIR)/usr/bin/livecd-iso-to-pxeboot
+	$(INSTALL_PROGRAM) -D tools/mkbiarch.py $(DESTDIR)/usr/bin/mkbiarch
 	$(INSTALL_DATA) -D AUTHORS $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)/AUTHORS
 	$(INSTALL_DATA) -D COPYING $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)/COPYING
 	$(INSTALL_DATA) -D README $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)/README
@@ -41,6 +42,7 @@ uninstall:
 	rm -f $(DESTDIR)/usr/bin/livecd-creator
 	rm -rf $(DESTDIR)/usr/lib/livecd-creator
 	rm -rf $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)
+	rm -f $(DESTDIR)/usr/bin/mkbiarch
 
 dist : all
 	git archive --format=tar --prefix=livecd-tools-$(VERSION)/ HEAD | bzip2 -9v > livecd-tools-$(VERSION).tar.bz2
