@@ -199,6 +199,28 @@ createMSDOSLayout() {
     USBLABEL="UUID=$(/sbin/blkid -s UUID -o value $USBDEV)"
 }
 
+createEXTFSLayout() {
+    dev=$1
+    getdisk $dev
+
+    echo "WARNING: THIS WILL DESTROY ANY DATA ON $device!!!"
+    echo "Press Enter to continue or ctrl-c to abort"
+    read
+    umount ${device}? &> /dev/null
+    /sbin/parted --script $device mklabel msdos
+    partinfo=$(LC_ALL=C /sbin/parted --script -m $device "unit b print" |grep ^$device:)
+    size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/B$//')
+    /sbin/parted --script $device unit b mkpart primary ext2 17408 $(($size - 17408)) set 1 boot on
+    USBDEV=${device}1
+    # Sometimes automount can be _really_ annoying.
+    echo "Waiting for devices to settle..."
+    /sbin/udevadm settle
+    sleep 5
+    umount $USBDEV &> /dev/null
+    /sbin/mkfs.ext4 -L LIVE $USBDEV
+    USBLABEL="UUID=$(/sbin/blkid -s UUID -o value $USBDEV)"
+}
+
 checkGPT() {
     dev=$1
     getdisk $dev
@@ -231,10 +253,13 @@ checkFilesystem() {
     dev=$1
 
     USBFS=$(/sbin/blkid -s TYPE -o value $dev)
-    if [ "$USBFS" != "vfat" -a "$USBFS" != "msdos" -a "$USBFS" != "ext2" -a "$USBFS" != "ext3" ]; then
-	echo "USB filesystem must be vfat or ext[23]"
-	exitclean
+    if [ "$USBFS" != "vfat" ] && [ "$USBFS" != "msdos" ]; then
+        if [ "$USBFS" != "ext2" ] && [ "$USBFS" != "ext3" ] && [ "$USBFS" != "ext4" ]; then
+	    echo "USB filesystem must be vfat or ext[234]"
+	    exitclean
+        fi
     fi
+    
 
     USBLABEL=$(/sbin/blkid -s UUID -o value $dev)
     if [ -n "$USBLABEL" ]; then 
@@ -247,7 +272,7 @@ checkFilesystem() {
 	    echo "Need to have a filesystem label or UUID for your USB device"
 	    if [ "$USBFS" = "vfat" -o "$USBFS" = "msdos" ]; then
 		echo "Label can be set with /sbin/dosfslabel"
-	    elif [ "$USBFS" = "ext2" -o "$USBFS" = "ext3" ]; then
+	    elif [ "$USBFS" = "ext2" -o "$USBFS" = "ext3" -o "$USBFS" = "ext4" ]; then
 		echo "Label can be set with /sbin/e2label"
 	    fi
 	    exitclean
@@ -451,6 +476,7 @@ if [ -z "$noverify" ]; then
     fi
 fi
 
+checkFilesystem $USBDEV
 # do some basic sanity checks.  
 checkMounted $USBDEV
 if [ -n "$format" -a -z "$skipcopy" ];then
@@ -458,14 +484,18 @@ if [ -n "$format" -a -z "$skipcopy" ];then
   # checks for a valid filesystem
   if [ -n "$efi" ];then
     createGPTLayout $USBDEV
-  else
+  elif [ "$USBFS" == "vfat" -o "$USBFS" == "msdos" ]; then
     createMSDOSLayout $USBDEV
+  else
+    createEXTFSLayout $USBDEV
   fi
 fi
+
 checkFilesystem $USBDEV
 if [ -n "$efi" ]; then
   checkGPT $USBDEV
 fi
+
 checkSyslinuxVersion
 # Because we can't set boot flag for EFI Protective on msdos partition tables
 [ -z "$efi" ] && checkPartActive $USBDEV
@@ -785,7 +815,7 @@ if [ -z "$multi" ]; then
     cp /usr/lib/syslinux/menu.c32 $USBMNT/$SYSLINUXPATH/menu.c32
   fi
 
-  if [ "$USBFS" = "vfat" -o "$USBFS" = "msdos" ]; then
+  if [ "$USBFS" == "vfat" -o "$USBFS" == "msdos" ]; then
     # syslinux expects the config to be named syslinux.cfg 
     # and has to run with the file system unmounted
     mv $USBMNT/$SYSLINUXPATH/isolinux.cfg $USBMNT/$SYSLINUXPATH/syslinux.cfg
@@ -797,7 +827,7 @@ if [ -z "$multi" ]; then
     else
       syslinux $USBDEV
     fi
-  elif [ "$USBFS" = "ext2" -o "$USBFS" = "ext3" ]; then
+  elif [ "$USBFS" == "ext2" -o "$USBFS" == "ext3" -o "$USBFS" == "ext4" ]; then
     # extlinux expects the config to be named extlinux.conf
     # and has to be run with the file system mounted
     mv $USBMNT/$SYSLINUXPATH/isolinux.cfg $USBMNT/$SYSLINUXPATH/extlinux.conf
