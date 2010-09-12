@@ -327,8 +327,13 @@ detectisotype() {
         return
     fi
     if [ -e $CDMNT/images/install.img ]; then
-        isotype=installer
-        return
+        if [ -e $CDMNT/Packages ]; then
+            isotype=installer
+            return
+        else 
+            isotype=netinst
+            return
+	fi
     fi
     echo "ERROR: $ISO does not appear to be a Live image or DVD installer."
     exitclean
@@ -650,14 +655,18 @@ if [ "$isotype" = "live" -a -z "$skipcopy" ]; then
   if [ -f $CDMNT/LiveOS/osmin.img ]; then
       copyFile $CDMNT/LiveOS/osmin.img $USBMNT/$LIVEOS/osmin.img || exitclean
   fi
+  sync
 fi
 
 # DVD installer copy
-if [ "$isotype" = "installer" ] && [ -z "$skipcopy" ]; then
+if [ \( "$isotype" = "installer" -o "$isotype" = "netinst" \) -a -z "$skipcopy" ]; then
       echo "Copying DVD image to USB stick"
       mkdir -p $USBMNT/images/
       copyFile $CDMNT/images/install.img $USBMNT/images/install.img || exitclean
-      copyFile $ISO $USBMNT/
+      if [ "$isotype" = "installer" ]; then
+          cp $ISO $USBMNT/
+      fi
+      sync
 fi
 
 cp $CDMNT/isolinux/* $USBMNT/$SYSLINUXPATH
@@ -686,6 +695,12 @@ if [ "$isotype" = "installer" ]; then
   sed -i -e "s;initrd=initrd.img;initrd=initrd.img ${LANG:+LANG=$LANG} repo=hd:$USBLABEL:/;g" $BOOTCONFIG $BOOTCONFIG_EFI
   sed -i -e "s;stage2=\S*;;g" $BOOTCONFIG $BOOTCONFIG_EFI
 fi
+
+# DVD Installer for netinst
+if [ "$isotype" = "netinst" ]; then
+  sed -i -e "s;stage2=\S*;stage2=hd:$USBLABEL:/images/install.img;g" $BOOTCONFIG $BOOTCONFIG_EFI
+fi
+
 
 if [ "$overlaysizemb" -gt 0 ]; then
     echo "Initializing persistent overlay file"
