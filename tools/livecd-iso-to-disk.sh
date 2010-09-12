@@ -39,10 +39,15 @@ exitclean() {
     exit 1
 }
 
+isdevloop()
+{
+    [ x"${1#/dev/loop}" != x"$1" ]
+}
+
 getdisk() {
     DEV=$1
 
-    if [[ "$DEV" =~ "/dev/loop*" ]]; then
+    if isdevloop "$DEV"; then
        device="$DEV"
        return
     fi
