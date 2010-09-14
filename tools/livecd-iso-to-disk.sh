@@ -99,7 +99,7 @@ resetMBR() {
 }
 
 checkMBR() {
-    if [[ "$DEV" =~ "/dev/loop*" ]]; then
+    if isdevloop "$DEV"; then
        return 0
     fi
     getdisk $1
