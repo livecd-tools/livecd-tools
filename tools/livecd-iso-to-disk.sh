@@ -70,7 +70,7 @@ getdisk() {
 }
 
 resetMBR() {
-    if [[ "$DEV" =~ "/dev/loop*" ]]; then
+    if isdevloop "$DEV"; then
        return
     fi
     getdisk $1
@@ -129,7 +129,7 @@ checkPartActive() {
     if [ "$dev" = "$device" ]; then
 	return
     fi
-    if [[ "$dev" =~ "/dev/loop*" ]]; then
+    if isdevloop "$DEV"; then
         return
     fi
 
@@ -189,7 +189,11 @@ createMSDOSLayout() {
     partinfo=$(LC_ALL=C /sbin/parted --script -m $device "unit b print" |grep ^$device:)
     size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/B$//')
     /sbin/parted --script $device unit b mkpart primary fat32 17408 $(($size - 17408)) set 1 boot on
-    USBDEV=${device}1
+    if ! isdevloop "$DEV"; then
+        USBDEV=${device}1
+    else
+        USBDEV=${device}
+    fi
     # Sometimes automount can be _really_ annoying.
     echo "Waiting for devices to settle..."
     /sbin/udevadm settle
