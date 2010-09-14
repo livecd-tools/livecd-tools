@@ -452,23 +452,11 @@ menu hiddenrow 5
             template = """label %(short)s
   menu label %(long)s
   kernel vmlinuz%(index)s
-  append initrd=initrd%(index)s.img root=%(rootlabel)s rootfstype=%(isofstype)s %(liveargs)s %(extra)s
-
-
-  label %(short)s
-  menu label %(long)s %(basicvideo)s
-  kernel vmlinuz%(index)s
   append initrd=initrd%(index)s.img root=%(rootlabel)s rootfstype=%(isofstype)s %(liveargs)s %(xdriver)s %(extra)s
 """
         else:
             template = """label %(short)s
   menu label %(long)s
-  kernel mboot.c32
-  append xen%(index)s.gz --- vmlinuz%(index)s root=%(rootlabel)s rootfstype=%(isofstype)s %(liveargs)s %(extra)s --- initrd%(index)s.img
-
-
-  label %(short)s
-  menu label %(long)s %(basicvideo)s
   kernel mboot.c32
   append xen%(index)s.gz --- vmlinuz%(index)s root=%(rootlabel)s rootfstype=%(isofstype)s %(liveargs)s %(xdriver)s %(extra)s --- initrd%(index)s.img
 """
@@ -504,7 +492,7 @@ menu hiddenrow 5
 
             # Basic video driver
             basic = "system with basic video driver"
-            xdriver = "xdriver=vesa"
+            xdriver = "xdriver=vesa nomodeset"
 
 
             # tell dracut not to ask for LUKS passwords or activate mdraid sets
@@ -519,13 +507,24 @@ menu hiddenrow 5
                                            liveargs = kern_opts,
                                            long = long,
                                            short = "linux" + index,
-                                           basicvideo = basic,
-                                           xdriver = xdriver,
+                                           basicvideo = "",
+                                           xdriver = "",
                                            extra = "",
                                            index = index)
 
             if default:
                 cfg += "menu default\n"
+
+            cfg += self.__get_image_stanza(is_xen, isDracut,
+                                           fslabel = self.fslabel,
+                                           isofstype = "auto",
+                                           liveargs = kern_opts,
+                                           long = long,
+                                           short = "linux" + index,
+                                           basicvideo = basic,
+                                           xdriver = xdriver,
+                                           extra = "",
+                                           index = index)
 
             if checkisomd5:
                 cfg += self.__get_image_stanza(is_xen, isDracut,
