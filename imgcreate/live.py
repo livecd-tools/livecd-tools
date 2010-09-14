@@ -519,7 +519,7 @@ menu hiddenrow 5
                                            fslabel = self.fslabel,
                                            isofstype = "auto",
                                            liveargs = kern_opts,
-                                           long = long,
+                                           long = long + " (Basic Video)",
                                            short = "linux" + index,
                                            basicvideo = basic,
                                            xdriver = xdriver,
