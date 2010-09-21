@@ -42,7 +42,7 @@ def parse_options(args):
     imgopt.add_option("-f", "--fslabel", type="string", dest="fs_label",
                       help="File system label (default based on config name)")
     imgopt.add_option("", "--compression-type", type="string", dest="compress_type",
-                      help="Compression type recognized by mksquashfs (default gzip, lzma needs custom kernel)",
+                      help="Compression type recognized by mksquashfs (default gzip, lzma needs custom kernel, lzo needs a 2.6.36+ kernel)",
                       default="gzip")
     parser.add_option_group(imgopt)
 

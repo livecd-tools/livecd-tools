@@ -43,7 +43,7 @@ Defines the file system label. The default is based on the configuration name.
 =item --compression-type=COMPRESSOR
 
 Specify a compressor recognized by mksquashfs. The default is gzip. lzma
-currently requires a custom kernel to produce a functional image. If gzip
+currently requires a custom kernel to produce a functional image. lzo works with 2.6.36+ kernels, but will generally take up more space than using gzip. If gzip
 is used, the -comp option is not passed to mksquashfs to allow the use of
 older versions of mksquashfs.
 
