@@ -61,6 +61,9 @@ class LiveImageEditor(LiveImageCreator):
         self.tmpdir = "/var/tmp"
         """The directory in which all temporary files will be created."""
 
+        self.compress_type = "gzip"
+        """mksquashfs compressor to use."""
+
         self.skip_compression = False
         """Controls whether to use squashfs to compress the image."""
 
