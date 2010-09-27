@@ -420,7 +420,7 @@ class SelinuxConfig(KickstartConfig):
         if not os.path.exists(self.path("/sbin/setfiles")):
             return
 
-        self.call(["/sbin/setfiles", "/etc/selinux/targeted/contexts/files/file_contexts", "-e", "/proc", "-e", "/sys", "-e", "/dev", "-e", "/selinux", "/"])
+        self.call(["/sbin/setfiles", "-e", "/proc", "-e", "/sys", "-e", "/dev", "-e", "/selinux", "/etc/selinux/targeted/contexts/files/file_contexts", "/"])
 
     def apply(self, ksselinux):
         if os.path.exists(self.path("/usr/sbin/lokkit")):
