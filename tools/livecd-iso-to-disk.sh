@@ -258,8 +258,8 @@ checkFilesystem() {
 
     USBFS=$(/sbin/blkid -s TYPE -o value $dev)
     if [ "$USBFS" != "vfat" ] && [ "$USBFS" != "msdos" ]; then
-        if [ "$USBFS" != "ext2" ] && [ "$USBFS" != "ext3" ] && [ "$USBFS" != "ext4" ]; then
-	    echo "USB filesystem must be vfat or ext[234]"
+        if [ "$USBFS" != "ext2" ] && [ "$USBFS" != "ext3" ] && [ "$USBFS" != "ext4" ] && [ "$USBFS" != "btrfs"]; then
+	    echo "USB filesystem must be vfat, ext[234] or btrfs"
 	    exitclean
         fi
     fi
@@ -278,6 +278,8 @@ checkFilesystem() {
 		echo "Label can be set with /sbin/dosfslabel"
 	    elif [ "$USBFS" = "ext2" -o "$USBFS" = "ext3" -o "$USBFS" = "ext4" ]; then
 		echo "Label can be set with /sbin/e2label"
+	    elif [ "$USBFS" = "btrfs" ]; then
+                echo "Eventually you'll be able to use /sbin/btrfs filesystem label to add a label." 
 	    fi
 	    exitclean
 	fi
@@ -853,7 +855,7 @@ if [ -z "$multi" ]; then
     else
       syslinux $USBDEV
     fi
-  elif [ "$USBFS" == "ext2" -o "$USBFS" == "ext3" -o "$USBFS" == "ext4" ]; then
+  elif [ "$USBFS" == "ext2" -o "$USBFS" == "ext3" -o "$USBFS" == "ext4" -o "$USBFS" == "btrfs" ]; then
     # extlinux expects the config to be named extlinux.conf
     # and has to be run with the file system mounted
     mv $USBMNT/$SYSLINUXPATH/isolinux.cfg $USBMNT/$SYSLINUXPATH/extlinux.conf
