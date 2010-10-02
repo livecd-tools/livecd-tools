@@ -858,7 +858,12 @@ if [ -z "$multi" ]; then
     # and has to be run with the file system mounted
     mv $USBMNT/$SYSLINUXPATH/isolinux.cfg $USBMNT/$SYSLINUXPATH/extlinux.conf
     extlinux -i $USBMNT/$SYSLINUXPATH
-    chattr -i $USBMNT/$SYSLINUXPATH/extlinux.sys
+    # Starting with syslinux 4 ldlinux.sys is used on all file systems.
+    if [ -f "$USBMNT/$SYSLINUXPATH/extlinux.sys" ]; then
+        chattr -i $USBMNT/$SYSLINUXPATH/extlinux.sys
+    elif [ -f "$USBMNT/$SYSLINUXPATH/ldlinux.sys" ]; then
+        chattr -i $USBMNT/$SYSLINUXPATH/ldlinux.sys
+    fi
     cleanup
   fi
 else
