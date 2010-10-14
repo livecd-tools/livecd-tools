@@ -130,6 +130,7 @@ class LiveCDYum(yum.YumBase):
             # takes a variable and substitutes like yum configs do
             option = option.replace("$basearch", rpmUtils.arch.getBaseArch())
             option = option.replace("$arch", rpmUtils.arch.getCanonArch())
+            option = option.replace("$releasever", yum.config._getsysver("/", "redhat-release"))
             return option
 
         repo = yum.yumRepo.YumRepository(name)
