@@ -637,13 +637,15 @@ class ImageCreator(object):
         ayum.setup(yum_conf, self._instroot)
 
         for repo in kickstart.get_repos(self.ks, repo_urls):
-            (name, baseurl, mirrorlist, inc, exc) = repo
-            
+            (name, baseurl, mirrorlist, proxy, inc, exc) = repo
+
             yr = ayum.addRepository(name, baseurl, mirrorlist)
             if inc:
                 yr.includepkgs = inc
             if exc:
                 yr.exclude = exc
+            if proxy:
+                yr.proxy = proxy
 
         if kickstart.exclude_docs(self.ks):
             rpm.addMacro("_excludedocs", "1")
