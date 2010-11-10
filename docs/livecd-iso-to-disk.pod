@@ -52,6 +52,14 @@ The intended use of this option is to speed up testing of the boot configuration
 
 Create a GPT partition table when --format is passed, and install an hybrid EFI/MBR bootloader on the disk. This is necessary for most Intel Macs.
 
+=item --timeout
+
+Modify the bootloader's timeout value. This overrides the value set during iso creation. Units are 1/10s
+
+=item --totaltimeout
+
+Add a totaltimeout to the bootloader config. This is used to force and automatic boot. This cannot be canceled by the user. Units are 1/10s
+
 =back
 
 =head1 CONTRIBUTORS
