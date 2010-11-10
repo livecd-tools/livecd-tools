@@ -23,7 +23,7 @@
 export PATH=/sbin:/usr/sbin:$PATH
 
 usage() {
-    echo "$0 [--format] [--reset-mbr] [--noverify] [--overlay-size-mb <size>] [--home-size-mb <size>] [--unencrypted-home] [--skipcopy] [--efi] <isopath> <usbstick device>"
+    echo "$0 [--timeout <time>] [--totaltimeout <time>] [--format] [--reset-mbr] [--noverify] [--overlay-size-mb <size>] [--home-size-mb <size>] [--unencrypted-home] [--skipcopy] [--efi] <isopath> <usbstick device>"
     exit 1
 }
 
@@ -452,6 +452,16 @@ while [ $# -gt 2 ]; do
 	--multi)
 	    multi=1
 	    ;;
+        --timeout)
+            checkint $2
+            timeout=$2
+            shift
+            ;;
+        --totaltimeout)
+            checkint $2
+            totaltimeout=$2
+            shift
+            ;;
 	*)
 	    echo "invalid arg -- $1"
 	    usage
@@ -487,7 +497,7 @@ if [ -z "$noverify" ]; then
     fi
 fi
 
-checkFilesystem $USBDEV
+#checkFilesystem $USBDEV
 # do some basic sanity checks.  
 checkMounted $USBDEV
 if [ -n "$format" -a -z "$skipcopy" ];then
@@ -705,6 +715,14 @@ fi
 # DVD Installer for netinst
 if [ "$isotype" = "netinst" ]; then
   sed -i -e "s;stage2=\S*;stage2=hd:$USBLABEL:/images/install.img;g" $BOOTCONFIG $BOOTCONFIG_EFI
+fi
+
+# Adjust the boot timeouts
+if [ -n "$timeout" ]; then
+    sed -i -e "s/^timeout.*$/timeout\ $timeout/" $BOOTCONFIG
+fi
+if [ -n "$totaltimeout" ]; then
+    sed -i -e "/^timeout.*$/a\totaltimeout\ $totaltimeout" $BOOTCONFIG
 fi
 
 # Use repo if the .iso has the repository on it, otherwise use stage2 which
