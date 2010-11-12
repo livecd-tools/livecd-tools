@@ -258,7 +258,7 @@ checkFilesystem() {
 
     USBFS=$(/sbin/blkid -s TYPE -o value $dev)
     if [ "$USBFS" != "vfat" ] && [ "$USBFS" != "msdos" ]; then
-        if [ "$USBFS" != "ext2" ] && [ "$USBFS" != "ext3" ] && [ "$USBFS" != "ext4" ] && [ "$USBFS" != "btrfs"]; then
+        if [ "$USBFS" != "ext2" ] && [ "$USBFS" != "ext3" ] && [ "$USBFS" != "ext4" ] && [ "$USBFS" != "btrfs" ]; then
 	    echo "USB filesystem must be vfat, ext[234] or btrfs"
 	    exitclean
         fi
