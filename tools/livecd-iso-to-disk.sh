@@ -54,13 +54,13 @@ getdisk() {
 
     p=$(udevadm info -q path -n $DEV)
     if [ -e /sys/$p/device ]; then
-	device=$(basename /sys/$p)
+        device=$(basename /sys/$p)
     else
-	device=$(basename $(readlink -f /sys/$p/../))
+        device=$(basename $(readlink -f /sys/$p/../))
     fi
     if [ ! -e /sys/block/$device -o ! -e /dev/$device ]; then
-	echo "Error finding block device of $DEV.  Aborting!"
-	exitclean
+        echo "Error finding block device of $DEV.  Aborting!"
+        exitclean
     fi
 
     device="/dev/$device"
@@ -110,11 +110,11 @@ checkMBR() {
     mbrword=$(hexdump -n 2 $bs |head -n 1|awk {'print $2;'})
     rm -f $bs
     if [ "$mbrword" = "0000" ]; then
-	echo "MBR appears to be blank."
-	echo "Do you want to replace the MBR on this device?"
-	echo "Press Enter to continue or ctrl-c to abort"
-	read
-	resetMBR $1
+        echo "MBR appears to be blank."
+        echo "Do you want to replace the MBR on this device?"
+        echo "Press Enter to continue or ctrl-c to abort"
+        read
+        resetMBR $1
     fi
 
     return 0
@@ -127,19 +127,19 @@ checkPartActive() {
     # if we're installing to whole-disk and not a partition, then we
     # don't need to worry about being active
     if [ "$dev" = "$device" ]; then
-	return
+        return
     fi
     if isdevloop "$DEV"; then
         return
     fi
 
     if [ "$(/sbin/fdisk -l $device 2>/dev/null |grep $dev |awk {'print $2;'})" != "*" ]; then
-	echo "Partition isn't marked bootable!"
-	echo "You can mark the partition as bootable with "
+        echo "Partition isn't marked bootable!"
+        echo "You can mark the partition as bootable with "
         echo "    # /sbin/parted $device"
-	echo "    (parted) toggle N boot"
-	echo "    (parted) quit"
-	exitclean
+        echo "    (parted) toggle N boot"
+        echo "    (parted) quit"
+        exitclean
     fi
 }
 
@@ -147,10 +147,10 @@ checkLVM() {
     dev=$1
 
     if [ -x /sbin/pvs -a \
-	"$(/sbin/pvs -o vg_name --noheadings $dev* 2>/dev/null)" ]; then
-	echo "Device, $dev, contains a volume group and cannot be formated!"
-	echo "You can remove the volume group using vgremove."
-	exitclean
+        "$(/sbin/pvs -o vg_name --noheadings $dev* 2>/dev/null)" ]; then
+        echo "Device, $dev, contains a volume group and cannot be formated!"
+        echo "You can remove the volume group using vgremove."
+        exitclean
     fi
     return 0
 }
@@ -239,17 +239,17 @@ checkGPT() {
     volname=$(echo $partinfo |cut -d : -f 6)
     flags=$(echo $partinfo |cut -d : -f 7)
     if [ "$volname" != "EFI System Partition" ]; then
-	echo "Partition name must be 'EFI System Partition'"
-	echo "This can be set in parted or you can run with --reset-mbr"
-	exitclean
+        echo "Partition name must be 'EFI System Partition'"
+        echo "This can be set in parted or you can run with --reset-mbr"
+        exitclean
     fi
     if [ "$(echo $flags |grep -c boot)" = "0" ]; then
-	echo "Partition isn't marked bootable!"
-	echo "You can mark the partition as bootable with "
+        echo "Partition isn't marked bootable!"
+        echo "You can mark the partition as bootable with "
         echo "    # /sbin/parted $device"
-	echo "    (parted) toggle N boot"
-	echo "    (parted) quit"
-	exitclean
+        echo "    (parted) toggle N boot"
+        echo "    (parted) quit"
+        exitclean
     fi
 }
 
@@ -259,48 +259,48 @@ checkFilesystem() {
     USBFS=$(/sbin/blkid -s TYPE -o value $dev)
     if [ "$USBFS" != "vfat" ] && [ "$USBFS" != "msdos" ]; then
         if [ "$USBFS" != "ext2" ] && [ "$USBFS" != "ext3" ] && [ "$USBFS" != "ext4" ] && [ "$USBFS" != "btrfs" ]; then
-	    echo "USB filesystem must be vfat, ext[234] or btrfs"
-	    exitclean
+            echo "USB filesystem must be vfat, ext[234] or btrfs"
+            exitclean
         fi
     fi
 
 
     USBLABEL=$(/sbin/blkid -s UUID -o value $dev)
     if [ -n "$USBLABEL" ]; then
-	USBLABEL="UUID=$USBLABEL" ;
+        USBLABEL="UUID=$USBLABEL" ;
     else
-	USBLABEL=$(/sbin/blkid -s LABEL -o value $dev)
-	if [ -n "$USBLABEL" ]; then
-	    USBLABEL="LABEL=$USBLABEL"
-	else
-	    echo "Need to have a filesystem label or UUID for your USB device"
-	    if [ "$USBFS" = "vfat" -o "$USBFS" = "msdos" ]; then
-		echo "Label can be set with /sbin/dosfslabel"
-	    elif [ "$USBFS" = "ext2" -o "$USBFS" = "ext3" -o "$USBFS" = "ext4" ]; then
-		echo "Label can be set with /sbin/e2label"
-	    elif [ "$USBFS" = "btrfs" ]; then
+        USBLABEL=$(/sbin/blkid -s LABEL -o value $dev)
+        if [ -n "$USBLABEL" ]; then
+            USBLABEL="LABEL=$USBLABEL"
+        else
+            echo "Need to have a filesystem label or UUID for your USB device"
+            if [ "$USBFS" = "vfat" -o "$USBFS" = "msdos" ]; then
+                echo "Label can be set with /sbin/dosfslabel"
+            elif [ "$USBFS" = "ext2" -o "$USBFS" = "ext3" -o "$USBFS" = "ext4" ]; then
+                echo "Label can be set with /sbin/e2label"
+            elif [ "$USBFS" = "btrfs" ]; then
                 echo "Eventually you'll be able to use /sbin/btrfs filesystem label to add a label."
-	    fi
-	    exitclean
-	fi
+            fi
+            exitclean
+        fi
     fi
 
     if [ "$USBFS" = "vfat" -o "$USBFS" = "msdos" ]; then
-	mountopts="-o shortname=winnt,umask=0077"
+        mountopts="-o shortname=winnt,umask=0077"
     fi
 }
 
 checkSyslinuxVersion() {
     if [ ! -x /usr/bin/syslinux ]; then
-	echo "You need to have syslinux installed to run this script"
-	exit 1
+        echo "You need to have syslinux installed to run this script"
+        exit 1
     fi
     if ! syslinux 2>&1 | grep -qe -d; then
-	SYSLINUXPATH=""
+        SYSLINUXPATH=""
     elif [ -n "$multi" ]; then
-	SYSLINUXPATH="$LIVEOS/syslinux"
+        SYSLINUXPATH="$LIVEOS/syslinux"
     else
-	SYSLINUXPATH="syslinux"
+        SYSLINUXPATH="syslinux"
     fi
 }
 
@@ -318,7 +318,7 @@ checkMounted() {
 
 checkint() {
     if ! test $1 -gt 0 2>/dev/null ; then
-	usage
+        usage
     fi
 }
 
@@ -339,40 +339,40 @@ detectisotype() {
         else 
             isotype=netinst
             return
-	fi
+        fi
     fi
     echo "ERROR: $ISO does not appear to be a Live image or DVD installer."
     exitclean
 }
 
 cp_p() {
-	strace -q -ewrite cp -- "${1}" "${2}" 2>&1 \
-	| awk '{
-	count += $NF
-	if (count % 10 == 0) {
-		percent = count / total_size * 100
-		printf "%3d%% [", percent
-		for (i=0;i<=percent;i++)
-			printf "="
-			printf ">"
-			for (i=percent;i<100;i++)
-				printf " "
-				printf "]\r"
-			}
-		}
-		END { print "" }' total_size=$(stat -c '%s' "${1}") count=0
+    strace -q -ewrite cp -- "${1}" "${2}" 2>&1 \
+        | awk '{
+        count += $NF
+        if (count % 10 == 0) {
+            percent = count / total_size * 100
+            printf "%3d%% [", percent
+            for (i=0;i<=percent;i++)
+                printf "="
+                printf ">"
+            for (i=percent;i<100;i++)
+                printf " "
+                printf "]\r"
+            }
+        }
+        END { print "" }' total_size=$(stat -c '%s' "${1}") count=0
 }
 
 copyFile() {
-	if [ -x /usr/bin/gvfs-copy ]; then
-	    gvfs-copy -p "$1" "$2"
-	    return
-	fi
-	if [ -x /usr/bin/strace -a -x /bin/awk ]; then
-	    cp_p "$1" "$2"
-	    return
-	fi
-	cp "$1" "$2"
+    if [ -x /usr/bin/gvfs-copy ]; then
+        gvfs-copy -p "$1" "$2"
+        return
+    fi
+    if [ -x /usr/bin/strace -a -x /bin/awk ]; then
+        cp_p "$1" "$2"
+        return
+    fi
+    cp "$1" "$2"
 }
 
 cryptedhome=1
@@ -386,58 +386,58 @@ LIVEOS=LiveOS
 HOMEFILE="home.img"
 while [ $# -gt 2 ]; do
     case $1 in
-	--overlay-size-mb)
-	    checkint $2
-	    overlaysizemb=$2
-	    shift
-	    ;;
-	--home-size-mb)
-	    checkint $2
+        --overlay-size-mb)
+            checkint $2
+            overlaysizemb=$2
+            shift
+            ;;
+        --home-size-mb)
+            checkint $2
             homesizemb=$2
             shift
-	    ;;
-	--swap-size-mb)
-	    checkint $2
-	    swapsizemb=$2
-	    shift
-	    ;;
+            ;;
+        --swap-size-mb)
+            checkint $2
+            swapsizemb=$2
+            shift
+            ;;
         --crypted-home)
             cryptedhome=1
-	    ;;
+            ;;
         --unencrypted-home)
             cryptedhome=""
             ;;
         --delete-home)
             keephome=""
             ;;
-	--noverify)
-	    noverify=1
-	    ;;
-	--reset-mbr|--resetmbr)
-	    resetmbr=1
-	    ;;
-	--efi|--mactel)
-	    efi=1
-	    ;;
-	--format)
-	    format=1
-	    ;;
-	--skipcopy)
-	    skipcopy=1
-	    ;;
-	--xo)
-	    xo=1
-	    skipcompress=1
-	    ;;
-	--xo-no-home)
-	    xonohome=1
-	    ;;
-	--compress)
-	    skipcompress=""
-	    ;;
-	--skipcompress)
-	    skipcompress=1
-	    ;;
+        --noverify)
+            noverify=1
+            ;;
+        --reset-mbr|--resetmbr)
+            resetmbr=1
+            ;;
+        --efi|--mactel)
+            efi=1
+            ;;
+        --format)
+            format=1
+            ;;
+        --skipcopy)
+            skipcopy=1
+            ;;
+        --xo)
+            xo=1
+            skipcompress=1
+            ;;
+        --xo-no-home)
+            xonohome=1
+            ;;
+        --compress)
+            skipcompress=""
+            ;;
+        --skipcompress)
+            skipcompress=1
+            ;;
         --extra-kernel-args)
             kernelargs=$2
             shift
@@ -445,13 +445,13 @@ while [ $# -gt 2 ]; do
         --force)
             force=1
             ;;
-	--livedir)
-	    LIVEOS=$2
-	    shift
-	    ;;
-	--multi)
-	    multi=1
-	    ;;
+        --livedir)
+            LIVEOS=$2
+            shift
+            ;;
+        --multi)
+            multi=1
+            ;;
         --timeout)
             checkint $2
             timeout=$2
@@ -462,10 +462,10 @@ while [ $# -gt 2 ]; do
             totaltimeout=$2
             shift
             ;;
-	*)
-	    echo "invalid arg -- $1"
-	    usage
-	    ;;
+        *)
+            echo "invalid arg -- $1"
+            usage
+            ;;
     esac
     shift
 done
@@ -491,9 +491,9 @@ if [ -z "$noverify" ]; then
     echo "Verifying image..."
     checkisomd5 --verbose "$ISO"
     if [ $? -ne 0 ]; then
-	echo "Are you SURE you want to continue?"
-	echo "Press Enter to continue or ctrl-c to abort"
-	read
+        echo "Are you SURE you want to continue?"
+        echo "Press Enter to continue or ctrl-c to abort"
+        read
     fi
 fi
 
@@ -582,15 +582,15 @@ fi
 livesize=$(du -s -B 1M $check | awk {'print $1;'})
 if [ -n "$skipcompress" ]; then
     if [ -e $CDMNT/LiveOS/squashfs.img ]; then
-	if mount -o loop $CDMNT/LiveOS/squashfs.img $CDMNT; then
-	    livesize=$(du -s -B 1M $CDMNT/LiveOS/ext3fs.img | awk {'print $1;'})
-	    umount $CDMNT
-	else
-	    echo "WARNING: --skipcompress or --xo was specified but the currently"
-	    echo "running kernel can not mount the squashfs from the ISO file to extract"
-	    echo "it. The compressed squashfs will be copied to the USB stick."
-	    skipcompress=""
-	fi
+        if mount -o loop $CDMNT/LiveOS/squashfs.img $CDMNT; then
+            livesize=$(du -s -B 1M $CDMNT/LiveOS/ext3fs.img | awk {'print $1;'})
+            umount $CDMNT
+        else
+            echo "WARNING: --skipcompress or --xo was specified but the currently"
+            echo "running kernel can not mount the squashfs from the ISO file to extract"
+            echo "it. The compressed squashfs will be copied to the USB stick."
+            skipcompress=""
+        fi
     fi
 fi
 free=$(df  -B1M $USBDEV  |tail -n 1 |awk {'print $4;'})
@@ -700,7 +700,7 @@ fi
 echo "Updating boot config file"
 # adjust label and fstype
 if [ -n "$LANG" ]; then
-	kernelargs="$kernelargs LANG=$LANG"
+    kernelargs="$kernelargs LANG=$LANG"
 fi
 sed -i -e "s/CDLABEL=[^ ]*/$USBLABEL/" -e "s/rootfstype=[^ ]*/rootfstype=$USBFS/" -e "s/LABEL=[^ ]*/$USBLABEL/" $BOOTCONFIG  $BOOTCONFIG_EFI
 if [ -n "$kernelargs" ]; then sed -i -e "s/liveimg/liveimg ${kernelargs}/" $BOOTCONFIG $BOOTCONFIG_EFI ; fi
@@ -741,7 +741,7 @@ if [ "$overlaysizemb" -gt 0 ]; then
         # vfat can't handle sparse files
         dd if=/dev/zero of=$USBMNT/$LIVEOS/$OVERFILE count=$overlaysizemb bs=1M
       else
-	dd if=/dev/null of=$USBMNT/$LIVEOS/$OVERFILE count=1 bs=1M seek=$overlaysizemb
+        dd if=/dev/null of=$USBMNT/$LIVEOS/$OVERFILE count=1 bs=1M seek=$overlaysizemb
       fi
     fi
     sed -i -e "s/liveimg/liveimg overlay=${USBLABEL}/" $BOOTCONFIG $BOOTCONFIG_EFI
@@ -759,35 +759,35 @@ if [ "$homesizemb" -gt 0 -a -z "$skipcopy" ]; then
     homesource=/dev/zero
     [ -n "$cryptedhome" ] && homesource=/dev/urandom
     if [ "$USBFS" = "vfat" ]; then
-	# vfat can't handle sparse files
-	dd if=${homesource} of=$USBMNT/$LIVEOS/$HOMEFILE count=$homesizemb bs=1M
+        # vfat can't handle sparse files
+        dd if=${homesource} of=$USBMNT/$LIVEOS/$HOMEFILE count=$homesizemb bs=1M
     else
-	dd if=/dev/null of=$USBMNT/$LIVEOS/$HOMEFILE count=1 bs=1M seek=$homesizemb
+        dd if=/dev/null of=$USBMNT/$LIVEOS/$HOMEFILE count=1 bs=1M seek=$homesizemb
     fi
     if [ -n "$cryptedhome" ]; then
-	loop=$(losetup -f)
-	losetup $loop $USBMNT/$LIVEOS/$HOMEFILE
-	setupworked=1
-	until [ ${setupworked} == 0 ]; do
+        loop=$(losetup -f)
+        losetup $loop $USBMNT/$LIVEOS/$HOMEFILE
+        setupworked=1
+        until [ ${setupworked} == 0 ]; do
             echo "Encrypting persistent /home"
             cryptsetup luksFormat -y -q $loop
-	    setupworked=$?
-	done
-	setupworked=1
-	until [ ${setupworked} == 0 ]; do
+            setupworked=$?
+        done
+        setupworked=1
+        until [ ${setupworked} == 0 ]; do
             echo "Please enter the password again to unlock the device"
             cryptsetup luksOpen $loop EncHomeFoo
-	    setupworked=$?
-	done
+            setupworked=$?
+        done
         mke2fs -j /dev/mapper/EncHomeFoo
-	tune2fs -c0 -i0 -ouser_xattr,acl /dev/mapper/EncHomeFoo
-	sleep 2
+        tune2fs -c0 -i0 -ouser_xattr,acl /dev/mapper/EncHomeFoo
+        sleep 2
         cryptsetup luksClose EncHomeFoo
         losetup -d $loop
     else
         echo "Formatting unencrypted /home"
-	mke2fs -F -j $USBMNT/$LIVEOS/$HOMEFILE
-	tune2fs -c0 -i0 -ouser_xattr,acl $USBMNT/$LIVEOS/$HOMEFILE
+        mke2fs -F -j $USBMNT/$LIVEOS/$HOMEFILE
+        tune2fs -c0 -i0 -ouser_xattr,acl $USBMNT/$LIVEOS/$HOMEFILE
     fi
 fi
 
@@ -798,7 +798,7 @@ if [ -n "$xo" ]; then
     echo "Setting up /boot/olpc.fth file"
     args=$(grep "^ *append" $USBMNT/$SYSLINUXPATH/isolinux.cfg |head -n1 |sed -e 's/.*initrd=[^ ]*//')
     if [ -z "$xonohome" -a ! -f $USBMNT/$LIVEOS/$HOMEFILE ]; then
-	args="$args persistenthome=mtd0"
+        args="$args persistenthome=mtd0"
     fi
     args="$args reset_overlay"
     xosyspath=$(echo $SYSLINUXPATH | sed -e 's;/;\\;')
