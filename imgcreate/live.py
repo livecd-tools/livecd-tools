@@ -530,7 +530,7 @@ menu hiddenrow 5
                 cfg += self.__get_image_stanza(is_xen, isDracut,
                                                fslabel = self.fslabel,
                                                isofstype = "auto",
-                                               liveargs = kernel_options,
+                                               liveargs = kern_opts,
                                                long = "Verify and " + long,
                                                short = "rd.live.check" + index,
                                                basicvideo = "",
