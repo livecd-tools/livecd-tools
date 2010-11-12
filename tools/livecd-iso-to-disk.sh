@@ -106,7 +106,7 @@ checkMBR() {
 
     bs=$(mktemp /tmp/bs.XXXXXX)
     dd if=$device of=$bs bs=512 count=1 2>/dev/null || exit 2
-    
+
     mbrword=$(hexdump -n 2 $bs |head -n 1|awk {'print $2;'})
     rm -f $bs
     if [ "$mbrword" = "0000" ]; then
@@ -123,8 +123,8 @@ checkMBR() {
 checkPartActive() {
     dev=$1
     getdisk $dev
-    
-    # if we're installing to whole-disk and not a partition, then we 
+
+    # if we're installing to whole-disk and not a partition, then we
     # don't need to worry about being active
     if [ "$dev" = "$device" ]; then
 	return
@@ -263,15 +263,15 @@ checkFilesystem() {
 	    exitclean
         fi
     fi
-    
+
 
     USBLABEL=$(/sbin/blkid -s UUID -o value $dev)
-    if [ -n "$USBLABEL" ]; then 
-	USBLABEL="UUID=$USBLABEL" ; 
+    if [ -n "$USBLABEL" ]; then
+	USBLABEL="UUID=$USBLABEL" ;
     else
 	USBLABEL=$(/sbin/blkid -s LABEL -o value $dev)
-	if [ -n "$USBLABEL" ]; then 
-	    USBLABEL="LABEL=$USBLABEL" 
+	if [ -n "$USBLABEL" ]; then
+	    USBLABEL="LABEL=$USBLABEL"
 	else
 	    echo "Need to have a filesystem label or UUID for your USB device"
 	    if [ "$USBFS" = "vfat" -o "$USBFS" = "msdos" ]; then
@@ -279,7 +279,7 @@ checkFilesystem() {
 	    elif [ "$USBFS" = "ext2" -o "$USBFS" = "ext3" -o "$USBFS" = "ext4" ]; then
 		echo "Label can be set with /sbin/e2label"
 	    elif [ "$USBFS" = "btrfs" ]; then
-                echo "Eventually you'll be able to use /sbin/btrfs filesystem label to add a label." 
+                echo "Eventually you'll be able to use /sbin/btrfs filesystem label to add a label."
 	    fi
 	    exitclean
 	fi
@@ -498,7 +498,7 @@ if [ -z "$noverify" ]; then
 fi
 
 #checkFilesystem $USBDEV
-# do some basic sanity checks.  
+# do some basic sanity checks.
 checkMounted $USBDEV
 if [ -n "$format" -a -z "$skipcopy" ];then
   checkLVM $USBDEV
@@ -612,7 +612,7 @@ if [ $tba -gt $(($free + $tbd)) ]; then
 fi
 fi
 
-# Verify available space for DVD installer 
+# Verify available space for DVD installer
 if [ "$isotype" = "installer" ]; then
   isosize=$(du -s -B 1M $ISO | awk {'print $1;'})
   installimgsize=$(du -s -B 1M $CDMNT/images/install.img | awk {'print $1;'})
@@ -634,7 +634,7 @@ fi
 
 if [ -z "$skipcopy" ] && [ "$isotype" = "live" ]; then
   if [ -d $USBMNT/$LIVEOS -a -z "$force" ]; then
-      echo "Already set up as live image."  
+      echo "Already set up as live image."
       if [ -z "$keephome" -a -e $USBMNT/$LIVEOS/$HOMEFILE ]; then
         echo "WARNING: Persistent /home will be deleted!!!"
         echo "Press Enter to continue or ctrl-c to abort"
