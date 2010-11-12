@@ -497,7 +497,7 @@ menu hiddenrow 5
 
             # tell dracut not to ask for LUKS passwords or activate mdraid sets
             if isDracut:
-                kern_opts = kernel_options + " rd_NO_LUKS rd_NO_MD rd_NO_DM"
+                kern_opts = kernel_options + " rd.luks=0 rd.md=0 rd.dm=0"
             else:
                 kern_opts = kernel_options
 
@@ -532,10 +532,10 @@ menu hiddenrow 5
                                                isofstype = "auto",
                                                liveargs = kernel_options,
                                                long = "Verify and " + long,
-                                               short = "check" + index,
+                                               short = "rd.live.check" + index,
                                                basicvideo = "",
                                                xdriver = "",
-                                               extra = "check",
+                                               extra = "rd.live.check",
                                                index = index)
 
             index = str(int(index) + 1)
@@ -638,7 +638,7 @@ hiddenmenu
                                                    isofstype = "auto",
                                                    liveargs = kernel_options,
                                                    long = "Verify and Boot " + name,
-                                                   extra = "check",
+                                                   extra = "rd.live.check",
                                                    index = index)
             break
 
@@ -777,9 +777,9 @@ image=/ppc/ppc%(bit)s/vmlinuz
         if self._has_checkisomd5():
             cfg += self.__get_image_stanza(fslabel = self.fslabel,
                                            isofstype = "auto",
-                                           short = "check",
+                                           short = "rd.live.check",
                                            long = "Verify and run from image",
-                                           extra = "check",
+                                           extra = "rd.live.check",
                                            bit = bit,
                                            liveargs = kernel_options,
                                            isDracut = isDracut)
