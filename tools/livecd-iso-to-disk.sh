@@ -48,8 +48,8 @@ getdisk() {
     DEV=$1
 
     if isdevloop "$DEV"; then
-       device="$DEV"
-       return
+        device="$DEV"
+        return
     fi
 
     p=$(udevadm info -q path -n $DEV)
@@ -71,36 +71,36 @@ getdisk() {
 
 resetMBR() {
     if isdevloop "$DEV"; then
-       return
+        return
     fi
     getdisk $1
     # if efi, we need to use the hybrid MBR
     if [ -n "$efi" ];then
-      if [ -f /usr/lib/syslinux/gptmbr.bin ]; then
-        gptmbr='/usr/lib/syslinux/gptmbr.bin'
-      elif [ -f /usr/share/syslinux/gptmbr.bin ]; then
-        gptmbr='/usr/share/syslinux/gptmbr.bin'
-      else
-        echo "Could not find gptmbr.bin (syslinux)"
-        exitclean
-      fi
-      # our magic number is LBA-2, offset 16 - (512+512+16)/$bs
-      dd if=$device bs=16 skip=65 count=1 | cat $gptmbr - > $device
+        if [ -f /usr/lib/syslinux/gptmbr.bin ]; then
+            gptmbr='/usr/lib/syslinux/gptmbr.bin'
+        elif [ -f /usr/share/syslinux/gptmbr.bin ]; then
+            gptmbr='/usr/share/syslinux/gptmbr.bin'
+        else
+            echo "Could not find gptmbr.bin (syslinux)"
+            exitclean
+        fi
+        # our magic number is LBA-2, offset 16 - (512+512+16)/$bs
+        dd if=$device bs=16 skip=65 count=1 | cat $gptmbr - > $device
     else
-      if [ -f /usr/lib/syslinux/mbr.bin ]; then
-        cat /usr/lib/syslinux/mbr.bin > $device
-      elif [ -f /usr/share/syslinux/mbr.bin ]; then
-        cat /usr/share/syslinux/mbr.bin > $device
-      else
-        echo "Could not find mbr.bin (syslinux)"
-        exitclean
-      fi
+        if [ -f /usr/lib/syslinux/mbr.bin ]; then
+            cat /usr/lib/syslinux/mbr.bin > $device
+        elif [ -f /usr/share/syslinux/mbr.bin ]; then
+            cat /usr/share/syslinux/mbr.bin > $device
+        else
+            echo "Could not find mbr.bin (syslinux)"
+            exitclean
+        fi
     fi
 }
 
 checkMBR() {
     if isdevloop "$DEV"; then
-       return 0
+        return 0
     fi
     getdisk $1
 
@@ -230,9 +230,9 @@ checkGPT() {
     getdisk $dev
 
     if [ "$(/sbin/fdisk -l $device 2>/dev/null |grep -c GPT)" -eq "0" ]; then
-       echo "EFI boot requires a GPT partition table."
-       echo "This can be done manually or you can run with --format"
-       exitclean
+        echo "EFI boot requires a GPT partition table."
+        echo "This can be done manually or you can run with --format"
+        exitclean
     fi
 
     partinfo=$(LC_ALL=C /sbin/parted --script -m $device "print" |grep ^$partnum:)
@@ -307,12 +307,12 @@ checkSyslinuxVersion() {
 checkMounted() {
     dev=$1
     if grep -q "^$dev " /proc/mounts ; then
-      echo "$dev is mounted, please unmount for safety"
-      exitclean
+        echo "$dev is mounted, please unmount for safety"
+        exitclean
     fi
     if grep -q "^$dev " /proc/swaps; then
-      echo "$dev is in use as a swap device, please disable swap"
-      exitclean
+        echo "$dev is in use as a swap device, please disable swap"
+        exitclean
     fi
 }
 
@@ -501,20 +501,20 @@ fi
 # do some basic sanity checks.
 checkMounted $USBDEV
 if [ -n "$format" -a -z "$skipcopy" ];then
-  checkLVM $USBDEV
-  # checks for a valid filesystem
-  if [ -n "$efi" ];then
-    createGPTLayout $USBDEV
-  elif [ "$USBFS" == "vfat" -o "$USBFS" == "msdos" ]; then
-    createMSDOSLayout $USBDEV
-  else
-    createEXTFSLayout $USBDEV
-  fi
+    checkLVM $USBDEV
+    # checks for a valid filesystem
+    if [ -n "$efi" ];then
+        createGPTLayout $USBDEV
+    elif [ "$USBFS" == "vfat" -o "$USBFS" == "msdos" ]; then
+        createMSDOSLayout $USBDEV
+    else
+        createEXTFSLayout $USBDEV
+    fi
 fi
 
 checkFilesystem $USBDEV
 if [ -n "$efi" ]; then
-  checkGPT $USBDEV
+    checkGPT $USBDEV
 fi
 
 checkSyslinuxVersion
@@ -525,24 +525,24 @@ checkMBR $USBDEV
 
 
 if [ "$overlaysizemb" -gt 0 -a "$USBFS" = "vfat" ]; then
-  if [ "$overlaysizemb" -gt 2047 ]; then
-    echo "Can't have an overlay of 2048MB or greater on VFAT"
-    exitclean
-  fi
+    if [ "$overlaysizemb" -gt 2047 ]; then
+        echo "Can't have an overlay of 2048MB or greater on VFAT"
+        exitclean
+    fi
 fi
 
 if [ "$homesizemb" -gt 0 -a "$USBFS" = "vfat" ]; then
-  if [ "$homesizemb" -gt 2047 ]; then
-    echo "Can't have a home overlay greater than 2048MB on VFAT"
-    exitclean
-  fi
+    if [ "$homesizemb" -gt 2047 ]; then
+        echo "Can't have a home overlay greater than 2048MB on VFAT"
+        exitclean
+    fi
 fi
 
 if [ "$swapsizemb" -gt 0 -a "$USBFS" = "vfat" ]; then
-  if [ "$swapsizemb" -gt 2047 ]; then
-    echo "Can't have a swap file greater than 2048MB on VFAT"
-    exitclean
-  fi
+    if [ "$swapsizemb" -gt 2047 ]; then
+        echo "Can't have a swap file greater than 2048MB on VFAT"
+        exitclean
+    fi
 fi
 
 # FIXME: would be better if we had better mountpoints
@@ -556,28 +556,28 @@ trap exitclean SIGINT SIGTERM
 detectisotype
 
 if [ -f "$USBMNT/$LIVEOS/$HOMEFILE" -a -n "$keephome" -a "$homesizemb" -gt 0 ]; then
-  echo "ERROR: Requested keeping existing /home and specified a size for /home"
-  echo "Please either don't specify a size or specify --delete-home"
-  exitclean
+    echo "ERROR: Requested keeping existing /home and specified a size for /home"
+    echo "Please either don't specify a size or specify --delete-home"
+    exitclean
 fi
 
 if [ -n "$efi" -a ! -d $CDMNT/EFI/boot ]; then
-  echo "ERROR: This live image does not support EFI booting"
-  exitclean
+    echo "ERROR: This live image does not support EFI booting"
+    exitclean
 fi
 
 # let's try to make sure there's enough room on the stick
 if [ -d $CDMNT/LiveOS ]; then
-  check=$CDMNT/LiveOS
+    check=$CDMNT/LiveOS
 else
-  check=$CDMNT
+    check=$CDMNT
 fi
 if [ -d $USBMNT/$LIVEOS ]; then
-  tbd=$(du -s -B 1M $USBMNT/$LIVEOS | awk {'print $1;'})
-  [ -f $USBMNT/$LIVEOS/$HOMEFILE ] && homesz=$(du -s -B 1M $USBMNT/$LIVEOS/$HOMEFILE | awk {'print $1;'})
-  [ -n "$homesz" -a -n "$keephome" ] && tbd=$(($tbd - $homesz))
+    tbd=$(du -s -B 1M $USBMNT/$LIVEOS | awk {'print $1;'})
+    [ -f $USBMNT/$LIVEOS/$HOMEFILE ] && homesz=$(du -s -B 1M $USBMNT/$LIVEOS/$HOMEFILE | awk {'print $1;'})
+    [ -n "$homesz" -a -n "$keephome" ] && tbd=$(($tbd - $homesz))
 else
-  tbd=0
+    tbd=0
 fi
 livesize=$(du -s -B 1M $check | awk {'print $1;'})
 if [ -n "$skipcompress" ]; then
@@ -596,58 +596,58 @@ fi
 free=$(df  -B1M $USBDEV  |tail -n 1 |awk {'print $4;'})
 
 if [ "$isotype" = "live" ]; then
-tba=$(($overlaysizemb + $homesizemb + $livesize + $swapsizemb))
-if [ $tba -gt $(($free + $tbd)) ]; then
-  echo "Unable to fit live image + overlay on available space on USB stick"
-  echo "+ Size of live image:  $livesize"
-  [ "$overlaysizemb" -gt 0 ] && echo "+ Overlay size:  $overlaysizemb"
-  [ "$homesizemb" -gt 0 ] && echo "+ Home overlay size:  $homesizemb"
-  [ "$swapsizemb" -gt 0 ] && echo "+ Swap overlay size:  $swapsizemb"
-  echo "---------------------------"
-  echo "= Requested:  $tba"
-  echo "- Available:  $(($free + $tbd))"
-  echo "---------------------------"
-  echo "= To fit, free or decrease requested size total by:  $(($tba - $free - $tbd))"
-  exitclean
-fi
+    tba=$(($overlaysizemb + $homesizemb + $livesize + $swapsizemb))
+    if [ $tba -gt $(($free + $tbd)) ]; then
+        echo "Unable to fit live image + overlay on available space on USB stick"
+        echo "+ Size of live image:  $livesize"
+        [ "$overlaysizemb" -gt 0 ] && echo "+ Overlay size:  $overlaysizemb"
+        [ "$homesizemb" -gt 0 ] && echo "+ Home overlay size:  $homesizemb"
+        [ "$swapsizemb" -gt 0 ] && echo "+ Swap overlay size:  $swapsizemb"
+        echo "---------------------------"
+        echo "= Requested:  $tba"
+        echo "- Available:  $(($free + $tbd))"
+        echo "---------------------------"
+        echo "= To fit, free or decrease requested size total by:  $(($tba - $free - $tbd))"
+        exitclean
+    fi
 fi
 
 # Verify available space for DVD installer
 if [ "$isotype" = "installer" ]; then
-  isosize=$(du -s -B 1M $ISO | awk {'print $1;'})
-  installimgsize=$(du -s -B 1M $CDMNT/images/install.img | awk {'print $1;'})
-  tbd=0
-  if [ -e $USBMNT/images/install.img ]; then
-    tbd=$(du -s -B 1M $USBMNT/images/install.img | awk {'print $1;'})
-  fi
-  if [ -e $USBMNT/$(basename $ISO) ]; then
-    tbd=$(($tbd + $(du -s -B 1M $USBMNT/$(basename $ISO) | awk {'print $1;'})))
-  fi
-  echo "Size of DVD image: $isosize"
-  echo "Size of install.img: $installimgsize"
-  echo "Available space: $(($free + $tbd))"
-  if [ $(($isosize + $installimgsize)) -gt $(($free + $tbd)) ]; then
-    echo "ERROR: Unable to fit DVD image + install.img on available space on USB stick"
-    exitclean
-  fi
+    isosize=$(du -s -B 1M $ISO | awk {'print $1;'})
+    installimgsize=$(du -s -B 1M $CDMNT/images/install.img | awk {'print $1;'})
+    tbd=0
+    if [ -e $USBMNT/images/install.img ]; then
+        tbd=$(du -s -B 1M $USBMNT/images/install.img | awk {'print $1;'})
+    fi
+    if [ -e $USBMNT/$(basename $ISO) ]; then
+        tbd=$(($tbd + $(du -s -B 1M $USBMNT/$(basename $ISO) | awk {'print $1;'})))
+    fi
+    echo "Size of DVD image: $isosize"
+    echo "Size of install.img: $installimgsize"
+    echo "Available space: $(($free + $tbd))"
+    if [ $(($isosize + $installimgsize)) -gt $(($free + $tbd)) ]; then
+        echo "ERROR: Unable to fit DVD image + install.img on available space on USB stick"
+        exitclean
+    fi
 fi
 
 if [ -z "$skipcopy" ] && [ "$isotype" = "live" ]; then
-  if [ -d $USBMNT/$LIVEOS -a -z "$force" ]; then
-      echo "Already set up as live image."
-      if [ -z "$keephome" -a -e $USBMNT/$LIVEOS/$HOMEFILE ]; then
-        echo "WARNING: Persistent /home will be deleted!!!"
-        echo "Press Enter to continue or ctrl-c to abort"
-        read
-      else
-        echo "Deleting old OS in fifteen seconds..."
-        sleep 15
+    if [ -d $USBMNT/$LIVEOS -a -z "$force" ]; then
+        echo "Already set up as live image."
+        if [ -z "$keephome" -a -e $USBMNT/$LIVEOS/$HOMEFILE ]; then
+            echo "WARNING: Persistent /home will be deleted!!!"
+            echo "Press Enter to continue or ctrl-c to abort"
+            read
+        else
+            echo "Deleting old OS in fifteen seconds..."
+            sleep 15
 
-        [ -e "$USBMNT/$LIVEOS/$HOMEFILE" -a -n "$keephome" ] && mv $USBMNT/$LIVEOS/$HOMEFILE $USBMNT/$HOMEFILE
-      fi
+            [ -e "$USBMNT/$LIVEOS/$HOMEFILE" -a -n "$keephome" ] && mv $USBMNT/$LIVEOS/$HOMEFILE $USBMNT/$HOMEFILE
+        fi
 
-      rm -rf $USBMNT/$LIVEOS
-  fi
+        rm -rf $USBMNT/$LIVEOS
+    fi
 fi
 
 # Bootloader is always reconfigured, so keep these out of the if skipcopy stuff.
@@ -656,33 +656,33 @@ fi
 
 # Live image copy
 if [ "$isotype" = "live" -a -z "$skipcopy" ]; then
-  echo "Copying live image to USB stick"
-  [ ! -d $USBMNT/$LIVEOS ] && mkdir $USBMNT/$LIVEOS
-  [ -n "$keephome" -a -f "$USBMNT/$HOMEFILE" ] && mv $USBMNT/$HOMEFILE $USBMNT/$LIVEOS/$HOMEFILE
-  if [ -n "$skipcompress" -a -f $CDMNT/LiveOS/squashfs.img ]; then
-      mount -o loop $CDMNT/LiveOS/squashfs.img $CDMNT || exitclean
-      copyFile $CDMNT/LiveOS/ext3fs.img $USBMNT/$LIVEOS/ext3fs.img || (umount $CDMNT ; exitclean)
-      umount $CDMNT
-  elif [ -f $CDMNT/LiveOS/squashfs.img ]; then
-      copyFile $CDMNT/LiveOS/squashfs.img $USBMNT/$LIVEOS/squashfs.img || exitclean
-  elif [ -f $CDMNT/LiveOS/ext3fs.img ]; then
-      copyFile $CDMNT/LiveOS/ext3fs.img $USBMNT/$LIVEOS/ext3fs.img || exitclean
-  fi
-  if [ -f $CDMNT/LiveOS/osmin.img ]; then
-      copyFile $CDMNT/LiveOS/osmin.img $USBMNT/$LIVEOS/osmin.img || exitclean
-  fi
-  sync
+    echo "Copying live image to USB stick"
+    [ ! -d $USBMNT/$LIVEOS ] && mkdir $USBMNT/$LIVEOS
+    [ -n "$keephome" -a -f "$USBMNT/$HOMEFILE" ] && mv $USBMNT/$HOMEFILE $USBMNT/$LIVEOS/$HOMEFILE
+    if [ -n "$skipcompress" -a -f $CDMNT/LiveOS/squashfs.img ]; then
+        mount -o loop $CDMNT/LiveOS/squashfs.img $CDMNT || exitclean
+        copyFile $CDMNT/LiveOS/ext3fs.img $USBMNT/$LIVEOS/ext3fs.img || (umount $CDMNT ; exitclean)
+        umount $CDMNT
+    elif [ -f $CDMNT/LiveOS/squashfs.img ]; then
+        copyFile $CDMNT/LiveOS/squashfs.img $USBMNT/$LIVEOS/squashfs.img || exitclean
+    elif [ -f $CDMNT/LiveOS/ext3fs.img ]; then
+        copyFile $CDMNT/LiveOS/ext3fs.img $USBMNT/$LIVEOS/ext3fs.img || exitclean
+    fi
+    if [ -f $CDMNT/LiveOS/osmin.img ]; then
+        copyFile $CDMNT/LiveOS/osmin.img $USBMNT/$LIVEOS/osmin.img || exitclean
+    fi
+    sync
 fi
 
 # DVD installer copy
 if [ \( "$isotype" = "installer" -o "$isotype" = "netinst" \) -a -z "$skipcopy" ]; then
-      echo "Copying DVD image to USB stick"
-      mkdir -p $USBMNT/images/
-      copyFile $CDMNT/images/install.img $USBMNT/images/install.img || exitclean
-      if [ "$isotype" = "installer" ]; then
-          cp $ISO $USBMNT/
-      fi
-      sync
+    echo "Copying DVD image to USB stick"
+    mkdir -p $USBMNT/images/
+    copyFile $CDMNT/images/install.img $USBMNT/images/install.img || exitclean
+    if [ "$isotype" = "installer" ]; then
+        cp $ISO $USBMNT/
+    fi
+    sync
 fi
 
 cp $CDMNT/isolinux/* $USBMNT/$SYSLINUXPATH
@@ -690,11 +690,11 @@ BOOTCONFIG=$USBMNT/$SYSLINUXPATH/isolinux.cfg
 # Set this to nothing so sed doesn't care
 BOOTCONFIG_EFI=
 if [ -n "$efi" ];then
-  cp $CDMNT/EFI/boot/* $USBMNT/EFI/boot
+    cp $CDMNT/EFI/boot/* $USBMNT/EFI/boot
 
-  # this is a little ugly, but it gets the "interesting" named config file
-  BOOTCONFIG_EFI=$USBMNT/EFI/boot/boot?*.conf
-  rm -f $USBMNT/EFI/boot/grub.conf
+    # this is a little ugly, but it gets the "interesting" named config file
+    BOOTCONFIG_EFI=$USBMNT/EFI/boot/boot?*.conf
+    rm -f $USBMNT/EFI/boot/grub.conf
 fi
 
 echo "Updating boot config file"
@@ -708,13 +708,13 @@ if [ "$LIVEOS" != "LiveOS" ]; then sed -i -e "s;liveimg;liveimg live_dir=$LIVEOS
 
 # DVD Installer
 if [ "$isotype" = "installer" ]; then
-  sed -i -e "s;initrd=initrd.img;initrd=initrd.img ${LANG:+LANG=$LANG} repo=hd:$USBLABEL:/;g" $BOOTCONFIG $BOOTCONFIG_EFI
-  sed -i -e "s;stage2=\S*;;g" $BOOTCONFIG $BOOTCONFIG_EFI
+    sed -i -e "s;initrd=initrd.img;initrd=initrd.img ${LANG:+LANG=$LANG} repo=hd:$USBLABEL:/;g" $BOOTCONFIG $BOOTCONFIG_EFI
+    sed -i -e "s;stage2=\S*;;g" $BOOTCONFIG $BOOTCONFIG_EFI
 fi
 
 # DVD Installer for netinst
 if [ "$isotype" = "netinst" ]; then
-  sed -i -e "s;stage2=\S*;stage2=hd:$USBLABEL:/images/install.img;g" $BOOTCONFIG $BOOTCONFIG_EFI
+    sed -i -e "s;stage2=\S*;stage2=hd:$USBLABEL:/images/install.img;g" $BOOTCONFIG $BOOTCONFIG_EFI
 fi
 
 # Adjust the boot timeouts
@@ -728,21 +728,21 @@ fi
 # Use repo if the .iso has the repository on it, otherwise use stage2 which
 # will default to using the network mirror
 if [ -e "$CDMNT/.discinfo" ]; then
-  METHODSTR=repo
+    METHODSTR=repo
 else
-  METHODSTR=stage2
+    METHODSTR=stage2
 fi
 
 if [ "$overlaysizemb" -gt 0 ]; then
     echo "Initializing persistent overlay file"
     OVERFILE="overlay-$( /sbin/blkid -s LABEL -o value $USBDEV )-$( /sbin/blkid -s UUID -o value $USBDEV )"
     if [ -z "$skipcopy" ]; then
-      if [ "$USBFS" = "vfat" ]; then
-        # vfat can't handle sparse files
-        dd if=/dev/zero of=$USBMNT/$LIVEOS/$OVERFILE count=$overlaysizemb bs=1M
-      else
-        dd if=/dev/null of=$USBMNT/$LIVEOS/$OVERFILE count=1 bs=1M seek=$overlaysizemb
-      fi
+        if [ "$USBFS" = "vfat" ]; then
+            # vfat can't handle sparse files
+            dd if=/dev/zero of=$USBMNT/$LIVEOS/$OVERFILE count=$overlaysizemb bs=1M
+        else
+            dd if=/dev/null of=$USBMNT/$LIVEOS/$OVERFILE count=1 bs=1M seek=$overlaysizemb
+        fi
     fi
     sed -i -e "s/liveimg/liveimg overlay=${USBLABEL}/" $BOOTCONFIG $BOOTCONFIG_EFI
     sed -i -e "s/\ ro\ /\ rw\ /" $BOOTCONFIG  $BOOTCONFIG_EFI
@@ -844,54 +844,54 @@ EOF
 fi
 
 if [ -z "$multi" ]; then
-  echo "Installing boot loader"
-  if [ -n "$efi" ]; then
-    # replace the ia32 hack
-    if [ -f "$USBMNT/EFI/boot/boot.conf" ]; then cp -f $USBMNT/EFI/boot/bootia32.conf $USBMNT/EFI/boot/boot.conf ; fi
-  fi
-
-  # this is a bit of a kludge, but syslinux doesn't guarantee the API for its com32 modules :/
-  if [ -f $USBMNT/$SYSLINUXPATH/vesamenu.c32 -a -f /usr/share/syslinux/vesamenu.c32 ]; then
-    cp /usr/share/syslinux/vesamenu.c32 $USBMNT/$SYSLINUXPATH/vesamenu.c32
-  elif [ -f $USBMNT/$SYSLINUXPATH/vesamenu.c32 -a -f /usr/lib/syslinux/vesamenu.c32 ]; then
-    cp /usr/lib/syslinux/vesamenu.c32 $USBMNT/$SYSLINUXPATH/vesamenu.c32
-  elif [ -f $USBMNT/$SYSLINUXPATH/menu.c32 -a -f /usr/share/syslinux/menu.c32 ]; then
-    cp /usr/share/syslinux/menu.c32 $USBMNT/$SYSLINUXPATH/menu.c32
-  elif [ -f $USBMNT/$SYSLINUXPATH/menu.c32 -a -f /usr/lib/syslinux/menu.c32 ]; then
-    cp /usr/lib/syslinux/menu.c32 $USBMNT/$SYSLINUXPATH/menu.c32
-  fi
-
-  if [ "$USBFS" == "vfat" -o "$USBFS" == "msdos" ]; then
-    # syslinux expects the config to be named syslinux.cfg 
-    # and has to run with the file system unmounted
-    mv $USBMNT/$SYSLINUXPATH/isolinux.cfg $USBMNT/$SYSLINUXPATH/syslinux.cfg
-    # deal with mtools complaining about ldlinux.sys
-    if [ -f $USBMNT/$SYSLINUXPATH/ldlinux.sys ] ; then rm -f $USBMNT/$SYSLINUXPATH/ldlinux.sys ; fi
-    cleanup
-    if [ -n "$SYSLINUXPATH" ]; then
-      syslinux -d $SYSLINUXPATH $USBDEV
-    else
-      syslinux $USBDEV
+    echo "Installing boot loader"
+    if [ -n "$efi" ]; then
+        # replace the ia32 hack
+        if [ -f "$USBMNT/EFI/boot/boot.conf" ]; then cp -f $USBMNT/EFI/boot/bootia32.conf $USBMNT/EFI/boot/boot.conf ; fi
     fi
-  elif [ "$USBFS" == "ext2" -o "$USBFS" == "ext3" -o "$USBFS" == "ext4" -o "$USBFS" == "btrfs" ]; then
-    # extlinux expects the config to be named extlinux.conf
-    # and has to be run with the file system mounted
-    mv $USBMNT/$SYSLINUXPATH/isolinux.cfg $USBMNT/$SYSLINUXPATH/extlinux.conf
-    extlinux -i $USBMNT/$SYSLINUXPATH
-    # Starting with syslinux 4 ldlinux.sys is used on all file systems.
-    if [ -f "$USBMNT/$SYSLINUXPATH/extlinux.sys" ]; then
-        chattr -i $USBMNT/$SYSLINUXPATH/extlinux.sys
-    elif [ -f "$USBMNT/$SYSLINUXPATH/ldlinux.sys" ]; then
-        chattr -i $USBMNT/$SYSLINUXPATH/ldlinux.sys
+
+    # this is a bit of a kludge, but syslinux doesn't guarantee the API for its com32 modules :/
+    if [ -f $USBMNT/$SYSLINUXPATH/vesamenu.c32 -a -f /usr/share/syslinux/vesamenu.c32 ]; then
+        cp /usr/share/syslinux/vesamenu.c32 $USBMNT/$SYSLINUXPATH/vesamenu.c32
+    elif [ -f $USBMNT/$SYSLINUXPATH/vesamenu.c32 -a -f /usr/lib/syslinux/vesamenu.c32 ]; then
+        cp /usr/lib/syslinux/vesamenu.c32 $USBMNT/$SYSLINUXPATH/vesamenu.c32
+    elif [ -f $USBMNT/$SYSLINUXPATH/menu.c32 -a -f /usr/share/syslinux/menu.c32 ]; then
+        cp /usr/share/syslinux/menu.c32 $USBMNT/$SYSLINUXPATH/menu.c32
+    elif [ -f $USBMNT/$SYSLINUXPATH/menu.c32 -a -f /usr/lib/syslinux/menu.c32 ]; then
+        cp /usr/lib/syslinux/menu.c32 $USBMNT/$SYSLINUXPATH/menu.c32
     fi
-    cleanup
-  fi
+
+    if [ "$USBFS" == "vfat" -o "$USBFS" == "msdos" ]; then
+        # syslinux expects the config to be named syslinux.cfg
+        # and has to run with the file system unmounted
+        mv $USBMNT/$SYSLINUXPATH/isolinux.cfg $USBMNT/$SYSLINUXPATH/syslinux.cfg
+        # deal with mtools complaining about ldlinux.sys
+        if [ -f $USBMNT/$SYSLINUXPATH/ldlinux.sys ] ; then rm -f $USBMNT/$SYSLINUXPATH/ldlinux.sys ; fi
+        cleanup
+        if [ -n "$SYSLINUXPATH" ]; then
+            syslinux -d $SYSLINUXPATH $USBDEV
+        else
+            syslinux $USBDEV
+        fi
+    elif [ "$USBFS" == "ext2" -o "$USBFS" == "ext3" -o "$USBFS" == "ext4" -o "$USBFS" == "btrfs" ]; then
+        # extlinux expects the config to be named extlinux.conf
+        # and has to be run with the file system mounted
+        mv $USBMNT/$SYSLINUXPATH/isolinux.cfg $USBMNT/$SYSLINUXPATH/extlinux.conf
+        extlinux -i $USBMNT/$SYSLINUXPATH
+        # Starting with syslinux 4 ldlinux.sys is used on all file systems.
+        if [ -f "$USBMNT/$SYSLINUXPATH/extlinux.sys" ]; then
+            chattr -i $USBMNT/$SYSLINUXPATH/extlinux.sys
+        elif [ -f "$USBMNT/$SYSLINUXPATH/ldlinux.sys" ]; then
+            chattr -i $USBMNT/$SYSLINUXPATH/ldlinux.sys
+        fi
+        cleanup
+    fi
 else
-  # we need to do some more config file tweaks for multi-image mode
-  sed -i -e "s;kernel vm;kernel /$LIVEOS/syslinux/vm;" $USBMNT/$SYSLINUXPATH/isolinux.cfg
-  sed -i -e "s;initrd=i;initrd=/$LIVEOS/syslinux/i;" $USBMNT/$SYSLINUXPATH/isolinux.cfg
-  mv $USBMNT/$SYSLINUXPATH/isolinux.cfg $USBMNT/$SYSLINUXPATH/syslinux.cfg
-  cleanup
+    # we need to do some more config file tweaks for multi-image mode
+    sed -i -e "s;kernel vm;kernel /$LIVEOS/syslinux/vm;" $USBMNT/$SYSLINUXPATH/isolinux.cfg
+    sed -i -e "s;initrd=i;initrd=/$LIVEOS/syslinux/i;" $USBMNT/$SYSLINUXPATH/isolinux.cfg
+    mv $USBMNT/$SYSLINUXPATH/isolinux.cfg $USBMNT/$SYSLINUXPATH/syslinux.cfg
+    cleanup
 fi
 
 echo "USB stick set up as live image!"
