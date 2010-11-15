@@ -39,8 +39,7 @@ exitclean() {
     exit 1
 }
 
-isdevloop()
-{
+isdevloop() {
     [ x"${1#/dev/loop}" != x"$1" ]
 }
 
@@ -65,7 +64,7 @@ getdisk() {
 
     device="/dev/$device"
     # FIXME: weird dev names could mess this up I guess
-    p=/dev/`basename $p`
+    p=/dev/$(basename $p)
     partnum=${p##$device}
 }
 
