@@ -171,6 +171,10 @@ class LiveCDYum(yum.YumBase):
             (res, resmsg) = self.buildTransaction()
         except yum.Errors.RepoError, e:
             raise CreatorError("Unable to download from repo : %s" %(e,))
+        # Empty transactions are generally fine, we might be rebuilding an
+        # existing image with no packages added
+        if resmsg and resmsg[0].endswith(" - empty transaction"):
+            return res
         if res != 2:
             raise CreatorError("Failed to build transaction : %s" % str.join("\n", resmsg))
         
