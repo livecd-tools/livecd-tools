@@ -41,6 +41,11 @@ def parse_options(args):
                       help="Add packages to an existing live CD iso9660 image.")
     imgopt.add_option("-f", "--fslabel", type="string", dest="fs_label",
                       help="File system label (default based on config name)")
+    # Provided for img-create compatibility
+    imgopt.add_option("-n", "--name", type="string", dest="fs_label",
+                      help=optparse.SUPPRESS_HELP)
+    imgopt.add_option("", "--image-type", type="string", dest="image_type",
+                      help=optparse.SUPPRESS_HELP)
     imgopt.add_option("", "--compression-type", type="string", dest="compress_type",
                       help="Compression type recognized by mksquashfs (default gzip, lzma needs custom kernel, lzo needs a 2.6.36+ kernel)",
                       default="gzip")
@@ -70,14 +75,31 @@ def parse_options(args):
                       help=optparse.SUPPRESS_HELP)
 
     (options, args) = parser.parse_args()
+
+    # Pretend to be a image-creator if called with that name
+    if not options.image_type:
+        if sys.argv[0].endswith('image-creator'):
+            options.image_type = 'image'
+        else:
+            options.image_type = 'livecd'
+    if options.image_type not in ('livecd', 'image'):
+        raise Usage("'%s' is a recognized image type" % options.image_type)
+
+    # image-create compatibility: Last argument is kickstart file
+    if len(args) == 1:
+        options.kscfg = args.pop()
+    if len(args):
+        raise Usage("Extra arguments given")
+
     if not options.kscfg:
         raise Usage("Kickstart file must be provided")
     if options.base_on and not os.path.isfile(options.base_on):
-        raise Usage("Live CD ISO '%s' does not exist" %(options.base_on,))
-    if options.fs_label and len(options.fs_label) > imgcreate.FSLABEL_MAXLEN:
-        raise Usage("CD labels are limited to 32 characters")
-    if options.fs_label and options.fs_label.find(" ") != -1:
-        raise Usage("CD labels cannot contain spaces.")
+        raise Usage("Image file '%s' does not exist" %(options.base_on,))
+    if options.image_type == 'livecd':
+        if options.fs_label and len(options.fs_label) > imgcreate.FSLABEL_MAXLEN:
+            raise Usage("CD labels are limited to 32 characters")
+        if options.fs_label and options.fs_label.find(" ") != -1:
+            raise Usage("CD labels cannot contain spaces.")
 
     return options
 
@@ -96,17 +118,17 @@ def main():
         return ret
 
     if os.geteuid () != 0:
-        print >> sys.stderr, "You must run livecd-creator as root"
+        print >> sys.stderr, "You must run %s as root" % sys.argv[0]
         return 1
 
     if options.fs_label:
         fs_label = options.fs_label
         name = fs_label
     else:
-        name = imgcreate.build_name(options.kscfg, "livecd-")
+        name = imgcreate.build_name(options.kscfg, options.image_type + "-")
 
         fs_label = imgcreate.build_name(options.kscfg,
-                                        "livecd-",
+                                        options.image_type + "-",
                                         maxlen = imgcreate.FSLABEL_MAXLEN,
                                         suffix = "%s-%s" %(os.uname()[4], time.strftime("%Y%m%d%H%M")))
 
@@ -114,7 +136,15 @@ def main():
 
     ks = imgcreate.read_kickstart(options.kscfg)
 
-    creator = imgcreate.LiveImageCreator(ks, name, fs_label)
+    if options.image_type == 'livecd':
+        creator = imgcreate.LiveImageCreator(ks, name, fs_label)
+    elif options.image_type == 'image':
+        creator = imgcreate.LoopImageCreator(ks, name, fs_label)
+    else:
+        # Cannot happen, we validate this when parsing options.
+        logging.error(u"'%s' is not a valid image type" % options.image_type)
+        return 1
+
     creator.tmpdir = os.path.abspath(options.tmpdir)
     creator.compress_type = options.compress_type
     creator.skip_compression = options.skip_compression
