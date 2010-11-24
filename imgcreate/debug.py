@@ -27,16 +27,17 @@ def handle_logging(option, opt, val, parser, logger, level):
     if level < logger.level:
         logger.setLevel(level)
 
-def handle_logfile(option, opt, val, parser, logger, stream):
+def handle_logfile(option, opt, val, parser, logger):
+
     try:
         logfile = logging.FileHandler(val,"a")
     except IOError, e:
         raise optparse.OptionValueError("Cannot open file '%s' : %s" %
                                         (val, e.strerror))
-
-
-    logger.removeHandler(stream)
     logger.addHandler(logfile)
+
+def handle_quiet(option, opt, val, parser, logger, stream):
+    logger.removeHandler(stream)
 
 def setup_logging(parser = None):
     """Set up the root logger and add logging options.
@@ -78,9 +79,14 @@ def setup_logging(parser = None):
                      callback_args = (logger, logging.INFO),
                      help = "Output verbose progress information")
 
+    group.add_option("-q", "--quiet",
+                     action = "callback", callback = handle_quiet,
+                     callback_args = (logger, stream),
+                     help = "Supress stdout")
+
     group.add_option("", "--logfile", type="string",
                      action = "callback", callback = handle_logfile,
-                     callback_args = (logger, stream),
+                     callback_args = (logger,),
                      help = "Save debug information to FILE", metavar = "FILE")
 
     parser.add_option_group(group)
