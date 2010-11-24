@@ -28,13 +28,21 @@ import pykickstart.parser
 from imgcreate.errors import *
 
 class TextProgress(object):
+    logger = logging.getLogger()
+    def emit(self, lvl, msg):
+        '''play nice with the logging module'''
+        for hdlr in self.logger.handlers:
+            if lvl >= self.logger.level:
+                hdlr.stream.write(msg)
+                hdlr.stream.flush()
+
     def start(self, filename, url, *args, **kwargs):
-        sys.stdout.write("Retrieving %s " % (url,))
+        self.emit(logging.INFO, "Retrieving %s " % (url,))
         self.url = url
     def update(self, *args):
         pass
     def end(self, *args):
-        sys.stdout.write("...OK\n")
+        self.emit(logging.INFO, "...OK\n")
 
 class LiveCDYum(yum.YumBase):
     def __init__(self):
