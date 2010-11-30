@@ -571,18 +571,27 @@ if [ -d $CDMNT/LiveOS ]; then
 else
     check=$CDMNT
 fi
-if [ -d $USBMNT/$LIVEOS ]; then
-    tbd=$(du -s -B 1M $USBMNT/$LIVEOS | awk {'print $1;'})
-    [ -f $USBMNT/$LIVEOS/$HOMEFILE ] && homesz=$(du -s -B 1M $USBMNT/$LIVEOS/$HOMEFILE | awk {'print $1;'})
-    [ -n "$homesz" -a -n "$keephome" ] && tbd=$(($tbd - $homesz))
+if [[ -d $USBMNT/$LIVEOS ]]; then
+    tbd=($(du -B 1M $USBMNT/$LIVEOS))
+    [[ -s $USBMNT/$LIVEOS/$HOMEFILE ]] && \
+        homesize=($(du -B 1M $USBMNT/$LIVEOS/$HOMEFILE))
+    ((homesize > 0)) && [[ -n $keephome ]] && ((tbd -= homesize))
 else
     tbd=0
 fi
-livesize=$(du -s -B 1M $check | awk {'print $1;'})
-if [ -n "$skipcompress" ]; then
-    if [ -e $CDMNT/LiveOS/squashfs.img ]; then
+targets="$USBMNT/$SYSLINUXPATH"
+if [[ -n $efi ]]; then
+    targets+=" $USBMNT/EFI/boot"
+fi
+duTable=($(du -c -B 1M $targets 2> /dev/null))
+((tbd += ${duTable[*]: -2:1}))
+
+sources="$CDMNT/isolinux"
+[[ -n $efi ]] && sources+=" $CDMNT/EFI/boot"
+if [[ -n $skipcompress ]]; then
+    if [[ -s $CDMNT/LiveOS/squashfs.img ]]; then
         if mount -o loop $CDMNT/LiveOS/squashfs.img $CDMNT; then
-            livesize=$(du -s -B 1M $CDMNT/LiveOS/ext3fs.img | awk {'print $1;'})
+            livesize=($(du -B 1M --apparent-size $CDMNT/LiveOS/ext3fs.img))
             umount $CDMNT
         else
             echo "WARNING: --skipcompress or --xo was specified but the currently"
@@ -591,22 +600,37 @@ if [ -n "$skipcompress" ]; then
             skipcompress=""
         fi
     fi
+    duTable=($(du -c -B 1M $sources 2> /dev/null))
+    ((livesize += ${duTable[*]: -2:1}))
+else
+    sources+=" $check/osmin.img $check/squashfs.img"
+    duTable=($(du -c -B 1M $sources 2> /dev/null))
+    livesize=${duTable[*]: -2:1}
 fi
-free=$(df  -B1M $USBDEV  |tail -n 1 |awk {'print $4;'})
+
+freespace=($(df -B 1M --total $USBDEV))
+freespace=${freespace[*]: -2:1}
 
 if [ "$isotype" = "live" ]; then
-    tba=$(($overlaysizemb + $homesizemb + $livesize + $swapsizemb))
-    if [ $tba -gt $(($free + $tbd)) ]; then
-        echo "Unable to fit live image + overlay on available space on USB stick"
-        echo "+ Size of live image:  $livesize"
-        [ "$overlaysizemb" -gt 0 ] && echo "+ Overlay size:  $overlaysizemb"
-        [ "$homesizemb" -gt 0 ] && echo "+ Home overlay size:  $homesizemb"
-        [ "$swapsizemb" -gt 0 ] && echo "+ Swap overlay size:  $swapsizemb"
-        echo "---------------------------"
-        echo "= Requested:  $tba"
-        echo "- Available:  $(($free + $tbd))"
-        echo "---------------------------"
-        echo "= To fit, free or decrease requested size total by:  $(($tba - $free - $tbd))"
+    tba=$((overlaysizemb + homesizemb + livesize + swapsizemb))
+    if ((tba > freespace + tbd)); then
+        needed=$((tba - freespace - tbd))
+        printf "\n  The live image + overlay, home, & swap space, if requested,
+        \r  will NOT fit in the space available on the target device.\n
+        \r  + Size of live image: %10s  MiB\n" $livesize
+        (($overlaysizemb > 0)) && \
+            printf "  + Overlay size: %16s\n" $overlaysizemb
+        (($homesizemb > 0)) && \
+            printf "  + Home directory size: %9s\n" $homesizemb
+        (($swapsizemb > 0)) && \
+            printf "  + Swap overlay size: %11s\n" $swapsizemb
+        printf "  = Total requested space:  %6s  MiB\n" $tba
+        printf "  - Space available:  %12s\n" $(($free + $tbd))
+        printf "    ==============================\n"
+        printf "    Space needed:  %15s  MiB\n\n" $needed
+        printf "  To fit the installation on this device,
+        \r  free space on the target, or decrease the
+        \r  requested size total by:    %s  MiB\n\n" $needed
         exitclean
     fi
 fi
