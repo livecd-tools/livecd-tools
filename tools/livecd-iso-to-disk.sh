@@ -68,6 +68,13 @@ getdisk() {
     partnum=${p##$device}
 }
 
+getpartition() {
+    DEV=$1
+    pa=$( < /proc/partitions )
+    pa=${pa##*$DEV}
+    partnum=${pa%% *}
+}
+
 resetMBR() {
     if isdevloop "$DEV"; then
         return
@@ -166,11 +173,12 @@ createGPTLayout() {
     partinfo=$(LC_ALL=C /sbin/parted --script -m $device "unit b print" |grep ^$device:)
     size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/B$//')
     /sbin/parted --script $device unit b mkpart '"EFI System Partition"' fat32 17408 $(($size - 17408)) set 1 boot on
-    USBDEV=${device}1
     # Sometimes automount can be _really_ annoying.
     echo "Waiting for devices to settle..."
     /sbin/udevadm settle
     sleep 5
+    getpartition ${device#/dev/}
+    USBDEV=${device}${partnum}
     umount $USBDEV &> /dev/null
     /sbin/mkdosfs -n LIVE $USBDEV
     USBLABEL="UUID=$(/sbin/blkid -s UUID -o value $USBDEV)"
@@ -188,15 +196,16 @@ createMSDOSLayout() {
     partinfo=$(LC_ALL=C /sbin/parted --script -m $device "unit b print" |grep ^$device:)
     size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/B$//')
     /sbin/parted --script $device unit b mkpart primary fat32 17408 $(($size - 17408)) set 1 boot on
-    if ! isdevloop "$DEV"; then
-        USBDEV=${device}1
-    else
-        USBDEV=${device}
-    fi
     # Sometimes automount can be _really_ annoying.
     echo "Waiting for devices to settle..."
     /sbin/udevadm settle
     sleep 5
+    if ! isdevloop "$DEV"; then
+        getpartition ${device#/dev/}
+        USBDEV=${device}${partnum}
+    else
+        USBDEV=${device}
+    fi
     umount $USBDEV &> /dev/null
     /sbin/mkdosfs -n LIVE $USBDEV
     USBLABEL="UUID=$(/sbin/blkid -s UUID -o value $USBDEV)"
@@ -214,11 +223,12 @@ createEXTFSLayout() {
     partinfo=$(LC_ALL=C /sbin/parted --script -m $device "unit b print" |grep ^$device:)
     size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/B$//')
     /sbin/parted --script $device unit b mkpart primary ext2 17408 $(($size - 17408)) set 1 boot on
-    USBDEV=${device}1
     # Sometimes automount can be _really_ annoying.
     echo "Waiting for devices to settle..."
     /sbin/udevadm settle
     sleep 5
+    getpartition ${device#/dev/}
+    USBDEV=${device}${partnum}
     umount $USBDEV &> /dev/null
     /sbin/mkfs.ext4 -L LIVE $USBDEV
     USBLABEL="UUID=$(/sbin/blkid -s UUID -o value $USBDEV)"
