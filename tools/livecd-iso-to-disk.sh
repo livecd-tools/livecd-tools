@@ -74,7 +74,7 @@ resetMBR() {
     fi
     getdisk $1
     # if efi, we need to use the hybrid MBR
-    if [ -n "$efi" ];then
+    if [ -n "$efi" ]; then
         if [ -f /usr/lib/syslinux/gptmbr.bin ]; then
             gptmbr='/usr/lib/syslinux/gptmbr.bin'
         elif [ -f /usr/share/syslinux/gptmbr.bin ]; then
@@ -266,7 +266,7 @@ checkFilesystem() {
 
     USBLABEL=$(/sbin/blkid -s UUID -o value $dev)
     if [ -n "$USBLABEL" ]; then
-        USBLABEL="UUID=$USBLABEL" ;
+        USBLABEL="UUID=$USBLABEL"
     else
         USBLABEL=$(/sbin/blkid -s LABEL -o value $dev)
         if [ -n "$USBLABEL" ]; then
@@ -321,7 +321,7 @@ checkint() {
     fi
 }
 
-if [ $(id -u) != 0 ]; then 
+if [ $(id -u) != 0 ]; then
     echo "You need to be root to run this script"
     exit 1
 fi
@@ -335,7 +335,7 @@ detectisotype() {
         if [ -e $CDMNT/Packages ]; then
             isotype=installer
             return
-        else 
+        else
             isotype=netinst
             return
         fi
@@ -499,10 +499,10 @@ fi
 #checkFilesystem $USBDEV
 # do some basic sanity checks.
 checkMounted $USBDEV
-if [ -n "$format" -a -z "$skipcopy" ];then
+if [ -n "$format" -a -z "$skipcopy" ]; then
     checkLVM $USBDEV
     # checks for a valid filesystem
-    if [ -n "$efi" ];then
+    if [ -n "$efi" ]; then
         createGPTLayout $USBDEV
     elif [ "$USBFS" == "vfat" -o "$USBFS" == "msdos" ]; then
         createMSDOSLayout $USBDEV
@@ -688,7 +688,7 @@ cp $CDMNT/isolinux/* $USBMNT/$SYSLINUXPATH
 BOOTCONFIG=$USBMNT/$SYSLINUXPATH/isolinux.cfg
 # Set this to nothing so sed doesn't care
 BOOTCONFIG_EFI=
-if [ -n "$efi" ];then
+if [ -n "$efi" ]; then
     cp $CDMNT/EFI/boot/* $USBMNT/EFI/boot
 
     # this is a little ugly, but it gets the "interesting" named config file
@@ -702,8 +702,12 @@ if [ -n "$LANG" ]; then
     kernelargs="$kernelargs LANG=$LANG"
 fi
 sed -i -e "s/CDLABEL=[^ ]*/$USBLABEL/" -e "s/rootfstype=[^ ]*/rootfstype=$USBFS/" -e "s/LABEL=[^ ]*/$USBLABEL/" $BOOTCONFIG  $BOOTCONFIG_EFI
-if [ -n "$kernelargs" ]; then sed -i -e "s/liveimg/liveimg ${kernelargs}/" $BOOTCONFIG $BOOTCONFIG_EFI ; fi
-if [ "$LIVEOS" != "LiveOS" ]; then sed -i -e "s;liveimg;liveimg live_dir=$LIVEOS;" $BOOTCONFIG $BOOTCONFIG_EFI ; fi
+if [ -n "$kernelargs" ]; then
+    sed -i -e "s/liveimg/liveimg ${kernelargs}/" $BOOTCONFIG $BOOTCONFIG_EFI
+fi
+if [ "$LIVEOS" != "LiveOS" ]; then
+    sed -i -e "s;liveimg;liveimg live_dir=$LIVEOS;" $BOOTCONFIG $BOOTCONFIG_EFI
+fi
 
 # DVD Installer
 if [ "$isotype" = "installer" ]; then
@@ -801,7 +805,9 @@ if [ -n "$xo" ]; then
     fi
     args="$args reset_overlay"
     xosyspath=$(echo $SYSLINUXPATH | sed -e 's;/;\\;')
-    if [ ! -d $USBMNT/boot ]; then mkdir -p $USBMNT/boot ; fi
+    if [ ! -d $USBMNT/boot ]; then
+        mkdir -p $USBMNT/boot
+    fi
     cat > $USBMNT/boot/olpc.fth <<EOF
 \ Boot script for USB boot
 hex  rom-pa fffc7 + 4 \$number drop  h# 2e19 < [if]
@@ -846,7 +852,9 @@ if [ -z "$multi" ]; then
     echo "Installing boot loader"
     if [ -n "$efi" ]; then
         # replace the ia32 hack
-        if [ -f "$USBMNT/EFI/boot/boot.conf" ]; then cp -f $USBMNT/EFI/boot/bootia32.conf $USBMNT/EFI/boot/boot.conf ; fi
+        if [ -f "$USBMNT/EFI/boot/boot.conf" ]; then
+            cp -f $USBMNT/EFI/boot/bootia32.conf $USBMNT/EFI/boot/boot.conf
+        fi
     fi
 
     # this is a bit of a kludge, but syslinux doesn't guarantee the API for its com32 modules :/
@@ -865,7 +873,9 @@ if [ -z "$multi" ]; then
         # and has to run with the file system unmounted
         mv $USBMNT/$SYSLINUXPATH/isolinux.cfg $USBMNT/$SYSLINUXPATH/syslinux.cfg
         # deal with mtools complaining about ldlinux.sys
-        if [ -f $USBMNT/$SYSLINUXPATH/ldlinux.sys ] ; then rm -f $USBMNT/$SYSLINUXPATH/ldlinux.sys ; fi
+        if [ -f $USBMNT/$SYSLINUXPATH/ldlinux.sys ]; then
+            rm -f $USBMNT/$SYSLINUXPATH/ldlinux.sys
+        fi
         cleanup
         if [ -n "$SYSLINUXPATH" ]; then
             syslinux -d $SYSLINUXPATH $USBDEV
