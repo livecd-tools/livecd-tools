@@ -25,6 +25,7 @@ import optparse
 import logging
 
 import imgcreate
+from imgcreate.fs import makedirs
 
 class Usage(Exception):
     def __init__(self, msg = None, no_error = False):
@@ -116,6 +117,8 @@ def main():
 
     creator = imgcreate.LiveImageCreator(ks, name, fs_label)
     creator.tmpdir = os.path.abspath(options.tmpdir)
+    if not os.path.exists(creator.tmpdir):
+        makedirs(creator.tmpdir)
     creator.compress_type = options.compress_type
     creator.skip_compression = options.skip_compression
     creator.skip_minimize = options.skip_minimize
