@@ -635,7 +635,7 @@ if [ "$isotype" = "live" ]; then
         (($swapsizemb > 0)) && \
             printf "  + Swap overlay size: %11s\n" $swapsizemb
         printf "  = Total requested space:  %6s  MiB\n" $tba
-        printf "  - Space available:  %12s\n" $(($free + $tbd))
+        printf "  - Space available:  %12s\n" $((freespace + tbd))
         printf "    ==============================\n"
         printf "    Space needed:  %15s  MiB\n\n" $needed
         printf "  To fit the installation on this device,
@@ -658,8 +658,8 @@ if [ "$isotype" = "installer" ]; then
     fi
     echo "Size of DVD image: $isosize"
     echo "Size of install.img: $installimgsize"
-    echo "Available space: $(($free + $tbd))"
-    if [ $(($isosize + $installimgsize)) -gt $(($free + $tbd)) ]; then
+    echo "Available space: $((freespace + tbd))"
+    if (( ((isosize + installimgsize)) > ((freespace + tbd)) )); then
         echo "ERROR: Unable to fit DVD image + install.img on available space on USB stick"
         exitclean
     fi
