@@ -525,7 +525,8 @@ class DeviceMapperSnapshot(object):
                                              self.imgloop.device,
                                              self.cowloop.device)
 
-        args = ["/sbin/dmsetup", "create", self.__name, "--table", table]
+        args = ["/sbin/dmsetup", "create", self.__name,
+                "--uuid", "LIVECD-%s" % self.__name, "--table", table]
         if subprocess.call(args) != 0:
             self.cowloop.cleanup()
             self.imgloop.cleanup()
