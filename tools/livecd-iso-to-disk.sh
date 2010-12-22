@@ -688,13 +688,15 @@ fi
 [ -n "$efi" -a ! -d $USBMNT/EFI/boot ] && mkdir -p $USBMNT/EFI/boot
 
 # Live image copy
+set -o pipefail
 if [ "$isotype" = "live" -a -z "$skipcopy" ]; then
     echo "Copying live image to USB stick"
     [ ! -d $USBMNT/$LIVEOS ] && mkdir $USBMNT/$LIVEOS
     [ -n "$keephome" -a -f "$USBMNT/$HOMEFILE" ] && mv $USBMNT/$HOMEFILE $USBMNT/$LIVEOS/$HOMEFILE
     if [ -n "$skipcompress" -a -f $CDMNT/LiveOS/squashfs.img ]; then
         mount -o loop $CDMNT/LiveOS/squashfs.img $CDMNT || exitclean
-        copyFile $CDMNT/LiveOS/ext3fs.img $USBMNT/$LIVEOS/ext3fs.img || (umount $CDMNT ; exitclean)
+        copyFile $CDMNT/LiveOS/ext3fs.img $USBMNT/$LIVEOS/ext3fs.img || {
+            umount $CDMNT ; exitclean ; }
         umount $CDMNT
     elif [ -f $CDMNT/LiveOS/squashfs.img ]; then
         copyFile $CDMNT/LiveOS/squashfs.img $USBMNT/$LIVEOS/squashfs.img || exitclean
