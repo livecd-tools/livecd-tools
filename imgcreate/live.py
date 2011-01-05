@@ -38,13 +38,13 @@ class LiveImageCreatorBase(LoopImageCreator):
 
     """
 
-    def __init__(self, *args):
+    def __init__(self, ks, name, fslabel=None, releasever=None):
         """Initialise a LiveImageCreator instance.
 
-        This method takes the same arguments as ImageCreator.__init__().
+        This method takes the same arguments as LoopImageCreator.__init__().
 
         """
-        LoopImageCreator.__init__(self, *args)
+        LoopImageCreator.__init__(self, ks, name, fslabel=fslabel, releasever=releasever)
 
         self.compress_type = "gzip"
         """mksquashfs compressor to use."""
