@@ -47,6 +47,10 @@ currently requires a custom kernel to produce a functional image. lzo works with
 is used, the -comp option is not passed to mksquashfs to allow the use of
 older versions of mksquashfs.
 
+=item --releasever=VER
+
+Set the value to substitute for $releasever in kickstart repo urls
+
 =back
 
 =head1 SYSTEM DIRECTORY OPTIONS
@@ -81,11 +85,15 @@ livecd-creator \
 =head1 REPO EXTENSIONS
 
 livecd-creator provides for some extensions to the repo commands similar
-to what yum supports. The strings $arch, $basearch and $releveasever
+to what yum supports. The strings $arch, $basearch and $releasever
 are replaced with the system arch, basearch and release version respectively.
+When no --releasever is passed it defaults to the current system's version.
 The allows the use of repo commands such as the following:
 
 repo --name=fedora --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=fedora-$releasever&arch=$basearch
+
+Note that in a chroot environment (like koji) the rpmdb is not available,
+so either don't use $releasever in that case, or pass --releasever=VER
 
 =head1 CONTRIBUTORS
 

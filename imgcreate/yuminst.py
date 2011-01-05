@@ -45,8 +45,12 @@ class TextProgress(object):
         self.emit(logging.INFO, "...OK\n")
 
 class LiveCDYum(yum.YumBase):
-    def __init__(self):
+    def __init__(self, releasever=None):
+        """
+        releasever = optional value to use in replacing $releasever in repos
+        """
         yum.YumBase.__init__(self)
+        self.releasever = releasever
 
     def doFileLogSetup(self, uid, logfile):
         # don't do the file log for the livecd as it can lead to open fds
@@ -138,7 +142,16 @@ class LiveCDYum(yum.YumBase):
             # takes a variable and substitutes like yum configs do
             option = option.replace("$basearch", rpmUtils.arch.getBaseArch())
             option = option.replace("$arch", rpmUtils.arch.getCanonArch())
-            option = option.replace("$releasever", yum.config._getsysver("/", "redhat-release"))
+            # If the url includes $releasever substitute user's value or
+            # current system's version.
+            if option.find("$releasever") > -1:
+                if self.releasever:
+                    option = option.replace("$releasever", self.releasever)
+                else:
+                    try:
+                        option = option.replace("$releasever", yum.config._getsysver("/", "redhat-release"))
+                    except yum.Errors.YumBaseError:
+                        raise CreatorError("$releasever in repo url, but no releasever set")
             return option
 
         repo = yum.yumRepo.YumRepository(name)

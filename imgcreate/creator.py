@@ -51,7 +51,7 @@ class ImageCreator(object):
 
     """
 
-    def __init__(self, ks, name):
+    def __init__(self, ks, name, releasever=None):
         """Initialize an ImageCreator instance.
 
         ks -- a pykickstart.KickstartParser instance; this instance will be
@@ -61,12 +61,15 @@ class ImageCreator(object):
         name -- a name for the image; used for e.g. image filenames or
                 filesystem labels
 
+        releasever -- Value to substitute for $releasever in repo urls
         """
         self.ks = ks
         """A pykickstart.KickstartParser instance."""
 
         self.name = name
         """A name for the image."""
+
+        self.releasever = releasever
 
         self.tmpdir = "/var/tmp"
         """The directory in which all temporary files will be created."""
@@ -634,7 +637,7 @@ class ImageCreator(object):
         """
         yum_conf = self._mktemp(prefix = "yum.conf-")
 
-        ayum = LiveCDYum()
+        ayum = LiveCDYum(releasever=self.releasever)
         ayum.setup(yum_conf, self._instroot)
 
         for repo in kickstart.get_repos(self.ks, repo_urls):
@@ -793,7 +796,7 @@ class LoopImageCreator(ImageCreator):
 
     """
 
-    def __init__(self, ks, name, fslabel = None):
+    def __init__(self, ks, name, fslabel=None, releasever=None):
         """Initialize a LoopImageCreator instance.
 
         This method takes the same arguments as ImageCreator.__init__() with
@@ -802,7 +805,7 @@ class LoopImageCreator(ImageCreator):
         fslabel -- A string used as a label for any filesystems created.
 
         """
-        ImageCreator.__init__(self, ks, name)
+        ImageCreator.__init__(self, ks, name, releasever=releasever)
 
         self.__fslabel = None
         self.fslabel = fslabel
