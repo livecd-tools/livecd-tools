@@ -48,7 +48,7 @@ def parse_options(args):
     imgopt.add_option("", "--image-type", type="string", dest="image_type",
                       help=optparse.SUPPRESS_HELP)
     imgopt.add_option("", "--compression-type", type="string", dest="compress_type",
-                      help="Compression type recognized by mksquashfs (default gzip, lzma needs custom kernel, lzo needs a 2.6.36+ kernel)",
+                      help="Compression type recognized by mksquashfs (default gzip, xz needs a 2.6.38+ kernel, lzo needs a 2.6.36+ kernel, lzma needs custom kernel)",
                       default="gzip")
     imgopt.add_option("", "--releasever", type="string", dest="releasever",
                       default=None,
