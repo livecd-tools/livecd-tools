@@ -341,14 +341,18 @@ detectisotype() {
         isotype=live
         return
     fi
-    if [ -e $CDMNT/images/install.img ]; then
+    if [ -e $CDMNT/images/install.img -o $CDMNT/isolinux/initrd.img ]; then
+        imgtype=install
         if [ -e $CDMNT/Packages ]; then
             isotype=installer
-            return
         else
             isotype=netinst
-            return
         fi
+        if [ ! -e $CDMNT/images/install.img ]; then
+            echo "$ISO uses initrd.img w/o install.img"
+            imgtype=initrd
+        fi
+        return
     fi
     echo "ERROR: $ISO does not appear to be a Live image or DVD installer."
     exitclean
@@ -390,6 +394,7 @@ homesizemb=0
 swapsizemb=0
 overlaysizemb=0
 isotype=
+imgtype=
 LIVEOS=LiveOS
 
 HOMEFILE="home.img"
@@ -648,16 +653,22 @@ fi
 # Verify available space for DVD installer
 if [ "$isotype" = "installer" ]; then
     isosize=$(du -s -B 1M $ISO | awk {'print $1;'})
-    installimgsize=$(du -s -B 1M $CDMNT/images/install.img | awk {'print $1;'})
+    if [ "$imgtype" = "install" ]; then
+        imgpath=images/install.img
+    else
+        imgpath=isolinux/initrd.img
+    fi
+    installimgsize=$(du -s -B 1M $CDMNT/$imgpath | awk {'print $1;'})
+
     tbd=0
-    if [ -e $USBMNT/images/install.img ]; then
-        tbd=$(du -s -B 1M $USBMNT/images/install.img | awk {'print $1;'})
+    if [ -e $USBMNT/$imgpath ]; then
+        tbd=$(du -s -B 1M $USBMNT/$imgpath | awk {'print $1;'})
     fi
     if [ -e $USBMNT/$(basename $ISO) ]; then
         tbd=$(($tbd + $(du -s -B 1M $USBMNT/$(basename $ISO) | awk {'print $1;'})))
     fi
     echo "Size of DVD image: $isosize"
-    echo "Size of install.img: $installimgsize"
+    echo "Size of $imgpath: $installimgsize"
     echo "Available space: $((freespace + tbd))"
     if (( ((isosize + installimgsize)) > ((freespace + tbd)) )); then
         echo "ERROR: Unable to fit DVD image + install.img on available space on USB stick"
@@ -713,7 +724,9 @@ fi
 if [ \( "$isotype" = "installer" -o "$isotype" = "netinst" \) -a -z "$skipcopy" ]; then
     echo "Copying DVD image to USB stick"
     mkdir -p $USBMNT/images/
-    copyFile $CDMNT/images/install.img $USBMNT/images/install.img || exitclean
+    if [ "$imgtype" = "install" ]; then
+        copyFile $CDMNT/images/install.img $USBMNT/images/install.img || exitclean
+    fi
     if [ "$isotype" = "installer" ]; then
         cp $ISO $USBMNT/
     fi
@@ -753,7 +766,12 @@ fi
 
 # DVD Installer for netinst
 if [ "$isotype" = "netinst" ]; then
-    sed -i -e "s;stage2=\S*;stage2=hd:$USBLABEL:/images/install.img;g" $BOOTCONFIG $BOOTCONFIG_EFI
+    if [ "$imgtype" = "install" ]; then
+        sed -i -e "s;stage2=\S*;stage2=hd:$USBLABEL:/images/install.img;g" $BOOTCONFIG $BOOTCONFIG_EFI
+    else
+        # The initrd has everything, so no stage2
+        sed -i -e "s;stage2=\S*;;g" $BOOTCONFIG $BOOTCONFIG_EFI
+    fi
 fi
 
 # Adjust the boot timeouts
