@@ -555,7 +555,10 @@ menu hiddenrow 5
 """
 
     def __get_local_stanza(self, isodir):
-        return ""
+        return """label local
+  menu label Boot from local drive
+  localboot 0xffff
+"""
 
     def _configure_syslinux_bootloader(self, isodir):
         """configure the boot loader"""
