@@ -46,7 +46,7 @@ class LiveImageCreatorBase(LoopImageCreator):
         """
         LoopImageCreator.__init__(self, ks, name, fslabel=fslabel, releasever=releasever)
 
-        self.compress_type = "gzip"
+        self.compress_type = "xz"
         """mksquashfs compressor to use."""
 
         self.skip_compression = False
