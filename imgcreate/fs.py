@@ -56,14 +56,14 @@ def mksquashfs(in_img, out_img, compress_type):
         raise SquashfsError("'%s' exited with error (%d)" %
                             (string.join(args, " "), ret))
 
-def resize2fs(fs, size = None, minimal = False):
+def resize2fs(fs, size = None, minimal = False, tmpdir = "/tmp"):
     if minimal and size is not None:
         raise ResizeError("Can't specify both minimal and a size for resize!")
     if not minimal and size is None:
         raise ResizeError("Must specify either a size or minimal for resize!")
 
     e2fsck(fs)
-    (fd, saved_image) = tempfile.mkstemp("", "resize-image-", "/tmp")
+    (fd, saved_image) = tempfile.mkstemp("", "resize-image-", tmpdir)
     os.close(fd)
     call(["/sbin/e2image", "-r", fs, saved_image])
 
@@ -184,7 +184,9 @@ class SparseLoopbackMount(LoopbackMount):
 class SparseExtLoopbackMount(SparseLoopbackMount):
     """SparseExtLoopbackMount  compatibility layer for old API"""
     def __init__(self, lofile, mountdir, size, fstype, blocksize, fslabel):
-        self.diskmount = ExtDiskMount(SparseLoopbackDisk(lofile,size), mountdir, fstype, blocksize, fslabel, rmmountdir = True)
+        self.diskmount = ExtDiskMount(SparseLoopbackDisk(lofile,size),
+                                      mountdir, fstype, blocksize, fslabel,
+                                      rmmountdir = True, tmpdir = "/tmp")
 
 
     def __format_filesystem(self):
@@ -414,10 +416,12 @@ class DiskMount(Mount):
 
 class ExtDiskMount(DiskMount):
     """A DiskMount object that is able to format/resize ext[23] filesystems."""
-    def __init__(self, disk, mountdir, fstype, blocksize, fslabel, rmmountdir=True):
+    def __init__(self, disk, mountdir, fstype, blocksize, fslabel,
+                 rmmountdir=True, tmpdir="/tmp"):
         DiskMount.__init__(self, disk, mountdir, fstype, rmmountdir)
         self.blocksize = blocksize
         self.fslabel = "_" + fslabel
+        self.tmpdir = tmpdir
 
     def __format_filesystem(self):
         logging.info("Formating %s filesystem on %s" % (self.fstype, self.disk.device))
@@ -445,7 +449,7 @@ class ExtDiskMount(DiskMount):
         if size > current_size:
             self.disk.expand(size)
 
-        resize2fs(self.disk.lofile, size)
+        resize2fs(self.disk.lofile, size, tmpdir = self.tmpdir)
         return size
 
     def __create(self):
@@ -487,7 +491,7 @@ class ExtDiskMount(DiskMount):
         return int(parse_field(out, "Block count")) * self.blocksize
 
     def __resize_to_minimal(self):
-        resize2fs(self.disk.lofile, minimal = True)
+        resize2fs(self.disk.lofile, minimal = True, tmpdir = self.tmpdir)
         return self.__get_size_from_filesystem()
 
     def resparse(self, size = None):
@@ -577,7 +581,8 @@ class DeviceMapperSnapshot(object):
         except ValueError:
             raise SnapshotError("Failed to parse dmsetup status: " + out)
 
-def create_image_minimizer(path, image, compress_type, target_size = None):
+def create_image_minimizer(path, image, compress_type, target_size = None,
+                           tmpdir = "/tmp"):
     """
     Builds a copy-on-write image which can be used to
     create a device-mapper snapshot of an image where
@@ -605,9 +610,9 @@ def create_image_minimizer(path, image, compress_type, target_size = None):
         snapshot.create()
 
         if target_size is not None:
-            resize2fs(snapshot.path, target_size)
+            resize2fs(snapshot.path, target_size, tmpdir = tmpdir)
         else:
-            resize2fs(snapshot.path, minimal = True)
+            resize2fs(snapshot.path, minimal = True, tmpdir = tmpdir)
 
         cow_used = snapshot.get_cow_used()
     finally:

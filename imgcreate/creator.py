@@ -934,11 +934,13 @@ class LoopImageCreator(ImageCreator):
         if not base_on is None:
             self._base_on(base_on)
 
-        self.__instloop = ExtDiskMount(SparseLoopbackDisk(self._image, self.__image_size),
+        self.__instloop = ExtDiskMount(SparseLoopbackDisk(self._image,
+                                                          self.__image_size),
                                        self._instroot,
                                        self.__fstype,
                                        self.__blocksize,
-                                       self.fslabel)
+                                       self.fslabel,
+                                       self.__tmpdir)
 
         try:
             self.__instloop.mount()
