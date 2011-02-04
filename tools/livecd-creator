@@ -141,17 +141,20 @@ def main():
     ks = imgcreate.read_kickstart(options.kscfg)
 
     if options.image_type == 'livecd':
-        creator = imgcreate.LiveImageCreator(ks, name, fslabel=fslabel, releasever=options.releasever)
+        creator = imgcreate.LiveImageCreator(ks, name,
+                                        fslabel=fslabel,
+                                        releasever=options.releasever,
+                                        tmpdir=os.path.abspath(options.tmpdir))
     elif options.image_type == 'image':
-        creator = imgcreate.LoopImageCreator(ks, name, fslabel=fslabel, releasever=options.releasever)
+        creator = imgcreate.LoopImageCreator(ks, name,
+                                        fslabel=fslabel,
+                                        releasever=options.releasever,
+                                        tmpdir=os.path.abspath(options.tmpdir))
     else:
         # Cannot happen, we validate this when parsing options.
         logging.error(u"'%s' is not a valid image type" % options.image_type)
         return 1
 
-    creator.tmpdir = os.path.abspath(options.tmpdir)
-    if not os.path.exists(creator.tmpdir):
-        makedirs(creator.tmpdir)
     creator.compress_type = options.compress_type
     creator.skip_compression = options.skip_compression
     creator.skip_minimize = options.skip_minimize
