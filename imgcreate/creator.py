@@ -51,7 +51,7 @@ class ImageCreator(object):
 
     """
 
-    def __init__(self, ks, name, releasever=None):
+    def __init__(self, ks, name, releasever=None, tmpdir="/tmp"):
         """Initialize an ImageCreator instance.
 
         ks -- a pykickstart.KickstartParser instance; this instance will be
@@ -62,6 +62,8 @@ class ImageCreator(object):
                 filesystem labels
 
         releasever -- Value to substitute for $releasever in repo urls
+
+        tmpdir -- Top level directory to use for temporary files and dirs
         """
         self.ks = ks
         """A pykickstart.KickstartParser instance."""
@@ -71,8 +73,10 @@ class ImageCreator(object):
 
         self.releasever = releasever
 
-        self.tmpdir = "/var/tmp"
+        self.tmpdir = tmpdir
         """The directory in which all temporary files will be created."""
+        if not os.path.exists(self.tmpdir):
+            makedirs(self.tmpdir)
 
         self.__builddir = None
         self.__bindmounts = []
@@ -796,7 +800,7 @@ class LoopImageCreator(ImageCreator):
 
     """
 
-    def __init__(self, ks, name, fslabel=None, releasever=None):
+    def __init__(self, ks, name, fslabel=None, releasever=None, tmpdir="/tmp"):
         """Initialize a LoopImageCreator instance.
 
         This method takes the same arguments as ImageCreator.__init__() with
@@ -805,7 +809,7 @@ class LoopImageCreator(ImageCreator):
         fslabel -- A string used as a label for any filesystems created.
 
         """
-        ImageCreator.__init__(self, ks, name, releasever=releasever)
+        ImageCreator.__init__(self, ks, name, releasever=releasever, tmpdir=tmpdir)
 
         self.__fslabel = None
         self.fslabel = fslabel
@@ -940,7 +944,7 @@ class LoopImageCreator(ImageCreator):
                                        self.__fstype,
                                        self.__blocksize,
                                        self.fslabel,
-                                       self.__tmpdir)
+                                       self.tmpdir)
 
         try:
             self.__instloop.mount()
