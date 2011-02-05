@@ -172,7 +172,7 @@ createGPTLayout() {
     /sbin/parted --script $device mklabel gpt
     partinfo=$(LC_ALL=C /sbin/parted --script -m $device "unit b print" |grep ^$device:)
     size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/B$//')
-    /sbin/parted --script $device unit b mkpart '"EFI System Partition"' fat32 17408 $(($size - 17408)) set 1 boot on
+    /sbin/parted --script $device unit b mkpart '"EFI System Partition"' fat32 1048576 $(($size - 1048576)) set 1 boot on
     # Sometimes automount can be _really_ annoying.
     echo "Waiting for devices to settle..."
     /sbin/udevadm settle
@@ -195,7 +195,7 @@ createMSDOSLayout() {
     /sbin/parted --script $device mklabel msdos
     partinfo=$(LC_ALL=C /sbin/parted --script -m $device "unit b print" |grep ^$device:)
     size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/B$//')
-    /sbin/parted --script $device unit b mkpart primary fat32 17408 $(($size - 17408)) set 1 boot on
+    /sbin/parted --script $device unit b mkpart primary fat32 1048576 $(($size - 1048576)) set 1 boot on
     # Sometimes automount can be _really_ annoying.
     echo "Waiting for devices to settle..."
     /sbin/udevadm settle
@@ -222,7 +222,7 @@ createEXTFSLayout() {
     /sbin/parted --script $device mklabel msdos
     partinfo=$(LC_ALL=C /sbin/parted --script -m $device "unit b print" |grep ^$device:)
     size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/B$//')
-    /sbin/parted --script $device unit b mkpart primary ext2 17408 $(($size - 17408)) set 1 boot on
+    /sbin/parted --script $device unit b mkpart primary ext2 1048576 $(($size - 1048576)) set 1 boot on
     # Sometimes automount can be _really_ annoying.
     echo "Waiting for devices to settle..."
     /sbin/udevadm settle
