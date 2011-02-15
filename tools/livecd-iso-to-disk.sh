@@ -812,7 +812,14 @@ fi
 
 # FIXME: would be better if we had better mountpoints
 SRCMNT=$(mktemp -d /media/srctmp.XXXXXX)
-mount -o loop,ro "$SRC" $SRCMNT || exitclean
+if [ -b $SRC ]; then
+    mount -o ro "$SRC" $SRCMNT || exitclean
+elif [ -f $SRC ]; then
+    mount -o loop,ro "$SRC" $SRCMNT || exitclean
+else
+    echo "$SRC is not a file or block device."
+    exitclean
+fi
 TGTMNT=$(mktemp -d /media/tgttmp.XXXXXX)
 mount $mountopts $TGTDEV $TGTMNT || exitclean
 
