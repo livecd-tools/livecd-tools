@@ -337,7 +337,7 @@ if [ $(id -u) != 0 ]; then
 fi
 
 detectsrctype() {
-    if [ -e $SRCMNT/LiveOS/squashfs.img ]; then
+    if [[ -e $SRCMNT/$LIVEOS/squashfs.img ]]; then
         srctype=live
         return
     fi
@@ -581,53 +581,50 @@ if [ -n "$efi" -a ! -d $SRCMNT/EFI/boot ]; then
 fi
 
 # let's try to make sure there's enough room on the target device
-if [ -d $SRCMNT/LiveOS ]; then
-    check=$SRCMNT/LiveOS
-else
-    check=$SRCMNT
-fi
 if [[ -d $TGTMNT/$LIVEOS ]]; then
     tbd=($(du -B 1M $TGTMNT/$LIVEOS))
-    [[ -s $TGTMNT/$LIVEOS/$HOMEFILE ]] && \
+    if [[ -s $TGTMNT/$LIVEOS/$HOMEFILE ]] && [[ -n $keephome ]]; then
         homesize=($(du -B 1M $TGTMNT/$LIVEOS/$HOMEFILE))
-    ((homesize > 0)) && [[ -n $keephome ]] && ((tbd -= homesize))
+        ((tbd -= homesize))
+    fi
 else
     tbd=0
 fi
-targets="$TGTMNT/$SYSLINUXPATH"
-if [[ -n $efi ]]; then
-    targets+=" $TGTMNT/EFI/boot"
-fi
-duTable=($(du -c -B 1M $targets 2> /dev/null))
-((tbd += ${duTable[*]: -2:1}))
 
-sources="$SRCMNT/isolinux"
-[[ -n $efi ]] && sources+=" $SRCMNT/EFI/boot"
-if [[ -n $skipcompress ]]; then
-    if [[ -s $SRCMNT/LiveOS/squashfs.img ]]; then
-        if mount -o loop $SRCMNT/LiveOS/squashfs.img $SRCMNT; then
-            livesize=($(du -B 1M --apparent-size $SRCMNT/LiveOS/ext3fs.img))
-            umount $SRCMNT
-        else
-            echo "WARNING: --skipcompress or --xo was specified but the
-            currently-running kernel can not mount the SquashFS from the source
-            file to extract it. Instead, the compressed SquashFS will be copied
-            to the target device."
-            skipcompress=""
-        fi
+if [[ live == $srctype ]]; then
+   targets="$TGTMNT/$SYSLINUXPATH"
+   [[ -n $efi ]] && targets+=" $TGTMNT/EFI/boot"
+   [[ -n $xo ]] && targets+=" $TGTMNT/boot/olpc.fth"
+   duTable=($(du -c -B 1M $targets 2> /dev/null))
+   ((tbd += ${duTable[*]: -2:1}))
+fi
+
+if [[ -n $skipcompress ]] && [[ -s $SRCMNT/$LIVEOS/squashfs.img ]]; then
+    if mount -o loop $SRCMNT/$LIVEOS/squashfs.img $SRCMNT; then
+        livesize=($(du -B 1M --apparent-size $SRCMNT/LiveOS/ext3fs.img))
+        umount $SRCMNT
+    else
+        echo "WARNING: --skipcompress or --xo was specified but the
+        currently-running kernel can not mount the SquashFS from the source
+        file to extract it. Instead, the compressed SquashFS will be copied
+        to the target device."
+        skipcompress=""
     fi
-    duTable=($(du -c -B 1M $sources 2> /dev/null))
+fi
+if [[ live == $srctype ]]; then
+    thisScriptpath=$(readlink -f "$0")
+    sources="$SRCMNT/$LIVEOS/ext3fs.img $SRCMNT/$LIVEOS/osmin.img"
+    [[ -z $skipcompress ]] && sources+=" $SRCMNT/$LIVEOS/squashfs.img"
+    sources+=" $SRCMNT/isolinux $SRCMNT/syslinux"
+    [[ -n $efi ]] && sources+=" $SRCMNT/EFI/boot"
+    duTable=($(du -c -B 1M "$thisScriptpath" $sources 2> /dev/null))
     ((livesize += ${duTable[*]: -2:1}))
-else
-    sources+=" $check/osmin.img $check/squashfs.img"
-    duTable=($(du -c -B 1M $sources 2> /dev/null))
-    livesize=${duTable[*]: -2:1}
 fi
 
 freespace=($(df -B 1M --total $TGTDEV))
 freespace=${freespace[*]: -2:1}
 
-if [ "$srctype" = "live" ]; then
+if [[ live == $srctype ]]; then
     tba=$((overlaysizemb + homesizemb + livesize + swapsizemb))
     if ((tba > freespace + tbd)); then
         needed=$((tba - freespace - tbd))
@@ -646,7 +643,7 @@ if [ "$srctype" = "live" ]; then
         printf "    Space needed:  %15s  MiB\n\n" $needed
         printf "  To fit the installation on this device,
         \r  free space on the target, or decrease the
-        \r  requested size total by:    %s  MiB\n\n" $needed
+        \r  requested size total by:  %6s  MiB\n\n" $needed
         exitclean
     fi
 fi
@@ -705,18 +702,18 @@ if [ "$srctype" = "live" -a -z "$skipcopy" ]; then
     echo "Copying live image to target device."
     [ ! -d $TGTMNT/$LIVEOS ] && mkdir $TGTMNT/$LIVEOS
     [ -n "$keephome" -a -f "$TGTMNT/$HOMEFILE" ] && mv $TGTMNT/$HOMEFILE $TGTMNT/$LIVEOS/$HOMEFILE
-    if [ -n "$skipcompress" -a -f $SRCMNT/LiveOS/squashfs.img ]; then
-        mount -o loop $SRCMNT/LiveOS/squashfs.img $SRCMNT || exitclean
+    if [ -n "$skipcompress" -a -f $SRCMNT/$LIVEOS/squashfs.img ]; then
+        mount -o loop $SRCMNT/$LIVEOS/squashfs.img $SRCMNT || exitclean
         copyFile $SRCMNT/LiveOS/ext3fs.img $TGTMNT/$LIVEOS/ext3fs.img || {
             umount $SRCMNT ; exitclean ; }
         umount $SRCMNT
-    elif [ -f $SRCMNT/LiveOS/squashfs.img ]; then
-        copyFile $SRCMNT/LiveOS/squashfs.img $TGTMNT/$LIVEOS/squashfs.img || exitclean
-    elif [ -f $SRCMNT/LiveOS/ext3fs.img ]; then
-        copyFile $SRCMNT/LiveOS/ext3fs.img $TGTMNT/$LIVEOS/ext3fs.img || exitclean
+    elif [ -f $SRCMNT/$LIVEOS/squashfs.img ]; then
+        copyFile $SRCMNT/$LIVEOS/squashfs.img $TGTMNT/$LIVEOS/squashfs.img || exitclean
+    elif [ -f $SRCMNT/$LIVEOS/ext3fs.img ]; then
+        copyFile $SRCMNT/$LIVEOS/ext3fs.img $TGTMNT/$LIVEOS/ext3fs.img || exitclean
     fi
-    if [ -f $SRCMNT/LiveOS/osmin.img ]; then
-        copyFile $SRCMNT/LiveOS/osmin.img $TGTMNT/$LIVEOS/osmin.img || exitclean
+    if [ -f $SRCMNT/$LIVEOS/osmin.img ]; then
+        copyFile $SRCMNT/$LIVEOS/osmin.img $TGTMNT/$LIVEOS/osmin.img || exitclean
     fi
     sync
 fi
@@ -734,7 +731,19 @@ if [ \( "$srctype" = "installer" -o "$srctype" = "netinst" \) -a -z "$skipcopy" 
     sync
 fi
 
-cp $SRCMNT/isolinux/* $TGTMNT/$SYSLINUXPATH
+# Adjust syslinux sources for replication of installed images
+# between filesystem types.
+if [[ -d $SRCMNT/isolinux/ ]]; then
+    cp $SRCMNT/isolinux/* $TGTMNT/$SYSLINUXPATH
+elif [[ -d $SRCMNT/syslinux/ ]]; then
+    cp $SRCMNT/syslinux/* $TGTMNT/$SYSLINUXPATH
+    if [[ -f $SRCMNT/syslinux/extlinux.conf ]]; then
+        mv $TGTMNT/$SYSLINUXPATH/extlinux.conf \
+            $TGTMNT/$SYSLINUXPATH/isolinux.cfg
+    elif [[ -f $SRCMNT/syslinux/syslinux.cfg ]]; then
+        mv $TGTMNT/$SYSLINUXPATH/syslinux.cfg $TGTMNT/$SYSLINUXPATH/isolinux.cfg
+    fi
+fi
 BOOTCONFIG=$TGTMNT/$SYSLINUXPATH/isolinux.cfg
 # Set this to nothing so sed doesn't care
 BOOTCONFIG_EFI=
@@ -746,6 +755,21 @@ if [ -n "$efi" ]; then
     rm -f $TGTMNT/EFI/boot/grub.conf
 fi
 
+if [[ live == $srctype ]]; then
+    # Copy this installer script.
+    cp -fTp "$thisScriptpath" $TGTMNT/$LIVEOS/livecd-iso-to-disk &> /dev/null
+
+    # When the source is an installed Live USB/SD image, restore the boot config
+    # file to a base state before updating.
+    if [[ -d $SRCMNT/syslinux/ ]]; then
+        echo "Preparing boot config file."
+        sed -i -e "s/root=live:[^ ]*/root=live:CDLABEL=name/"\
+               -e "s/liveimg .* quiet/liveimg quiet/"\
+                    $BOOTCONFIG $BOOTCONFIG_EFI
+        sed -i -e "s/^timeout.*$/timeout\ 100/"\
+               -e "/^totaltimeout.*$/d" $BOOTCONFIG
+    fi
+fi
 echo "Updating boot config file"
 # adjust label and fstype
 if [ -n "$LANG" ]; then
