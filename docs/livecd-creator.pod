@@ -47,6 +47,7 @@ xz is the default and works with 2.6.38 and later kernels.
 gzip works with all kernels.
 lzo works with 2.6.36 and later kernels.
 lzma will only work with custom kernels.
+Set to 'None' to force reading the compressor used in BASE_ON.
 If gzip is used, the -comp option is not passed to mksquashfs to allow the use of older versions of mksquashfs.
 
 =item --releasever=VER

@@ -41,6 +41,35 @@ def makedirs(dirname):
         if e.errno != errno.EEXIST:
             raise
 
+def squashfs_compression_type(sqfs_img):
+    """Check the compression type of a SquashFS image. If the type cannot be
+    ascertained, return 'undetermined'. The calling code must decide what to
+    do."""
+
+    env = os.environ.copy()
+    env['LC_ALL'] = 'C'
+    args = ['/usr/sbin/unsquashfs', '-s', sqfs_img]
+    try:
+        p = subprocess.Popen(args, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE, env=env)
+        out, err = p.communicate()
+    except OSError, e:
+        raise SquashfsError(u"Error white stat-ing '%s'\n'%s'" % (args, e))
+    except:
+        raise SquashfsError(u"Error while stat-ing '%s'" % args)
+    else:
+        if p.returncode != 0:
+            raise SquashfsError(
+                u"Error while stat-ing '%s'\n'%s'\nreturncode: '%s'" %
+                (args, err, p.returncode))
+        else:
+            compress_type = 'undetermined'
+            for l in out.splitlines():
+                if l.split(None, 1)[0] == 'Compression':
+                    compress_type = l.split()[1]
+                    break
+    return compress_type
+
 def mksquashfs(in_img, out_img, compress_type):
 # Allow gzip to work for older versions of mksquashfs
     if compress_type == "gzip":

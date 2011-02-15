@@ -152,6 +152,12 @@ class LiveImageCreatorBase(LoopImageCreator):
             
         squashloop = DiskMount(LoopbackDisk(squashimg, 0), self._mkdtemp(), "squashfs")
 
+        # 'self.compress_type = None' will force reading it from base_on.
+        if self.compress_type is None:
+            self.compress_type = squashfs_compression_type(squashimg)
+            if self.compress_type == 'undetermined':
+                # Default to 'gzip' for compatibility with older versions.
+                self.compress_type = 'gzip'
         try:
             if not squashloop.disk.exists():
                 raise CreatorError("'%s' is not a valid live CD ISO : "
