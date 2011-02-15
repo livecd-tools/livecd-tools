@@ -561,7 +561,14 @@ fi
 
 # FIXME: would be better if we had better mountpoints
 CDMNT=$(mktemp -d /media/cdtmp.XXXXXX)
-mount -o loop,ro "$ISO" $CDMNT || exitclean
+if [ -b $ISO ]; then
+    mount -o ro "$ISO" $CDMNT || exitclean
+elif [ -f $ISO ]; then
+    mount -o loop,ro "$ISO" $CDMNT || exitclean
+else
+    echo "$ISO is not a file or block device."
+    exitclean
+fi
 USBMNT=$(mktemp -d /media/usbdev.XXXXXX)
 mount $mountopts $USBDEV $USBMNT || exitclean
 
