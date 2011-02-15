@@ -38,13 +38,16 @@ class LiveImageCreatorBase(LoopImageCreator):
 
     """
 
-    def __init__(self, ks, name, fslabel=None, releasever=None):
+    def __init__(self, ks, name, fslabel=None, releasever=None, tmpdir="/tmp"):
         """Initialise a LiveImageCreator instance.
 
         This method takes the same arguments as LoopImageCreator.__init__().
 
         """
-        LoopImageCreator.__init__(self, ks, name, fslabel=fslabel, releasever=releasever)
+        LoopImageCreator.__init__(self, ks, name,
+                                  fslabel=fslabel,
+                                  releasever=releasever,
+                                  tmpdir=tmpdir)
 
         self.compress_type = "xz"
         """mksquashfs compressor to use."""
