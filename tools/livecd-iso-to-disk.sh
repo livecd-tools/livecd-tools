@@ -22,8 +22,248 @@
 
 export PATH=/sbin:/usr/sbin:$PATH
 
+shortusage() {
+    echo "
+    SYNTAX
+
+    livecd-iso-to-disk [--help] [--noverify] [--format] [--reset-mbr] [--efi]
+                       [--skipcopy] [--force] [--xo] [--xo-no-home]
+                       [--timeout <time>] [--totaltimeout <time>]
+                       [--extra-kernel-args <args>] [--multi] [--livedir <dir>]
+                       [--compress] [--skipcompress] [--swap-size-mb <size>]
+                       [--overlay-size-mb <size>] [--home-size-mb <size>]
+                       [--delete-home] [--crypted-home] [--unencrypted-home]
+                       <source> <target device>
+
+    (Enter livecd-iso-to-disk --help on the command line for more information.)"
+}
+
 usage() {
-    echo "$0 [--timeout <time>] [--totaltimeout <time>] [--format] [--reset-mbr] [--noverify] [--overlay-size-mb <size>] [--home-size-mb <size>] [--unencrypted-home] [--skipcopy] [--efi] <source> <target device>"
+    echo "
+    "
+    shortusage
+    echo "
+    livecd-iso-to-disk  -  Transfer a LiveOS image so that it's bootable off of
+                           a USB/SD device.
+
+    The script may be run in simplest form with just the two arguments:
+
+             <source>
+                 This may be the filesystem path to a LiveOS .iso image file,
+                 such as from a CD-ROM, DVD, or download.  It could also be the
+                 device node reference for the mount point of another LiveOS
+                 filesystem, including the currently-running one (such as a
+                 booted Live CD/DVD/USB, where /dev/live references the running
+                 image device).
+
+             <target device>
+                 This should be the device partition name for the attached,
+                 target device, such as /dev/sdb1 or /dev/sdc1.  (Issue the
+                 df -Th command to get a listing of the mounted partitions,
+                 where you can confirm the filesystem types, available space,
+                 and device names.)  Be careful to specify the correct device,
+                 or you may overwrite important data on another disk!
+
+    To execute the script to completion, you will need to run it with root user
+    permissions.
+    SYSLINUX must be installed on the computer running the installation script.
+
+    DESCRIPTION
+
+    livecd-iso-to-disk installs a Live CD/DVD/USB image (LiveOS) onto a USB/SD
+    storage device (or any storage partition that will boot with a SYSLINUX
+    bootloader).  The target storage device can then boot the installed
+    operating system on systems that support booting via the USB or the SD
+    interface.  The script requires a LiveOS source image and a target storage
+    device.  The source image may be either a LiveOS .iso file, the currently-
+    running LiveOS image, the device node reference for an attached device with
+    an installed LiveOS image, or a file backed by a block device with an
+    installed LiveOS image.  If the operating system supports persistent
+    overlays for saving system changes, a pre-sized overlay may be included with
+    the installation.
+
+    Unless you request the --format option, the installation does not destroy
+    data outside of the LiveOS, syslinux, & EFI folders on your target device.
+    This allows one to maintain other files on the target disk outside of the
+    LiveOS filesystem.
+
+    LiveOS images provide embedded filesystems through the Device-mapper
+    component of the Linux kernel.  The embedded filesystems exist within files
+    such as /LiveOS/squashfs.img (the default compressed storage) or
+    /LiveOS/ext3fs.img (an uncompressed version) on the primary volume partition
+    of the storage device.  In use, these are read-only filesystems. Optionally,
+    one may specify a persistent LiveOS overlay to hold image-change snapshots
+    (that use write-once, difference-tracking storage) in the
+    /LiveOS/overlay-<device_id> file, which, *one should note*, always grows in
+    size due to the storage mechanism.  (The fraction of allocated space that
+    has been consumed by system activity and changes may be displayed by issuing
+    the 'dmsetup status' command in a terminal session of a running LiveOS
+    image.)  One way to conserve the unrecoverable, overlay file space, is to
+    specify a persistent home folder for user files, which will be saved in a
+    /LiveOS/home.img filesystem image file.  This file space is encrypted by
+    default, but is not compressed.  (One may bypass encryption with the
+    --unencrypted-home installation option.)  Files in this home folder may be
+    erased to recover and reuse their storage space.  The home.img file is also
+    convenient for backing up or swapping user account files.
+
+    OPTIONS
+
+    --help
+        Displays usage information and exits.
+
+    --noverify
+        Disables the image validation process that occurs before the image is
+        installed from the original Live CD .iso image.  When this option is
+        specified, the image is not verified before loading onto the target
+        storage device.
+
+    --format
+        Formats the target device and creates an MS-DOS partition table (or GPT
+        partition table, if the --efi option is passed).
+
+    --reset-mbr
+        Sets the Master Boot Record (MBR) of the target storage device to the
+        mbr.bin file from the installation system's syslinux directory.  This
+        may be helpful in recovering a damaged or corrupted device.
+
+    --efi
+        Creates a GUID partition table when --format is passed, and installs a
+        hybrid Extensible Firmware Interface (EFI)/MBR bootloader on the disk.
+        This is necessary for most Intel Macs.
+
+    --skipcopy
+        Skips the copying of the live image to the target device, bypassing the
+        actions of the --format, --overlay-size-mb, --home-size-mb, &
+        --swap-size-mb options, if present on the command line. (The --skipcopy
+        option may be used while testing the script, in order to avoid repeated
+        and lengthy copy commands, or to repair boot configuration files on a
+        previously installed device.)
+
+    --force
+        This option allows the installation script to bypass a delete
+        confirmation dialog in the event that a pre-existing LiveOS directory
+        is found on the target device.
+
+    --xo
+        Used to prepare an image for the OLPC XO-1 laptop with its compressed,
+        JFFS2 filesystem.  Do not use the following options with --xo:
+            --overlay-size-mb <size>, home-size-mb <size>, --delete-home,
+            --compress
+
+    --xo-no-home
+        Used together with the --xo option to prepare an image for an OLPC XO
+        laptop with the home folder on an SD card instead of the internal flash
+        storage.
+
+    --timeout
+        Modifies the bootloader's timeout value, which indicates how long to
+        pause at the boot: prompt before booting automatically.  This overrides
+        the value set during iso creation.  Units are 1/10 s.  The timeout is
+        canceled when any key is pressed, the assumption being that the user
+        will complete the command line.  A timeout of zero will disable the
+        timeout completely.
+
+    --totaltimeout
+        Adds a bootloader totaltimeout, which indicates how long to wait before
+        booting automatically.  This is used to force an automatic boot.  This
+        timeout cannot be canceled by the user.  Units are 1/10 s.
+
+    --extra-kernel-args <args>
+        Specifies additional kernel arguments, <args>, that will be inserted
+        into the syslinux and EFI boot configurations.  Multiple arguments
+        should be specified in one string, i.e.,
+            --extra-kernel-args \"arg1 arg2 ...\"
+
+    --multi
+        Used when installing multiple image copies to signal configuration of
+        the boot files for the image in the --livedir <dir> parameter.
+
+
+    --livedir <dir>
+        Used with multiple image installations to designate the directory <dir>
+        for the particular image.
+
+    --compress   (default state for the operating system files)
+        The default, compressed SquashFS filesystem image is copied on
+        installation.  This option has no effect when the source filesystem is
+        already expanded.
+
+    --skipcompress   (default option when  --xo is specified)
+        Expands the source SquashFS image on installation into the read-only
+        /LiveOS/ext3fs.img filesystem image file.
+
+    --swap-size-mb <size>
+        Sets up a swap file of <size> mebibytes (integer values only) on the
+        target device.
+
+    --overlay-size-mb <size>
+        This option sets the overlay size in mebibytes (integer values only).
+        The overlay makes persistent storage available to the live operating
+        system, if the operating system supports it.  The persistent LiveOS
+        overlay holds image-change snapshots (using write-once, difference-
+        tracking  storage) in the /LiveOS/overlay-<device_id> file, which, *one
+        should note*, always grows in size due to the storage mechanism.  (The
+        fraction of allocated space that has been consumed may be displayed by
+        issuing the 'dmsetup status' command in a terminal session of a running
+        LiveOS installation.)  One way to conserve the unrecoverable, overlay
+        file space, is to specify a persistent home folder for user files, see
+        --home-size-mb below.  The target storage device must have enough free
+        space for the image and the overlay.  A maximum <size> of 2047 MiB is
+        permitted for vfat-formatted devices.  If there is insufficient room on
+        your device, you will be given information to help in adjusting your
+        settings.
+
+    --home-size-mb <size>
+        Sets the home directory size in mebibytes (integer values only).  A
+        persistent home directory will be made in the /LiveOS/home.img
+        filesystem image file.  This file space is encrypted by default, but not
+        compressed  (one may bypass encryption with the --unencrypted-home
+        installation option).  Files in this home folder may be erased to
+        recover and reuse their storage space.  The target storage device must
+        have enough free space for the image, any overlay, and the home
+        directory.  Note that the --delete-home option must also be selected to
+        replace an existing persistent home with a new, empty one.  A maximum
+        <size> of 2047 MiB is permitted for vfat-formatted devices.  If there is
+        insufficient room on your device, you will be given information to help
+        in adjusting your settings.
+
+    --delete-home
+        To prevent unwitting deletion of user files, this option must be
+        explicitly selected when the option --home-size-mb <size> is selected
+        and there is an existing persistent home directory on the target device.
+
+    --crypted-home   (default that only applies to new home-size-mb requests)
+        Specifies the default option to encrypt a new persistent home directory
+        if --home-size-mb <size> is specified.
+
+    --unencrypted-home
+        Prevents the default option to encrypt a new persistent home directory.
+
+    CONTRIBUTORS
+
+    livecd-iso-to-disk: David Zeuthen, Jeremy Katz, Douglas McClendon,
+                        Chris Curran and other contributors.
+                        (See the AUTHORS file in the source distribution for
+                        the complete list of credits.)
+
+    BUGS
+
+    Report bugs to the mailing list
+    http://admin.fedoraproject.org/mailman/listinfo/livecd or directly to
+    Bugzilla http://bugzilla.redhat.com/bugzilla/ against the Fedora product,
+    and the livecd-tools component.
+
+    COPYRIGHT
+
+    Copyright (C) Fedora Project 2008, 2009, 2010 and various contributors.
+    This is free software. You may redistribute copies of it under the terms of
+    the GNU General Public License http://www.gnu.org/licenses/gpl.html.
+    There is NO WARRANTY, to the extent permitted by law.
+
+    SEE ALSO
+
+    livecd-creator, project website http://fedoraproject.org/wiki/FedoraLiveCD
+    "
     exit 1
 }
 
@@ -327,7 +567,8 @@ checkMounted() {
 
 checkint() {
     if ! test $1 -gt 0 2>/dev/null ; then
-        usage
+        shortusage
+        exit 1
     fi
 }
 
@@ -396,36 +637,21 @@ overlaysizemb=0
 srctype=
 imgtype=
 LIVEOS=LiveOS
-
 HOMEFILE="home.img"
+
+if [[ "$*" =~ "--help" ]]; then
+    usage
+fi
 while [ $# -gt 2 ]; do
     case $1 in
-        --overlay-size-mb)
-            checkint $2
-            overlaysizemb=$2
-            shift
-            ;;
-        --home-size-mb)
-            checkint $2
-            homesizemb=$2
-            shift
-            ;;
-        --swap-size-mb)
-            checkint $2
-            swapsizemb=$2
-            shift
-            ;;
-        --crypted-home)
-            cryptedhome=1
-            ;;
-        --unencrypted-home)
-            cryptedhome=""
-            ;;
-        --delete-home)
-            keephome=""
+        --help)
+            usage
             ;;
         --noverify)
             noverify=1
+            ;;
+        --format)
+            format=1
             ;;
         --reset-mbr|--resetmbr)
             resetmbr=1
@@ -433,11 +659,11 @@ while [ $# -gt 2 ]; do
         --efi|--mactel)
             efi=1
             ;;
-        --format)
-            format=1
-            ;;
         --skipcopy)
             skipcopy=1
+            ;;
+        --force)
+            force=1
             ;;
         --xo)
             xo=1
@@ -445,26 +671,6 @@ while [ $# -gt 2 ]; do
             ;;
         --xo-no-home)
             xonohome=1
-            ;;
-        --compress)
-            skipcompress=""
-            ;;
-        --skipcompress)
-            skipcompress=1
-            ;;
-        --extra-kernel-args)
-            kernelargs=$2
-            shift
-            ;;
-        --force)
-            force=1
-            ;;
-        --livedir)
-            LIVEOS=$2
-            shift
-            ;;
-        --multi)
-            multi=1
             ;;
         --timeout)
             checkint $2
@@ -476,9 +682,51 @@ while [ $# -gt 2 ]; do
             totaltimeout=$2
             shift
             ;;
+        --extra-kernel-args)
+            kernelargs=$2
+            shift
+            ;;
+        --multi)
+            multi=1
+            ;;
+        --livedir)
+            LIVEOS=$2
+            shift
+            ;;
+        --compress)
+            skipcompress=""
+            ;;
+        --skipcompress)
+            skipcompress=1
+            ;;
+        --swap-size-mb)
+            checkint $2
+            swapsizemb=$2
+            shift
+            ;;
+        --overlay-size-mb)
+            checkint $2
+            overlaysizemb=$2
+            shift
+            ;;
+        --home-size-mb)
+            checkint $2
+            homesizemb=$2
+            shift
+            ;;
+        --crypted-home)
+            cryptedhome=1
+            ;;
+        --unencrypted-home)
+            cryptedhome=""
+            ;;
+        --delete-home)
+            keephome=""
+            ;;
         *)
             echo "invalid arg -- $1"
-            usage
+            shortusage
+            exit 1
             ;;
     esac
     shift
@@ -488,16 +736,19 @@ SRC=$(readlink -f "$1")
 TGTDEV=$(readlink -f "$2")
 
 if [ -z "$SRC" ]; then
-    usage
+    shortusage
+    exit 1
 fi
 
 if [ ! -b "$SRC" -a ! -f "$SRC" ]; then
-    usage
+    shortusage
+    exit 1
 fi
 
 # FIXME: If --format is given, we shouldn't care and just use /dev/foo1
 if [ -z "$TGTDEV" -o ! -b "$TGTDEV" ]; then
-    usage
+    shortusage
+    exit 1
 fi
 
 if [ -z "$noverify" ]; then
