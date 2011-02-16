@@ -292,6 +292,10 @@ getdisk() {
     fi
 
     p=$(udevadm info -q path -n $DEV)
+    if [ $? -gt 0 ]; then
+        echo "Error getting udev path to $DEV"
+        exitclean
+    fi
     if [ -e /sys/$p/device ]; then
         device=$(basename /sys/$p)
     else
