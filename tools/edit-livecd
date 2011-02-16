@@ -72,8 +72,9 @@ class LiveImageEditor(LiveImageCreator):
         self._include = None
         """A string of file or directory paths to include in __copy_img_root."""
 
-        self._builder = "someone"
-        """The name of the Remix builder for _branding."""
+        self._builder = os.getlogin()
+        """The name of the Remix builder for _branding.
+        Default = os.getlogin()"""
 
         self.compress_type = None
         """mksquashfs compressor to use. Use 'None' to force reading of the
@@ -119,21 +120,7 @@ class LiveImageEditor(LiveImageCreator):
         rtn = self._LoopImageCreator__imagedir + "/ext3fs.img"
         return rtn
     _image = property(__get_image)
-    """The location of the image file or filesystem root."""
-
-    def _get_fstype(self, filesystem):
-        dev_null = os.open('/dev/null', os.O_WRONLY)
-        args = ['/sbin/blkid', '-s', 'TYPE', '-o', 'value', filesystem]
-        try:
-            fs_type = subprocess.Popen(args,
-                                   stdout=subprocess.PIPE,
-                                   stderr=dev_null).communicate()[0]
-        except IOError, e:
-            raise CreatorError("Failed to determine fsimage TYPE: %s" % e )
-        finally:
-            os.close(dev_null)
-
-        return fs_type.rstrip()
+    """The location of the filesystem image file."""
 
     def _get_fslabel(self):
         dev_null = os.open("/dev/null", os.O_WRONLY)
@@ -211,11 +198,11 @@ class LiveImageEditor(LiveImageCreator):
 
         if self.clone:
             # Need to clone base_on into ext3fs.img at this point
-            self._base_on(base_on)
             self._LoopImageCreator__fslabel = self.name
+            self._base_on(base_on)
         else:
             LiveImageCreator._base_on(self, base_on)
-            self._LoopImageCreator__fstype = self._get_fstype(self._image)
+            self._LoopImageCreator__fstype = get_fsvalue(self._image, 'TYPE')
             self._get_fslabel()
 
         self.fslabel = self._LoopImageCreator__fslabel
@@ -249,7 +236,6 @@ class LiveImageEditor(LiveImageCreator):
 
         self.__copy_img_root(base_on)
         self._brand(self._builder)
-
 
     def _base_on(self, base_on):
         """Clone the running LiveOS image as the basis for the new image."""
@@ -353,6 +339,7 @@ class LiveImageEditor(LiveImageCreator):
         """Adjust the image branding to show its variation from original
         source by builder and build date."""
 
+        self.fslabel = self.name
         dt = time.strftime('%d-%b-%Y')
 
         lst = ['isolinux/isolinux.cfg', 'syslinux/syslinux.cfg',
@@ -371,12 +358,11 @@ class LiveImageEditor(LiveImageCreator):
             for line in cfgf:
                 i = line.find('Welcome to ')
                 if i > -1:
-                    self.name = line[i+11:-2]
+                    release = line[i+11:-2]
                     break
             cfgf.close()
 
-        ntext = dt.translate(None,
-                             '-') + '-' + _builder + '-Remix-' + self.name
+        ntext = dt.translate(None, '-') + '-' + _builder + '-Remix-' + release
 
         # Update fedora-release message with Remix details.
         releasefiles = '/etc/fedora-release, /etc/generic-release'
@@ -392,8 +378,8 @@ class LiveImageEditor(LiveImageCreator):
                     raise CreatorError("Failed to open or write '%s' : %s" %
                                        (f.name, e))
 
-        self.name = ntext
-        self.fslabel += '-' + os.uname()[4] + '-' + time.strftime('%Y%m%d.%H')
+        self._releasefile = ntext
+        self.name += '-' + os.uname()[4] + '-' + time.strftime('%Y%m%d.%H%M')
 
 
     def _configure_bootloader(self, isodir):
@@ -411,8 +397,8 @@ class LiveImageEditor(LiveImageCreator):
                 os.rename(src, cfgf)
 
         args = ['/bin/sed', '-i',
-                '-e', 's/Welcome to .*/Welcome to ' + self.name + '!/',
-                '-e', 's/root=[^ ]*/root=live:CDLABEL=' + self.fslabel + '/',
+                '-e', 's/Welcome to .*/Welcome to ' + self._releasefile + '!/',
+                '-e', 's/root=[^ ]*/root=live:CDLABEL=' + self.name + '/',
                 '-e', 's/rootfstype=[^ ]* [^ ]*/rootfstype=auto ro/',
                 '-e', 's/liveimg .* quiet/liveimg quiet/', cfgf]
 
@@ -430,20 +416,21 @@ class LiveImageEditor(LiveImageCreator):
             os.close(dev_null)
 
 def parse_options(args):
-    parser = optparse.OptionParser(usage = "\n       %prog [-n=<name>]"
-                            "\n                      [-o=<output>]"
-                            "\n                      [-s=<script.sh>]"
-                            "\n                      [-t=<tmpdir>]"
-                            "\n                      [-e=<excludes>]"
-                            "\n                      [-f=<exclude-file>]"
-                            "\n                      [-i=<includes>]"
-                            "\n                      [-r=<releasefile>]"
-                            "\n                      [-b=<builder>]"
-                            "\n                      [--clone]"
-                            "\n                      [-c=<compress_type>]"
-                            "\n                      [--skip-compression]"
-                            "\n                      [--skip-minimize]"
-                            "\n                      <LIVEIMG.src>")
+    parser = optparse.OptionParser(usage = """
+       %prog [-n=<name>]
+                      [-o=<output>]
+                      [-s=<script.sh>]
+                      [-t=<tmpdir>]
+                      [-e=<excludes>]
+                      [-f=<exclude-file>]
+                      [-i=<includes>]
+                      [-r=<releasefile>]
+                      [-b=<builder>]
+                      [--clone]
+                      [-c=<compress_type>]
+                      [--skip-compression]
+                      [--skip-minimize]
+                      <LIVEIMG.src>""")
 
     parser.add_option("-n", "--name", type="string", dest="name",
                       help="name of new LiveOS (don't include .iso, it will "
@@ -476,7 +463,8 @@ def parse_options(args):
     parser.add_option("-r", "--releasefile", type="string", dest="releasefile",
                       help="Specify release file/s for branding.")
 
-    parser.add_option("-b", "--builder", type="string", dest="builder",
+    parser.add_option("-b", "--builder", type="string",
+                      dest="builder", default=os.getlogin(),
                       help="Specify the builder of a Remix.")
 
     parser.add_option("", "--clone", action="store_true", dest="clone",
@@ -507,6 +495,20 @@ def parse_options(args):
 
     return (args[0], options)
 
+def get_fsvalue(filesystem, tag):
+    dev_null = os.open('/dev/null', os.O_WRONLY)
+    args = ['/sbin/blkid', '-s', tag, '-o', 'value', filesystem]
+    try:
+        fs_type = subprocess.Popen(args,
+                               stdout=subprocess.PIPE,
+                               stderr=dev_null).communicate()[0]
+    except IOError, e:
+        raise CreatorError("Failed to determine fs %s: %s" % value, e )
+    finally:
+        os.close(dev_null)
+
+    return fs_type.rstrip()
+
 def rebuild_iso_symlinks(isodir):
     # remove duplicate files and rebuild symlinks to reduce iso size
     efi_vmlinuz = "%s/EFI/boot/vmlinuz0" % isodir
@@ -528,7 +530,9 @@ def main():
         print >> sys.stderr, "You must run edit-liveos as root"
         return 1
 
-    if options.name and options.name != os.path.basename(LiveOS):
+    if stat.S_ISBLK(os.stat(LiveOS).st_mode):
+        name = get_fsvalue(LiveOS, 'LABEL') + '.edited'
+    elif options.name and options.name != os.path.basename(LiveOS):
         name = options.name
     else:
         name = os.path.basename(LiveOS) + ".edited"
@@ -537,6 +541,8 @@ def main():
         output = options.output
     else:
         output = os.path.dirname(LiveOS)
+        if output == '/dev':
+            output = options.tmpdir
 
     editor = LiveImageEditor(name)
     editor._exclude = options.exclude
@@ -553,10 +559,17 @@ def main():
     try:
         editor.mount(LiveOS, cachedir = None)
         editor._configure_bootloader(editor._LiveImageCreatorBase__isodir)
-        editor.name = editor.fslabel
+        if options.script:
+            print "Running edit script '%s'" % options.script
+            editor._run_script(options.script)
+        else:
+            print "Launching shell. Exit to continue."
+            print "----------------------------------"
+            editor.launch_shell()
         rebuild_iso_symlinks(editor._LiveImageCreatorBase__isodir)
         editor.unmount()
         editor.package(output)
+        logging.info("%s.iso saved to %s"  % (editor.name, output))
     except CreatorError, e:
         logging.error(u"Error editing LiveOS : %s" % e)
         return 1
