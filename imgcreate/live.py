@@ -73,7 +73,9 @@ class LiveImageCreatorBase(LoopImageCreator):
 
         self.__isodir = None
 
-        self.__modules = ["=ata", "sym53c8xx", "aic7xxx", "=usb", "=firewire", "=mmc", "=pcmcia", "mptsas", "udf"]
+        self.__modules = ["=ata", "sym53c8xx", "aic7xxx", "=usb", "=firewire",
+                          "=mmc", "=pcmcia", "mptsas", "udf", "virtio_blk",
+                          "virtio_pci"]
         self.__modules.extend(kickstart.get_modules(self.ks))
 
         self._isofstype = "iso9660"
