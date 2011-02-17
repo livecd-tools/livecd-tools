@@ -912,7 +912,11 @@ fi
 
 # Verify available space for DVD installer
 if [ "$srctype" = "installer" ]; then
-    srcsize=$(du -s -B 1M $SRC | awk {'print $1;'})
+    if [ -z "$skipcopy" ]; then
+        srcsize=$(du -s -B 1M $SRC | awk {'print $1;'})
+    else
+        srcsize=0
+    fi
     if [ "$imgtype" = "install" ]; then
         imgpath=images/install.img
     else
@@ -981,13 +985,13 @@ if [ "$srctype" = "live" -a -z "$skipcopy" ]; then
 fi
 
 # DVD installer copy
-if [ \( "$srctype" = "installer" -o "$srctype" = "netinst" \) -a -z "$skipcopy" ]; then
+if [ \( "$srctype" = "installer" -o "$srctype" = "netinst" \) ]; then
     echo "Copying DVD image to target device."
     mkdir -p $TGTMNT/images/
     if [ "$imgtype" = "install" ]; then
         copyFile $SRCMNT/images/install.img $TGTMNT/images/install.img || exitclean
     fi
-    if [ "$srctype" = "installer" ]; then
+    if [ "$srctype" = "installer" -a -z "$skipcopy" ]; then
         cp $SRC $TGTMNT/
     fi
     sync
