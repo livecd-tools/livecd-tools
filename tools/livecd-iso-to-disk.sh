@@ -492,15 +492,23 @@ ISO=$(readlink -f "$1")
 USBDEV=$(readlink -f "$2")
 
 if [ -z "$ISO" ]; then
+    echo "Missing source"
     usage
 fi
 
 if [ ! -b "$ISO" -a ! -f "$ISO" ]; then
+    echo "$ISO is not a file or block device"
     usage
 fi
 
 # FIXME: If --format is given, we shouldn't care and just use /dev/foo1
-if [ -z "$USBDEV" -o ! -b "$USBDEV" ]; then
+if [ -z "$USBDEV" ]; then
+    echo "Missing target device"
+    usage
+fi
+
+if [ ! -b "$USBDEV" ]; then
+    echo "$USBDEV is not a block device"
     usage
 fi
 
