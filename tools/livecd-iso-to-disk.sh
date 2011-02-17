@@ -639,7 +639,11 @@ fi
 
 # Verify available space for DVD installer
 if [ "$isotype" = "installer" ]; then
-    isosize=$(du -s -B 1M $ISO | awk {'print $1;'})
+    if [ -z "$skipcopy" ]; then
+        isosize=$(du -s -B 1M $ISO | awk {'print $1;'})
+    else
+        isosize=0
+    fi
     if [ "$imgtype" = "install" ]; then
         imgpath=images/install.img
     else
@@ -708,13 +712,13 @@ if [ "$isotype" = "live" -a -z "$skipcopy" ]; then
 fi
 
 # DVD installer copy
-if [ \( "$isotype" = "installer" -o "$isotype" = "netinst" \) -a -z "$skipcopy" ]; then
+if [ \( "$isotype" = "installer" -o "$isotype" = "netinst" \) ]; then
     echo "Copying DVD image to USB stick"
     mkdir -p $USBMNT/images/
     if [ "$imgtype" = "install" ]; then
         copyFile $CDMNT/images/install.img $USBMNT/images/install.img || exitclean
     fi
-    if [ "$isotype" = "installer" ]; then
+    if [ "$isotype" = "installer" -a -z "$skipcopy" ]; then
         cp $ISO $USBMNT/
     fi
     sync
