@@ -732,7 +732,6 @@ class ImageCreator(object):
         kickstart.KeyboardConfig(self._instroot).apply(ksh.keyboard)
         kickstart.TimezoneConfig(self._instroot).apply(ksh.timezone)
         kickstart.AuthConfig(self._instroot).apply(ksh.authconfig)
-        kickstart.SelinuxConfig(self._instroot).apply(ksh.selinux)
         kickstart.FirewallConfig(self._instroot).apply(ksh.firewall)
         kickstart.RootPasswordConfig(self._instroot).apply(ksh.rootpw)
         kickstart.ServicesConfig(self._instroot).apply(ksh.services)
@@ -743,6 +742,7 @@ class ImageCreator(object):
         self._create_bootconfig()
 
         self.__run_post_scripts()
+        kickstart.SelinuxConfig(self._instroot).apply(ksh.selinux)
 
     def launch_shell(self):
         """Launch a shell in the install root.
