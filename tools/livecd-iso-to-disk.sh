@@ -740,17 +740,26 @@ SRC=$(readlink -f "$1")
 TGTDEV=$(readlink -f "$2")
 
 if [ -z "$SRC" ]; then
+    echo "Missing source"
     shortusage
     exit 1
 fi
 
 if [ ! -b "$SRC" -a ! -f "$SRC" ]; then
+    echo "$SRC is not a file or block device"
     shortusage
     exit 1
 fi
 
 # FIXME: If --format is given, we shouldn't care and just use /dev/foo1
-if [ -z "$TGTDEV" -o ! -b "$TGTDEV" ]; then
+if [ -z "$TGTDEV" ]; then
+    echo "Missing target device"
+    shortusage
+    exit 1
+fi
+
+if [ ! -b "$TGTDEV" ]; then
+    echo "$TGTDEV is not a block device"
     shortusage
     exit 1
 fi
