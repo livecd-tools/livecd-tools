@@ -582,7 +582,7 @@ if [ $(id -u) != 0 ]; then
 fi
 
 detectsrctype() {
-    if [[ -e $SRCMNT/$LIVEOS/squashfs.img ]]; then
+    if [[ -e $SRCMNT/LiveOS/squashfs.img ]]; then
         srctype=live
         return
     fi
@@ -870,8 +870,8 @@ if [[ live == $srctype ]]; then
    ((tbd += ${duTable[*]: -2:1}))
 fi
 
-if [[ -n $skipcompress ]] && [[ -s $SRCMNT/$LIVEOS/squashfs.img ]]; then
-    if mount -o loop $SRCMNT/$LIVEOS/squashfs.img $SRCMNT; then
+if [[ -n $skipcompress ]] && [[ -s $SRCMNT/LiveOS/squashfs.img ]]; then
+    if mount -o loop $SRCMNT/LiveOS/squashfs.img $SRCMNT; then
         livesize=($(du -B 1M --apparent-size $SRCMNT/LiveOS/ext3fs.img))
         umount $SRCMNT
     else
@@ -884,8 +884,8 @@ if [[ -n $skipcompress ]] && [[ -s $SRCMNT/$LIVEOS/squashfs.img ]]; then
 fi
 if [[ live == $srctype ]]; then
     thisScriptpath=$(readlink -f "$0")
-    sources="$SRCMNT/$LIVEOS/ext3fs.img $SRCMNT/$LIVEOS/osmin.img"
-    [[ -z $skipcompress ]] && sources+=" $SRCMNT/$LIVEOS/squashfs.img"
+    sources="$SRCMNT/LiveOS/ext3fs.img $SRCMNT/LiveOS/osmin.img"
+    [[ -z $skipcompress ]] && sources+=" $SRCMNT/LiveOS/squashfs.img"
     sources+=" $SRCMNT/isolinux $SRCMNT/syslinux"
     [[ -n $efi ]] && sources+=" $SRCMNT/EFI/boot"
     duTable=($(du -c -B 1M "$thisScriptpath" $sources 2> /dev/null))
@@ -977,18 +977,18 @@ if [ "$srctype" = "live" -a -z "$skipcopy" ]; then
     echo "Copying live image to target device."
     [ ! -d $TGTMNT/$LIVEOS ] && mkdir $TGTMNT/$LIVEOS
     [ -n "$keephome" -a -f "$TGTMNT/$HOMEFILE" ] && mv $TGTMNT/$HOMEFILE $TGTMNT/$LIVEOS/$HOMEFILE
-    if [ -n "$skipcompress" -a -f $SRCMNT/$LIVEOS/squashfs.img ]; then
-        mount -o loop $SRCMNT/$LIVEOS/squashfs.img $SRCMNT || exitclean
+    if [ -n "$skipcompress" -a -f $SRCMNT/LiveOS/squashfs.img ]; then
+        mount -o loop $SRCMNT/LiveOS/squashfs.img $SRCMNT || exitclean
         copyFile $SRCMNT/LiveOS/ext3fs.img $TGTMNT/$LIVEOS/ext3fs.img || {
             umount $SRCMNT ; exitclean ; }
         umount $SRCMNT
-    elif [ -f $SRCMNT/$LIVEOS/squashfs.img ]; then
-        copyFile $SRCMNT/$LIVEOS/squashfs.img $TGTMNT/$LIVEOS/squashfs.img || exitclean
-    elif [ -f $SRCMNT/$LIVEOS/ext3fs.img ]; then
-        copyFile $SRCMNT/$LIVEOS/ext3fs.img $TGTMNT/$LIVEOS/ext3fs.img || exitclean
+    elif [ -f $SRCMNT/LiveOS/squashfs.img ]; then
+        copyFile $SRCMNT/LiveOS/squashfs.img $TGTMNT/$LIVEOS/squashfs.img || exitclean
+    elif [ -f $SRCMNT/LiveOS/ext3fs.img ]; then
+        copyFile $SRCMNT/LiveOS/ext3fs.img $TGTMNT/$LIVEOS/ext3fs.img || exitclean
     fi
-    if [ -f $SRCMNT/$LIVEOS/osmin.img ]; then
-        copyFile $SRCMNT/$LIVEOS/osmin.img $TGTMNT/$LIVEOS/osmin.img || exitclean
+    if [ -f $SRCMNT/LiveOS/osmin.img ]; then
+        copyFile $SRCMNT/LiveOS/osmin.img $TGTMNT/$LIVEOS/osmin.img || exitclean
     fi
     sync
 fi
