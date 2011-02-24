@@ -327,15 +327,13 @@ resetMBR() {
     # if efi, we need to use the hybrid MBR
     if [ -n "$efi" ]; then
         if [ -f /usr/lib/syslinux/gptmbr.bin ]; then
-            gptmbr='/usr/lib/syslinux/gptmbr.bin'
+            cat /usr/lib/syslinux/gptmbr.bin > $device
         elif [ -f /usr/share/syslinux/gptmbr.bin ]; then
-            gptmbr='/usr/share/syslinux/gptmbr.bin'
+            cat /usr/share/syslinux/gptmbr.bin > $device
         else
             echo "Could not find gptmbr.bin (syslinux)"
             exitclean
         fi
-        # our magic number is LBA-2, offset 16 - (512+512+16)/$bs
-        dd if=$device bs=16 skip=65 count=1 | cat $gptmbr - > $device
     else
         if [ -f /usr/lib/syslinux/mbr.bin ]; then
             cat /usr/lib/syslinux/mbr.bin > $device
