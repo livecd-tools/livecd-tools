@@ -872,6 +872,15 @@ if [[ -n $skipcompress ]] && [[ -s $SRCMNT/LiveOS/squashfs.img ]]; then
     if mount -o loop $SRCMNT/LiveOS/squashfs.img $SRCMNT; then
         livesize=($(du -B 1M --apparent-size $SRCMNT/LiveOS/ext3fs.img))
         umount $SRCMNT
+        if ((livesize > 2048)) &&  [[ vfat == $TGTFS ]]; then
+            echo "
+            An uncompressed image size greater than 2048 MB is not suitable
+            for a VFAT-formatted device.  The compressed SquashFS will be
+            copied to the target device.
+            "
+            skipcompress=""
+            livesize=0
+        fi
     else
         echo "WARNING: --skipcompress or --xo was specified but the
         currently-running kernel can not mount the SquashFS from the source
@@ -886,6 +895,7 @@ if [[ live == $srctype ]]; then
     [[ -z $skipcompress ]] && sources+=" $SRCMNT/LiveOS/squashfs.img"
     sources+=" $SRCMNT/isolinux $SRCMNT/syslinux"
     [[ -n $efi ]] && sources+=" $SRCMNT/EFI/boot"
+    [[ -n $xo ]] && sources+=" $SRCMNT/boot/olpc.fth"
     duTable=($(du -c -B 1M "$thisScriptpath" $sources 2> /dev/null))
     ((livesize += ${duTable[*]: -2:1}))
 fi
