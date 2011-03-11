@@ -1152,14 +1152,14 @@ if [ "$homesizemb" -gt 0 -a -z "$skipcopy" ]; then
             cryptsetup luksOpen $loop EncHomeFoo
             setupworked=$?
         done
-        mke2fs -j /dev/mapper/EncHomeFoo
+        mkfs.ext4 -j /dev/mapper/EncHomeFoo
         tune2fs -c0 -i0 -ouser_xattr,acl /dev/mapper/EncHomeFoo
         sleep 2
         cryptsetup luksClose EncHomeFoo
         losetup -d $loop
     else
         echo "Formatting unencrypted /home"
-        mke2fs -F -j $TGTMNT/$LIVEOS/$HOMEFILE
+        mkfs.ext4 -F -j $TGTMNT/$LIVEOS/$HOMEFILE
         tune2fs -c0 -i0 -ouser_xattr,acl $TGTMNT/$LIVEOS/$HOMEFILE
     fi
 fi
