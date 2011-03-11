@@ -1129,9 +1129,17 @@ if [ "$homesizemb" -gt 0 -a -z "$skipcopy" ]; then
     else
         dd if=/dev/null of=$TGTMNT/$LIVEOS/$HOMEFILE count=1 bs=1M seek=$homesizemb
     fi
+    if [ $? -gt 0 ]; then
+        echo "Error creating $TGTMNT/$LIVEOS/$HOMEFILE"
+        exitclean
+    fi
     if [ -n "$cryptedhome" ]; then
         loop=$(losetup -f)
         losetup $loop $TGTMNT/$LIVEOS/$HOMEFILE
+        if [ $? -gt 0 ]; then
+            echo "Error setting up $TGTMNT/$LIVEOS/$HOMEFILE on $loop"
+            exitclean
+        fi
         setupworked=1
         until [ ${setupworked} == 0 ]; do
             echo "Encrypting persistent /home"
