@@ -277,9 +277,13 @@ cleanup() {
 }
 
 exitclean() {
-    echo "Cleaning up to exit..."
-    cleanup
-    exit 1
+    RETVAL=$?
+    if [ -d "$SRCMNT" ] || [ -d "$TGTMNT" ];
+    then
+        [ "$RETVAL" = 0 ] || echo "Cleaning up to exit..."
+        cleanup
+    fi
+    exit $RETVAL
 }
 
 isdevloop() {
@@ -398,7 +402,7 @@ checkLVM() {
     dev=$1
 
     if [ -x /sbin/pvs -a \
-        "$(/sbin/pvs -o vg_name --noheadings $dev* 2>/dev/null)" ]; then
+        "$(/sbin/pvs -o vg_name --noheadings $dev* 2>/dev/null || :)" ]; then
         echo "Device, $dev, contains a volume group and cannot be formated!"
         echo "You can remove the volume group using vgremove."
         exitclean
@@ -413,7 +417,7 @@ createGPTLayout() {
     echo "WARNING: THIS WILL DESTROY ANY DATA ON $device!!!"
     echo "Press Enter to continue or ctrl-c to abort"
     read
-    umount ${device}* &> /dev/null
+    umount ${device}* &> /dev/null || :
     /sbin/parted --script $device mklabel gpt
     partinfo=$(LC_ALL=C /sbin/parted --script -m $device "unit b print" |grep ^$device:)
     size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/B$//')
@@ -424,7 +428,7 @@ createGPTLayout() {
     sleep 5
     getpartition ${device#/dev/}
     TGTDEV=${device}${partnum}
-    umount $TGTDEV &> /dev/null
+    umount $TGTDEV &> /dev/null || :
     /sbin/mkdosfs -n LIVE $TGTDEV
     TGTLABEL="UUID=$(/sbin/blkid -s UUID -o value $TGTDEV)"
 }
@@ -436,7 +440,7 @@ createMSDOSLayout() {
     echo "WARNING: THIS WILL DESTROY ANY DATA ON $device!!!"
     echo "Press Enter to continue or ctrl-c to abort"
     read
-    umount ${device}* &> /dev/null
+    umount ${device}* &> /dev/null || :
     /sbin/parted --script $device mklabel msdos
     partinfo=$(LC_ALL=C /sbin/parted --script -m $device "unit b print" |grep ^$device:)
     size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/B$//')
@@ -451,7 +455,7 @@ createMSDOSLayout() {
     else
         TGTDEV=${device}
     fi
-    umount $TGTDEV &> /dev/null
+    umount $TGTDEV &> /dev/null || :
     /sbin/mkdosfs -n LIVE $TGTDEV
     TGTLABEL="UUID=$(/sbin/blkid -s UUID -o value $TGTDEV)"
 }
@@ -463,7 +467,7 @@ createEXTFSLayout() {
     echo "WARNING: THIS WILL DESTROY ANY DATA ON $device!!!"
     echo "Press Enter to continue or ctrl-c to abort"
     read
-    umount ${device}* &> /dev/null
+    umount ${device}* &> /dev/null || :
     /sbin/parted --script $device mklabel msdos
     partinfo=$(LC_ALL=C /sbin/parted --script -m $device "unit b print" |grep ^$device:)
     size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/B$//')
@@ -474,7 +478,7 @@ createEXTFSLayout() {
     sleep 5
     getpartition ${device#/dev/}
     TGTDEV=${device}${partnum}
-    umount $TGTDEV &> /dev/null
+    umount $TGTDEV &> /dev/null || :
 
     # Check extlinux version
     if extlinux -v 2>&1 | grep -q 'extlinux 3'; then
@@ -516,7 +520,7 @@ checkGPT() {
 checkFilesystem() {
     dev=$1
 
-    TGTFS=$(/sbin/blkid -s TYPE -o value $dev)
+    TGTFS=$(/sbin/blkid -s TYPE -o value $dev || :)
     if [ "$TGTFS" != "vfat" ] && [ "$TGTFS" != "msdos" ]; then
         if [ "$TGTFS" != "ext2" ] && [ "$TGTFS" != "ext3" ] && [ "$TGTFS" != "ext4" ] && [ "$TGTFS" != "btrfs" ]; then
             echo "Target filesystem must be vfat, ext[234] or btrfs"
@@ -639,6 +643,10 @@ copyFile() {
     fi
     cp "$1" "$2"
 }
+
+set -e
+set -o pipefail
+trap exitclean EXIT
 
 cryptedhome=1
 keephome=1
@@ -776,8 +784,7 @@ fi
 if [ -z "$noverify" ]; then
     # verify the image
     echo "Verifying image..."
-    checkisomd5 --verbose "$SRC"
-    if [ $? -ne 0 ]; then
+    if !  checkisomd5 --verbose "$SRC"; then
         echo "Are you SURE you want to continue?"
         echo "Press Enter to continue or ctrl-c to abort"
         read
@@ -876,7 +883,7 @@ if [[ live == $srctype ]]; then
    targets="$TGTMNT/$SYSLINUXPATH"
    [[ -n $efi ]] && targets+=" $TGTMNT/EFI/boot"
    [[ -n $xo ]] && targets+=" $TGTMNT/boot/olpc.fth"
-   duTable=($(du -c -B 1M $targets 2> /dev/null))
+   duTable=($(du -c -B 1M $targets 2> /dev/null || :))
    ((tbd += ${duTable[*]: -2:1}))
 fi
 
@@ -908,7 +915,7 @@ if [[ live == $srctype ]]; then
     sources+=" $SRCMNT/isolinux $SRCMNT/syslinux"
     [[ -n $efi ]] && sources+=" $SRCMNT/EFI/boot"
     [[ -n $xo ]] && sources+=" $SRCMNT/boot/olpc.fth"
-    duTable=($(du -c -B 1M "$thisScriptpath" $sources 2> /dev/null))
+    duTable=($(du -c -B 1M "$thisScriptpath" $sources 2> /dev/null || :))
     ((livesize += ${duTable[*]: -2:1}))
 fi
 
@@ -1052,7 +1059,8 @@ fi
 
 if [[ live == $srctype ]]; then
     # Copy this installer script.
-    cp -fTp "$thisScriptpath" $TGTMNT/$LIVEOS/livecd-iso-to-disk &> /dev/null
+    cp -fT "$thisScriptpath" $TGTMNT/$LIVEOS/livecd-iso-to-disk
+    chmod +x $TGTMNT/$LIVEOS/livecd-iso-to-disk &> /dev/null || :
 
     # When the source is an installed Live USB/SD image, restore the boot config
     # file to a base state before updating.
@@ -1141,29 +1149,16 @@ if [ "$homesizemb" -gt 0 -a -z "$skipcopy" ]; then
     else
         dd if=/dev/null of=$TGTMNT/$LIVEOS/$HOMEFILE count=1 bs=1M seek=$homesizemb
     fi
-    if [ $? -gt 0 ]; then
-        echo "Error creating $TGTMNT/$LIVEOS/$HOMEFILE"
-        exitclean
-    fi
     if [ -n "$cryptedhome" ]; then
         loop=$(losetup -f)
         losetup $loop $TGTMNT/$LIVEOS/$HOMEFILE
-        if [ $? -gt 0 ]; then
-            echo "Error setting up $TGTMNT/$LIVEOS/$HOMEFILE on $loop"
-            exitclean
-        fi
-        setupworked=1
-        until [ ${setupworked} == 0 ]; do
-            echo "Encrypting persistent /home"
-            cryptsetup luksFormat -y -q $loop
-            setupworked=$?
-        done
-        setupworked=1
-        until [ ${setupworked} == 0 ]; do
-            echo "Please enter the password again to unlock the device"
-            cryptsetup luksOpen $loop EncHomeFoo
-            setupworked=$?
-        done
+
+        echo "Encrypting persistent /home"
+        while ! cryptsetup luksFormat -y -q $loop; do :; done;
+
+        echo "Please enter the password again to unlock the device"
+        while ! cryptsetup luksOpen $loop EncHomeFoo; do :; done;
+
         mkfs.ext4 -j /dev/mapper/EncHomeFoo
         tune2fs -c0 -i0 -ouser_xattr,acl /dev/mapper/EncHomeFoo
         sleep 2
