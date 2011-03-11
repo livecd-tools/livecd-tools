@@ -26,8 +26,8 @@ shortusage() {
     echo "
     SYNTAX
 
-    livecd-iso-to-disk [--help] [--noverify] [--format] [--reset-mbr] [--efi]
-                       [--skipcopy] [--force] [--xo] [--xo-no-home]
+    livecd-iso-to-disk [--help] [--noverify] [--format] [--msdos] [--reset-mbr]
+                       [--efi] [--skipcopy] [--force] [--xo] [--xo-no-home]
                        [--timeout <time>] [--totaltimeout <time>]
                        [--extra-kernel-args <args>] [--multi] [--livedir <dir>]
                        [--compress] [--skipcompress] [--swap-size-mb <size>]
@@ -120,6 +120,9 @@ usage() {
     --format
         Formats the target device and creates an MS-DOS partition table (or GPT
         partition table, if the --efi option is passed).
+
+    --msdos
+        Forces format to use msdos instead of ext4.
 
     --reset-mbr
         Sets the Master Boot Record (MBR) of the target storage device to the
@@ -472,7 +475,13 @@ createEXTFSLayout() {
     getpartition ${device#/dev/}
     TGTDEV=${device}${partnum}
     umount $TGTDEV &> /dev/null
-    /sbin/mkfs.ext4 -L LIVE $TGTDEV
+
+    # Check extlinux version
+    if extlinux -v 2>&1 | grep -q 'extlinux 3'; then
+        /sbin/mkfs.ext3 -L LIVE $TGTDEV
+    else
+        /sbin/mkfs.ext4 -L LIVE $TGTDEV
+    fi
     TGTLABEL="UUID=$(/sbin/blkid -s UUID -o value $TGTDEV)"
 }
 
@@ -655,6 +664,9 @@ while [ $# -gt 2 ]; do
         --format)
             format=1
             ;;
+        --msdos)
+            usemsdos=1
+            ;;
         --reset-mbr|--resetmbr)
             resetmbr=1
             ;;
@@ -749,7 +761,6 @@ if [ ! -b "$SRC" -a ! -f "$SRC" ]; then
     exit 1
 fi
 
-# FIXME: If --format is given, we shouldn't care and just use /dev/foo1
 if [ -z "$TGTDEV" ]; then
     echo "Missing target device"
     shortusage
@@ -773,15 +784,16 @@ if [ -z "$noverify" ]; then
     fi
 fi
 
-#checkFilesystem $TGTDEV
 # do some basic sanity checks.
 checkMounted $TGTDEV
+
+# Format the device
 if [ -n "$format" -a -z "$skipcopy" ]; then
     checkLVM $TGTDEV
-    # checks for a valid filesystem
+
     if [ -n "$efi" ]; then
         createGPTLayout $TGTDEV
-    elif [ "$TGTFS" == "vfat" -o "$TGTFS" == "msdos" ]; then
+    elif [ -n "$usemsdos" -o ! -x /sbin/extlinux ]; then
         createMSDOSLayout $TGTDEV
     else
         createEXTFSLayout $TGTDEV
