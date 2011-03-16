@@ -395,6 +395,8 @@ copyFile() {
 	cp "$1" "$2"
 }
 
+shopt -s extglob
+
 cryptedhome=1
 keephome=1
 homesizemb=0
@@ -597,9 +599,15 @@ if [ -f "$USBMNT/$LIVEOS/$HOMEFILE" -a -n "$keephome" -a "$homesizemb" -gt 0 ]; 
     exitclean
 fi
 
-if [ -n "$efi" -a ! -d $CDMNT/EFI/boot ]; then
-    echo "ERROR: This live image does not support EFI booting"
-    exitclean
+if [ -n "$efi" ]; then
+    if [ -d $CDMNT/EFI/BOOT ]; then
+        EFI_BOOT="/EFI/BOOT"
+    elif [ -d $CDMNT/EFI/boot ]; then
+        EFI_BOOT="/EFI/boot"
+    else
+        echo "ERROR: This live image does not support EFI booting"
+        exitclean
+    fi
 fi
 
 # let's try to make sure there's enough room on the stick
@@ -698,7 +706,7 @@ fi
 
 # Bootloader is always reconfigured, so keep these out of the if skipcopy stuff.
 [ ! -d $USBMNT/$SYSLINUXPATH ] && mkdir -p $USBMNT/$SYSLINUXPATH
-[ -n "$efi" -a ! -d $USBMNT/EFI/boot ] && mkdir -p $USBMNT/EFI/boot
+[ -n "$efi" -a ! -d $USBMNT$EFI_BOOT ] && mkdir -p $USBMNT$EFI_BOOT
 
 # Live image copy
 set -o pipefail
@@ -743,12 +751,16 @@ cp $CDMNT/isolinux/* $USBMNT/$SYSLINUXPATH
 BOOTCONFIG=$USBMNT/$SYSLINUXPATH/isolinux.cfg
 # Set this to nothing so sed doesn't care
 BOOTCONFIG_EFI=
-if [ -n "$efi" ];then
-    cp $CDMNT/EFI/boot/* $USBMNT/EFI/boot
+if [ -n "$efi" ]; then
+    cp $CDMNT$EFI_BOOT/* $USBMNT$EFI_BOOT
+
+    # FIXME
+    # There is a problem here. On older LiveCD's the files are boot?*.conf
+    # They really should be renamed to BOOT?*.conf
 
     # this is a little ugly, but it gets the "interesting" named config file
-    BOOTCONFIG_EFI=$USBMNT/EFI/boot/boot?*.conf
-    rm -f $USBMNT/EFI/boot/grub.conf
+    BOOTCONFIG_EFI=$USBMNT$EFI_BOOT/+(BOOT|boot)?*.conf
+    rm -f $USBMNT$EFI_BOOT/grub.conf
 fi
 
 echo "Updating boot config file"
@@ -906,7 +918,9 @@ if [ -z "$multi" ]; then
     echo "Installing boot loader"
     if [ -n "$efi" ]; then
         # replace the ia32 hack
-        if [ -f "$USBMNT/EFI/boot/boot.conf" ]; then cp -f $USBMNT/EFI/boot/bootia32.conf $USBMNT/EFI/boot/boot.conf ; fi
+        if [ -f "$USBMNT$EFI_BOOT/boot.conf" ]; then
+            cp -f $USBMNT$EFI_BOOT/BOOTia32.conf $USBMNT$EFI_BOOT/BOOT.conf
+        fi
     fi
 
     # this is a bit of a kludge, but syslinux doesn't guarantee the API for its com32 modules :/
