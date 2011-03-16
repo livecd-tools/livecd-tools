@@ -647,6 +647,7 @@ copyFile() {
 set -e
 set -o pipefail
 trap exitclean EXIT
+shopt -s extglob
 
 cryptedhome=1
 keephome=1
@@ -863,9 +864,15 @@ if [ -f "$TGTMNT/$LIVEOS/$HOMEFILE" -a -n "$keephome" -a "$homesizemb" -gt 0 ]; 
     exitclean
 fi
 
-if [ -n "$efi" -a ! -d $SRCMNT/EFI/boot ]; then
-    echo "ERROR: This live image does not support EFI booting"
-    exitclean
+if [ -n "$efi" ]; then
+    if [ -d $SRCMNT/EFI/BOOT ]; then
+        EFI_BOOT="/EFI/BOOT"
+    elif [ -d $SRCMNT/EFI/boot ]; then
+        EFI_BOOT="/EFI/boot"
+    else
+        echo "ERROR: This live image does not support EFI booting"
+        exitclean
+    fi
 fi
 
 # let's try to make sure there's enough room on the target device
@@ -881,8 +888,8 @@ fi
 
 if [[ live == $srctype ]]; then
    targets="$TGTMNT/$SYSLINUXPATH"
-   [[ -n $efi ]] && targets+=" $TGTMNT/EFI/boot"
-   [[ -n $xo ]] && targets+=" $TGTMNT/boot/olpc.fth"
+   [[ -n $efi ]] && targets+=" $TGTMNT$EFI_BOOT"
+   [[ -n $xo ]] && targets+=" $TGTMNT/BOOT/olpc.fth"
    duTable=($(du -c -B 1M $targets 2> /dev/null || :))
    ((tbd += ${duTable[*]: -2:1}))
 fi
@@ -913,8 +920,8 @@ if [[ live == $srctype ]]; then
     sources="$SRCMNT/LiveOS/ext3fs.img $SRCMNT/LiveOS/osmin.img"
     [[ -z $skipcompress ]] && sources+=" $SRCMNT/LiveOS/squashfs.img"
     sources+=" $SRCMNT/isolinux $SRCMNT/syslinux"
-    [[ -n $efi ]] && sources+=" $SRCMNT/EFI/boot"
-    [[ -n $xo ]] && sources+=" $SRCMNT/boot/olpc.fth"
+    [[ -n $efi ]] && sources+=" $SRCMNT$EFI_BOOT"
+    [[ -n $xo ]] && sources+=" $SRCMNT/BOOT/olpc.fth"
     duTable=($(du -c -B 1M "$thisScriptpath" $sources 2> /dev/null || :))
     ((livesize += ${duTable[*]: -2:1}))
 fi
@@ -996,7 +1003,7 @@ fi
 
 # Bootloader is always reconfigured, so keep these out of the if skipcopy stuff.
 [ ! -d $TGTMNT/$SYSLINUXPATH ] && mkdir -p $TGTMNT/$SYSLINUXPATH
-[ -n "$efi" -a ! -d $TGTMNT/EFI/boot ] && mkdir -p $TGTMNT/EFI/boot
+[ -n "$efi" -a ! -d $TGTMNT$EFI_BOOT ] && mkdir -p $TGTMNT$EFI_BOOT
 
 # Live image copy
 set -o pipefail
@@ -1050,11 +1057,15 @@ BOOTCONFIG=$TGTMNT/$SYSLINUXPATH/isolinux.cfg
 # Set this to nothing so sed doesn't care
 BOOTCONFIG_EFI=
 if [ -n "$efi" ]; then
-    cp $SRCMNT/EFI/boot/* $TGTMNT/EFI/boot
+    cp $SRCMNT$EFI_BOOT/* $TGTMNT$EFI_BOOT
+
+    # FIXME
+    # There is a problem here. On older LiveCD's the files are boot?*.conf
+    # They really should be renamed to BOOT?*.conf
 
     # this is a little ugly, but it gets the "interesting" named config file
-    BOOTCONFIG_EFI=$TGTMNT/EFI/boot/boot?*.conf
-    rm -f $TGTMNT/EFI/boot/grub.conf
+    BOOTCONFIG_EFI=$TGTMNT$EFI_BOOT/+(BOOT|boot)?*.conf
+    rm -f $TGTMNT$EFI_BOOT/grub.conf
 fi
 
 if [[ live == $srctype ]]; then
@@ -1229,8 +1240,8 @@ if [ -z "$multi" ]; then
     echo "Installing boot loader"
     if [ -n "$efi" ]; then
         # replace the ia32 hack
-        if [ -f "$TGTMNT/EFI/boot/boot.conf" ]; then
-            cp -f $TGTMNT/EFI/boot/bootia32.conf $TGTMNT/EFI/boot/boot.conf
+        if [ -f "$TGTMNT$EFI_BOOT/boot.conf" ]; then
+            cp -f $TGTMNT$EFI_BOOT/BOOTia32.conf $TGTMNT$EFI_BOOT/BOOT.conf
         fi
     fi
 
