@@ -1066,6 +1066,34 @@ if [ -n "$efi" ]; then
     # this is a little ugly, but it gets the "interesting" named config file
     BOOTCONFIG_EFI=$TGTMNT$EFI_BOOT/+(BOOT|boot)?*.conf
     rm -f $TGTMNT$EFI_BOOT/grub.conf
+
+    # On some images (RHEL) the BOOT*.efi file isn't in $EFI_BOOT, but is in
+    # the eltorito image, so try to extract it if it is missing
+
+    # test for presence of *.efi grub binary
+    if [ ! -f $TGTMNT$EFI_BOOT/+(BOOT|boot)?*.efi ]; then
+        if [ ! -x /usr/bin/dumpet ]; then
+            echo "No /usr/bin/dumpet tool found. EFI image will not boot."
+            echo "Source media is missing grub binary in /EFI/BOOT/*efi"
+            exitclean
+        else
+            # dump the eltorito image with dumpet, output is $SRC.1
+            dumpet -i $SRC -d
+            EFIMNT=$(mktemp -d /media/srctmp.XXXXXX)
+            mount -o loop $SRC.1 $EFIMNT
+
+            if [ -f $EFIMNT$EFI_BOOT/+(BOOT|boot)?*.efi ]; then
+                cp $EFIMNT$EFI_BOOT/+(BOOT|boot)?*.efi $TGTMNT$EFI_BOOT
+            else
+                echo "No BOOT*.efi found in eltorito image. EFI will not boot"
+                umount $EFIMNT
+                rm $SRC.1
+                exitclean
+            fi
+            umount $EFIMNT
+            rm $SRC.1
+        fi
+    fi
 fi
 
 if [[ live == $srctype ]]; then
