@@ -778,17 +778,25 @@ if [ "$LIVEOS" != "LiveOS" ]; then sed -i -e "s;liveimg;liveimg live_dir=$LIVEOS
 
 # DVD Installer
 if [ "$isotype" = "installer" ]; then
-    sed -i -e "s;initrd=initrd.img;initrd=initrd.img ${LANG:+LANG=$LANG} repo=hd:$USBLABEL:/;g" $BOOTCONFIG $BOOTCONFIG_EFI
-    sed -i -e "s;stage2=\S*;;g" $BOOTCONFIG $BOOTCONFIG_EFI
+    sed -i -e "s;initrd=initrd.img;initrd=initrd.img ${LANG:+LANG=$LANG} repo=hd:$USBLABEL:/;g" $BOOTCONFIG
+    sed -i -e "s;stage2=\S*;;g" $BOOTCONFIG
+    if [ -n "$efi" ]; then
+        # Images are in $SYSLINUXPATH now
+        sed -i -e "s;/images/pxeboot/;/$SYSLINUXPATH/;g" -e "s;vmlinuz;vmlinuz ${LANG:+LANG=$LANG} repo=hd:$USBLABEL:/;g" $BOOTCONFIG_EFI
+    fi
 fi
 
 # DVD Installer for netinst
 if [ "$isotype" = "netinst" ]; then
     if [ "$imgtype" = "install" ]; then
-        sed -i -e "s;stage2=\S*;stage2=hd:$USBLABEL:/images/install.img;g" $BOOTCONFIG $BOOTCONFIG_EFI
+        sed -i -e "s;stage2=\S*;stage2=hd:$USBLABEL:/images/install.img;g" $BOOTCONFIG
     else
         # The initrd has everything, so no stage2
-        sed -i -e "s;stage2=\S*;;g" $BOOTCONFIG $BOOTCONFIG_EFI
+        sed -i -e "s;stage2=\S*;;g" $BOOTCONFIG
+    fi
+    if [ -n "$efi" ]; then
+        # Images are in $SYSLINUXPATH now
+        sed -ie "s;/images/pxeboot/;/$SYSLINUXPATH/;g" $BOOTCONFIG_EFI
     fi
 fi
 
