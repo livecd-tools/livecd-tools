@@ -770,6 +770,10 @@ if [ "$LIVEOS" != "LiveOS" ]; then sed -i -e "s;liveimg;liveimg live_dir=$LIVEOS
 if [ "$isotype" = "installer" ]; then
     sed -i -e "s;initrd=initrd.img;initrd=initrd.img ${LANG:+LANG=$LANG} repo=hd:$USBLABEL:/;g" $BOOTCONFIG
     sed -i -e "s;stage2=\S*;;g" $BOOTCONFIG
+    if [ -n "$efi" ]; then
+        # Images are in / now
+        sed -i -e "s;images/pxeboot/;;g" -e "s;vmlinuz;vmlinuz ${LANG:+LANG=$LANG} repo=hd:$USBLABEL:/;g" $BOOTCONFIG_EFI
+    fi
 fi
 
 # DVD Installer for netinst
