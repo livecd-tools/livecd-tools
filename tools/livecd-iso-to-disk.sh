@@ -1099,17 +1099,22 @@ fi
 
 # DVD Installer
 if [ "$srctype" = "installer" ]; then
-    sed -i -e "s;initrd=initrd.img;initrd=initrd.img ${LANG:+LANG=$LANG} repo=hd:$TGTLABEL:/;g" $BOOTCONFIG $BOOTCONFIG_EFI
-    sed -i -e "s;stage2=\S*;;g" $BOOTCONFIG $BOOTCONFIG_EFI
+    sed -i -e "s;initrd=initrd.img;initrd=initrd.img ${LANG:+LANG=$LANG} repo=hd:$TGTLABEL:/;g" $BOOTCONFIG
+    sed -i -e "s;stage2=\S*;;g" $BOOTCONFIG
 fi
 
 # DVD Installer for netinst
 if [ "$srctype" = "netinst" ]; then
     if [ "$imgtype" = "install" ]; then
-        sed -i -e "s;stage2=\S*;stage2=hd:$TGTLABEL:/images/install.img;g" $BOOTCONFIG $BOOTCONFIG_EFI
+        sed -i -e "s;stage2=\S*;stage2=hd:$TGTLABEL:/images/install.img;g" $BOOTCONFIG
     else
         # The initrd has everything, so no stage2
-        sed -i -e "s;stage2=\S*;;g" $BOOTCONFIG $BOOTCONFIG_EFI
+        sed -i -e "s;stage2=\S*;;g" $BOOTCONFIG
+
+        if [ -n "$efi" ]; then
+            # Images are in / now
+            sed -ie "s;images/pxeboot/;;g" $BOOTCONFIG_EFI
+        fi
     fi
 fi
 
