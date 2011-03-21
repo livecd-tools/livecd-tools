@@ -890,7 +890,7 @@ fi
 if [[ live == $srctype ]]; then
    targets="$TGTMNT/$SYSLINUXPATH"
    [[ -n $efi ]] && targets+=" $TGTMNT$EFI_BOOT"
-   [[ -n $xo ]] && targets+=" $TGTMNT/BOOT/olpc.fth"
+   [[ -n $xo ]] && targets+=" $TGTMNT/boot/olpc.fth"
    duTable=($(du -c -B 1M $targets 2> /dev/null || :))
    tbd=$((tbd + ${duTable[*]: -2:1}))
 fi
@@ -922,7 +922,7 @@ if [[ live == $srctype ]]; then
     [[ -z $skipcompress ]] && sources+=" $SRCMNT/LiveOS/squashfs.img"
     sources+=" $SRCMNT/isolinux $SRCMNT/syslinux"
     [[ -n $efi ]] && sources+=" $SRCMNT$EFI_BOOT"
-    [[ -n $xo ]] && sources+=" $SRCMNT/BOOT/olpc.fth"
+    [[ -n $xo ]] && sources+=" $SRCMNT/boot/olpc.fth"
     duTable=($(du -c -B 1M "$thisScriptpath" $sources 2> /dev/null || :))
     livesize=$((livesize + ${duTable[*]: -2:1}))
 fi
