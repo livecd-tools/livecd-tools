@@ -559,7 +559,8 @@ checkSyslinuxVersion() {
         echo "You need to have syslinux installed to run this script"
         exit 1
     fi
-    if ! syslinux 2>&1 | grep -qe -d; then
+    check=($(syslinux --version 2>&1)) || :
+    if [[ 'syslinux' == $check ]]; then
         SYSLINUXPATH=""
     elif [ -n "$multi" ]; then
         SYSLINUXPATH="$LIVEOS/syslinux"
@@ -1006,7 +1007,6 @@ fi
 [ -n "$efi" -a ! -d $TGTMNT$EFI_BOOT ] && mkdir -p $TGTMNT$EFI_BOOT
 
 # Live image copy
-set -o pipefail
 if [ "$srctype" = "live" -a -z "$skipcopy" ]; then
     echo "Copying live image to target device."
     [ ! -d $TGTMNT/$LIVEOS ] && mkdir $TGTMNT/$LIVEOS
