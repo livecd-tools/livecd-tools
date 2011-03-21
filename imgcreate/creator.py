@@ -536,7 +536,7 @@ class ImageCreator(object):
 
         self.__create_minimal_dev()
 
-        os.symlink("../proc/mounts", self._instroot + "/etc/mtab")
+        os.symlink("/proc/self/mounts", self._instroot + "/etc/mtab")
 
         self.__write_fstab()
 
@@ -548,11 +548,6 @@ class ImageCreator(object):
         from the install root.
 
         """
-        try:
-            os.unlink(self._instroot + "/etc/mtab")
-        except OSError:
-            pass
-
         self.__destroy_selinuxfs()
 
         self._undo_bindmounts()
