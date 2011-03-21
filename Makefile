@@ -1,5 +1,5 @@
 
-VERSION = 16.2
+VERSION = 16.3
 
 INSTALL = /usr/bin/install -c
 INSTALL_PROGRAM = ${INSTALL}
@@ -22,7 +22,7 @@ man:
 
 install: man
 	$(INSTALL_PROGRAM) -D tools/livecd-creator $(DESTDIR)/usr/bin/livecd-creator
-	ln -s $(DESTDIR)/usr/bin/livecd-creator $(DESTDIR)/usr/bin/image-creator
+	ln -s ./livecd-creator $(DESTDIR)/usr/bin/image-creator
 	$(INSTALL_PROGRAM) -D tools/liveimage-mount $(DESTDIR)/usr/bin/liveimage-mount
 	$(INSTALL_PROGRAM) -D tools/livecd-iso-to-disk.sh $(DESTDIR)/usr/bin/livecd-iso-to-disk
 	$(INSTALL_PROGRAM) -D tools/livecd-iso-to-pxeboot.sh $(DESTDIR)/usr/bin/livecd-iso-to-pxeboot
