@@ -881,7 +881,7 @@ if [[ -d $TGTMNT/$LIVEOS ]]; then
     tbd=($(du -B 1M $TGTMNT/$LIVEOS))
     if [[ -s $TGTMNT/$LIVEOS/$HOMEFILE ]] && [[ -n $keephome ]]; then
         homesize=($(du -B 1M $TGTMNT/$LIVEOS/$HOMEFILE))
-        ((tbd -= homesize))
+        tbd=$((tbd - homesize))
     fi
 else
     tbd=0
@@ -892,7 +892,7 @@ if [[ live == $srctype ]]; then
    [[ -n $efi ]] && targets+=" $TGTMNT$EFI_BOOT"
    [[ -n $xo ]] && targets+=" $TGTMNT/BOOT/olpc.fth"
    duTable=($(du -c -B 1M $targets 2> /dev/null || :))
-   ((tbd += ${duTable[*]: -2:1}))
+   tbd=$((tbd + ${duTable[*]: -2:1}))
 fi
 
 if [[ -n $skipcompress ]] && [[ -s $SRCMNT/LiveOS/squashfs.img ]]; then
@@ -924,7 +924,7 @@ if [[ live == $srctype ]]; then
     [[ -n $efi ]] && sources+=" $SRCMNT$EFI_BOOT"
     [[ -n $xo ]] && sources+=" $SRCMNT/BOOT/olpc.fth"
     duTable=($(du -c -B 1M "$thisScriptpath" $sources 2> /dev/null || :))
-    ((livesize += ${duTable[*]: -2:1}))
+    livesize=$((livesize + ${duTable[*]: -2:1}))
 fi
 
 freespace=($(df -B 1M --total $TGTDEV))
