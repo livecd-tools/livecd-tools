@@ -560,7 +560,7 @@ checkSyslinuxVersion() {
         exit 1
     fi
     check=($(syslinux --version 2>&1)) || :
-    if [[ 'syslinux' == $check ]]; then
+    if [[ 'syslinux' != $check ]]; then
         SYSLINUXPATH=""
     elif [ -n "$multi" ]; then
         SYSLINUXPATH="$LIVEOS/syslinux"
