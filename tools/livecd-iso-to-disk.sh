@@ -799,8 +799,8 @@ if [ "$isotype" = "installer" ]; then
     sed -i -e "s;initrd=initrd.img;initrd=initrd.img ${LANG:+LANG=$LANG} repo=hd:$USBLABEL:/;g" $BOOTCONFIG
     sed -i -e "s;stage2=\S*;;g" $BOOTCONFIG
     if [ -n "$efi" ]; then
-        # Images are in / now
-        sed -i -e "s;images/pxeboot/;;g" -e "s;vmlinuz;vmlinuz ${LANG:+LANG=$LANG} repo=hd:$USBLABEL:/;g" $BOOTCONFIG_EFI
+        # Images are in $SYSLINUXPATH now
+        sed -i -e "s;/images/pxeboot/;/$SYSLINUXPATH/;g" -e "s;vmlinuz;vmlinuz ${LANG:+LANG=$LANG} repo=hd:$USBLABEL:/;g" $BOOTCONFIG_EFI
     fi
 fi
 
@@ -811,11 +811,10 @@ if [ "$isotype" = "netinst" ]; then
     else
         # The initrd has everything, so no stage2
         sed -i -e "s;stage2=\S*;;g" $BOOTCONFIG
-
-        if [ -n "$efi" ]; then
-            # Images are in / now
-            sed -ie "s;images/pxeboot/;;g" $BOOTCONFIG_EFI
-        fi
+    fi
+    if [ -n "$efi" ]; then
+        # Images are in $SYSLINUXPATH now
+        sed -ie "s;/images/pxeboot/;/$SYSLINUXPATH/;g" $BOOTCONFIG_EFI
     fi
 fi
 
