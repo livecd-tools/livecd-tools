@@ -828,7 +828,7 @@ if [ "$overlaysizemb" -gt 0 ]; then
     fi
     LABEL=$(/sbin/blkid -s LABEL -o value $TGTDEV)
     if [[ "$LABEL" =~ ( ) ]]; then
-        echo "The LABEL($LABEL) on $TGTDEV has spaces in it, which not work with the overlay"
+        echo "The LABEL($LABEL) on $TGTDEV has spaces in it, which do not work with the overlay"
         echo "You can re-format or use dosfslabel/e2fslabel to change it"
         exitclean
     fi
