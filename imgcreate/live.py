@@ -605,8 +605,11 @@ menu hiddenrow 5
             return False
         shutil.copy(self._instroot + "/boot/efi/EFI/redhat/grub.efi",
                     isodir + "/EFI/boot/grub.efi")
-        shutil.copy(self._instroot + "/boot/grub/splash.xpm.gz",
-                    isodir + "/EFI/boot/splash.xpm.gz")
+
+        # Should exist, but if it doesn't we should fail
+        if os.path.exists(self._instroot + "/boot/grub/splash.xpm.gz"):
+            shutil.copy(self._instroot + "/boot/grub/splash.xpm.gz",
+                        isodir + "/EFI/boot/splash.xpm.gz")
 
         return True
 
