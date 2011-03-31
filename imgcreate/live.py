@@ -22,6 +22,7 @@ import glob
 import shutil
 import subprocess
 import logging
+import re
 
 from imgcreate.errors import *
 from imgcreate.fs import *
@@ -79,6 +80,7 @@ class LiveImageCreatorBase(LoopImageCreator):
         self.__modules.extend(kickstart.get_modules(self.ks))
 
         self._isofstype = "iso9660"
+        self.base_on = False
 
     #
     # Hooks for subclasses
@@ -149,12 +151,24 @@ class LiveImageCreatorBase(LoopImageCreator):
             raise CreatorError("Failed to loopback mount '%s' : %s" %
                                (base_on, e))
 
+        # Copy the initrd%d.img and xen%d.gz files over to /isolinux
+        # This is because the originals in /boot are removed when the
+        # original .iso was created.
+        src = isoloop.mountdir + "/isolinux/"
+        dest = self.__ensure_isodir() + "/isolinux/"
+        makedirs(dest)
+        pattern = re.compile(r"(initrd\d+\.img|xen\d+\.gz)")
+        files = [f for f in os.listdir(src) if pattern.search(f)
+                                               and os.path.isfile(src+f)]
+        for f in files:
+            shutil.copyfile(src+f, dest+f)
+
         # legacy LiveOS filesystem layout support, remove for F9 or F10
         if os.path.exists(isoloop.mountdir + "/squashfs.img"):
             squashimg = isoloop.mountdir + "/squashfs.img"
         else:
             squashimg = isoloop.mountdir + "/LiveOS/squashfs.img"
-            
+
         squashloop = DiskMount(LoopbackDisk(squashimg, 0), self._mkdtemp(), "squashfs")
 
         # 'self.compress_type = None' will force reading it from base_on.
@@ -194,6 +208,7 @@ class LiveImageCreatorBase(LoopImageCreator):
             isoloop.cleanup()
 
     def _mount_instroot(self, base_on = None):
+        self.base_on = True
         LoopImageCreator._mount_instroot(self, base_on)
         self.__write_initrd_conf(self._instroot + "/etc/sysconfig/mkinitrd")
         self.__write_dracut_conf(self._instroot + "/etc/dracut.conf")
@@ -410,9 +425,11 @@ class x86LiveImageCreator(LiveImageCreatorBase):
             shutil.copyfile(bootdir + "/initramfs-" + version + ".img",
                             isodir + "/isolinux/initrd" + index + ".img")
             isDracut = True
-        else:
+        elif os.path.exists(bootdir + "/initrd-" + version + ".img"):
             shutil.copyfile(bootdir + "/initrd-" + version + ".img",
                             isodir + "/isolinux/initrd" + index + ".img")
+        elif not self.base_on:
+            logging.error("No initrd or initramfs found for %s" % (version,))
 
         is_xen = False
         if os.path.exists(bootdir + "/xen.gz-" + version[:-3]):
