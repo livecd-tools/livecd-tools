@@ -1038,7 +1038,11 @@ if [ \( "$srctype" = "installer" -o "$srctype" = "netinst" \) ]; then
     echo "Copying DVD image to target device."
     mkdir -p $TGTMNT/images/
     if [ "$imgtype" = "install" ]; then
-        copyFile $SRCMNT/images/install.img $TGTMNT/images/install.img || exitclean
+        for img in install.img updates.img product.img; do
+            if [ -e $SRCMNT/images/$img ]; then
+                copyFile $SRCMNT/images/$img $TGTMNT/images/$img || exitclean
+            fi
+        done
     fi
     if [ "$srctype" = "installer" -a -z "$skipcopy" ]; then
         cp $SRC $TGTMNT/
