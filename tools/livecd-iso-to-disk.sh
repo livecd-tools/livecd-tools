@@ -724,7 +724,11 @@ if [ \( "$isotype" = "installer" -o "$isotype" = "netinst" \) ]; then
     echo "Copying DVD image to USB stick"
     mkdir -p $USBMNT/images/
     if [ "$imgtype" = "install" ]; then
-        copyFile $CDMNT/images/install.img $USBMNT/images/install.img || exitclean
+        for img in install.img updates.img product.img; do
+            if [ -e $CDMNT/images/$img ]; then
+                copyFile $CDMNT/images/$img $USBMNT/images/$img || exitclean
+            fi
+        done
     fi
     if [ "$isotype" = "installer" -a -z "$skipcopy" ]; then
         cp $ISO $USBMNT/
