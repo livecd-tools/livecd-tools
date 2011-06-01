@@ -234,7 +234,7 @@ createEXTFSLayout() {
     getpartition ${device#/dev/}
     USBDEV=${device}${partnum}
     umount $USBDEV &> /dev/null
-    /sbin/mkfs.ext4 -L LIVE $USBDEV
+    /sbin/mkfs.ext3 -L LIVE $USBDEV
     USBLABEL="UUID=$(/sbin/blkid -s UUID -o value $USBDEV)"
 }
 
@@ -271,8 +271,8 @@ checkFilesystem() {
 
     USBFS=$(/sbin/blkid -s TYPE -o value $dev)
     if [ "$USBFS" != "vfat" ] && [ "$USBFS" != "msdos" ]; then
-        if [ "$USBFS" != "ext2" ] && [ "$USBFS" != "ext3" ] && [ "$USBFS" != "ext4" ] && [ "$USBFS" != "btrfs" ]; then
-	    echo "USB filesystem must be vfat, ext[234] or btrfs"
+        if [ "$USBFS" != "ext2" ] && [ "$USBFS" != "ext3" ]; then
+	    echo "USB filesystem must be vfat, ext[23]"
 	    exitclean
         fi
     fi
@@ -289,7 +289,7 @@ checkFilesystem() {
 	    echo "Need to have a filesystem label or UUID for your USB device"
 	    if [ "$USBFS" = "vfat" -o "$USBFS" = "msdos" ]; then
 		echo "Label can be set with /sbin/dosfslabel"
-	    elif [ "$USBFS" = "ext2" -o "$USBFS" = "ext3" -o "$USBFS" = "ext4" ]; then
+	    elif [ "$USBFS" = "ext2" -o "$USBFS" = "ext3" ]; then
 		echo "Label can be set with /sbin/e2label"
 	    elif [ "$USBFS" = "btrfs" ]; then
                 echo "Eventually you'll be able to use /sbin/btrfs filesystem label to add a label."
@@ -925,7 +925,7 @@ if [ -z "$multi" ]; then
         else
             syslinux $USBDEV
         fi
-    elif [ "$USBFS" == "ext2" -o "$USBFS" == "ext3" -o "$USBFS" == "ext4" -o "$USBFS" == "btrfs" ]; then
+    elif [ "$USBFS" == "ext2" -o "$USBFS" == "ext3" ]; then
         # extlinux expects the config to be named extlinux.conf
         # and has to be run with the file system mounted
         mv $USBMNT/$SYSLINUXPATH/isolinux.cfg $USBMNT/$SYSLINUXPATH/extlinux.conf
