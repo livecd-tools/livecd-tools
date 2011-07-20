@@ -916,5 +916,8 @@ elif arch in ("ppc",):
     LiveImageCreator = ppcLiveImageCreator
 elif arch in ("ppc64",):
     LiveImageCreator = ppc64LiveImageCreator
+elif arch.startswith('arm'):
+    LiveImageCreator = LiveImageCreatorBase
+
 else:
     raise CreatorError("Architecture not supported!")
