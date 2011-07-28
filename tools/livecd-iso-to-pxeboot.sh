@@ -66,8 +66,6 @@ if [ -d tftpboot ]; then
     exit 1
 fi
 
-mkdir tftpboot
-
 # Mount the ISO.
 # FIXME: would be better if we had better mountpoints
 CDMNT=$(mktemp -d /media/cdtmp.XXXXXX)
@@ -76,10 +74,20 @@ mount -o loop "$ISO" $CDMNT || exitclean
 trap exitclean SIGINT SIGTERM
 
 # Does it look like an ISO?
-if [ ! -d $CDMNT/isolinux -o ! -f $CDMNT/isolinux/initrd0.img ]; then
+if [[ ( ! -d $CDMNT/isolinux ) || ( ! -f $CDMNT/isolinux/initrd0.img && ! -f $CDMNT/isolinux/initrd.img  ) ]]; then
     echo "The ISO image doesn't look like a LiveCD ISO image to me."
     exitclean
 fi
+
+if [[ -f $CDMNT/isolinux/initrd0.img ]]; then
+    INITRD=initrd0.img
+    VMLINUZ=vmlinuz0
+else
+    INITRD=initrd.img
+    VMLINUZ=vmlinuz
+fi
+
+mkdir tftpboot
 
 # Create a cpio archive of just the ISO and append it to the
 # initrd image.  The Linux kernel will do the right thing,
@@ -89,10 +97,10 @@ ISOBASENAME=`basename "$ISO"`
 ISODIRNAME=`dirname "$ISO"`
 ( cd "$ISODIRNAME" && echo "$ISOBASENAME" | cpio -H newc --quiet -L -o ) |
   gzip -9 |
-  cat $CDMNT/isolinux/initrd0.img - > tftpboot/initrd0.img
+  cat $CDMNT/isolinux/$INITRD - > tftpboot/$INITRD
 
 # Kernel image.
-cp $CDMNT/isolinux/vmlinuz0 tftpboot/vmlinuz0
+cp $CDMNT/isolinux/$VMLINUZ tftpboot/$VMLINUZ
 
 # pxelinux bootloader.
 if [ -f /usr/share/syslinux/pxelinux.0 ]; then
@@ -115,7 +123,7 @@ DEFAULT pxeboot
 TIMEOUT 20
 PROMPT 0
 LABEL pxeboot
-	KERNEL vmlinuz0
+	KERNEL $VMLINUZ
 	APPEND rootflags=loop $APPEND
 ONERROR LOCALBOOT 0
 EOF
