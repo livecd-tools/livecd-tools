@@ -96,6 +96,8 @@ resetMBR() {
         fi
         # our magic number is LBA-2, offset 16 - (512+512+16)/$bs
         dd if=$device bs=16 skip=65 count=1 | cat $gptmbr - > $device
+        # Make it bootable on EFI and BIOS
+        parted -s $device set $partnum legacy_boot on
     else
         if [ -f /usr/lib/syslinux/mbr.bin ]; then
             cat /usr/lib/syslinux/mbr.bin > $device
