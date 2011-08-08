@@ -365,9 +365,11 @@ checkMBR() {
     mbrword=$(hexdump -n 2 $bs |head -n 1|awk {'print $2;'})
     rm -f $bs
     if [ "$mbrword" = "0000" ]; then
-        echo "MBR appears to be blank."
-        echo "Press Enter to replace the MBR and continue or ctrl-c to abort"
-        read
+        if [ -z "$format" ]; then
+            echo "MBR appears to be blank."
+            echo "Press Enter to replace the MBR and continue or ctrl-c to abort"
+            read
+        fi
         resetMBR $1
     fi
 
