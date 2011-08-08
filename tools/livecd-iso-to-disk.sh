@@ -366,8 +366,7 @@ checkMBR() {
     rm -f $bs
     if [ "$mbrword" = "0000" ]; then
         echo "MBR appears to be blank."
-        echo "Do you want to replace the MBR on this device?"
-        echo "Press Enter to continue or ctrl-c to abort"
+        echo "Press Enter to replace the MBR and continue or ctrl-c to abort"
         read
         resetMBR $1
     fi
