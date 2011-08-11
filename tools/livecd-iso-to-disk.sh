@@ -856,9 +856,9 @@ fi
 
 # FIXME: would be better if we had better mountpoints
 SRCMNT=$(mktemp -d /media/srctmp.XXXXXX)
-if [ -b $SRC ]; then
+if [ -b "$SRC" ]; then
     mount -o ro "$SRC" $SRCMNT || exitclean
-elif [ -f $SRC ]; then
+elif [ -f "$SRC" ]; then
     mount -o loop,ro "$SRC" $SRCMNT || exitclean
 else
     echo "$SRC is not a file or block device."
@@ -969,7 +969,7 @@ fi
 # Verify available space for DVD installer
 if [ "$srctype" = "installer" ]; then
     if [ -z "$skipcopy" ]; then
-        srcsize=$(du -s -B 1M $SRC | awk {'print $1;'})
+        srcsize=$(du -s -B 1M "$SRC" | awk {'print $1;'})
     else
         srcsize=0
     fi
@@ -984,8 +984,8 @@ if [ "$srctype" = "installer" ]; then
     if [ -e $TGTMNT/$imgpath ]; then
         tbd=$(du -s -B 1M $TGTMNT/$imgpath | awk {'print $1;'})
     fi
-    if [ -e $TGTMNT/$(basename $SRC) ]; then
-        tbd=$(($tbd + $(du -s -B 1M $TGTMNT/$(basename $SRC) | awk {'print $1;'})))
+    if [ -e $TGTMNT/$(basename "$SRC") ]; then
+        tbd=$(($tbd + $(du -s -B 1M $TGTMNT/$(basename "$SRC") | awk {'print $1;'})))
     fi
     echo "Size of DVD image: $srcsize"
     echo "Size of $imgpath: $installimgsize"
@@ -1051,7 +1051,7 @@ if [ \( "$srctype" = "installer" -o "$srctype" = "netinst" \) ]; then
         done
     fi
     if [ "$srctype" = "installer" -a -z "$skipcopy" ]; then
-        cp $SRC $TGTMNT/
+        cp "$SRC" $TGTMNT/
     fi
     sync
 fi
@@ -1094,20 +1094,20 @@ if [ -n "$efi" ]; then
             exitclean
         else
             # dump the eltorito image with dumpet, output is $SRC.1
-            dumpet -i $SRC -d
+            dumpet -i "$SRC" -d
             EFIMNT=$(mktemp -d /media/srctmp.XXXXXX)
-            mount -o loop $SRC.1 $EFIMNT
+            mount -o loop "$SRC".1 $EFIMNT
 
             if [ -f $EFIMNT$EFI_BOOT/+(BOOT|boot)?*.efi ]; then
                 cp $EFIMNT$EFI_BOOT/+(BOOT|boot)?*.efi $TGTMNT$EFI_BOOT
             else
                 echo "No BOOT*.efi found in eltorito image. EFI will not boot"
                 umount $EFIMNT
-                rm $SRC.1
+                rm "$SRC".1
                 exitclean
             fi
             umount $EFIMNT
-            rm $SRC.1
+            rm "$SRC".1
         fi
     fi
 fi
