@@ -83,6 +83,15 @@ class ImageCreator(object):
 
         self.__sanity_check()
 
+        # get selinuxfs mountpoint
+        self.__selinux_mountpoint = "/sys/fs/selinux"
+        with open("/proc/self/mountinfo", "r") as f:
+            for line in f.readlines():
+                fields = line.split()
+                if fields[-2] == "selinuxfs":
+                    self.__selinux_mountpoint = fields[4]
+                    break
+
     def __del__(self):
         self.cleanup()
 
@@ -435,63 +444,25 @@ class ImageCreator(object):
                 os.symlink(src, self._instroot + dest)
         os.umask(origumask)
 
-    def __getbooleans(self):
-        booleans = []
-        if not kickstart.selinux_enabled(self.ks) or not os.path.exists("/selinux/enforce"):
-            return booleans
-        for i in  selinux.security_get_boolean_names()[1]:
-            on = selinux.security_get_boolean_active(i)
-            booleans.append(("/booleans/%s" % i, "%d %d" % (on, on)))
-        return booleans
-
     def __create_selinuxfs(self):
-        # if selinux exists on the host we need to lie to the chroot
-        if os.path.exists("/selinux/enforce"):
-            selinux_dir = self._instroot + "/selinux"
+        arglist = ["/bin/mount", "--bind", "/dev/null", self._instroot + self.__selinux_mountpoint + "/load"]
+        subprocess.call(arglist, close_fds = True)
 
-            # enforce=0 tells the chroot selinux is not enforcing
-            # policyvers=999 tell the chroot to make the highest version of policy it can
-
-            files = [('/enforce', '0'),
-                     ('/policyvers', '999'),
-                     ('/commit_pending_bools', ''),
-                     ('/mls', str(selinux.is_selinux_mls_enabled()))]
-
-            for (file, value) in files + self.__getbooleans():
-                fd = os.open(selinux_dir + file, os.O_WRONLY | os.O_TRUNC | os.O_CREAT)
-                os.write(fd, value)
-                os.close(fd)
-
-            # we steal mls from the host system for now, might be best to always set it to 1????
-            # make /load -> /dev/null so chroot policy loads don't hurt anything
-            os.mknod(selinux_dir + "/load", 0666 | stat.S_IFCHR, os.makedev(1, 3))
-
-        # selinux is on in the kickstart, so clean up as best we can to start
         if kickstart.selinux_enabled(self.ks):
             # label the fs like it is a root before the bind mounting
             arglist = ["/sbin/setfiles", "-F", "-r", self._instroot, selinux.selinux_file_context_path(), self._instroot]
             subprocess.call(arglist, close_fds = True)
             # these dumb things don't get magically fixed, so make the user generic
-            for f in ("/proc", "/sys", "/selinux"):
+        # if selinux exists on the host we need to lie to the chroot
+        if selinux.is_selinux_enabled():
+            for f in ("/proc", "/sys"):
                 arglist = ["/usr/bin/chcon", "-u", "system_u", self._instroot + f]
                 subprocess.call(arglist, close_fds = True)
 
     def __destroy_selinuxfs(self):
         # if the system was running selinux clean up our lies
-        if os.path.exists("/selinux/enforce"):
-            for root, dirs, files in os.walk(self._instroot + "/selinux"):
-                for name in files:
-                    try:
-                        os.remove(os.path.join(root, name))
-                    except OSError:
-                        pass
-                for name in dirs:
-                    if os.path.join(root, name) == self._instroot + "/selinux":
-                        continue
-                    try:
-                        os.rmdir(os.path.join(root, name))
-                    except OSError:
-                        pass
+        arglist = ["/bin/umount", self._instroot + self.__selinux_mountpoint + "/load"]
+        subprocess.call(arglist, close_fds = True)
 
     def mount(self, base_on = None, cachedir = None):
         """Setup the target filesystem in preparation for an install.
@@ -518,7 +489,7 @@ class ImageCreator(object):
 
         self._mount_instroot(base_on)
 
-        for d in ("/dev/pts", "/etc", "/boot", "/var/log", "/var/cache/yum", "/sys", "/proc", "/selinux/booleans"):
+        for d in ("/dev/pts", "/etc", "/boot", "/var/log", "/var/cache/yum", "/sys", "/proc"):
             makedirs(self._instroot + d)
 
         cachesrc = cachedir or (self.__builddir + "/yum-cache")
@@ -527,12 +498,13 @@ class ImageCreator(object):
         # bind mount system directories into _instroot
         for (f, dest) in [("/sys", None), ("/proc", None),
                           ("/dev/pts", None), ("/dev/shm", None),
+                          (self.__selinux_mountpoint, self.__selinux_mountpoint),
                           (cachesrc, "/var/cache/yum")]:
             self.__bindmounts.append(BindChrootMount(f, self._instroot, dest))
 
-        self.__create_selinuxfs()
-
         self._do_bindmounts()
+
+        self.__create_selinuxfs()
 
         self.__create_minimal_dev()
 
@@ -619,7 +591,7 @@ class ImageCreator(object):
     # we need /usr/sbin/lokkit
     def __can_handle_selinux(self, ayum):
         file = "/usr/sbin/lokkit"
-        if not kickstart.selinux_enabled(self.ks) and os.path.exists("/selinux/enforce") and not ayum.installHasFile(file):
+        if not kickstart.selinux_enabled(self.ks) and selinux.is_selinux_enabled() and not ayum.installHasFile(file):
             raise CreatorError("Unable to disable SELinux because the installed package set did not include the file %s" % (file))
 
     def install(self, repo_urls = {}):
