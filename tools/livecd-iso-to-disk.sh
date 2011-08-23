@@ -622,6 +622,10 @@ cp_p() {
 }
 
 copyFile() {
+    if [ -x /usr/bin/rsync ]; then
+        rsync -P "$1" "$2"
+        return
+    fi
     if [ -x /usr/bin/gvfs-copy ]; then
         gvfs-copy -p "$1" "$2"
         return
