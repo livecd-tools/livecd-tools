@@ -746,7 +746,7 @@ if [ \( "$isotype" = "installer" -o "$isotype" = "netinst" \) ]; then
         done
     fi
     if [ "$isotype" = "installer" -a -z "$skipcopy" ]; then
-        cp $ISO $USBMNT/
+        copyFile $ISO $USBMNT/
     fi
     sync
 fi
