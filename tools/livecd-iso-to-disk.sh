@@ -1055,7 +1055,7 @@ if [ \( "$srctype" = "installer" -o "$srctype" = "netinst" \) ]; then
         done
     fi
     if [ "$srctype" = "installer" -a -z "$skipcopy" ]; then
-        cp "$SRC" $TGTMNT/
+        copyFile "$SRC" $TGTMNT/
     fi
     sync
 fi
