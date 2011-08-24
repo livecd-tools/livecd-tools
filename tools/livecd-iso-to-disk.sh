@@ -729,7 +729,7 @@ if [ \( "$isotype" = "installer" -o "$isotype" = "netinst" \) ]; then
         copyFile $CDMNT/images/install.img $USBMNT/images/install.img || exitclean
     fi
     if [ "$isotype" = "installer" -a -z "$skipcopy" ]; then
-        cp $ISO $USBMNT/
+        copyFile $ISO $USBMNT/
     fi
     sync
 fi
