@@ -500,7 +500,10 @@ class ImageCreator(object):
                           ("/dev/pts", None), ("/dev/shm", None),
                           (self.__selinux_mountpoint, self.__selinux_mountpoint),
                           (cachesrc, "/var/cache/yum")]:
-            self.__bindmounts.append(BindChrootMount(f, self._instroot, dest))
+            if os.path.exists(f):
+                self.__bindmounts.append(BindChrootMount(f, self._instroot, dest))
+            else:
+                logging.warn("Skipping (%s,%s) because source doesn't exist." % (f, dest))
 
         self._do_bindmounts()
 
