@@ -455,21 +455,34 @@ class x86LiveImageCreator(LiveImageCreatorBase):
         return """
 default %(menu)s
 timeout %(timeout)d
+menu background %(background)s
+menu autoboot Starting %(name)s in # second{,s}. Press any key to interrupt.
 
-%(background)s
-menu title Welcome to %(name)s!
-menu color border 0 #ffffffff #00000000
-menu color sel 7 #ffffffff #ff000000
-menu color title 0 #ffffffff #00000000
-menu color tabmsg 0 #ffffffff #00000000
-menu color unsel 0 #ffffffff #00000000
-menu color hotsel 0 #ff000000 #ffffffff
-menu color hotkey 7 #ffffffff #ff000000
-menu color timeout_msg 0 #ffffffff #00000000
-menu color timeout 0 #ffffffff #00000000
-menu color cmdline 0 #ffffffff #00000000
-menu hidden
-menu hiddenrow 5
+menu clear
+menu title @PRODUCT@ @VERSION@
+menu vshift 8
+menu rows 18
+menu margin 8
+#menu hidden
+menu helpmsgrow 15
+menu tabmsgrow 13
+
+menu color border * #00000000 #00000000 none
+menu color sel 0 #ffffffff #00000000 none
+menu color title 0 #ff7ba3d0 #00000000 none
+menu color tabmsg 0 #ff3a6496 #00000000 none
+menu color unsel 0 #84b8ffff #00000000 none
+menu color hotsel 0 #84b8ffff #00000000 none
+menu color hotkey 0 #ffffffff #00000000 none
+menu color help 0 #ffffffff #00000000 none
+menu color scrollbar 0 #ffffffff #ff355594 none
+menu color timeout 0 #ffffffff #00000000 none
+menu color timeout_msg 0 #ffffffff #00000000 none
+menu color cmdmark 0 #84b8ffff #00000000 none
+menu color cmdline 0 #ffffffff #00000000 none
+
+menu tabmsg Press Tab for full configuration options on menu items.
+menu separator
 """ % args
 
     def __get_image_stanza(self, is_xen, isDracut, **args):
@@ -482,13 +495,18 @@ menu hiddenrow 5
             template = """label %(short)s
   menu label %(long)s
   kernel vmlinuz%(index)s
-  append initrd=initrd%(index)s.img root=%(rootlabel)s rootfstype=%(isofstype)s %(liveargs)s %(xdriver)s %(extra)s
+  append initrd=initrd%(index)s.img root=%(rootlabel)s rootfstype=%(isofstype)s %(liveargs)s %(extra)s
 """
         else:
             template = """label %(short)s
   menu label %(long)s
   kernel mboot.c32
-  append xen%(index)s.gz --- vmlinuz%(index)s root=%(rootlabel)s rootfstype=%(isofstype)s %(liveargs)s %(xdriver)s %(extra)s --- initrd%(index)s.img
+  append xen%(index)s.gz --- vmlinuz%(index)s root=%(rootlabel)s rootfstype=%(isofstype)s %(liveargs)s %(extra)s --- initrd%(index)s.img
+"""
+        if args.get("help"):
+            template += """  text help
+      %(help)s
+  endtext
 """
         return template % args
 
@@ -503,7 +521,10 @@ menu hiddenrow 5
 
         checkisomd5 = self._has_checkisomd5()
 
-        cfg = ""
+        # Stanzas for insertion into the config template
+        linux = []
+        basic = []
+        check = []
 
         index = "0"
         for version in versions:
@@ -514,16 +535,11 @@ menu hiddenrow 5
             default = self.__is_default_kernel(kernel, kernels)
 
             if default:
-                long = "Boot"
+                long = ""
             elif kernel.startswith("kernel-"):
-                long = "Boot %s(%s)" % (self.name, kernel[7:])
+                long = "%s(%s)" % (self.name, kernel[7:])
             else:
-                long = "Boot %s(%s)" % (self.name, kernel)
-
-            # Basic video driver
-            basic = "system with basic video driver"
-            xdriver = "xdriver=vesa nomodeset"
-
+                long = "%s(%s)" % (self.name, kernel)
 
             # tell dracut not to ask for LUKS passwords or activate mdraid sets
             if isDracut:
@@ -531,46 +547,45 @@ menu hiddenrow 5
             else:
                 kern_opts = kernel_options
 
-            cfg += self.__get_image_stanza(is_xen, isDracut,
+            linux.append(self.__get_image_stanza(is_xen, isDracut,
                                            fslabel = self.fslabel,
                                            isofstype = "auto",
                                            liveargs = kern_opts,
-                                           long = long,
+                                           long = "^Start " + long,
                                            short = "linux" + index,
-                                           basicvideo = "",
-                                           xdriver = "",
                                            extra = "",
-                                           index = index)
+                                           help = "",
+                                           index = index))
 
             if default:
-                cfg += "menu default\n"
+                linux[-1] += "  menu default\n"
 
-            cfg += self.__get_image_stanza(is_xen, isDracut,
+            basic.append(self.__get_image_stanza(is_xen, isDracut,
                                            fslabel = self.fslabel,
                                            isofstype = "auto",
                                            liveargs = kern_opts,
-                                           long = long + " (Basic Video)",
-                                           short = "linux" + index,
-                                           basicvideo = basic,
-                                           xdriver = xdriver,
-                                           extra = "",
-                                           index = index)
+                                           long = "Start " + long + " in ^basic graphics mode.",
+                                           short = "basic" + index,
+                                           extra = "xdriver=vesa nomodeset",
+                                           help = "Try this option out if you're having trouble starting.",
+                                           index = index))
 
             if checkisomd5:
-                cfg += self.__get_image_stanza(is_xen, isDracut,
+                check.append(self.__get_image_stanza(is_xen, isDracut,
                                                fslabel = self.fslabel,
                                                isofstype = "auto",
                                                liveargs = kern_opts,
-                                               long = "Verify and " + long,
-                                               short = "rd.live.check" + index,
-                                               basicvideo = "",
-                                               xdriver = "",
+                                               long = "^Test this media & start " + long,
+                                               short = "check" + index,
                                                extra = "rd.live.check",
-                                               index = index)
+                                               help = "",
+                                               index = index))
+            else:
+                check.append(None)
 
             index = str(int(index) + 1)
 
-        return cfg
+        return (linux, basic, check)
 
     def __get_memtest_stanza(self, isodir):
         memtest = glob.glob(self._instroot + "/boot/memtest86*")
@@ -580,13 +595,18 @@ menu hiddenrow 5
         shutil.copyfile(memtest[0], isodir + "/isolinux/memtest")
 
         return """label memtest
-  menu label Memory Test
+  menu label Run a ^memory test.
+  text help
+    If your system is having issues, an problem with your 
+    system's memory may be the cause. Use this utility to 
+    see if the memory is working correctly.
+  endtext
   kernel memtest
 """
 
     def __get_local_stanza(self, isodir):
         return """label local
-  menu label Boot from local drive
+  menu label Boot from ^local drive
   localboot 0xffff
 """
 
@@ -601,18 +621,41 @@ menu hiddenrow 5
 
         background = ""
         if self.__copy_syslinux_background(isodir + "/isolinux/splash.jpg"):
-            background = "menu background splash.jpg"
+            background = "splash.jpg"
 
         cfg = self.__get_basic_syslinux_config(menu = menu,
                                                background = background,
                                                name = self.name,
                                                timeout = self._timeout * 10)
+        cfg += "menu separator\n"
 
-        cfg += self.__get_image_stanzas(isodir)
+        linux, basic, check = self.__get_image_stanzas(isodir)
+        # Add linux stanzas to main menu
+        for s in linux:
+            cfg += s
+        cfg += "menu separator\n"
+
+        cfg += """menu begin ^Troubleshooting
+  menu title Troubleshooting
+"""
+        # Add basic video and check to submenu
+        for b, c in zip(basic, check):
+            cfg += b
+            if c:
+                cfg += c
+
         cfg += self.__get_memtest_stanza(isodir)
+        cfg += "menu separator\n"
+
         cfg += self.__get_local_stanza(isodir)
         cfg += self._get_isolinux_stanzas(isodir)
 
+        cfg += """menu separator
+label returntomain
+  menu label Return to ^main menu.
+  menu exit
+menu end
+"""
         cfgf = open(isodir + "/isolinux/isolinux.cfg", "w")
         cfgf.write(cfg)
         cfgf.close()
