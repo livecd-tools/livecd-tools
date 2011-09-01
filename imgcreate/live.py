@@ -39,7 +39,8 @@ class LiveImageCreatorBase(LoopImageCreator):
 
     """
 
-    def __init__(self, ks, name, fslabel=None, releasever=None, tmpdir="/tmp"):
+    def __init__(self, ks, name, fslabel=None, releasever=None, tmpdir="/tmp",
+                 title="Linux", product="Linux"):
         """Initialise a LiveImageCreator instance.
 
         This method takes the same arguments as LoopImageCreator.__init__().
@@ -81,6 +82,9 @@ class LiveImageCreatorBase(LoopImageCreator):
 
         self._isofstype = "iso9660"
         self.base_on = False
+
+        self.title = title
+        self.product = product
 
     #
     # Hooks for subclasses
@@ -456,10 +460,10 @@ class x86LiveImageCreator(LiveImageCreatorBase):
 default %(menu)s
 timeout %(timeout)d
 menu background %(background)s
-menu autoboot Starting %(name)s in # second{,s}. Press any key to interrupt.
+menu autoboot Starting %(title)s in # second{,s}. Press any key to interrupt.
 
 menu clear
-menu title @PRODUCT@ @VERSION@
+menu title %(title)s
 menu vshift 8
 menu rows 18
 menu margin 8
@@ -535,11 +539,11 @@ menu separator
             default = self.__is_default_kernel(kernel, kernels)
 
             if default:
-                long = ""
+                long = self.product
             elif kernel.startswith("kernel-"):
-                long = "%s(%s)" % (self.name, kernel[7:])
+                long = "%s (%s)" % (self.product, kernel[7:])
             else:
-                long = "%s(%s)" % (self.name, kernel)
+                long = "%s (%s)" % (self.product, kernel)
 
             # tell dracut not to ask for LUKS passwords or activate mdraid sets
             if isDracut:
@@ -625,7 +629,7 @@ menu separator
 
         cfg = self.__get_basic_syslinux_config(menu = menu,
                                                background = background,
-                                               name = self.name,
+                                               title = self.title,
                                                timeout = self._timeout * 10)
         cfg += "menu separator\n"
 

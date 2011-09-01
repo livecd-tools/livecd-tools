@@ -42,6 +42,10 @@ def parse_options(args):
                       help="Add packages to an existing live CD iso9660 image.")
     imgopt.add_option("-f", "--fslabel", type="string", dest="fslabel",
                       help="File system label (default based on config name)")
+    imgopt.add_option("", "--title", type="string", dest="title",
+                      help="Title used by syslinux.cfg file"),
+    imgopt.add_option("", "--product", type="string", dest="product",
+                      help="Product name used in syslinux.cfg boot stanzas and countdown"),
     # Provided for img-create compatibility
     imgopt.add_option("-n", "--name", type="string", dest="fslabel",
                       help=optparse.SUPPRESS_HELP)
@@ -142,13 +146,32 @@ def main():
 
         logging.info("Using label '%s' and name '%s'" % (fslabel, name))
 
+    if options.title:
+        title = options.title
+    else:
+        try:
+            title = " ".join(name.split("-")[:2])
+            title = title.title()
+        except:
+            title = "Linux"
+    if options.product:
+        product = options.product
+    else:
+        try:
+            product = " ".join(name.split("-")[:2])
+            product = product.title()
+        except:
+            product = "Linux"
+    logging.info("Using title '%s' and product '%s'" % (title, product))
+
     ks = imgcreate.read_kickstart(options.kscfg)
 
     if options.image_type == 'livecd':
         creator = imgcreate.LiveImageCreator(ks, name,
                                         fslabel=fslabel,
                                         releasever=options.releasever,
-                                        tmpdir=os.path.abspath(options.tmpdir))
+                                        tmpdir=os.path.abspath(options.tmpdir),
+                                        title=title, product=product)
     elif options.image_type == 'image':
         creator = imgcreate.LoopImageCreator(ks, name,
                                         fslabel=fslabel,
