@@ -92,10 +92,8 @@ def resize2fs(fs, size = None, minimal = False, tmpdir = "/tmp"):
         raise ResizeError("Must specify either a size or minimal for resize!")
 
     e2fsck(fs)
-    (fd, saved_image) = tempfile.mkstemp("", "resize-image-", tmpdir)
-    os.close(fd)
-    call(["/sbin/e2image", "-r", fs, saved_image])
 
+    logging.info("resizing %s" % (fs,))
     args = ["/sbin/resize2fs", fs]
     if minimal:
         args.append("-M")
@@ -103,17 +101,17 @@ def resize2fs(fs, size = None, minimal = False, tmpdir = "/tmp"):
         args.append("%sK" %(size / 1024,))
     ret = call(args)
     if ret != 0:
-        raise ResizeError("resize2fs returned an error (%d)!  image to debug at %s" %(ret, saved_image))
+        raise ResizeError("resize2fs returned an error (%d)!" % (ret,))
 
-    if e2fsck(fs) != 0:
-        raise ResizeError("fsck after resize returned an error!  image to debug at %s" %(saved_image,))
-    os.unlink(saved_image)
+    ret = e2fsck(fs)
+    if ret != 0:
+        raise ResizeError("fsck after resize returned an error (%d)!", (ret,))
+
     return 0
 
 def e2fsck(fs):
     logging.info("Checking filesystem %s" % fs)
-    rc = call(["/sbin/e2fsck", "-f", "-y", fs])
-    return rc
+    return call(["/sbin/e2fsck", "-f", "-y", fs])
 
 class BindChrootMount:
     """Represents a bind mount of a directory into a chroot."""
