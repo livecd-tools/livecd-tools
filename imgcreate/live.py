@@ -402,21 +402,20 @@ class x86LiveImageCreator(LiveImageCreatorBase):
 
             shutil.copy(path, isodir + "/isolinux/")
 
-    def __copy_syslinux_background(self, isodest):
-        background_path = self._instroot + \
-                          "/usr/share/anaconda/boot/syslinux-vesa-splash.jpg"
+    def __copy_syslinux_background(self, isodir):
+        """ Find the correct splash image, copy it to the destination and
+        return the name of the file.
+        """
+        bg_list = [ ("/usr/share/anaconda/boot/splash.png", "splash.png"),
+                    ("/usr/share/anaconda/boot/syslinux-vesa-splash.jpg", "splash.jpg"),
+                    ("/usr/lib/anaconda-runtime/syslinux-vesa-splash.jpg", "splash.jpg")]
 
-        if not os.path.exists(background_path):
-            # fallback to F13 location
-            background_path = self._instroot + \
-                              "/usr/lib/anaconda-runtime/syslinux-vesa-splash.jpg"
+        for bg_path, bg_name in bg_list:
+            if os.path.exists(bg_path):
+                shutil.copyfile(bg_path, isodir + bg_name)
+                return bg_name
 
-            if not os.path.exists(background_path):
-                return False
-
-        shutil.copyfile(background_path, isodest)
-
-        return True
+        return ""
 
     def __copy_kernel_and_initramfs(self, isodir, version, index):
         bootdir = self._instroot + "/boot"
@@ -623,9 +622,7 @@ menu separator
         self.__copy_syslinux_files(isodir, menu,
                                    self.__find_syslinux_mboot())
 
-        background = ""
-        if self.__copy_syslinux_background(isodir + "/isolinux/splash.jpg"):
-            background = "splash.jpg"
+        background = self.__copy_syslinux_background(isodir + "/isolinux/")
 
         cfg = self.__get_basic_syslinux_config(menu = menu,
                                                background = background,
