@@ -570,7 +570,7 @@ menu separator
                                            long = "Start " + long + " in ^basic graphics mode.",
                                            short = "basic" + index,
                                            extra = "xdriver=vesa nomodeset",
-                                           help = "Try this option out if you're having trouble starting.",
+                                           help = "Try this option out if you're having trouble installing " + long + ".",
                                            index = index))
 
             if checkisomd5:
@@ -600,7 +600,7 @@ menu separator
         return """label memtest
   menu label Run a ^memory test.
   text help
-    If your system is having issues, an problem with your 
+    If your system is having issues, a problem with your 
     system's memory may be the cause. Use this utility to 
     see if the memory is working correctly.
   endtext
