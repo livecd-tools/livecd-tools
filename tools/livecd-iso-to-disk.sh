@@ -391,7 +391,7 @@ checkPartActive() {
         return
     fi
 
-    if [ "$(/sbin/fdisk -l $device 2>/dev/null |grep $dev |awk {'print $2;'})" != "*" ]; then
+    if [ "$(/sbin/fdisk -l $device 2>/dev/null |grep -m1 $dev |awk {'print $2;'})" != "*" ]; then
         echo "Partition isn't marked bootable!"
         echo "You can mark the partition as bootable with "
         echo "    # /sbin/parted $device"
