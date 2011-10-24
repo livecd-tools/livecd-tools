@@ -699,21 +699,26 @@ hiddenmenu
         kernel_options = self._get_kernel_options()
         checkisomd5 = self._has_checkisomd5()
 
-        cfg = ""
+        # tell dracut not to ask for LUKS passwords or activate mdraid sets
+        if self.isDracut:
+            kern_opts = kernel_options + " rd.luks=0 rd.md=0 rd.dm=0"
+        else:
+            kern_opts = kernel_options
 
+        cfg = ""
         for index in range(0, 9):
             # we don't support xen kernels
             if os.path.exists("%s/EFI/boot/xen%d.gz" %(isodir, index)):
                 continue
             cfg += self.__get_efi_image_stanza(fslabel = self.fslabel,
                                                isofstype = "auto",
-                                               liveargs = kernel_options,
+                                               liveargs = kern_opts,
                                                long = name,
                                                extra = "", index = index)
             if checkisomd5:
                 cfg += self.__get_efi_image_stanza(fslabel = self.fslabel,
                                                    isofstype = "auto",
-                                                   liveargs = kernel_options,
+                                                   liveargs = kern_opts,
                                                    long = "Verify and Boot " + name,
                                                    extra = "rd.live.check",
                                                    index = index)
