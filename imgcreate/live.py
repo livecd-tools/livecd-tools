@@ -700,7 +700,7 @@ hiddenmenu
         checkisomd5 = self._has_checkisomd5()
 
         # tell dracut not to ask for LUKS passwords or activate mdraid sets
-        if self.isDracut:
+        if self._isDracut:
             kern_opts = kernel_options + " rd.luks=0 rd.md=0 rd.dm=0"
         else:
             kern_opts = kernel_options
