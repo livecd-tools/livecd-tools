@@ -520,25 +520,32 @@ checkFilesystem() {
         fi
     fi
 
-
-    TGTLABEL=$(/sbin/blkid -s UUID -o value $dev)
-    if [ -n "$TGTLABEL" ]; then
-        TGTLABEL="UUID=$TGTLABEL"
-    else
-        TGTLABEL=$(/sbin/blkid -s LABEL -o value $dev)
-        if [ -n "$TGTLABEL" ]; then
-            TGTLABEL="LABEL=$TGTLABEL"
-        else
-            echo "Need to have a filesystem label or UUID for your target device"
-            if [ "$TGTFS" = "vfat" -o "$TGTFS" = "msdos" ]; then
-                echo "Label can be set with /sbin/dosfslabel"
-            elif [ "$TGTFS" = "ext2" -o "$TGTFS" = "ext3" -o "$TGTFS" = "ext4" ]; then
-                echo "Label can be set with /sbin/e2label"
-            elif [ "$TGTFS" = "btrfs" ]; then
-                echo "Eventually you'll be able to use /sbin/btrfs filesystem label to add a label."
+    TGTLABEL=$(/sbin/blkid -s LABEL -o value $dev)
+    if [ "$TGTLABEL" != "LIVE" ]; then
+        if [ "$TGTFS" = "vfat" -o "$TGTFS" = "msdos" ]; then
+            /sbin/dosfslabel $dev LIVE
+            if [ $? -gt 0 ]; then
+                echo "dosfslabel failed on $dev, device not setup"
+                exitclean
             fi
+        elif [ "$TGTFS" = "ext2" -o "$TGTFS" = "ext3" -o "$TGTFS" = "ext4" ]; then
+            /sbin/e2label $dev LIVE
+            if [ $? -gt 0 ]; then
+                echo "e2label failed on $dev, device not setup"
+                exitclean
+            fi
+        else
+            echo "Unknown filesystem type. Try setting its label to LIVE and re-running"
             exitclean
         fi
+    fi
+
+    # Use UUID if available
+    TGTUUID=$(/sbin/blkid -s UUID -o value $dev)
+    if [ -n "$TGTUUID" ]; then
+        TGTLABEL="UUID=$TGTUUID"
+    else
+        TGTLABEL="LABEL=LIVE"
     fi
 
     if [ "$TGTFS" = "vfat" -o "$TGTFS" = "msdos" ]; then
