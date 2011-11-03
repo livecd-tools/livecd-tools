@@ -272,7 +272,7 @@ def main():
             if os.path.ismount(destmnt):
                 call(['/bin/umount', destmnt])
             if img_type is 'blk':
-     m_cow:
+                if dm_cow:
                     call(['/sbin/dmsetup', '--noudevrules', '--noudevsync',
                           'remove', dm_cow])
                 if overlayloop:
