@@ -278,29 +278,36 @@ checkFilesystem() {
         fi
     fi
 
+    USBLABEL=$(/sbin/blkid -s LABEL -o value $dev)
+    if [ "$USBLABEL" != "LIVE" ]; then
+        if [ "$USBFS" = "vfat" -o "$USBFS" = "msdos" ]; then
+            /sbin/dosfslabel $dev LIVE
+            if [ $? -gt 0 ]; then
+                echo "dosfslabel failed on $dev, device not setup"
+                exitclean
+            fi
+        elif [ "$USBFS" = "ext2" -o "$USBFS" = "ext3" -o "$USBFS" = "ext4" ]; then
+            /sbin/e2label $dev LIVE
+            if [ $? -gt 0 ]; then
+                echo "e2label failed on $dev, device not setup"
+                exitclean
+            fi
+        else
+            echo "Unknown filesystem type. Try setting its label to LIVE and re-running"
+            exitclean
+        fi
+    fi
 
-    USBLABEL=$(/sbin/blkid -s UUID -o value $dev)
-    if [ -n "$USBLABEL" ]; then
-	USBLABEL="UUID=$USBLABEL" ;
+    # Use UUID if available
+    USBUUID=$(/sbin/blkid -s UUID -o value $dev)
+    if [ -n "$USBUUID" ]; then
+        USBLABEL="UUID=$USBUUID"
     else
-	USBLABEL=$(/sbin/blkid -s LABEL -o value $dev)
-	if [ -n "$USBLABEL" ]; then
-	    USBLABEL="LABEL=$USBLABEL"
-	else
-	    echo "Need to have a filesystem label or UUID for your USB device"
-	    if [ "$USBFS" = "vfat" -o "$USBFS" = "msdos" ]; then
-		echo "Label can be set with /sbin/dosfslabel"
-	    elif [ "$USBFS" = "ext2" -o "$USBFS" = "ext3" -o "$USBFS" = "ext4" ]; then
-		echo "Label can be set with /sbin/e2label"
-	    elif [ "$USBFS" = "btrfs" ]; then
-                echo "Eventually you'll be able to use /sbin/btrfs filesystem label to add a label."
-	    fi
-	    exitclean
-	fi
+        USBLABEL="LABEL=LIVE"
     fi
 
     if [ "$USBFS" = "vfat" -o "$USBFS" = "msdos" ]; then
-	mountopts="-o shortname=winnt,umask=0077"
+        mountopts="-o shortname=winnt,umask=0077"
     fi
 }
 
