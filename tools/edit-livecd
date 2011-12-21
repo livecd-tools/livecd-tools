@@ -29,12 +29,16 @@ import shutil
 import subprocess
 import optparse
 import logging
+import rpm
+import glob
 
 from imgcreate.debug import *
 from imgcreate.errors import *
 from imgcreate.fs import *
 from imgcreate.live import *
 from imgcreate.creator import *
+import imgcreate.kickstart as kickstart
+from imgcreate import read_kickstart
 
 class ExistingSparseLoopbackDisk(SparseLoopbackDisk):
     """don't want to expand the disk"""
@@ -109,6 +113,9 @@ class LiveImageEditor(LiveImageCreator):
 
         self._LiveImageCreatorBase__isodir = None
         """directory where the iso is staged"""
+
+        self.ks = None
+        """optional kickstart file as a recipe for editing the image"""
 
     # properties
     def __get_image(self):
@@ -206,7 +213,8 @@ class LiveImageEditor(LiveImageCreator):
             self._get_fslabel()
 
         self.fslabel = self._LoopImageCreator__fslabel
-        self._LoopImageCreator__image_size = os.stat(self._image)[stat.ST_SIZE]
+        if self._LoopImageCreator__image_size == None:
+            self._LoopImageCreator__image_size = os.stat(self._image)[stat.ST_SIZE]
 
         self._LoopImageCreator__instloop = ExtDiskMount(
                 ExistingSparseLoopbackDisk(self._image,
@@ -355,12 +363,15 @@ class LiveImageEditor(LiveImageCreator):
         except IOError, e:
             raise CreatorError("Failed to open '%s' : %s" % (fpath, e))
         else:
+            release = None
             for line in cfgf:
                 i = line.find('Welcome to ')
                 if i > -1:
                     release = line[i+11:-2]
                     break
             cfgf.close()
+        if not release:
+            return
 
         ntext = dt.translate(None, '-') + '-' + _builder + '-Remix-' + release
 
@@ -396,12 +407,33 @@ class LiveImageEditor(LiveImageCreator):
             if os.path.exists(src):
                 os.rename(src, cfgf)
 
-        args = ['/bin/sed', '-i',
-                '-e', 's/Welcome to .*/Welcome to ' + self._releasefile + '!/',
-                '-e', 's/root=[^ ]*/root=live:CDLABEL=' + self.name + '/',
-                '-e', 's/rootfstype=[^ ]* [^ ]*/rootfstype=auto ro/',
-                '-e', 's/liveimg .* quiet/liveimg quiet/', cfgf]
-
+        args = ['/bin/sed', '-i']
+        if self._releasefile:
+            args.append('-e')
+            args.append('s/Welcome to .*/Welcome to ' + self._releasefile + '!/')
+        if self.clone:
+            args.append('-e')
+            args.append('s/rootfstype=[^ ]* [^ ]*/rootfstype=auto ro/')
+            args.append('-e')
+            args.append('s/liveimg .* quiet/liveimg quiet/')
+        args.append('-e')
+        args.append('s/root=[^ ]*/root=live:CDLABEL=' + self.name + '/')
+        if self.ks:
+            # bootloader --append "!opt-to-remove opt-to-add"
+            for param in kickstart.get_kernel_args(self.ks,"").split():
+                if param.startswith('!'):
+                    param=param[1:]
+                    # remove parameter prefixed with !
+                    args.append('-e')
+                    args.append("/^  append/s/%s //" % param)
+                    # special case for last parameter
+                    args.append('-e')
+                    args.append("/^  append/s/%s$//" % param)
+                else:
+                    # append parameter
+                    args.append('-e')
+                    args.append("/^  append/s/$/ %s/" % param)
+        args.append(cfgf)
         dev_null = os.open("/dev/null", os.O_WRONLY)
         try:
             subprocess.Popen(args,
@@ -415,10 +447,96 @@ class LiveImageEditor(LiveImageCreator):
         finally:
             os.close(dev_null)
 
+    def _run_pre_scripts(self):
+        for s in kickstart.get_pre_scripts(self.ks):
+            (fd, path) = tempfile.mkstemp(prefix = "ks-script-",
+                                          dir = self._instroot + "/tmp")
+
+            os.write(fd, s.script)
+            os.close(fd)
+            os.chmod(path, 0700)
+
+            env = self._get_post_scripts_env(s.inChroot)
+
+            if not s.inChroot:
+                env["INSTALL_ROOT"] = self._instroot
+                preexec = None
+                script = path
+            else:
+                preexec = self._chroot
+                script = "/tmp/" + os.path.basename(path)
+
+            try:
+                subprocess.check_call([s.interp, script],
+                                      preexec_fn = preexec, env = env)
+            except OSError, e:
+                raise CreatorError("Failed to execute %%post script "
+                                   "with '%s' : %s" % (s.interp, e.strerror))
+            except subprocess.CalledProcessError, err:
+                if s.errorOnFail:
+                    raise CreatorError("%%post script failed with code %d "
+                                       % err.returncode)
+                logging.warning("ignoring %%post failure (code %d)"
+                                % err.returncode)
+            finally:
+                os.unlink(path)
+
+    class simpleCallback:
+        def __init__(self):
+            self.fdnos = {}
+
+        def callback(self, what, amount, total, mydata, wibble):
+            if what == rpm.RPMCALLBACK_TRANS_START:
+                pass
+
+            elif what == rpm.RPMCALLBACK_INST_OPEN_FILE:
+                hdr, path = mydata
+                print "Installing %s\r" % (hdr["name"])
+                fd = os.open(path, os.O_RDONLY)
+                nvr = '%s-%s-%s' % ( hdr['name'], hdr['version'], hdr['release'] )
+                self.fdnos[nvr] = fd
+                return fd
+
+            elif what == rpm.RPMCALLBACK_INST_CLOSE_FILE:
+                hdr, path = mydata
+                nvr = '%s-%s-%s' % ( hdr['name'], hdr['version'], hdr['release'] )
+                os.close(self.fdnos[nvr])
+
+            elif what == rpm.RPMCALLBACK_INST_PROGRESS:
+                hdr, path = mydata
+                print "%s:  %.5s%% done\r" % (hdr["name"], (float(amount) / total) * 100),
+
+    def install_rpms(self):
+        if kickstart.exclude_docs(self.ks):
+            rpm.addMacro("_excludedocs", "1")
+        if not kickstart.selinux_enabled(self.ks):
+            rpm.addMacro("__file_context_path", "%{nil}")
+        if kickstart.inst_langs(self.ks) != None:
+            rpm.addMacro("_install_langs", kickstart.inst_langs(self.ks))
+        # start RPM transaction
+        ts=rpm.TransactionSet(self._instroot)
+        for repo in kickstart.get_repos(self.ks):
+            (name, baseurl, mirrorlist, proxy, inc, exc) = repo
+            if baseurl.startswith("file://"):
+               baseurl=baseurl[7:]
+            elif not baseurl.startswith("/"):
+                raise CreatorError("edit-livecd accepts only --baseurl pointing to a local folder with RPMs (not YUM repo)")
+            if not baseurl.endswith("/"):
+                baseurl+="/"
+            for pkg_from_list in kickstart.get_packages(self.ks):
+                # TODO report if package listed in ks is missing
+                for pkg in glob.glob(baseurl+pkg_from_list+"-[0-9]*.rpm"):
+                    fdno = os.open(pkg, os.O_RDONLY)
+                    hdr = ts.hdrFromFdno(fdno)
+                    os.close(fdno)
+                    ts.addInstall(hdr,(hdr,pkg), "u")
+        ts.run(self.simpleCallback().callback,'')
+
 def parse_options(args):
     parser = optparse.OptionParser(usage = """
        %prog [-n=<name>]
                       [-o=<output>]
+                      [-k=<kickstart-file>]
                       [-s=<script.sh>]
                       [-t=<tmpdir>]
                       [-e=<excludes>]
@@ -438,6 +556,9 @@ def parse_options(args):
 
     parser.add_option("-o", "--output", type="string", dest="output",
                       help="specify directory for new iso file.")
+
+    parser.add_option("-k", "--kickstart", type="string", dest="kscfg",
+                      help="Path or url to kickstart config file")
 
     parser.add_option("-s", "--script", type="string", dest="script",
                       help="specify script to run chrooted in the LiveOS "
@@ -530,10 +651,10 @@ def main():
         print >> sys.stderr, "You must run edit-liveos as root"
         return 1
 
-    if stat.S_ISBLK(os.stat(LiveOS).st_mode):
-        name = get_fsvalue(LiveOS, 'LABEL') + '.edited'
-    elif options.name and options.name != os.path.basename(LiveOS):
+    if options.name:
         name = options.name
+    elif stat.S_ISBLK(os.stat(LiveOS).st_mode):
+        name = get_fsvalue(LiveOS, 'LABEL') + '.edited'
     else:
         name = os.path.basename(LiveOS) + ".edited"
 
@@ -557,9 +678,17 @@ def main():
     editor.skip_minimize = options.skip_minimize
 
     try:
+        if options.kscfg:
+            editor.ks = read_kickstart(options.kscfg)
+            # part / --size <new rootfs size to be resized to>
+            editor._LoopImageCreator__image_size = kickstart.get_image_size(editor.ks)
         editor.mount(LiveOS, cachedir = None)
         editor._configure_bootloader(editor._LiveImageCreatorBase__isodir)
-        if options.script:
+        if editor.ks:
+            editor._run_pre_scripts()
+            editor.install_rpms()
+            editor._run_post_scripts()
+        elif options.script:
             print "Running edit script '%s'" % options.script
             editor._run_script(options.script)
         else:

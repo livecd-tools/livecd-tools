@@ -545,6 +545,14 @@ def inst_langs(ks):
         return ks.handler.packages.instLangs
     return ""
 
+def get_pre_scripts(ks):
+    scripts = []
+    for s in ks.handler.scripts:
+        if s.type != ksparser.KS_SCRIPT_PRE:
+            continue
+        scripts.append(s)
+    return scripts
+
 def get_post_scripts(ks):
     scripts = []
     for s in ks.handler.scripts:

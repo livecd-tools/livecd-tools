@@ -683,7 +683,7 @@ class ImageCreator(object):
             except:
                 pass
 
-    def __run_post_scripts(self):
+    def _run_post_scripts(self):
         for s in kickstart.get_post_scripts(self.ks):
             (fd, path) = tempfile.mkstemp(prefix = "ks-script-",
                                           dir = self._instroot + "/tmp")
@@ -742,7 +742,7 @@ class ImageCreator(object):
 
         self._create_bootconfig()
 
-        self.__run_post_scripts()
+        self._run_post_scripts()
         kickstart.SelinuxConfig(self._instroot).apply(ksh.selinux)
 
     def launch_shell(self):
