@@ -426,7 +426,7 @@ class SelinuxConfig(KickstartConfig):
 
     def apply(self, ksselinux):
         if os.path.exists(self.path("/usr/sbin/lokkit")):
-            args = ["/usr/sbin/lokkit", "-f", "--quiet", "--nostart"]
+            args = ["/usr/sbin/lokkit", "--quiet", "--nostart"]
 
             if ksselinux.selinux == ksconstants.SELINUX_ENFORCING:
                 args.append("--selinux=enforcing")
