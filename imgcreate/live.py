@@ -196,11 +196,11 @@ class LiveImageCreatorBase(LoopImageCreator):
     def _mount_instroot(self, base_on = None):
         LoopImageCreator._mount_instroot(self, base_on)
         self.__write_initrd_conf(self._instroot + "/etc/sysconfig/mkinitrd")
-        self.__write_dracut_conf(self._instroot + "/etc/dracut.conf")
+        self.__write_dracut_conf(self._instroot + "/etc/dracut.conf.d/02livecd.conf")
 
     def _unmount_instroot(self):
         self.__restore_file(self._instroot + "/etc/sysconfig/mkinitrd")
-        self.__restore_file(self._instroot + "/etc/dracut.conf")
+        self.__restore_file(self._instroot + "/etc/dracut.conf.d/02livecd.conf")
         LoopImageCreator._unmount_instroot(self)
 
     def __ensure_isodir(self):
@@ -264,7 +264,7 @@ class LiveImageCreatorBase(LoopImageCreator):
         f = open(path, "a")
         f.write('filesystems+="' + self.__extra_filesystems() + ' "\n')
         f.write('drivers+="' + self.__extra_drivers() + ' "\n')
-        f.write('dracutdrivers+="dmsquash-live"')
+        f.write('dracutdrivers+="dmsquash-live "')
         f.close()
 
     def __create_iso(self, isodir):
