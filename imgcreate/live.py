@@ -264,7 +264,7 @@ class LiveImageCreatorBase(LoopImageCreator):
         f = open(path, "a")
         f.write('filesystems+="' + self.__extra_filesystems() + ' "\n')
         f.write('drivers+="' + self.__extra_drivers() + ' "\n')
-        f.write('dracutdrivers+="dmsquash-live "')
+        f.write('add_dracutmodules+=" dmsquash-live "')
         f.close()
 
     def __create_iso(self, isodir):
