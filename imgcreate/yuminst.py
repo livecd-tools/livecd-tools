@@ -164,6 +164,7 @@ class LiveCDYum(yum.YumBase):
             if v or not hasattr(repo, k):
                 repo.setAttribute(k, v)
         repo.basecachedir = self.conf.cachedir
+        repo.base_persistdir = self.conf.cachedir
         repo.failovermethod = "priority"
         repo.metadata_expire = 0
         repo.mirrorlist_expire = 0
