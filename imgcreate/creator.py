@@ -445,6 +445,9 @@ class ImageCreator(object):
         os.umask(origumask)
 
     def __create_selinuxfs(self):
+        if not os.path.exists(self.__selinux_mountpoint):
+            return
+
         arglist = ["/bin/mount", "--bind", "/dev/null", self._instroot + self.__selinux_mountpoint + "/load"]
         subprocess.call(arglist, close_fds = True)
 
@@ -460,6 +463,9 @@ class ImageCreator(object):
                 subprocess.call(arglist, close_fds = True)
 
     def __destroy_selinuxfs(self):
+        if not os.path.exists(self.__selinux_mountpoint):
+            return
+
         # if the system was running selinux clean up our lies
         arglist = ["/bin/umount", self._instroot + self.__selinux_mountpoint + "/load"]
         subprocess.call(arglist, close_fds = True)
