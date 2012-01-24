@@ -117,6 +117,14 @@ class LiveImageEditor(LiveImageCreator):
         self.ks = None
         """optional kickstart file as a recipe for editing the image"""
 
+        self._ImageCreator__selinux_mountpoint = "/sys/fs/selinux"
+        with open("/proc/self/mountinfo", "r") as f:
+            for line in f.readlines():
+                fields = line.split()
+                if fields[-2] == "selinuxfs":
+                    self.__ImageCreator__selinux_mountpoint = fields[4]
+                    break
+
     # properties
     def __get_image(self):
         if self._LoopImageCreator__imagedir is None:
