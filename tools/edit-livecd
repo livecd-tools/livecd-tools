@@ -535,17 +535,17 @@ class LiveImageEditor(LiveImageCreator):
 def parse_options(args):
     parser = optparse.OptionParser(usage = """
        %prog [-n=<name>]
-                      [-o=<output>]
-                      [-k=<kickstart-file>]
-                      [-s=<script.sh>]
-                      [-t=<tmpdir>]
-                      [-e=<excludes>]
-                      [-f=<exclude-file>]
-                      [-i=<includes>]
-                      [-r=<releasefile>]
-                      [-b=<builder>]
+                      [-o <output>]
+                      [-k <kickstart-file>]
+                      [-s <script.sh>]
+                      [-t <tmpdir>]
+                      [-e <excludes>]
+                      [-f <exclude-file>]
+                      [-i <includes>]
+                      [-r <releasefile>]
+                      [-b <builder>]
                       [--clone]
-                      [-c=<compress_type>]
+                      [-c <compress_type>]
                       [--skip-compression]
                       [--skip-minimize]
                       <LIVEIMG.src>""")
@@ -682,6 +682,10 @@ def main():
             editor.ks = read_kickstart(options.kscfg)
             # part / --size <new rootfs size to be resized to>
             editor._LoopImageCreator__image_size = kickstart.get_image_size(editor.ks)
+        if options.script:
+            if not os.path.exists(options.script):
+                print "Invalid Script Path '%s'" % options.script
+                return 1
         editor.mount(LiveOS, cachedir = None)
         editor._configure_bootloader(editor._LiveImageCreatorBase__isodir)
         if editor.ks:
