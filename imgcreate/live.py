@@ -199,9 +199,21 @@ class LiveImageCreatorBase(LoopImageCreator):
             self.__isodir = self._mkdtemp("iso-")
         return self.__isodir
 
+    def _generate_efiboot(self, isodir):
+        """Generate EFI boot images."""
+        if not os.path.exists(self._instroot + "/boot/efi/EFI/redhat/grub.efi"):
+            return False
+        logging.info("Creating efiboot.img")
+        subprocess.call(["mkefiboot", isodir + "/EFI/boot",
+                         isodir + "/isolinux/efiboot.img"])
+#        logging.info("Creating macboot.img")
+#        subprocess.call(["mkefiboot", "-a", isodir + "/EFI/BOOT",
+#                         isodir + "/isolinux/macboot.img"])
+
     def _create_bootconfig(self):
         """Configure the image so that it's bootable."""
         self._configure_bootloader(self.__ensure_isodir())
+        self._generate_efiboot(self.__ensure_isodir())
 
     def _get_post_scripts_env(self, in_chroot):
         env = LoopImageCreator._get_post_scripts_env(self, in_chroot)
@@ -276,7 +288,14 @@ class LiveImageCreatorBase(LoopImageCreator):
             raise CreatorError("ISO creation failed!")
 
         if os.path.exists("/usr/bin/isohybrid"):
-            subprocess.call(["/usr/bin/isohybrid", iso])
+            args = ["/usr/bin/isohybrid"]
+            if os.path.exists(isodir + "/isolinux/efiboot.img"):
+                args.append("-u")
+#            if os.path.exists(isodir + "/isolinux/macboot.img"):
+#                args.append("-m")
+            args.append(iso)
+            if subprocess.call(args) != 0:
+                logging.warn("isohybrid failed")
 
         self.__implant_md5sum(iso)
 
@@ -289,7 +308,7 @@ class LiveImageCreatorBase(LoopImageCreator):
         else:
             logging.warn("isomd5sum not installed; not setting up mediacheck")
             return
-            
+
         subprocess.call([implantisomd5, iso])
 
     def _stage_final_image(self):
@@ -327,10 +346,19 @@ class LiveImageCreatorBase(LoopImageCreator):
 class x86LiveImageCreator(LiveImageCreatorBase):
     """ImageCreator for x86 machines"""
     def _get_mkisofs_options(self, isodir):
-        return [ "-b", "isolinux/isolinux.bin",
-                 "-c", "isolinux/boot.cat",
-                 "-no-emul-boot", "-boot-info-table",
-                 "-boot-load-size", "4" ]
+        options = [ "-b", "isolinux/isolinux.bin",
+                    "-c", "isolinux/boot.cat",
+                    "-no-emul-boot", "-boot-info-table",
+                    "-boot-load-size", "4" ]
+        if os.path.exists(isodir + "/isolinux/efiboot.img"):
+            options.extend([ "-eltorito-alt-boot",
+                             "-e", "isolinux/efiboot.img",
+                             "-no-emul-boot"])
+        if os.path.exists(isodir + "/isolinux/macboot.img"):
+            options.extend([ "-eltorito-alt-boot",
+                             "-e", "isolinux/macboot.img",
+                             "-no-emul-boot"])
+        return options
 
     def _get_required_packages(self):
         return ["syslinux"] + LiveImageCreatorBase._get_required_packages(self)
