@@ -640,9 +640,9 @@ def get_fsvalue(filesystem, tag):
 
 def rebuild_iso_symlinks(isodir):
     # remove duplicate files and rebuild symlinks to reduce iso size
-    efi_vmlinuz = "%s/EFI/boot/vmlinuz0" % isodir
+    efi_vmlinuz = "%s/EFI/BOOT/vmlinuz0" % isodir
     isolinux_vmlinuz = "%s/isolinux/vmlinuz0" % isodir
-    efi_initrd = "%s/EFI/boot/initrd0.img" % isodir
+    efi_initrd = "%s/EFI/BOOT/initrd0.img" % isodir
     isolinux_initrd = "%s/isolinux/initrd0.img" % isodir
 
     if os.path.exists(efi_vmlinuz):
