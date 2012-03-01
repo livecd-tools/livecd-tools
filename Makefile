@@ -1,5 +1,5 @@
 
-VERSION = 17.6
+VERSION = 17.7
 
 INSTALL = /usr/bin/install -c
 INSTALL_PROGRAM = ${INSTALL}
