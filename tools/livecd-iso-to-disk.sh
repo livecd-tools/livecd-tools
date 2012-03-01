@@ -432,7 +432,7 @@ createGPTLayout() {
     else
         p2_size=0
     fi
-    p1_size=$(($dev_size - 1 - $p2_size))
+    p1_size=$(($dev_size - 3 - $p2_size))
 
     if [ $p1_size -le 0 ]; then
         echo "Your device isn't big enough to hold $SRC"
@@ -485,7 +485,7 @@ createMSDOSLayout() {
     else
         p2_size=0
     fi
-    p1_size=$(($dev_size - 1 - $p2_size))
+    p1_size=$(($dev_size - 3 - $p2_size))
 
     if [ $p1_size -le 0 ]; then
         echo "Your device isn't big enough to hold $SRC"
@@ -542,7 +542,7 @@ createEXTFSLayout() {
     else
         p2_size=0
     fi
-    p1_size=$(($dev_size - 1 - $p2_size))
+    p1_size=$(($dev_size - 3 - $p2_size))
 
     if [ $p1_size -le 0 ]; then
         echo "Your device isn't big enough to hold $SRC"
