@@ -704,7 +704,7 @@ detectsrctype() {
         srctype=live
         return
     fi
-    if [ -e $SRCMNT/images/install.img -o $SRCMNT/isolinux/initrd.img ]; then
+    if [ -e $SRCMNT/images/install.img -o -e $SRCMNT/isolinux/initrd.img ]; then
         if [ -n "$packages" ]; then
             srctype=installer
         else
