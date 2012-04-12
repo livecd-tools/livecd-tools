@@ -712,8 +712,8 @@ hiddenmenu
             args["rootlabel"] = "CDLABEL=%(fslabel)s" % args
         return """title %(long)s
   findiso
-  kernel /EFI/BOOT/vmlinuz%(index)s root=%(rootlabel)s rootfstype=%(isofstype)s %(liveargs)s %(extra)s
-  initrd /EFI/BOOT/initrd%(index)s.img
+  kernel /isolinux/vmlinuz%(index)s root=%(rootlabel)s rootfstype=%(isofstype)s %(liveargs)s %(extra)s
+  initrd /isolinux/initrd%(index)s.img
 """ %args
 
     def __get_efi_image_stanzas(self, isodir, name):
@@ -756,11 +756,6 @@ hiddenmenu
         if not self.__copy_efi_files(isodir):
             shutil.rmtree(isodir + "/EFI")
             return
-
-        for f in os.listdir(isodir + "/isolinux"):
-            os.link("%s/isolinux/%s" %(isodir, f),
-                    "%s/EFI/BOOT/%s" %(isodir, f))
-
 
         cfg = self.__get_basic_efi_config(name = self.name,
                                           timeout = self._timeout)
