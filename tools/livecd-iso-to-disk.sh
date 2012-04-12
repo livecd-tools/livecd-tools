@@ -1253,6 +1253,7 @@ fi
 
 # EFI images are in $SYSLINUXPATH now
 if [ -n "$efi" ]; then
+    sed -i -e "s;/isolinux/;/$SYSLINUXPATH/;g" $BOOTCONFIG_EFI
     sed -i -e "s;/images/pxeboot/;/$SYSLINUXPATH/;g" $BOOTCONFIG_EFI
     sed -i -e "s;findiso;;g" $BOOTCONFIG_EFI
 fi
