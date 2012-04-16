@@ -615,7 +615,7 @@ checkFilesystem() {
     TGTFS=$(/sbin/blkid -s TYPE -o value $dev || :)
     if [ "$TGTFS" != "vfat" ] && [ "$TGTFS" != "msdos" ]; then
         if [ "$TGTFS" != "ext2" ] && [ "$TGTFS" != "ext3" ] && [ "$TGTFS" != "ext4" ] && [ "$TGTFS" != "btrfs" ]; then
-            echo "Target filesystem must be vfat, ext[234] or btrfs"
+            echo "Target filesystem ($dev:$TGTFS) must be vfat, ext[234] or btrfs"
             exitclean
         fi
     fi
@@ -1145,7 +1145,7 @@ fi
 
 # DVD installer copy
 # Also copies over the source .iso if the image is a new-style LiveOS DVD (F17+)
-if [ \( "$srctype" = "installer" -o "$srctype" = "netinst" \) ]; then
+if [ -z "$skipcopy" -a \( "$srctype" = "installer" -o "$srctype" = "netinst" \) ]; then
     echo "Copying DVD image to target device."
     mkdir -p $TGTMNT/images/
     if [ "$imgtype" = "install" ]; then
