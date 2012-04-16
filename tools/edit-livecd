@@ -524,7 +524,7 @@ class LiveImageEditor(LiveImageCreator):
         # start RPM transaction
         ts=rpm.TransactionSet(self._instroot)
         for repo in kickstart.get_repos(self.ks):
-            (name, baseurl, mirrorlist, proxy, inc, exc) = repo
+            (name, baseurl, mirrorlist, proxy, inc, exc, cost) = repo
             if baseurl.startswith("file://"):
                baseurl=baseurl[7:]
             elif not baseurl.startswith("/"):
