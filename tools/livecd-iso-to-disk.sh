@@ -460,7 +460,6 @@ createGPTLayout() {
         REPODEV=${device}2
         umount $REPODEV &> /dev/null || :
         /sbin/mkdosfs -n LIVE-REPO $REPODEV
-        REPOLABEL="UUID=$(/sbin/blkid -s UUID -o value $REPODEV)"
     fi
 }
 
@@ -517,7 +516,6 @@ createMSDOSLayout() {
         REPODEV=${device}2
         umount $REPODEV &> /dev/null || :
         /sbin/mkdosfs -n LIVE-REPO $REPODEV
-        REPOLABEL="UUID=$(/sbin/blkid -s UUID -o value $REPODEV)"
     fi
 }
 
@@ -577,7 +575,6 @@ createEXTFSLayout() {
         REPODEV=${device}2
         umount $REPODEV &> /dev/null || :
         $mkfs -L LIVE-REPO $REPODEV
-        REPOLABEL="UUID=$(/sbin/blkid -s UUID -o value $REPODEV)"
     fi
 }
 
@@ -651,6 +648,25 @@ checkFilesystem() {
     if [ "$TGTFS" = "vfat" -o "$TGTFS" = "msdos" ]; then
         mountopts="-o shortname=winnt,umask=0077"
     fi
+}
+
+# Check partition 2 to see if it has been setup as LIVE-REPO
+# Setup REPODEV for later use
+findLIVEREPO() {
+    dev=$1
+    getdisk $dev
+
+    if [ -b ${device}2 ]; then
+        label=$(/sbin/blkid -s LABEL -o value ${device}2)
+        if [ "$label" == "LIVE-REPO" ]; then
+            echo "Found LIVE-REPO on ${device}2"
+            REPODEV=${device}2
+            return
+        fi
+    fi
+    echo "DVD installs need a second partition labeled LIVE-REPO."
+    echo "This is setup when you use --format"
+    exitclean
 }
 
 checkSyslinuxVersion() {
@@ -741,7 +757,7 @@ cp_p() {
 
 copyFile() {
     if [ -x /usr/bin/rsync ]; then
-        rsync -P "$1" "$2"
+        rsync --inplace -P "$1" "$2"
         return
     fi
     if [ -x /usr/bin/gvfs-copy ]; then
@@ -931,6 +947,9 @@ if [ -n "$format" -a -z "$skipcopy" ]; then
     else
         createEXTFSLayout $TGTDEV
     fi
+elif [ -n "$packages" ]; then
+    # Need the LIVE-REPO partition to copy the .iso to
+    findLIVEREPO $TGTDEV
 fi
 
 checkFilesystem $TGTDEV
@@ -975,6 +994,7 @@ fi
 TGTMNT=$(mktemp -d /media/tgttmp.XXXXXX)
 mount $mountopts $TGTDEV $TGTMNT || exitclean
 if [ -n "$REPODEV" ]; then
+    REPOLABEL="UUID=$(/sbin/blkid -s UUID -o value $REPODEV)"
     REPOMNT=$(mktemp -d /media/repotmp.XXXXXX)
     mount $mountopts $REPODEV $REPOMNT || exitclean
 fi
@@ -1158,7 +1178,7 @@ if [ -z "$skipcopy" -a \( "$srctype" = "installer" -o "$srctype" = "netinst" \) 
 fi
 
 # Copy source .iso to repo partition
-if [ -n "$packages" -a -z "$skipcopy" ]; then
+if [ -n "$packages" -a -z "$skipcopy" -a -n "$REPOMNT" ]; then
     echo "Copying $SRC"
     copyFile "$SRC" $REPOMNT/
     sync
