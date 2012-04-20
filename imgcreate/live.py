@@ -204,7 +204,7 @@ class LiveImageCreatorBase(LoopImageCreator):
         if not os.path.exists(self._instroot + "/boot/efi/EFI/redhat/grub.efi"):
             return False
         logging.info("Creating efiboot.img")
-        subprocess.call(["mkefiboot", isodir + "/EFI/boot",
+        subprocess.call(["mkefiboot", isodir + "/EFI/BOOT",
                          isodir + "/isolinux/efiboot.img"])
 #        logging.info("Creating macboot.img")
 #        subprocess.call(["mkefiboot", "-a", isodir + "/EFI/BOOT",
@@ -621,16 +621,16 @@ menu hiddenrow 5
         if not os.path.exists(self._instroot + "/boot/efi/EFI/redhat/grub.efi"):
             return False
         shutil.copy(self._instroot + "/boot/efi/EFI/redhat/grub.efi",
-                    isodir + "/EFI/boot/grub.efi")
+                    isodir + "/EFI/BOOT/grub.efi")
         shutil.copy(self._instroot + "/boot/grub/splash.xpm.gz",
-                    isodir + "/EFI/boot/splash.xpm.gz")
+                    isodir + "/EFI/BOOT/splash.xpm.gz")
 
         return True
 
     def __get_basic_efi_config(self, **args):
         return """
 default=0
-splashimage=/EFI/boot/splash.xpm.gz
+splashimage=/EFI/BOOT/splash.xpm.gz
 timeout %(timeout)d
 hiddenmenu
 
@@ -656,7 +656,7 @@ hiddenmenu
 
         for index in range(0, 9):
             # we don't support xen kernels
-            if os.path.exists("%s/EFI/boot/xen%d.gz" %(isodir, index)):
+            if os.path.exists("%s/EFI/BOOT/xen%d.gz" %(isodir, index)):
                 continue
             cfg += self.__get_efi_image_stanza(fslabel = self.fslabel,
                                                isofstype = "auto",
@@ -676,7 +676,7 @@ hiddenmenu
 
     def _configure_efi_bootloader(self, isodir):
         """Set up the configuration for an EFI bootloader"""
-        makedirs(isodir + "/EFI/boot")
+        makedirs(isodir + "/EFI/BOOT")
 
         if not self.__copy_efi_files(isodir):
             shutil.rmtree(isodir + "/EFI")
@@ -691,20 +691,20 @@ hiddenmenu
                                           timeout = self._timeout)
         cfg += self.__get_efi_image_stanzas(isodir, self.name)
 
-        cfgf = open(isodir + "/EFI/boot/grub.conf", "w")
+        cfgf = open(isodir + "/EFI/BOOT/grub.conf", "w")
         cfgf.write(cfg)
         cfgf.close()
 
         # first gen mactel machines get the bootloader name wrong apparently
         if rpmUtils.arch.getBaseArch() == "i386":
-            os.link(isodir + "/EFI/boot/grub.efi", isodir + "/EFI/boot/boot.efi")
-            os.link(isodir + "/EFI/boot/grub.conf", isodir + "/EFI/boot/boot.conf")
+            os.link(isodir + "/EFI/BOOT/grub.efi", isodir + "/EFI/BOOT/BOOT.efi")
+            os.link(isodir + "/EFI/BOOT/grub.conf", isodir + "/EFI/BOOT/BOOT.conf")
 
         # for most things, we want them named boot$efiarch
         efiarch = {"i386": "ia32", "x86_64": "x64"}
         efiname = efiarch[rpmUtils.arch.getBaseArch()]
-        os.rename(isodir + "/EFI/boot/grub.efi", isodir + "/EFI/boot/boot%s.efi" %(efiname,))
-        os.link(isodir + "/EFI/boot/grub.conf", isodir + "/EFI/boot/boot%s.conf" %(efiname,))
+        os.rename(isodir + "/EFI/BOOT/grub.efi", isodir + "/EFI/BOOT/BOOT%s.efi" %(efiname,))
+        os.link(isodir + "/EFI/BOOT/grub.conf", isodir + "/EFI/BOOT/BOOT%s.conf" %(efiname,))
 
 
     def _configure_bootloader(self, isodir):
