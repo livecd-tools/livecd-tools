@@ -776,6 +776,11 @@ sed -i -e "s/CDLABEL=[^ ]*/$USBLABEL/" -e "s/rootfstype=[^ ]*/rootfstype=$USBFS/
 if [ -n "$kernelargs" ]; then sed -i -e "s/liveimg/liveimg ${kernelargs}/" $BOOTCONFIG $BOOTCONFIG_EFI ; fi
 if [ "$LIVEOS" != "LiveOS" ]; then sed -i -e "s;liveimg;liveimg live_dir=$LIVEOS;" $BOOTCONFIG $BOOTCONFIG_EFI ; fi
 
+if [ -n "$efi" ]; then
+    sed -i -e "s;/isolinux/;/$SYSLINUXPATH/;g" $BOOTCONFIG_EFI
+    sed -i -e "s;/images/pxeboot/;/$SYSLINUXPATH/;g" $BOOTCONFIG_EFI
+fi
+
 # DVD Installer
 if [ "$isotype" = "installer" ]; then
     sed -i -e "s;initrd=initrd.img;initrd=initrd.img ${LANG:+LANG=$LANG} repo=hd:$USBLABEL:/;g" $BOOTCONFIG
