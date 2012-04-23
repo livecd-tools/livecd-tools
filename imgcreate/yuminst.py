@@ -45,12 +45,13 @@ class TextProgress(object):
         self.emit(logging.INFO, "...OK\n")
 
 class LiveCDYum(yum.YumBase):
-    def __init__(self, releasever=None):
+    def __init__(self, releasever=None, useplugins=False):
         """
         releasever = optional value to use in replacing $releasever in repos
         """
         yum.YumBase.__init__(self)
         self.releasever = releasever
+        self.useplugins = useplugins
 
     def doFileLogSetup(self, uid, logfile):
         # don't do the file log for the livecd as it can lead to open fds
@@ -71,7 +72,10 @@ class LiveCDYum(yum.YumBase):
         conf  = "[main]\n"
         conf += "installroot=%s\n" % installroot
         conf += "cachedir=/var/cache/yum\n"
-        conf += "plugins=0\n"
+        if self.useplugins:
+            conf += "plugins=1\n"
+        else:
+            conf += "plugins=0\n"
         conf += "reposdir=\n"
         conf += "failovermethod=priority\n"
         conf += "keepcache=1\n"

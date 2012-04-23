@@ -49,6 +49,9 @@ def parse_options(args):
     # Provided for img-create compatibility
     imgopt.add_option("-n", "--name", type="string", dest="fslabel",
                       help=optparse.SUPPRESS_HELP)
+    imgopt.add_option("-p", "--plugins", action="store_true", dest="plugins",
+                      help="Use yum plugins during image creation",
+                      default=False)
     imgopt.add_option("", "--image-type", type="string", dest="image_type",
                       help=optparse.SUPPRESS_HELP)
     imgopt.add_option("", "--compression-type", type="string", dest="compress_type",
@@ -171,11 +174,13 @@ def main():
                                         fslabel=fslabel,
                                         releasever=options.releasever,
                                         tmpdir=os.path.abspath(options.tmpdir),
+                                        useplugins=options.plugins,
                                         title=title, product=product)
     elif options.image_type == 'image':
         creator = imgcreate.LoopImageCreator(ks, name,
                                         fslabel=fslabel,
                                         releasever=options.releasever,
+                                        useplugins=options.plugins,
                                         tmpdir=os.path.abspath(options.tmpdir))
     else:
         # Cannot happen, we validate this when parsing options.
