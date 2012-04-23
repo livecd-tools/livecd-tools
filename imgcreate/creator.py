@@ -51,7 +51,7 @@ class ImageCreator(object):
 
     """
 
-    def __init__(self, ks, name, releasever=None, tmpdir="/tmp"):
+    def __init__(self, ks, name, releasever=None, tmpdir="/tmp", useplugins=False):
         """Initialize an ImageCreator instance.
 
         ks -- a pykickstart.KickstartParser instance; this instance will be
@@ -72,6 +72,7 @@ class ImageCreator(object):
         """A name for the image."""
 
         self.releasever = releasever
+        self.useplugins = useplugins
 
         self.tmpdir = tmpdir
         """The directory in which all temporary files will be created."""
@@ -617,7 +618,7 @@ class ImageCreator(object):
         """
         yum_conf = self._mktemp(prefix = "yum.conf-")
 
-        ayum = LiveCDYum(releasever=self.releasever)
+        ayum = LiveCDYum(releasever=self.releasever, useplugins=self.useplugins)
         ayum.setup(yum_conf, self._instroot)
 
         for repo in kickstart.get_repos(self.ks, repo_urls):
@@ -632,6 +633,7 @@ class ImageCreator(object):
                 yr.proxy = proxy
             if cost is not None:
                 yr.cost = cost
+        ayum.setup(yum_conf, self._instroot)
 
         if kickstart.exclude_docs(self.ks):
             rpm.addMacro("_excludedocs", "1")
@@ -778,7 +780,7 @@ class LoopImageCreator(ImageCreator):
 
     """
 
-    def __init__(self, ks, name, fslabel=None, releasever=None, tmpdir="/tmp"):
+    def __init__(self, ks, name, fslabel=None, releasever=None, tmpdir="/tmp", useplugins=False):
         """Initialize a LoopImageCreator instance.
 
         This method takes the same arguments as ImageCreator.__init__() with
@@ -787,7 +789,7 @@ class LoopImageCreator(ImageCreator):
         fslabel -- A string used as a label for any filesystems created.
 
         """
-        ImageCreator.__init__(self, ks, name, releasever=releasever, tmpdir=tmpdir)
+        ImageCreator.__init__(self, ks, name, releasever=releasever, tmpdir=tmpdir, useplugins=useplugins)
 
         self.__fslabel = None
         self.fslabel = fslabel
