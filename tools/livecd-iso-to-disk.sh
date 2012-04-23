@@ -1109,8 +1109,8 @@ if [ "$srctype" = "installer" ]; then
     if [ -e $TGTMNT/$imgpath ]; then
         tbd=$(du -s -B 1M $TGTMNT/$imgpath | awk {'print $1;'})
     fi
-    if [ -e $TGTMNT/$(basename "$SRC") ]; then
-        tbd=$(($tbd + $(du -s -B 1M $TGTMNT/$(basename "$SRC") | awk {'print $1;'})))
+    if [ -e "$TGTMNT/$(basename "$SRC")" ]; then
+        tbd=$(($tbd + $(du -s -B 1M "$TGTMNT/$(basename "$SRC")" | awk {'print $1;'})))
     fi
     echo "Size of $imgpath: $installimgsize"
     echo "Available space: $((freespace + tbd))"
