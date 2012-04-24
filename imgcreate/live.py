@@ -773,7 +773,7 @@ hiddenmenu
             os.link(isodir + "/EFI/BOOT/grub.conf", isodir + "/EFI/BOOT/BOOT.conf")
 
         # for most things, we want them named boot$efiarch
-        efiarch = {"i386": "ia32", "x86_64": "x64"}
+        efiarch = {"i386": "IA32", "x86_64": "X64"}
         efiname = efiarch[rpmUtils.arch.getBaseArch()]
         os.rename(isodir + "/EFI/BOOT/grub.efi", isodir + "/EFI/BOOT/BOOT%s.efi" %(efiname,))
         os.link(isodir + "/EFI/BOOT/grub.conf", isodir + "/EFI/BOOT/BOOT%s.conf" %(efiname,))
