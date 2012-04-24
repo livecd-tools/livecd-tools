@@ -1,5 +1,5 @@
 
-VERSION = 18.3
+VERSION = 18.4
 
 INSTALL = /usr/bin/install -c
 INSTALL_PROGRAM = ${INSTALL}
