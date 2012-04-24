@@ -234,7 +234,9 @@ class LiveImageCreatorBase(LoopImageCreator):
         subprocess.call(["mkefiboot", isodir + "/EFI/BOOT",
                          isodir + "/isolinux/efiboot.img"])
         subprocess.call(["mkefiboot", "-a", isodir + "/EFI/BOOT",
-                         isodir + "/isolinux/macboot.img"])
+                         isodir + "/isolinux/macboot.img", "-l", self.product,
+                         "-i", "/usr/share/pixmaps/bootloader/fedora.icns",
+                         "-p", self.product])
 
     def _create_bootconfig(self):
         """Configure the image so that it's bootable."""
