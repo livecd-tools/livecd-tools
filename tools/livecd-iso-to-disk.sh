@@ -273,14 +273,11 @@ cleanup() {
     sleep 2
     [ -d "$SRCMNT" ] && umount $SRCMNT && rmdir $SRCMNT
     [ -d "$TGTMNT" ] && umount $TGTMNT && rmdir $TGTMNT
-    if [ -n "$REPOMNT" ]; then
-        [ -d "$REPOMNT" ] && umount $REPOMNT && rmdir $REPOMNT
-    fi
 }
 
 exitclean() {
     RETVAL=$?
-    if [ -d "$SRCMNT" ] || [ -d "$TGTMNT" ] || [ -n "$REPOMNT" ];
+    if [ -d "$SRCMNT" ] || [ -d "$TGTMNT" ];
     then
         [ "$RETVAL" = 0 ] || echo "Cleaning up to exit..."
         cleanup
@@ -419,16 +416,7 @@ createGPTLayout() {
     /sbin/parted --script $device mklabel gpt
     partinfo=$(LC_ALL=C /sbin/parted --script -m $device "unit MB print" |grep ^$device:)
     dev_size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/MB$//')
-
-    # Is a 2nd partition needed for package iso?
-    if [ -n "$packages" ]; then
-        src_size=$(du -s -B 1MB "$SRC" | awk {'print $1;'})
-        # iso size + 7% of slop for filesystem metadata
-        p2_size=$(($src_size * 107 / 100))
-    else
-        p2_size=0
-    fi
-    p1_size=$(($dev_size - 3 - $p2_size))
+    p1_size=$(($dev_size - 3))
 
     if [ $p1_size -le 0 ]; then
         echo "Your device isn't big enough to hold $SRC"
@@ -438,11 +426,6 @@ createGPTLayout() {
     p1_start=1
     p1_end=$(($p1_size + 1))
     /sbin/parted -s $device u MB mkpart '"EFI System Partition"' fat32 $p1_start $p1_end set 1 boot on
-    if [ $p2_size -gt 0 ]; then
-        p2_start=$p1_end
-        p2_end=$(($p2_size + $p2_start))
-        /sbin/parted -s $device u MB mkpart '"LIVE REPO"' fat32 $p2_start $p2_end
-    fi
     # Sometimes automount can be _really_ annoying.
     echo "Waiting for devices to settle..."
     /sbin/udevadm settle
@@ -451,13 +434,6 @@ createGPTLayout() {
     umount $TGTDEV &> /dev/null || :
     /sbin/mkdosfs -n LIVE $TGTDEV
     TGTLABEL="UUID=$(/sbin/blkid -s UUID -o value $TGTDEV)"
-
-    if [ $p2_size -gt 0 ]; then
-        REPODEV=${device}2
-        umount $REPODEV &> /dev/null || :
-        /sbin/mkdosfs -n LIVE-REPO $REPODEV
-        REPOLABEL="UUID=$(/sbin/blkid -s UUID -o value $REPODEV)"
-    fi
 }
 
 createMSDOSLayout() {
@@ -472,16 +448,7 @@ createMSDOSLayout() {
     /sbin/parted --script $device mklabel msdos
     partinfo=$(LC_ALL=C /sbin/parted --script -m $device "unit MB print" |grep ^$device:)
     dev_size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/MB$//')
-
-    # Is a 2nd partition needed for package iso?
-    if [ -n "$packages" ]; then
-        src_size=$(du -s -B 1MB "$SRC" | awk {'print $1;'})
-        # iso size + 7% of slop for filesystem metadata
-        p2_size=$(($src_size * 107 / 100))
-    else
-        p2_size=0
-    fi
-    p1_size=$(($dev_size - 3 - $p2_size))
+    p1_size=$(($dev_size - 3))
 
     if [ $p1_size -le 0 ]; then
         echo "Your device isn't big enough to hold $SRC"
@@ -491,11 +458,6 @@ createMSDOSLayout() {
     p1_start=1
     p1_end=$(($p1_size + 1))
     /sbin/parted -s $device u MB mkpart primary fat32 $p1_start $p1_end set 1 boot on
-    if [ $p2_size -gt 0 ]; then
-        p2_start=$p1_end
-        p2_end=$(($p2_size + $p2_start))
-        /sbin/parted -s $device u MB mkpart primary fat32 $p2_start $p2_end
-    fi
     # Sometimes automount can be _really_ annoying.
     echo "Waiting for devices to settle..."
     /sbin/udevadm settle
@@ -508,13 +470,6 @@ createMSDOSLayout() {
     umount $TGTDEV &> /dev/null
     /sbin/mkdosfs -n LIVE $TGTDEV
     TGTLABEL="UUID=$(/sbin/blkid -s UUID -o value $TGTDEV)"
-
-    if [ $p2_size -gt 0 ]; then
-        REPODEV=${device}2
-        umount $REPODEV &> /dev/null || :
-        /sbin/mkdosfs -n LIVE-REPO $REPODEV
-        REPOLABEL="UUID=$(/sbin/blkid -s UUID -o value $REPODEV)"
-    fi
 }
 
 createEXTFSLayout() {
@@ -529,16 +484,7 @@ createEXTFSLayout() {
     /sbin/parted -s $device mklabel msdos
     partinfo=$(LC_ALL=C /sbin/parted -s -m $device "u MB print" |grep ^$device:)
     dev_size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/MB$//')
-
-    # Is a 2nd partition needed for package iso?
-    if [ -n "$packages" ]; then
-        src_size=$(du -s -B 1MB "$SRC" | awk {'print $1;'})
-        # iso size + 7% of slop for filesystem metadata
-        p2_size=$(($src_size * 107 / 100))
-    else
-        p2_size=0
-    fi
-    p1_size=$(($dev_size - 3 - $p2_size))
+    p1_size=$(($dev_size - 3))
 
     if [ $p1_size -le 0 ]; then
         echo "Your device isn't big enough to hold $SRC"
@@ -548,11 +494,6 @@ createEXTFSLayout() {
     p1_start=1
     p1_end=$(($p1_size + 1))
     /sbin/parted -s $device u MB mkpart primary ext2 $p1_start $p1_end set 1 boot on
-    if [ $p2_size -gt 0 ]; then
-        p2_start=$p1_end
-        p2_end=$(($p2_size + $p2_start))
-        /sbin/parted -s $device u MB mkpart primary ext2 $p2_start $p2_end
-    fi
     # Sometimes automount can be _really_ annoying.
     echo "Waiting for devices to settle..."
     /sbin/udevadm settle
@@ -568,13 +509,6 @@ createEXTFSLayout() {
     fi
     $mkfs -L LIVE $TGTDEV
     TGTLABEL="UUID=$(/sbin/blkid -s UUID -o value $TGTDEV)"
-
-    if [ $p2_size -gt 0 ]; then
-        REPODEV=${device}2
-        umount $REPODEV &> /dev/null || :
-        $mkfs -L LIVE-REPO $REPODEV
-        REPOLABEL="UUID=$(/sbin/blkid -s UUID -o value $REPODEV)"
-    fi
 }
 
 checkGPT() {
@@ -689,9 +623,7 @@ fi
 
 detectsrctype() {
     if [[ -e "$SRCMNT/Packages" ]]; then
-        # This will cause the source .iso to be copied to a second partiton
-        # on the target and the boot args to have repo=... pointing to the iso
-        echo "/Packages found, will copy source .iso to target"
+        echo "/Packages found, will copy source packages to target"
         packages=1
     fi
     if [[ -e "$SRCMNT/LiveOS/squashfs.img" ]]; then
@@ -960,10 +892,6 @@ fi
 
 TGTMNT=$(mktemp -d /media/tgttmp.XXXXXX)
 mount $mountopts $TGTDEV $TGTMNT || exitclean
-if [ -n "$REPODEV" ]; then
-    REPOMNT=$(mktemp -d /media/repotmp.XXXXXX)
-    mount $mountopts $REPODEV $REPOMNT || exitclean
-fi
 
 trap exitclean SIGINT SIGTERM
 
@@ -1121,23 +1049,6 @@ if [ "$srctype" = "live" -a -z "$skipcopy" ]; then
     sync
 fi
 
-# DVD installer copy
-# Also copies over the source .iso if the image is a new-style LiveOS DVD (F17+)
-if [ \( "$srctype" = "installer" -o "$srctype" = "netinst" \) ]; then
-    echo "Copying DVD image to target device."
-    mkdir -p $TGTMNT/images/
-    if [ "$imgtype" = "install" ]; then
-        copyFile $SRCMNT/images/install.img $TGTMNT/images/install.img || exitclean
-    fi
-fi
-
-# Copy source .iso to repo partition
-if [ -n "$packages" -a -z "$skipcopy" ]; then
-    echo "Copying $SRC"
-    copyFile "$SRC" $REPOMNT/
-    sync
-fi
-
 # Adjust syslinux sources for replication of installed images
 # between filesystem types.
 if [[ -d $SRCMNT/isolinux/ ]]; then
@@ -1155,6 +1066,7 @@ BOOTCONFIG=$TGTMNT/$SYSLINUXPATH/isolinux.cfg
 # Set this to nothing so sed doesn't care
 BOOTCONFIG_EFI=
 if [ -n "$efi" ]; then
+    echo "Setting up $EFI_BOOT"
     cp $SRCMNT$EFI_BOOT/* $TGTMNT$EFI_BOOT
 
     # FIXME
@@ -1194,7 +1106,43 @@ if [ -n "$efi" ]; then
     fi
 fi
 
-if [[ live == $srctype ]]; then
+# DVD installer copy
+if [ -z "$skipcopy" -a \( "$srctype" = "installer" -o "$srctype" = "netinst" \) ]; then
+    echo "Copying DVD image to target device."
+    mkdir -p $TGTMNT/images/
+    if [ "$imgtype" = "install" ]; then
+        for img in install.img updates.img product.img; do
+            if [ -e $SRCMNT/images/$img ]; then
+                copyFile $SRCMNT/images/$img $TGTMNT/images/$img || exitclean
+            fi
+        done
+    fi
+fi
+
+# Copy packages over.
+# Before Fedora17 we could copy the .iso and setup a repo=
+# F17 and later look for repodata on the source media.
+# The presence of packages and LiveOS indicates F17 or later.
+if [ -n "$packages" -a -z "$skipcopy" ]; then
+    if [ "$srctype" != "live" ]; then
+        echo "Copying $SRC to device"
+        copyFile "$SRC" "$TGTMNT/"
+
+        # Setup a repo= to point to the .iso
+        sed -i -e "s;initrd.img;initrd.img repo=hd:$TGTLABEL:/;g" $BOOTCONFIG
+        if [ -n "$efi" ]; then
+            sed -i -e "s;vmlinuz;vmlinuz repo=hd:$TGTLABEL:/;g" $BOOTCONFIG_EFI
+        fi
+    else
+        echo "Copying package data from $SRC to device"
+        rsync --inplace -rLDP --exclude EFI/ --exclude images/ --exclude isolinux/ \
+            --exclude TRANS.TBL --exclude LiveOS/ "$SRCMNT/" "$TGTMNT/"
+    fi
+    echo "Waiting for device to finish writing"
+    sync
+fi
+
+if [ "$srctype" = "live" ]; then
     # Copy this installer script.
     cp -fTp "$thisScriptpath" $TGTMNT/$LIVEOS/livecd-iso-to-disk &> /dev/null
 
@@ -1228,14 +1176,6 @@ fi
 if [ -n "$efi" ]; then
     sed -i -e "s;/images/pxeboot/;/$SYSLINUXPATH/;g" $BOOTCONFIG_EFI
     sed -i -e "s;findiso;;g" $BOOTCONFIG_EFI
-fi
-
-# Add repo= to point to the source .iso with the packages
-if [[ -n "$packages" ]]; then
-    sed -i -e "s;initrd.img;initrd.img repo=hd:$REPOLABEL:/;g" $BOOTCONFIG
-    if [ -n "$efi" ]; then
-        sed -i -e "s;vmlinuz;vmlinuz repo=hd:$REPOLABEL:/;g" $BOOTCONFIG_EFI
-    fi
 fi
 
 # DVD Installer for netinst
