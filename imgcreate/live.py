@@ -236,6 +236,7 @@ class LiveImageCreatorBase(LoopImageCreator):
                          isodir + "/isolinux/efiboot.img"])
         subprocess.call(["mkefiboot", "-a", isodir + "/EFI/BOOT",
                          isodir + "/isolinux/macboot.img", "-l", self.product,
+                         "-n", "/usr/share/pixmaps/bootloader/fedora-media.vol",
                          "-i", "/usr/share/pixmaps/bootloader/fedora.icns",
                          "-p", self.product])
 
