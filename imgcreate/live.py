@@ -319,10 +319,7 @@ class LiveImageCreatorBase(LoopImageCreator):
             raise CreatorError("ISO creation failed!")
 
         if os.path.exists("/usr/bin/isohybrid"):
-            if os.path.exists(isodir + "/isolinux/efiboot.img"):
-                subprocess.call(["/usr/bin/isohybrid", "-u", "-m", iso])
-            else:
-                subprocess.call(["/usr/bin/isohybrid", iso])
+            subprocess.call(["/usr/bin/isohybrid", iso])
 
         self.__implant_md5sum(iso)
 
