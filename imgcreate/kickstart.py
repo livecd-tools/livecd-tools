@@ -154,7 +154,7 @@ class TimezoneConfig(KickstartConfig):
         f.write("UTC=" + utc + "\n")
         f.close()
         try:
-            shutil.copyfile(self.path("/usr/share/zoneinfo/%s" %(tz,)),
+            shutil.copy2(self.path("/usr/share/zoneinfo/%s" %(tz,)),
                             self.path("/etc/localtime"))
         except OSError, e:
             log.error("Error copying timezone: %s" %(e.strerror,))
