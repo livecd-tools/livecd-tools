@@ -433,7 +433,8 @@ class DiskMount(Mount):
         args = [ "/bin/mount", self.disk.device, self.mountdir ]
         if self.fstype:
             args.extend(["-t", self.fstype])
-
+        if self.fstype == "squashfs":
+            args.extend(["-o", "ro"])
         rc = call(args)
         if rc != 0:
             raise MountError("Failed to mount '%s' to '%s'" %
