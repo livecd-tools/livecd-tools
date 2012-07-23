@@ -92,11 +92,14 @@ class LiveCDYum(yum.YumBase):
         for f in glob.glob(installroot + "/var/lib/rpm/__db*"):
             os.unlink(f)
 
-    def setup(self, confpath, installroot):
+    def setup(self, confpath, installroot, cacheonly=False):
         self._writeConf(confpath, installroot)
         self._cleanupRpmdbLocks(installroot)
         self.doConfigSetup(fn = confpath, root = installroot)
-        self.conf.cache = 0
+        if cacheonly:
+            self.conf.cache = 1
+        else:
+            self.conf.cache = 0
         self.doTsSetup()
         self.doRpmDBSetup()
         self.doRepoSetup()
@@ -176,7 +179,7 @@ class LiveCDYum(yum.YumBase):
         # disable gpg check???
         repo.gpgcheck = 0
         repo.enable()
-        repo.setup(0)
+        repo.setup(self.conf.cache)
         repo.setCallback(TextProgress())
         self.repos.add(repo)
         return repo

@@ -51,7 +51,7 @@ class ImageCreator(object):
 
     """
 
-    def __init__(self, ks, name, releasever=None, tmpdir="/tmp", useplugins=False):
+    def __init__(self, ks, name, releasever=None, tmpdir="/tmp", useplugins=False, cacheonly=False):
         """Initialize an ImageCreator instance.
 
         ks -- a pykickstart.KickstartParser instance; this instance will be
@@ -64,6 +64,8 @@ class ImageCreator(object):
         releasever -- Value to substitute for $releasever in repo urls
 
         tmpdir -- Top level directory to use for temporary files and dirs
+
+        cacheonly -- Only read from cache, work offline
         """
         self.ks = ks
         """A pykickstart.KickstartParser instance."""
@@ -78,6 +80,8 @@ class ImageCreator(object):
         """The directory in which all temporary files will be created."""
         if not os.path.exists(self.tmpdir):
             makedirs(self.tmpdir)
+
+        self.cacheonly = cacheonly
 
         self.__builddir = None
         self.__bindmounts = []
@@ -619,7 +623,7 @@ class ImageCreator(object):
         yum_conf = self._mktemp(prefix = "yum.conf-")
 
         ayum = LiveCDYum(releasever=self.releasever, useplugins=self.useplugins)
-        ayum.setup(yum_conf, self._instroot)
+        ayum.setup(yum_conf, self._instroot, cacheonly=self.cacheonly)
 
         for repo in kickstart.get_repos(self.ks, repo_urls):
             (name, baseurl, mirrorlist, proxy, inc, exc, cost) = repo
@@ -780,7 +784,7 @@ class LoopImageCreator(ImageCreator):
 
     """
 
-    def __init__(self, ks, name, fslabel=None, releasever=None, tmpdir="/tmp", useplugins=False):
+    def __init__(self, ks, name, fslabel=None, releasever=None, tmpdir="/tmp", useplugins=False, cacheonly=False):
         """Initialize a LoopImageCreator instance.
 
         This method takes the same arguments as ImageCreator.__init__() with
@@ -789,7 +793,7 @@ class LoopImageCreator(ImageCreator):
         fslabel -- A string used as a label for any filesystems created.
 
         """
-        ImageCreator.__init__(self, ks, name, releasever=releasever, tmpdir=tmpdir, useplugins=useplugins)
+        ImageCreator.__init__(self, ks, name, releasever=releasever, tmpdir=tmpdir, useplugins=useplugins, cacheonly=cacheonly)
 
         self.__fslabel = None
         self.fslabel = fslabel

@@ -40,7 +40,7 @@ class LiveImageCreatorBase(LoopImageCreator):
     """
 
     def __init__(self, ks, name, fslabel=None, releasever=None, tmpdir="/tmp",
-                 title="Linux", product="Linux", useplugins=False):
+                 title="Linux", product="Linux", useplugins=False, cacheonly=False):
         """Initialise a LiveImageCreator instance.
 
         This method takes the same arguments as LoopImageCreator.__init__().
@@ -50,7 +50,7 @@ class LiveImageCreatorBase(LoopImageCreator):
                                   fslabel=fslabel,
                                   releasever=releasever,
                                   tmpdir=tmpdir,
-                                  useplugins=useplugins)
+                                  useplugins=useplugins, cacheonly=cacheonly)
 
         self.compress_type = "xz"
         """mksquashfs compressor to use."""
