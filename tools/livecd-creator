@@ -75,6 +75,10 @@ def parse_options(args):
     sysopt.add_option("", "--cache", type="string",
                       dest="cachedir", default=None,
                       help="Cache directory to use (default: private cache")
+    sysopt.add_option("", "--cacheonly", action="store_true",
+                      dest="cacheonly", default=False,
+                      help="Work offline from cache, use together with --cache (default: False)")
+
     parser.add_option_group(sysopt)
 
     imgcreate.setup_logging(parser)
@@ -175,13 +179,15 @@ def main():
                                         releasever=options.releasever,
                                         tmpdir=os.path.abspath(options.tmpdir),
                                         useplugins=options.plugins,
-                                        title=title, product=product)
+                                        title=title, product=product,
+                                        cacheonly=options.cacheonly)
     elif options.image_type == 'image':
         creator = imgcreate.LoopImageCreator(ks, name,
                                         fslabel=fslabel,
                                         releasever=options.releasever,
                                         useplugins=options.plugins,
-                                        tmpdir=os.path.abspath(options.tmpdir))
+                                        tmpdir=os.path.abspath(options.tmpdir),
+                                        cacheonly=options.cacheonly)
     else:
         # Cannot happen, we validate this when parsing options.
         logging.error(u"'%s' is not a valid image type" % options.image_type)
