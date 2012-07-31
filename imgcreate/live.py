@@ -295,7 +295,6 @@ class LiveImageCreatorBase(LoopImageCreator):
         if not os.path.exists(os.path.dirname(path)):
             makedirs(os.path.dirname(path))
         f = open(path, "a")
-        f.write('filesystems+="' + self.__extra_filesystems() + ' "\n')
         f.write('drivers+="' + self.__extra_drivers() + ' "\n')
         f.write('add_dracutmodules+=" dmsquash-live "')
         f.close()
