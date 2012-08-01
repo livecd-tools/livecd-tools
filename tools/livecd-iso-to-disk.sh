@@ -1174,7 +1174,7 @@ if [ "$srctype" = "live" ]; then
     if [[ -d $SRCMNT/syslinux/ ]]; then
         echo "Preparing boot config file."
         sed -i -e "s/root=live:[^ ]*/root=live:CDLABEL=name/"\
-               -e "s/liveimg .* quiet/liveimg quiet/"\
+               -e "s/\(r*d*.*live.*ima*ge*\) .* quiet/\1 quiet/"\
                     $BOOTCONFIG $BOOTCONFIG_EFI
         sed -i -e "s/^timeout.*$/timeout\ 100/"\
                -e "/^totaltimeout.*$/d" $BOOTCONFIG
@@ -1192,7 +1192,8 @@ if [ -n "$kernelargs" ]; then
     fi
 fi
 if [ "$LIVEOS" != "LiveOS" ]; then
-    sed -i -e "s;liveimg;liveimg live_dir=$LIVEOS;" $BOOTCONFIG $BOOTCONFIG_EFI
+    sed -i -e "s;r*d*.*live.*ima*ge*;& live_dir=$LIVEOS;"\
+              $BOOTCONFIG $BOOTCONFIG_EFI
 fi
 
 # EFI images are in $SYSLINUXPATH now
@@ -1234,7 +1235,8 @@ if [ "$overlaysizemb" -gt 0 ]; then
             dd if=/dev/null of=$TGTMNT/$LIVEOS/$OVERFILE count=1 bs=1M seek=$overlaysizemb
         fi
     fi
-    sed -i -e "s/liveimg/liveimg overlay=${TGTLABEL}/" $BOOTCONFIG $BOOTCONFIG_EFI
+    sed -i -e "s/r*d*.*live.*ima*ge*/& overlay=${TGTLABEL}/"\
+              $BOOTCONFIG $BOOTCONFIG_EFI
     sed -i -e "s/\ ro\ /\ rw\ /" $BOOTCONFIG  $BOOTCONFIG_EFI
 fi
 
