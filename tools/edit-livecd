@@ -423,7 +423,7 @@ class LiveImageEditor(LiveImageCreator):
             args.append('-e')
             args.append('s/rootfstype=[^ ]* [^ ]*/rootfstype=auto ro/')
             args.append('-e')
-            args.append('s/liveimg .* quiet/liveimg quiet/')
+            args.append('s/\(r*d*.*live.*ima*ge*\) .* quiet/\1 quiet/')
         args.append('-e')
         args.append('s/root=[^ ]*/root=live:CDLABEL=' + self.name + '/')
         if self.ks:
