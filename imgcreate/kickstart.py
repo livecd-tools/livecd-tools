@@ -153,11 +153,18 @@ class TimezoneConfig(KickstartConfig):
         f.write("ZONE=\"" + tz + "\"\n")
         f.write("UTC=" + utc + "\n")
         f.close()
-        try:
-            shutil.copy2(self.path("/usr/share/zoneinfo/%s" %(tz,)),
-                            self.path("/etc/localtime"))
-        except OSError, e:
-            log.error("Error copying timezone: %s" %(e.strerror,))
+
+        # /etc/localtime is a symlink with glibc > 2.15-41
+        if os.path.islink(self.path("/etc/localtime")):
+            os.unlink(self.path("/etc/localtime"))
+            os.symlink("/usr/share/zoneinfo/%s" %(tz,),
+                       self.path("/etc/localtime"))
+        else:
+            try:
+                shutil.copy2(self.path("/usr/share/zoneinfo/%s" %(tz,)),
+                                self.path("/etc/localtime"))
+            except (OSError, shutil.Error) as e:
+                log.error("Error copying timezone: %s" %(e.strerror,))
 
 
 class AuthConfig(KickstartConfig):
