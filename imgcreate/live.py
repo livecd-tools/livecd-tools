@@ -16,6 +16,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
+import sys
 import os
 import os.path
 import glob
@@ -40,7 +41,8 @@ class LiveImageCreatorBase(LoopImageCreator):
     """
 
     def __init__(self, ks, name, fslabel=None, releasever=None, tmpdir="/tmp",
-                 title="Linux", product="Linux", useplugins=False, cacheonly=False):
+                 title="Linux", product="Linux", useplugins=False, cacheonly=False,
+                 docleanup=True):
         """Initialise a LiveImageCreator instance.
 
         This method takes the same arguments as LoopImageCreator.__init__().
@@ -50,7 +52,9 @@ class LiveImageCreatorBase(LoopImageCreator):
                                   fslabel=fslabel,
                                   releasever=releasever,
                                   tmpdir=tmpdir,
-                                  useplugins=useplugins, cacheonly=cacheonly)
+                                  useplugins=useplugins,
+                                  cacheonly=cacheonly,
+                                  docleanup=docleanup)
 
         self.compress_type = "xz"
         """mksquashfs compressor to use."""

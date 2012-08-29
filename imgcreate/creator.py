@@ -51,7 +51,8 @@ class ImageCreator(object):
 
     """
 
-    def __init__(self, ks, name, releasever=None, tmpdir="/tmp", useplugins=False, cacheonly=False):
+    def __init__(self, ks, name, releasever=None, tmpdir="/tmp", useplugins=False,
+                 cacheonly=False, docleanup=True):
         """Initialize an ImageCreator instance.
 
         ks -- a pykickstart.KickstartParser instance; this instance will be
@@ -82,6 +83,7 @@ class ImageCreator(object):
             makedirs(self.tmpdir)
 
         self.cacheonly = cacheonly
+        self.docleanup = docleanup
 
         self.__builddir = None
         self.__bindmounts = []
@@ -557,6 +559,10 @@ class ImageCreator(object):
               creator.cleanup()
 
         """
+        if not self.docleanup:
+            logging.warn("Skipping cleanup of temporary files")
+            return
+
         if not self.__builddir:
             return
 
@@ -784,7 +790,8 @@ class LoopImageCreator(ImageCreator):
 
     """
 
-    def __init__(self, ks, name, fslabel=None, releasever=None, tmpdir="/tmp", useplugins=False, cacheonly=False):
+    def __init__(self, ks, name, fslabel=None, releasever=None, tmpdir="/tmp",
+                 useplugins=False, cacheonly=False, docleanup=True):
         """Initialize a LoopImageCreator instance.
 
         This method takes the same arguments as ImageCreator.__init__() with
@@ -793,7 +800,8 @@ class LoopImageCreator(ImageCreator):
         fslabel -- A string used as a label for any filesystems created.
 
         """
-        ImageCreator.__init__(self, ks, name, releasever=releasever, tmpdir=tmpdir, useplugins=useplugins, cacheonly=cacheonly)
+        ImageCreator.__init__(self, ks, name, releasever=releasever, tmpdir=tmpdir,
+                              useplugins=useplugins, cacheonly=cacheonly, docleanup=docleanup)
 
         self.__fslabel = None
         self.fslabel = fslabel
