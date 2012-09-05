@@ -1192,9 +1192,9 @@ echo "Updating boot config file"
 # adjust label and fstype
 sed -i -e "s/CDLABEL=[^ ]*/$TGTLABEL/" -e "s/rootfstype=[^ ]*/rootfstype=$TGTFS/" -e "s/LABEL=[^ ]*/$TGTLABEL/" $BOOTCONFIG  $BOOTCONFIG_EFI
 if [ -n "$kernelargs" ]; then
-    sed -i -e "s;initrd.img;initrd.img ${kernelargs};" $BOOTCONFIG
+    sed -i -e "s;initrd.\?\.img;& ${kernelargs};" $BOOTCONFIG
     if [ -n "$efi" ]; then
-        sed -i -e "s;vmlinuz;vmlinuz ${kernelargs};" $BOOTCONFIG_EFI
+        sed -i -e "s;vmlinuz.\?;& ${kernelargs} ;" $BOOTCONFIG_EFI
     fi
 fi
 if [ "$LIVEOS" != "LiveOS" ]; then
