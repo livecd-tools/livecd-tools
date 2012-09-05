@@ -1089,14 +1089,20 @@ BOOTCONFIG=$TGTMNT/$SYSLINUXPATH/isolinux.cfg
 BOOTCONFIG_EFI=
 if [ -n "$efi" ]; then
     echo "Setting up $EFI_BOOT"
-    cp $SRCMNT$EFI_BOOT/* $TGTMNT$EFI_BOOT
+    cp -a $SRCMNT$EFI_BOOT/* $TGTMNT$EFI_BOOT
 
-    # FIXME
-    # There is a problem here. On older LiveCD's the files are boot?*.conf
-    # They really should be renamed to BOOT?*.conf
-
-    # this is a little ugly, but it gets the "interesting" named config file
-    BOOTCONFIG_EFI=$TGTMNT$EFI_BOOT/+(BOOT|boot)?*.conf
+    # The GRUB EFI config file can be one of:
+    #   boot?*.conf
+    #   BOOT?*.conf
+    #   grub.cfg
+    if [ -e $TGTMNT$EFI_BOOT/grub.cfg ]; then
+        BOOTCONFIG_EFI=$TGTMNT$EFI_BOOT/grub.cfg
+    elif [ -e $TGTMNT$EFI_BOOT/+(BOOT|boot)?*.conf ]; then
+        BOOTCONFIG_EFI=$TGTMNT$EFI_BOOT/+(BOOT|boot)?*.conf
+    else
+        echo "Unable to find EFI config file."
+        exitclean
+    fi
     rm -f $TGTMNT$EFI_BOOT/grub.conf
 
     # On some images (RHEL) the BOOT*.efi file isn't in $EFI_BOOT, but is in
