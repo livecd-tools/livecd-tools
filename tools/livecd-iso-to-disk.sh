@@ -1089,7 +1089,7 @@ BOOTCONFIG=$TGTMNT/$SYSLINUXPATH/isolinux.cfg
 BOOTCONFIG_EFI=
 if [ -n "$efi" ]; then
     echo "Setting up $EFI_BOOT"
-    cp -a $SRCMNT$EFI_BOOT/* $TGTMNT$EFI_BOOT
+    cp -r $SRCMNT$EFI_BOOT/* $TGTMNT$EFI_BOOT
 
     # The GRUB EFI config file can be one of:
     #   boot?*.conf
