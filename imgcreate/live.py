@@ -804,7 +804,8 @@ search --no-floppy --set=root -l '%(isolabel)s'
         """Set up the configuration for an EFI bootloader"""
         if self.__copy_efi_files(isodir):
             shutil.rmtree(isodir + "/EFI")
-            raise CreatorError("Failed to copy EFI files")
+            logging.warn("Failed to copy EFI files, no EFI Support will be included.")
+            return
 
         cfg = self.__get_basic_efi_config(isolabel = self.fslabel,
                                           timeout = self._timeout)
