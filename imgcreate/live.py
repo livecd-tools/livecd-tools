@@ -400,7 +400,7 @@ class x86LiveImageCreator(LiveImageCreatorBase):
         return options
 
     def _get_required_packages(self):
-        return ["syslinux", "grub2-efi", "shim"] \
+        return ["syslinux"] \
                + LiveImageCreatorBase._get_required_packages(self)
 
     def _get_isolinux_stanzas(self, isodir):
