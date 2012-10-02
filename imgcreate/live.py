@@ -717,14 +717,12 @@ menu end
               shim.efi
               gcdx64.efi
               fonts/unicode.pf2
-              grub/splash.xpm.gz
         """
         fail = False
         missing = []
         files = [("/boot/efi/EFI/*/shim.efi", "/EFI/BOOT/BOOT%s.efi" % (self.efiarch,)),
                  ("/boot/efi/EFI/*/gcdx64.efi", "/EFI/BOOT/grubx64.efi"),
                  ("/boot/efi/EFI/*/fonts/unicode.pf2", "/EFI/BOOT/fonts/"),
-                 ("/boot/grub/splash.xpm.gz", "/EFI/BOOT"),
                 ]
         makedirs(isodir+"/EFI/BOOT/fonts/")
         for src, dest in files:
