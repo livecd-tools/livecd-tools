@@ -1,5 +1,5 @@
 
-VERSION = 13.4
+VERSION = 13.4.1
 
 INSTALL = /usr/bin/install -c
 INSTALL_PROGRAM = ${INSTALL}
