@@ -404,6 +404,9 @@ class DiskMount(Mount):
         if self.fstype:
             args.extend(["-t", self.fstype])
 
+        if self.fstype and self.fstype == "squashfs":
+            args.extend(["-o", "ro"])
+
         rc = subprocess.call(args)
         if rc != 0:
             raise MountError("Failed to mount '%s' to '%s'" %
