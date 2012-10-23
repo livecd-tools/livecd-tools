@@ -42,7 +42,7 @@ def makedirs(dirname):
 
 def mksquashfs(in_img, out_img, compress_type):
 # Allow gzip to work for older versions of mksquashfs
-    if compress_type == "gzip":
+    if not compress_type or compress_type == "gzip":
         args = ["/sbin/mksquashfs", in_img, out_img]
     else:
         args = ["/sbin/mksquashfs", in_img, out_img, "-comp", compress_type]
