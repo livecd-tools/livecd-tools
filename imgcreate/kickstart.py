@@ -131,7 +131,7 @@ class LanguageConfig(KickstartConfig):
     def apply(self, kslang):
         lang = kslang.lang or "en_US.UTF-8"
 
-        f = open(self.path("/etc/sysconfig/i18n"), "w+")
+        f = open(self.path("/etc/locale.conf"), "w+")
         f.write("LANG=\"" + lang + "\"\n")
         f.close()
 
