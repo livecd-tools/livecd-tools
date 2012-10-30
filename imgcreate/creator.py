@@ -607,13 +607,6 @@ class ImageCreator(object):
                                           self._get_excluded_packages()):
             ayum.deselectPackage(pkg)
 
-    # if the system is running selinux and the kickstart wants it disabled
-    # we need /usr/sbin/lokkit
-    def __can_handle_selinux(self, ayum):
-        file = "/usr/sbin/lokkit"
-        if not kickstart.selinux_enabled(self.ks) and selinux.is_selinux_enabled() and not ayum.installHasFile(file):
-            raise CreatorError("Unable to disable SELinux because the installed package set did not include the file %s" % (file))
-
     def install(self, repo_urls = {}):
         """Install packages into the install root.
 
@@ -656,8 +649,6 @@ class ImageCreator(object):
             self.__select_packages(ayum)
             self.__select_groups(ayum)
             self.__deselect_packages(ayum)
-
-            self.__can_handle_selinux(ayum)
 
             ayum.runInstall()
         except yum.Errors.RepoError, e:

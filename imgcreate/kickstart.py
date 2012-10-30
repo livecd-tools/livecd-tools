@@ -175,23 +175,25 @@ class AuthConfig(KickstartConfig):
 class FirewallConfig(KickstartConfig):
     """A class to apply a kickstart firewall configuration to a system."""
     def apply(self, ksfirewall):
-        if not os.path.exists(self.path("/usr/sbin/lokkit")):
-            return
-        args = ["/usr/sbin/lokkit", "-f", "--quiet", "--nostart"]
-        if ksfirewall.enabled:
-            args.append("--enabled")
-
-            for port in ksfirewall.ports:
-                args.append("--port=%s" %(port,))
-            for svc in ksfirewall.services:
-                args.append("--service=%s" %(svc,))
-            for dev in ksfirewall.trusts:
-                args.append("--trust=%s" %(dev,))
+        args = ["/usr/bin/firewall-offline-cmd"]
+        # enabled is None if neither --enable or --disable is passed
+        # default to enabled if nothing has been set.
+        if ksfirewall.enabled == False:
+            args += ["--disabled"]
         else:
-            args.append("--disabled")
+            args += ["--enabled"]
+
+        for dev in ksfirewall.trusts:
+            args += [ "--trust=%s" % (dev,) ]
+
+        for port in ksfirewall.ports:
+            args += [ "--port=%s" % (port,) ]
+
+        for service in ksfirewall.services:
+            args += [ "--service=%s" % (service,) ]
 
         self.call(args)
-        
+
 class RootPasswordConfig(KickstartConfig):
     """A class to apply a kickstart root password configuration to a system."""
     def unset(self):
@@ -426,17 +428,27 @@ class SelinuxConfig(KickstartConfig):
         self.call(["/sbin/setfiles", "-p", "-e", "/proc", "-e", "/sys", "-e", "/dev", selinux.selinux_file_context_path(), "/"])
 
     def apply(self, ksselinux):
-        if os.path.exists(self.path("/usr/sbin/lokkit")):
-            args = ["/usr/sbin/lokkit", "--quiet", "--nostart"]
+        selinux_config = "/etc/selinux/config"
+        if not os.path.exists(self.instroot+selinux_config):
+            return
 
-            if ksselinux.selinux == ksconstants.SELINUX_ENFORCING:
-                args.append("--selinux=enforcing")
-            if ksselinux.selinux == ksconstants.SELINUX_PERMISSIVE:
-                args.append("--selinux=permissive")
-            if ksselinux.selinux == ksconstants.SELINUX_DISABLED:
-                args.append("--selinux=disabled")
+        if ksselinux.selinux == ksconstants.SELINUX_ENFORCING:
+            cmd = "SELINUX=enforcing\n"
+        elif ksselinux.selinux == ksconstants.SELINUX_PERMISSIVE:
+            cmd = "SELINUX=permissive\n"
+        elif ksselinux.selinux == ksconstants.SELINUX_DISABLED:
+            cmd = "SELINUX=disabled\n"
+        else:
+            return
 
-            self.call(args)
+        # Replace the SELINUX line in the config
+        lines = open(self.instroot+selinux_config).readlines()
+        with open(self.instroot+selinux_config, "w") as f:
+            for line in lines:
+                if line.startswith("SELINUX="):
+                    f.write(cmd)
+                else:
+                    f.write(line)
 
         self.relabel(ksselinux)
 
