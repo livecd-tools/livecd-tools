@@ -149,11 +149,6 @@ class TimezoneConfig(KickstartConfig):
         tz = kstimezone.timezone or "America/New_York"
         utc = str(kstimezone.isUtc)
 
-        f = open(self.path("/etc/sysconfig/clock"), "w+")
-        f.write("ZONE=\"" + tz + "\"\n")
-        f.write("UTC=" + utc + "\n")
-        f.close()
-
         # /etc/localtime is a symlink with glibc > 2.15-41
         if os.path.islink(self.path("/etc/localtime")):
             os.unlink(self.path("/etc/localtime"))
