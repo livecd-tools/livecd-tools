@@ -159,7 +159,7 @@ class TimezoneConfig(KickstartConfig):
                 shutil.copy2(self.path("/usr/share/zoneinfo/%s" %(tz,)),
                                 self.path("/etc/localtime"))
             except (OSError, shutil.Error) as e:
-                log.error("Error copying timezone: %s" %(e.strerror,))
+                logging.error("Error copying timezone: %s" %(e.strerror,))
 
 
 class AuthConfig(KickstartConfig):
