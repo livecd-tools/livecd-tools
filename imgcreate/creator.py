@@ -474,8 +474,10 @@ class ImageCreator(object):
             return
 
         # if the system was running selinux clean up our lies
-        arglist = ["/bin/umount", self._instroot + self.__selinux_mountpoint + "/load"]
-        subprocess.call(arglist, close_fds = True)
+        path = self._instroot + self.__selinux_mountpoint + "/load"
+        if os.path.exists(path):
+            arglist = ["/bin/umount", path]
+            subprocess.call(arglist, close_fds = True)
 
     def mount(self, base_on = None, cachedir = None):
         """Setup the target filesystem in preparation for an install.
