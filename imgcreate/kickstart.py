@@ -328,11 +328,6 @@ class NetworkConfig(KickstartConfig):
         else:
             f.write("NETWORKING_IPV6=no\n")
 
-        if hostname:
-            f.write("HOSTNAME=%s\n" % hostname)
-        else:
-            f.write("HOSTNAME=localhost.localdomain\n")
-
         if gateway:
             f.write("GATEWAY=%s\n" % gateway)
 
@@ -352,6 +347,16 @@ class NetworkConfig(KickstartConfig):
         os.chmod(path, 0644)
         f.write("127.0.0.1\t\t%s\n" % localline)
         f.write("::1\t\tlocalhost6.localdomain6 localhost6\n")
+        f.close()
+
+    def write_hostname(self, hostname):
+        if not hostname:
+            return
+
+        path = self.path("/etc/hostname")
+        f = file(path, "w+")
+        os.chmod(path, 0644)
+        f.write("%s\n" % (hostname,))
         f.close()
 
     def write_resolv(self, nodns, nameservers):
@@ -407,6 +412,7 @@ class NetworkConfig(KickstartConfig):
 
         self.write_sysconfig(useipv6, hostname, gateway)
         self.write_hosts(hostname)
+        self.write_hostname(hostname)
         self.write_resolv(nodns, nameservers)
 
 class SelinuxConfig(KickstartConfig):
