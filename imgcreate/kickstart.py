@@ -236,18 +236,22 @@ class ServicesConfig(KickstartConfig):
 
 class XConfig(KickstartConfig):
     """A class to apply a kickstart X configuration to a system."""
+    RUNLEVELS = {3: 'multi-user.target', 5: 'graphical.target'}
+
     def apply(self, ksxconfig):
-        if ksxconfig.startX:
-            f = open(self.path("/etc/inittab"), "rw+")
-            buf = f.read()
-            buf = buf.replace("id:3:initdefault", "id:5:initdefault")
-            f.seek(0)
-            f.write(buf)
-            f.close()
         if ksxconfig.defaultdesktop:
             f = open(self.path("/etc/sysconfig/desktop"), "w")
             f.write("DESKTOP="+ksxconfig.defaultdesktop+"\n")
             f.close()
+
+        if ksxconfig.startX:
+            if not os.path.isdir(self.path('/etc/systemd/system')):
+                logging.warning("there is no /etc/systemd/system directory, cannot update default.target!")
+                return
+            default_target = self.path('/etc/systemd/system/default.target')
+            if os.path.islink(default_target):
+                 os.unlink(default_target)
+            os.symlink(self.path('/lib/systemd/system/graphical.target'), default_target)
 
 class RPMMacroConfig(KickstartConfig):
     """A class to apply the specified rpm macros to the filesystem"""
