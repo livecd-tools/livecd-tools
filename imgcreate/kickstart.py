@@ -150,17 +150,20 @@ class TimezoneConfig(KickstartConfig):
         utc = str(kstimezone.isUtc)
 
         # /etc/localtime is a symlink with glibc > 2.15-41
-        if os.path.islink(self.path("/etc/localtime")):
-            os.unlink(self.path("/etc/localtime"))
-            os.symlink("/usr/share/zoneinfo/%s" %(tz,),
-                       self.path("/etc/localtime"))
-        else:
+        # but if it exists as a file keep it as a file and fall back
+        # to a symlink.
+        localtime = self.path("/etc/localtime")
+        if os.path.isfile(localtime) and \
+           not os.path.islink(localtime):
             try:
                 shutil.copy2(self.path("/usr/share/zoneinfo/%s" %(tz,)),
-                                self.path("/etc/localtime"))
+                                localtime)
             except (OSError, shutil.Error) as e:
                 logging.error("Error copying timezone: %s" %(e.strerror,))
-
+        else:
+            if os.path.exists(localtime):
+                os.unlink(localtime)
+            os.symlink("/usr/share/zoneinfo/%s" %(tz,), localtime)
 
 class AuthConfig(KickstartConfig):
     """A class to apply a kickstart authconfig configuration to a system."""
