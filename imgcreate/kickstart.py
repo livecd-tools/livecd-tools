@@ -131,7 +131,7 @@ class LanguageConfig(KickstartConfig):
     def apply(self, kslang):
         lang = kslang.lang or "en_US.UTF-8"
 
-        f = open(self.path("/etc/sysconfig/i18n"), "w+")
+        f = open(self.path("/etc/locale.conf"), "w+")
         f.write("LANG=\"" + lang + "\"\n")
         f.close()
 
@@ -149,23 +149,21 @@ class TimezoneConfig(KickstartConfig):
         tz = kstimezone.timezone or "America/New_York"
         utc = str(kstimezone.isUtc)
 
-        f = open(self.path("/etc/sysconfig/clock"), "w+")
-        f.write("ZONE=\"" + tz + "\"\n")
-        f.write("UTC=" + utc + "\n")
-        f.close()
-
         # /etc/localtime is a symlink with glibc > 2.15-41
-        if os.path.islink(self.path("/etc/localtime")):
-            os.unlink(self.path("/etc/localtime"))
-            os.symlink("/usr/share/zoneinfo/%s" %(tz,),
-                       self.path("/etc/localtime"))
-        else:
+        # but if it exists as a file keep it as a file and fall back
+        # to a symlink.
+        localtime = self.path("/etc/localtime")
+        if os.path.isfile(localtime) and \
+           not os.path.islink(localtime):
             try:
                 shutil.copy2(self.path("/usr/share/zoneinfo/%s" %(tz,)),
-                                self.path("/etc/localtime"))
+                                localtime)
             except (OSError, shutil.Error) as e:
-                log.error("Error copying timezone: %s" %(e.strerror,))
-
+                logging.error("Error copying timezone: %s" %(e.strerror,))
+        else:
+            if os.path.exists(localtime):
+                os.unlink(localtime)
+            os.symlink("/usr/share/zoneinfo/%s" %(tz,), localtime)
 
 class AuthConfig(KickstartConfig):
     """A class to apply a kickstart authconfig configuration to a system."""
@@ -180,23 +178,25 @@ class AuthConfig(KickstartConfig):
 class FirewallConfig(KickstartConfig):
     """A class to apply a kickstart firewall configuration to a system."""
     def apply(self, ksfirewall):
-        if not os.path.exists(self.path("/usr/sbin/lokkit")):
-            return
-        args = ["/usr/sbin/lokkit", "-f", "--quiet", "--nostart"]
-        if ksfirewall.enabled:
-            args.append("--enabled")
-
-            for port in ksfirewall.ports:
-                args.append("--port=%s" %(port,))
-            for svc in ksfirewall.services:
-                args.append("--service=%s" %(svc,))
-            for dev in ksfirewall.trusts:
-                args.append("--trust=%s" %(dev,))
+        args = ["/usr/bin/firewall-offline-cmd"]
+        # enabled is None if neither --enable or --disable is passed
+        # default to enabled if nothing has been set.
+        if ksfirewall.enabled == False:
+            args += ["--disabled"]
         else:
-            args.append("--disabled")
+            args += ["--enabled"]
+
+        for dev in ksfirewall.trusts:
+            args += [ "--trust=%s" % (dev,) ]
+
+        for port in ksfirewall.ports:
+            args += [ "--port=%s" % (port,) ]
+
+        for service in ksfirewall.services:
+            args += [ "--service=%s" % (service,) ]
 
         self.call(args)
-        
+
 class RootPasswordConfig(KickstartConfig):
     """A class to apply a kickstart root password configuration to a system."""
     def unset(self):
@@ -239,18 +239,22 @@ class ServicesConfig(KickstartConfig):
 
 class XConfig(KickstartConfig):
     """A class to apply a kickstart X configuration to a system."""
+    RUNLEVELS = {3: 'multi-user.target', 5: 'graphical.target'}
+
     def apply(self, ksxconfig):
-        if ksxconfig.startX:
-            f = open(self.path("/etc/inittab"), "rw+")
-            buf = f.read()
-            buf = buf.replace("id:3:initdefault", "id:5:initdefault")
-            f.seek(0)
-            f.write(buf)
-            f.close()
         if ksxconfig.defaultdesktop:
             f = open(self.path("/etc/sysconfig/desktop"), "w")
             f.write("DESKTOP="+ksxconfig.defaultdesktop+"\n")
             f.close()
+
+        if ksxconfig.startX:
+            if not os.path.isdir(self.path('/etc/systemd/system')):
+                logging.warning("there is no /etc/systemd/system directory, cannot update default.target!")
+                return
+            default_target = self.path('/etc/systemd/system/default.target')
+            if os.path.islink(default_target):
+                 os.unlink(default_target)
+            os.symlink(self.path('/lib/systemd/system/graphical.target'), default_target)
 
 class RPMMacroConfig(KickstartConfig):
     """A class to apply the specified rpm macros to the filesystem"""
@@ -331,11 +335,6 @@ class NetworkConfig(KickstartConfig):
         else:
             f.write("NETWORKING_IPV6=no\n")
 
-        if hostname:
-            f.write("HOSTNAME=%s\n" % hostname)
-        else:
-            f.write("HOSTNAME=localhost.localdomain\n")
-
         if gateway:
             f.write("GATEWAY=%s\n" % gateway)
 
@@ -355,6 +354,16 @@ class NetworkConfig(KickstartConfig):
         os.chmod(path, 0644)
         f.write("127.0.0.1\t\t%s\n" % localline)
         f.write("::1\t\tlocalhost6.localdomain6 localhost6\n")
+        f.close()
+
+    def write_hostname(self, hostname):
+        if not hostname:
+            return
+
+        path = self.path("/etc/hostname")
+        f = file(path, "w+")
+        os.chmod(path, 0644)
+        f.write("%s\n" % (hostname,))
         f.close()
 
     def write_resolv(self, nodns, nameservers):
@@ -410,6 +419,7 @@ class NetworkConfig(KickstartConfig):
 
         self.write_sysconfig(useipv6, hostname, gateway)
         self.write_hosts(hostname)
+        self.write_hostname(hostname)
         self.write_resolv(nodns, nameservers)
 
 class SelinuxConfig(KickstartConfig):
@@ -431,17 +441,27 @@ class SelinuxConfig(KickstartConfig):
         self.call(["/sbin/setfiles", "-p", "-e", "/proc", "-e", "/sys", "-e", "/dev", selinux.selinux_file_context_path(), "/"])
 
     def apply(self, ksselinux):
-        if os.path.exists(self.path("/usr/sbin/lokkit")):
-            args = ["/usr/sbin/lokkit", "--quiet", "--nostart"]
+        selinux_config = "/etc/selinux/config"
+        if not os.path.exists(self.instroot+selinux_config):
+            return
 
-            if ksselinux.selinux == ksconstants.SELINUX_ENFORCING:
-                args.append("--selinux=enforcing")
-            if ksselinux.selinux == ksconstants.SELINUX_PERMISSIVE:
-                args.append("--selinux=permissive")
-            if ksselinux.selinux == ksconstants.SELINUX_DISABLED:
-                args.append("--selinux=disabled")
+        if ksselinux.selinux == ksconstants.SELINUX_ENFORCING:
+            cmd = "SELINUX=enforcing\n"
+        elif ksselinux.selinux == ksconstants.SELINUX_PERMISSIVE:
+            cmd = "SELINUX=permissive\n"
+        elif ksselinux.selinux == ksconstants.SELINUX_DISABLED:
+            cmd = "SELINUX=disabled\n"
+        else:
+            return
 
-            self.call(args)
+        # Replace the SELINUX line in the config
+        lines = open(self.instroot+selinux_config).readlines()
+        with open(self.instroot+selinux_config, "w") as f:
+            for line in lines:
+                if line.startswith("SELINUX="):
+                    f.write(cmd)
+                else:
+                    f.write(line)
 
         self.relabel(ksselinux)
 
