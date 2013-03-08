@@ -265,7 +265,7 @@ class LiveImageCreatorBase(LoopImageCreator):
         return "vfat msdos ";
 
     def __extra_drivers(self):
-        retval = "sr_mod sd_mod ide-cd cdrom "
+        retval = "sr_mod sd_mod ide-cd cdrom iso9660 "
         for module in self.__modules:
             if module == "=usb":
                 retval = retval + "ehci_hcd uhci_hcd ohci_hcd "
