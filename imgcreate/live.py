@@ -556,14 +556,8 @@ menu separator
         return template % args
 
     def __get_image_stanzas(self, isodir):
-        versions = []
         kernels = self._get_kernel_versions()
-        for kernel in kernels:
-            for version in kernels[kernel]:
-                versions.append(version)
-
         kernel_options = self._get_kernel_options()
-
         checkisomd5 = self._has_checkisomd5()
 
         # Stanzas for insertion into the config template
@@ -572,7 +566,7 @@ menu separator
         check = []
 
         index = "0"
-        for version in versions:
+        for kernel, version in ((k,v) for k in kernels for v in kernels[k]):
             (is_xen, isDracut) = self.__copy_kernel_and_initramfs(isodir, version, index)
             if index == "0":
                 self._isDracut = isDracut
