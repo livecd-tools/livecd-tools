@@ -519,7 +519,7 @@ checkGPT() {
     dev=$1
     getdisk $dev
 
-    if [ "$(/sbin/fdisk -l $device 2>/dev/null |grep -c GPT)" -eq "0" ]; then
+    if [ "$(/sbin/parted -m $device p 2>/dev/null |grep -ic :gpt:)" -eq "0" ]; then
         echo "EFI boot requires a GPT partition table."
         echo "This can be done manually or you can run with --format"
         exitclean
