@@ -194,7 +194,7 @@ class LiveCDYum(yum.YumBase):
                     return True
         return False
 
-            
+
     def runInstall(self):
         os.environ["HOME"] = "/"
         try:
@@ -207,19 +207,19 @@ class LiveCDYum(yum.YumBase):
             return res
         if res != 2:
             raise CreatorError("Failed to build transaction : %s" % str.join("\n", resmsg))
-        
+
         dlpkgs = map(lambda x: x.po, filter(lambda txmbr: txmbr.ts_state in ("i", "u"), self.tsInfo.getMembers()))
         self.downloadPkgs(dlpkgs)
         # FIXME: sigcheck?
-        
+
         self.initActionTs()
         self.populateTs(keepold=0)
         deps = self.ts.check()
         if len(deps) != 0:
-            raise CreatorError("Dependency check failed!")
+            raise CreatorError("Dependency check failed : %s" % "\n".join(deps))
         rc = self.ts.order()
         if rc != 0:
-            raise CreatorError("ordering packages for installation failed!")
+            raise CreatorError("ordering packages for installation failedr. rc = %s" % rc)
 
         # FIXME: callback should be refactored a little in yum 
         sys.path.append('/usr/share/yum-cli')
