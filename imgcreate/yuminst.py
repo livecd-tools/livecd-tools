@@ -36,8 +36,9 @@ class TextProgress(object):
                 hdlr.stream.write(msg)
                 hdlr.stream.flush()
 
-    def start(self, filename, url, *args, **kwargs):
-        self.emit(logging.INFO, "Retrieving %s " % (url,))
+    def start(self, filename=None, url=None, *args, **kwargs):
+        text = kwargs.get("text", "")
+        self.emit(logging.INFO, "Retrieving %s " % (url or text))
         self.url = url
     def update(self, *args):
         pass
