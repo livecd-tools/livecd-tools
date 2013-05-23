@@ -199,9 +199,9 @@ class FirewallConfig(KickstartConfig):
 
 class RootPasswordConfig(KickstartConfig):
     """A class to apply a kickstart root password configuration to a system."""
-    def unset(self):
-        self.call(["/usr/bin/passwd", "-d", "root"])
-        
+    def lock(self):
+        self.call(["/usr/bin/passwd", "-l", "root"])
+
     def set_encrypted(self, password):
         self.call(["/usr/sbin/usermod", "-p", password, "root"])
 
@@ -224,8 +224,9 @@ class RootPasswordConfig(KickstartConfig):
             self.set_encrypted(ksrootpw.password)
         elif ksrootpw.password != "":
             self.set_unencrypted(ksrootpw.password)
-        else:
-            self.unset()
+
+        if ksrootpw.lock:
+            self.lock()
 
 class ServicesConfig(KickstartConfig):
     """A class to apply a kickstart services configuration to a system."""
