@@ -255,7 +255,7 @@ class XConfig(KickstartConfig):
             default_target = self.path('/etc/systemd/system/default.target')
             if os.path.islink(default_target):
                  os.unlink(default_target)
-            os.symlink(self.path('/lib/systemd/system/graphical.target'), default_target)
+            os.symlink('/lib/systemd/system/graphical.target', default_target)
 
 class RPMMacroConfig(KickstartConfig):
     """A class to apply the specified rpm macros to the filesystem"""
