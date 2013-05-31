@@ -941,8 +941,8 @@ if [[ live == $srctype ]]; then
    targets="$TGTMNT/$SYSLINUXPATH"
    [[ -n $efi ]] && targets+=" $TGTMNT$EFI_BOOT"
    [[ -n $xo ]] && targets+=" $TGTMNT/boot/olpc.fth"
-   duTable=($(du -c -B 1M $targets 2> /dev/null || :))
-   tbd=$((tbd + ${duTable[*]: -2:1}))
+   target_size=$(du -s -c -B 1M $targets 2> /dev/null | awk '/total$/ {print $1;}') || :
+   tbd=$((tbd + target_size))
 fi
 
 if [[ -n $skipcompress ]] && [[ -s $SRCMNT/LiveOS/squashfs.img ]]; then
@@ -973,12 +973,11 @@ if [[ live == $srctype ]]; then
     sources+=" $SRCMNT/isolinux $SRCMNT/syslinux"
     [[ -n $efi ]] && sources+=" $SRCMNT$EFI_BOOT"
     [[ -n $xo ]] && sources+=" $SRCMNT/boot/olpc.fth"
-    duTable=($(du -c -B 1M "$thisScriptpath" $sources 2> /dev/null || :))
-    livesize=$((livesize + ${duTable[*]: -2:1}))
+    source_size=$(du -s -c -B 1M "$thisScriptpath" $sources 2> /dev/null | awk '/total$/ {print $1;}') || :
+    livesize=$((livesize + source_size))
 fi
 
-freespace=($(df -B 1M --total $TGTDEV))
-freespace=${freespace[*]: -2:1}
+freespace=$(df -B 1M --total $TGTDEV | awk '/^total/ {print $4;}')
 
 if [[ live == $srctype ]]; then
     tba=$((overlaysizemb + homesizemb + livesize + swapsizemb))
