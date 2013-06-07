@@ -35,6 +35,7 @@ shortusage() {
                        [--compress] [--skipcompress] [--swap-size-mb <size>]
                        [--overlay-size-mb <size>] [--home-size-mb <size>]
                        [--delete-home] [--crypted-home] [--unencrypted-home]
+                       [--updates updates.img]
                        <source> <target device>
 
     (Enter livecd-iso-to-disk --help on the command line for more information.)"
@@ -243,6 +244,10 @@ usage() {
 
     --unencrypted-home
         Prevents the default option to encrypt a new persistent home directory.
+
+    --updates updates.img
+        Setup inst.updates to point to an updates image on the device. Anaconda
+        uses this for testing updates to an iso without needing to make a new iso.
 
     CONTRIBUTORS
 
@@ -702,6 +707,7 @@ imgtype=
 packages=
 LIVEOS=LiveOS
 HOMEFILE="home.img"
+updates=
 
 if [[ "$*" =~ "--help" ]]; then
     usage
@@ -789,6 +795,10 @@ while [ $# -gt 2 ]; do
             ;;
         --delete-home)
             keephome=""
+            ;;
+        --updates)
+            updates=$2
+            shift
             ;;
         *)
             echo "invalid arg -- $1"
@@ -1187,6 +1197,11 @@ if [ "$srctype" = "live" ]; then
     fi
 fi
 
+# Setup the updates.img
+if [ -n "$updates" ]; then
+    copyFile "$updates" "$TGTMNT/updates.img"
+    kernelargs+=" inst.updates=hd:$TGTLABEL:/updates.img"
+fi
 
 echo "Updating boot config file"
 # adjust label and fstype
