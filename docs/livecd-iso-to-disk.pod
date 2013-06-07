@@ -6,7 +6,7 @@ livecd-iso-to-disk - installs bootable Live images onto USB/SD storage devices.
 
 =head1 SYNOPSIS
 
-B<livecd-iso-to-disk>  [--help] [--noverify] [--format] [--reset-mbr] [--efi] [--skipcopy] [--force] [--xo] [--xo-no-home] [--timeout <time>] [--totaltimeout <time>] [--extra-kernel-args <args>] [--multi] [--livedir <dir>] [--compress] [--skipcompress] [--swap-size-mb <size>] [--overlay-size-mb <size>] [--home-size-mb <size>] [--delete-home] [--crypted-home] [--unencrypted-home] <source> <target device>
+B<livecd-iso-to-disk>  [--help] [--noverify] [--format] [--reset-mbr] [--efi] [--skipcopy] [--force] [--xo] [--xo-no-home] [--timeout <time>] [--totaltimeout <time>] [--extra-kernel-args <args>] [--multi] [--livedir <dir>] [--compress] [--skipcompress] [--swap-size-mb <size>] [--overlay-size-mb <size>] [--home-size-mb <size>] [--delete-home] [--crypted-home] [--unencrypted-home] [--updates updates.img] <source> <target device>
 
 Simplest
 
@@ -134,6 +134,10 @@ Specifies the default option to encrypt a new persistent home directory if --hom
 =item --unencrypted-home
 
 Prevents the default option to encrypt a new persistent home directory.
+
+=item --updates updates.img
+
+Setup inst.updates to point to an updates image on the device. Anaconda uses this for testing updates to an iso without needing to make a new iso.
 
 =back
 
