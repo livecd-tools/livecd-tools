@@ -138,10 +138,21 @@ class LanguageConfig(KickstartConfig):
 class KeyboardConfig(KickstartConfig):
     """A class to apply a kickstart keyboard configuration to a system."""
     def apply(self, kskeyboard):
-        k = keyboard.Keyboard()
-        if kskeyboard.keyboard:
-            k.set(kskeyboard.keyboard)
-        k.write(self.instroot)
+        vcconf_file = self.path("/etc/vconsole.conf")
+        DEFAULT_VC_FONT = "latarcyrheb-sun16"
+
+        if not kskeyboard.keyboard:
+            kskeyboard.keyboard = "us"
+
+        try:
+            with open(vcconf_file, "w") as f:
+                f.write('KEYMAP="%s"\n' % kskeyboard.keyboard)
+
+                # systemd now defaults to a font that cannot display non-ascii
+                # characters, so we have to tell it to use a better one
+                f.write('FONT="%s"\n' % DEFAULT_VC_FONT)
+        except IOError as e:
+            logging.error("Cannot write vconsole configuration file: %s" % e)
 
 class TimezoneConfig(KickstartConfig):
     """A class to apply a kickstart timezone configuration to a system."""
