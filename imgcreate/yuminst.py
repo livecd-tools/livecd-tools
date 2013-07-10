@@ -215,7 +215,7 @@ class LiveCDYum(yum.YumBase):
         self.populateTs(keepold=0)
         deps = self.ts.check()
         if len(deps) != 0:
-            raise CreatorError("Dependency check failed : %s" % "\n".join(deps))
+            raise CreatorError("Dependency check failed : %s" % "\n".join([str(d) for d in deps]))
         rc = self.ts.order()
         if rc != 0:
             raise CreatorError("ordering packages for installation failedr. rc = %s" % rc)
