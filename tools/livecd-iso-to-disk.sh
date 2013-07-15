@@ -35,7 +35,7 @@ shortusage() {
                        [--compress] [--skipcompress] [--swap-size-mb <size>]
                        [--overlay-size-mb <size>] [--home-size-mb <size>]
                        [--delete-home] [--crypted-home] [--unencrypted-home]
-                       [--updates updates.img]
+                       [--updates updates.img] [--ks kickstart]
                        <source> <target device>
 
     (Enter livecd-iso-to-disk --help on the command line for more information.)"
@@ -248,6 +248,10 @@ usage() {
     --updates updates.img
         Setup inst.updates to point to an updates image on the device. Anaconda
         uses this for testing updates to an iso without needing to make a new iso.
+
+    --ks kickstart
+        Setup inst.ks to point to an kickstart file on the device. Use this for
+        automating installs on boot.
 
     CONTRIBUTORS
 
@@ -708,6 +712,7 @@ packages=
 LIVEOS=LiveOS
 HOMEFILE="home.img"
 updates=
+ks=
 
 if [[ "$*" =~ "--help" ]]; then
     usage
@@ -798,6 +803,10 @@ while [ $# -gt 2 ]; do
             ;;
         --updates)
             updates=$2
+            shift
+            ;;
+        --ks)
+            ks=$2
             shift
             ;;
         *)
@@ -1201,6 +1210,12 @@ fi
 if [ -n "$updates" ]; then
     copyFile "$updates" "$TGTMNT/updates.img"
     kernelargs+=" inst.updates=hd:$TGTLABEL:/updates.img"
+fi
+
+# Setup the kickstart
+if [ -n "$ks" ]; then
+    copyFile "$ks" "$TGTMNT/ks.cfg"
+    kernelargs+=" inst.ks=hd:$TGTLABEL:/ks.cfg"
 fi
 
 echo "Updating boot config file"
