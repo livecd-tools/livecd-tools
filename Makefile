@@ -28,10 +28,10 @@ install: man
 	$(INSTALL_PROGRAM) -D tools/livecd-iso-to-pxeboot.sh $(DESTDIR)/usr/bin/livecd-iso-to-pxeboot
 	$(INSTALL_PROGRAM) -D tools/edit-livecd $(DESTDIR)/usr/bin/edit-livecd
 	$(INSTALL_PROGRAM) -D tools/mkbiarch.py $(DESTDIR)/usr/bin/mkbiarch
-	$(INSTALL_DATA) -D AUTHORS $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)/AUTHORS
-	$(INSTALL_DATA) -D COPYING $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)/COPYING
-	$(INSTALL_DATA) -D README $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)/README
-	$(INSTALL_DATA) -D HACKING $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)/HACKING
+	$(INSTALL_DATA) -D AUTHORS $(DESTDIR)/usr/share/doc/livecd-tools/AUTHORS
+	$(INSTALL_DATA) -D COPYING $(DESTDIR)/usr/share/doc/livecd-tools/COPYING
+	$(INSTALL_DATA) -D README $(DESTDIR)/usr/share/doc/livecd-tools/README
+	$(INSTALL_DATA) -D HACKING $(DESTDIR)/usr/share/doc/livecd-tools/HACKING
 	mkdir -p $(DESTDIR)/usr/share/livecd-tools/
 	mkdir -p $(DESTDIR)/$(PYTHONDIR)/imgcreate
 	$(INSTALL_PYTHON) -D imgcreate/*.py $(DESTDIR)/$(PYTHONDIR)/imgcreate/
