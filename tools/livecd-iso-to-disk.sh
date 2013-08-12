@@ -214,7 +214,7 @@ usage() {
         LiveOS installation.)  One way to conserve the unrecoverable, overlay
         file space, is to specify a persistent home folder for user files, see
         --home-size-mb below.  The target storage device must have enough free
-        space for the image and the overlay.  A maximum <size> of 2047 MiB is
+        space for the image and the overlay.  A maximum <size> of 4095 MiB is
         permitted for vfat-formatted devices.  If there is insufficient room on
         your device, you will be given information to help in adjusting your
         settings.
@@ -229,7 +229,7 @@ usage() {
         have enough free space for the image, any overlay, and the home
         directory.  Note that the --delete-home option must also be selected to
         replace an existing persistent home with a new, empty one.  A maximum
-        <size> of 2047 MiB is permitted for vfat-formatted devices.  If there is
+        <size> of 4095 MiB is permitted for vfat-formatted devices.  If there is
         insufficient room on your device, you will be given information to help
         in adjusting your settings.
 
@@ -897,8 +897,8 @@ checkMBR $TGTDEV
 
 
 if [ "$overlaysizemb" -gt 0 ]; then
-    if [ "$TGTFS" = "vfat" -a "$overlaysizemb" -gt 2047 ]; then
-        echo "Can't have an overlay of 2048MB or greater on VFAT"
+    if [ "$TGTFS" = "vfat" -a "$overlaysizemb" -gt 4095 ]; then
+        echo "Can't have an overlay of 4095MB or greater on VFAT"
         exitclean
     fi
     LABEL=$(/sbin/blkid -s LABEL -o value $TGTDEV)
@@ -910,15 +910,15 @@ if [ "$overlaysizemb" -gt 0 ]; then
 fi
 
 if [ "$homesizemb" -gt 0 -a "$TGTFS" = "vfat" ]; then
-    if [ "$homesizemb" -gt 2047 ]; then
-        echo "Can't have a home overlay greater than 2048MB on VFAT"
+    if [ "$homesizemb" -gt 4095 ]; then
+        echo "Can't have a home overlay greater than 4095MB on VFAT"
         exitclean
     fi
 fi
 
 if [ "$swapsizemb" -gt 0 -a "$TGTFS" = "vfat" ]; then
-    if [ "$swapsizemb" -gt 2047 ]; then
-        echo "Can't have a swap file greater than 2048MB on VFAT"
+    if [ "$swapsizemb" -gt 4095 ]; then
+        echo "Can't have a swap file greater than 4095MB on VFAT"
         exitclean
     fi
 fi
@@ -968,9 +968,9 @@ if [[ -n $skipcompress ]] && [[ -s $SRCMNT/LiveOS/squashfs.img ]]; then
     if mount -o loop $SRCMNT/LiveOS/squashfs.img $SRCMNT; then
         livesize=($(du -B 1M --apparent-size $SRCMNT/LiveOS/ext3fs.img))
         umount $SRCMNT
-        if ((livesize > 2048)) &&  [[ vfat == $TGTFS ]]; then
+        if ((livesize > 4095)) &&  [[ vfat == $TGTFS ]]; then
             echo "
-            An uncompressed image size greater than 2048 MB is not suitable
+            An uncompressed image size greater than 4095 MB is not suitable
             for a VFAT-formatted device.  The compressed SquashFS will be
             copied to the target device.
             "
