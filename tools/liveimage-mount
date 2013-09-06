@@ -27,6 +27,7 @@ import getopt
 import tempfile
 import subprocess
 
+from imgcreate.errors import *
 
 def usage(ecode):
     print """Usage:
