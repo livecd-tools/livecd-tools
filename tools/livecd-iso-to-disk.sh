@@ -35,7 +35,7 @@ shortusage() {
                        [--compress] [--skipcompress] [--swap-size-mb <size>]
                        [--overlay-size-mb <size>] [--home-size-mb <size>]
                        [--delete-home] [--crypted-home] [--unencrypted-home]
-                       [--updates updates.img] [--ks kickstart]
+                       [--updates updates.img] [--ks kickstart] [--label label]
                        <source> <target device>
 
     (Enter livecd-iso-to-disk --help on the command line for more information.)"
@@ -253,6 +253,10 @@ usage() {
         Setup inst.ks to point to an kickstart file on the device. Use this for
         automating installs on boot.
 
+    --label label
+       Specifies a specific label instead of default LIVE. Useful when you do
+       unattended installs which pas a label to inst.ks
+
     CONTRIBUTORS
 
     livecd-iso-to-disk: David Zeuthen, Jeremy Katz, Douglas McClendon,
@@ -445,7 +449,7 @@ createGPTLayout() {
     sleep 5
     TGTDEV=${device}1
     umount $TGTDEV &> /dev/null || :
-    /sbin/mkdosfs -n LIVE $TGTDEV
+    /sbin/mkdosfs -n $label $TGTDEV
     TGTLABEL="UUID=$(/sbin/blkid -s UUID -o value $TGTDEV)"
 }
 
@@ -520,7 +524,7 @@ createEXTFSLayout() {
     else
         mkfs=/sbin/mkfs.ext4
     fi
-    $mkfs -L LIVE $TGTDEV
+    $mkfs -L $label $TGTDEV
     TGTLABEL="UUID=$(/sbin/blkid -s UUID -o value $TGTDEV)"
 }
 
@@ -564,21 +568,21 @@ checkFilesystem() {
     fi
 
     TGTLABEL=$(/sbin/blkid -s LABEL -o value $dev)
-    if [ "$TGTLABEL" != "LIVE" ]; then
+    if [ "$TGTLABEL" != "$label" ]; then
         if [ "$TGTFS" = "vfat" -o "$TGTFS" = "msdos" ]; then
-            /sbin/dosfslabel $dev LIVE
+            /sbin/dosfslabel $dev $label
             if [ $? -gt 0 ]; then
                 echo "dosfslabel failed on $dev, device not setup"
                 exitclean
             fi
         elif [ "$TGTFS" = "ext2" -o "$TGTFS" = "ext3" -o "$TGTFS" = "ext4" ]; then
-            /sbin/e2label $dev LIVE
+            /sbin/e2label $dev $label
             if [ $? -gt 0 ]; then
                 echo "e2label failed on $dev, device not setup"
                 exitclean
             fi
         else
-            echo "Unknown filesystem type. Try setting its label to LIVE and re-running"
+            echo "Unknown filesystem type. Try setting its label to $label and re-running"
             exitclean
         fi
     fi
@@ -588,7 +592,7 @@ checkFilesystem() {
     if [ -n "$TGTUUID" ]; then
         TGTLABEL="UUID=$TGTUUID"
     else
-        TGTLABEL="LABEL=LIVE"
+        TGTLABEL="LABEL=$label"
     fi
 
     if [ "$TGTFS" = "vfat" -o "$TGTFS" = "msdos" ]; then
@@ -713,6 +717,7 @@ LIVEOS=LiveOS
 HOMEFILE="home.img"
 updates=
 ks=
+label="LIVE"
 
 if [[ "$*" =~ "--help" ]]; then
     usage
@@ -809,6 +814,10 @@ while [ $# -gt 2 ]; do
             ks=$2
             shift
             ;;
+	--label)
+	    label=$2
+	    shift
+	    ;;
         *)
             echo "invalid arg -- $1"
             shortusage
@@ -1219,7 +1228,7 @@ fi
 
 echo "Updating boot config file"
 # adjust label and fstype
-sed -i -e "s/CDLABEL=[^ ]*/$TGTLABEL/" -e "s/rootfstype=[^ ]*/rootfstype=$TGTFS/" -e "s/LABEL=[^ ]*/$TGTLABEL/" $BOOTCONFIG  $BOOTCONFIG_EFI
+sed -i -e "s/CDLABEL=[^ ]*/$TGTLABEL/" -e "s/rootfstype=[^ ]*/rootfstype=$TGTFS/" -e "s/LABEL=[^ :]*/$TGTLABEL/" $BOOTCONFIG  $BOOTCONFIG_EFI
 if [ -n "$kernelargs" ]; then
     sed -i -e "s;initrd.\?\.img;& ${kernelargs};" $BOOTCONFIG
     if [ -n "$efi" ]; then
