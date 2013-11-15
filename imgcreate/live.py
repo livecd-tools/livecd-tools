@@ -605,7 +605,7 @@ menu separator
                                            liveargs = kern_opts,
                                            long = "Start " + long + " in ^basic graphics mode.",
                                            short = "basic" + index,
-                                           extra = "xdriver=vesa nomodeset",
+                                           extra = "nomodeset",
                                            help = "Try this option out if you're having trouble starting.",
                                            index = index))
 
