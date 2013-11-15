@@ -791,6 +791,16 @@ search --no-floppy --set=root -l '%(isolabel)s'
                                                    long = "Test this media & start " + self.product,
                                                    extra = "rd.live.check",
                                                    index = index)
+            cfg += """
+submenu 'Troubleshooting -->' {
+"""
+            cfg += self.__get_efi_image_stanza(fslabel = self.fslabel,
+                                               liveargs = kernel_options,
+                                               long = "Start " + self.product + " in basic graphics mode",
+                                               extra = "nomodeset", index = index)
+
+            cfg+= """}
+"""
             break
 
         return cfg
