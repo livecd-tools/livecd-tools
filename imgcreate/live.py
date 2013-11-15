@@ -734,7 +734,7 @@ menu end
 
     def __get_basic_efi_config(self, **args):
         return """
-set default="0"
+set default="1"
 
 function load_video {
   insmod efi_gop
@@ -783,12 +783,12 @@ search --no-floppy --set=root -l '%(isolabel)s'
                 continue
             cfg += self.__get_efi_image_stanza(fslabel = self.fslabel,
                                                liveargs = kernel_options,
-                                               long = name,
+                                               long = "Start " + self.product,
                                                extra = "", index = index)
             if checkisomd5:
                 cfg += self.__get_efi_image_stanza(fslabel = self.fslabel,
                                                    liveargs = kernel_options,
-                                                   long = "Verify and Boot " + name,
+                                                   long = "Test this media & start " + self.product,
                                                    extra = "rd.live.check",
                                                    index = index)
             break
