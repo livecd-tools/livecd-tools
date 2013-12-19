@@ -719,12 +719,9 @@ updates=
 ks=
 label="LIVE"
 
-if [[ "$*" =~ "--help" ]]; then
-    usage
-fi
-while [ $# -gt 2 ]; do
+while true ; do
     case $1 in
-        --help)
+        --help | -h | -?)
             usage
             ;;
         --noverify)
@@ -818,17 +815,26 @@ while [ $# -gt 2 ]; do
 	    label=$2
 	    shift
 	    ;;
-        *)
+        --*)
             echo "invalid arg -- $1"
             shortusage
             exit 1
+            ;;
+        *)
+            break
             ;;
     esac
     shift
 done
 
-SRC=$(readlink -f "$1")
-TGTDEV=$(readlink -f "$2")
+if [ $# -ne 2 ]; then
+    echo "Missing arguments"
+    shortusage
+    exit 1
+fi
+
+SRC=$(readlink -f "$1") || :
+TGTDEV=$(readlink -f "$2") || :
 
 if [ -z "$SRC" ]; then
     echo "Missing source"
