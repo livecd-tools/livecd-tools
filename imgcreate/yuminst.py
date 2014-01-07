@@ -158,7 +158,7 @@ class LiveCDYum(yum.YumBase):
                     option = option.replace("$releasever", self.releasever)
                 else:
                     try:
-                        option = option.replace("$releasever", yum.config._getsysver("/", ("system-release(release), "redhat-release")))
+                        option = option.replace("$releasever", yum.config._getsysver("/", ("system-release(release)", "redhat-release")))
                     except yum.Errors.YumBaseError:
                         raise CreatorError("$releasever in repo url, but no releasever set")
             return option
