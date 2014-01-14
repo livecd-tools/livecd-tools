@@ -58,7 +58,7 @@ class LiveImageEditor(LiveImageCreator):
 
     """
 
-    def __init__(self, name):
+    def __init__(self, name, docleanup=True):
         """Initialize a LiveImageEditor instance.
 
         creates a dummy instance of LiveImageCreator
@@ -124,6 +124,8 @@ class LiveImageEditor(LiveImageCreator):
                 if fields[-2] == "selinuxfs":
                     self.__ImageCreator__selinux_mountpoint = fields[4]
                     break
+
+        self.docleanup = docleanup
 
     # properties
     def __get_image(self):
@@ -611,6 +613,9 @@ def parse_options(args):
     parser.add_option("", "--skip-minimize", action="store_true",
                       dest="skip_minimize", default=False,
                       help="Specify no osmin.img minimal snapshot.")
+    parser.add_option("", "--nocleanup", action="store_true",
+                      dest="nocleanup", default=False,
+                      help="Skip cleanup of temporary files")
 
     setup_logging(parser)
 
@@ -673,7 +678,7 @@ def main():
         if output == '/dev':
             output = options.tmpdir
 
-    editor = LiveImageEditor(name)
+    editor = LiveImageEditor(name, docleanup=not options.nocleanup)
     editor._exclude = options.exclude
     editor._exclude_file = options.exclude_file
     editor._include = options.include
