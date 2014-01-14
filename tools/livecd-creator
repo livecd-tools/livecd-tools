@@ -23,7 +23,6 @@ import sys
 import time
 import optparse
 import logging
-import selinux
 
 import imgcreate
 from imgcreate.fs import makedirs
@@ -144,12 +143,6 @@ def main():
         print >> sys.stderr, "You must run %s as root" % sys.argv[0]
         return 1
 
-    # Set selinux to Permissive if it is enforcing
-    selinux_enforcing = False
-    if selinux.is_selinux_enabled() and selinux.security_getenforce():
-        selinux_enforcing = True
-        selinux.security_setenforce(0)
-
     if options.fslabel:
         fslabel = options.fslabel
         name = fslabel
@@ -203,8 +196,6 @@ def main():
     else:
         # Cannot happen, we validate this when parsing options.
         logging.error(u"'%s' is not a valid image type" % options.image_type)
-        if selinux_enforcing:
-            selinux.security_setenforce(1)
         return 1
 
     creator.compress_type = options.compress_type
@@ -228,8 +219,6 @@ def main():
         return 1
     finally:
         creator.cleanup()
-        if selinux_enforcing:
-            selinux.security_setenforce(1)
 
     return 0
 
