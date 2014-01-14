@@ -42,7 +42,9 @@ class CreatorError(Exception):
             return repr(self.message)
 
     def __unicode__(self):
-        return unicode(self.message)
+        if not self.message:
+            return unicode("")
+        return unicode(self.message.decode("utf8"))
 
 class KickstartError(CreatorError):
     pass
