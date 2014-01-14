@@ -25,7 +25,6 @@ import optparse
 import logging
 
 import imgcreate
-from imgcreate.fs import makedirs
 
 class Usage(Exception):
     def __init__(self, msg = None, no_error = False):
@@ -105,7 +104,7 @@ def parse_options(args):
         else:
             options.image_type = 'livecd'
     if options.image_type not in ('livecd', 'image'):
-        raise Usage("'%s' is a recognized image type" % options.image_type)
+        raise Usage("'%s' is not a recognized image type" % options.image_type)
 
     # image-create compatibility: Last argument is kickstart file
     if len(args) == 1:
@@ -176,26 +175,26 @@ def main():
 
     ks = imgcreate.read_kickstart(options.kscfg)
 
-    if options.image_type == 'livecd':
-        creator = imgcreate.LiveImageCreator(ks, name,
-                                        fslabel=fslabel,
-                                        releasever=options.releasever,
-                                        tmpdir=os.path.abspath(options.tmpdir),
-                                        useplugins=options.plugins,
-                                        title=title, product=product,
-                                        cacheonly=options.cacheonly,
-                                        docleanup=not options.nocleanup)
-    elif options.image_type == 'image':
-        creator = imgcreate.LoopImageCreator(ks, name,
-                                        fslabel=fslabel,
-                                        releasever=options.releasever,
-                                        useplugins=options.plugins,
-                                        tmpdir=os.path.abspath(options.tmpdir),
-                                        cacheonly=options.cacheonly,
-                                        docleanup=not options.nocleanup)
-    else:
-        # Cannot happen, we validate this when parsing options.
-        logging.error(u"'%s' is not a valid image type" % options.image_type)
+    try:
+        if options.image_type == 'livecd':
+            creator = imgcreate.LiveImageCreator(ks, name,
+                                            fslabel=fslabel,
+                                            releasever=options.releasever,
+                                            tmpdir=os.path.abspath(options.tmpdir),
+                                            useplugins=options.plugins,
+                                            title=title, product=product,
+                                            cacheonly=options.cacheonly,
+                                            docleanup=not options.nocleanup)
+        elif options.image_type == 'image':
+            creator = imgcreate.LoopImageCreator(ks, name,
+                                            fslabel=fslabel,
+                                            releasever=options.releasever,
+                                            useplugins=options.plugins,
+                                            tmpdir=os.path.abspath(options.tmpdir),
+                                            cacheonly=options.cacheonly,
+                                            docleanup=not options.nocleanup)
+    except imgcreate.CreatorError as e:
+        logging.error(u"%s creation failed: %s", options.image_type, e)
         return 1
 
     creator.compress_type = options.compress_type
