@@ -567,7 +567,7 @@ checkFilesystem() {
         fi
     fi
 
-    if [ "$TGTFS" = "ext2" -o "$TGTFS" = "ext3" -o "$TGTFS" = "ext4" -a ! -x /sbin/extlinux ]; then
+    if [ "$TGTFS" = "ext2" -o "$TGTFS" = "ext3" -o "$TGTFS" = "ext4" ] && [ ! -x /usr/sbin/extlinux ]; then
         echo "Target filesystem ($TGTFS) requires syslinux-extlinux to be installed."
         exitclean
     fi
