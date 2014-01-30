@@ -563,6 +563,11 @@ checkFilesystem() {
         fi
     fi
 
+    if [ "$TGTFS" = "ext2" -o "$TGTFS" = "ext3" -o "$TGTFS" = "ext4" ] && [ ! -x /usr/sbin/extlinux ]; then
+        echo "Target filesystem ($TGTFS) requires syslinux-extlinux to be installed."
+        exitclean
+    fi
+
     TGTLABEL=$(/sbin/blkid -s LABEL -o value $dev)
     if [ "$TGTLABEL" != "LIVE" ]; then
         if [ "$TGTFS" = "vfat" -o "$TGTFS" = "msdos" ]; then
