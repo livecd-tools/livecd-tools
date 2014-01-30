@@ -174,6 +174,9 @@ def main():
     logging.info("Using title '%s' and product '%s'" % (title, product))
 
     ks = imgcreate.read_kickstart(options.kscfg)
+    if not ks.handler.repo.seen:
+        print >> sys.stderr, "Kickstart (%s) must have at least one repository." % (options.kscfg)
+        return 1
 
     try:
         if options.image_type == 'livecd':
