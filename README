@@ -1,9 +1,9 @@
 
                        The Fedora live CD tools
                     David Zeuthen <davidz@redhat.com>
- 		    Jeremy Katz <katzj@redhat.com>
+                    Jeremy Katz <katzj@redhat.com>
 
-                    Last updated: October 9 2007 (v0.5)
+                    Last updated: March 10, 2014 (v20.5)
 
 This project concerns tools to generate live CD's on Fedora based
 systems including derived distributions such as RHEL, CentOS and
@@ -30,7 +30,7 @@ so on.
 Another design goal is that the live CD should be ''installable'',
 ie. an user should be able to install the bits from the live CD onto
 his hard disk without this process requiring network access or
-additional media. (NOTE: this feature is not yet implemented)
+additional media.
 
 Finally, another design goal is that the tool set itself should be
 separate from configuration; the same unmodified tool should be usable
@@ -93,7 +93,7 @@ In a nutshell, the livecd-creator program
 The command
 
 # livecd-creator \
-  --config=/usr/share/livecd-tools/livecd-fedora-minimal.ks
+  --config=/usr/share/doc/livecd-tools/livecd-fedora-minimal.ks
 
 will create a live CD that will boot to a login prompt. Not that since
 no configuration is done the user will not be able to login to the
@@ -106,10 +106,11 @@ same format as installing a system via kickstart.  They can include
 some basic system configuration items, the package manifest and a
 script to be run at the end of the build process.
 
-For the Fedora project, there are currently a variety of different
-live CD configuration files.  These include a minimal live image
-(livecd-fedora-minimal.ks), a complete desktop image
-(livecd-fedora-desktop.ks) and others.
+For the Fedora project, there are currently a variety of different live CD
+configuration files.  The spin-kickstarts package includes all of the
+kickstarts used to create the various spins. These include a minimal live image
+(livecd-fedora-minimal.ks), a complete desktop image (livecd-fedora-desktop.ks)
+and others.
 
 2.4 EXAMPLE: SPINNING THE FEDORA DESKTOP LIVE CD
 
@@ -117,8 +118,8 @@ Assuming that you use the livecd-fedora-desktop.ks configuration file,
 then the following command
 
 # livecd-creator \
-  --config=/usr/share/livecd-tools/livecd-fedora-desktop.ks \
-  --fslabel=Fedora-7-LiveCD-1-foo
+  --config=/usr/share/spin-kickstarts/fedora-livecd-desktop.ks \
+  --fslabel=Fedora-20-LiveCD-1-foo
 
 will create a live CD called "Fedora-7-LiveCD-1-foo". The name
 given by --fslabel is used.
