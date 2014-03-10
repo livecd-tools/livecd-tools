@@ -112,7 +112,7 @@ def parse_options(args):
     if len(args):
         raise Usage("Extra arguments given")
 
-    if not options.kscfg:
+    if not options.kscfg or not os.path.exists(options.kscfg):
         raise Usage("Kickstart file must be provided")
     if options.base_on and not os.path.isfile(options.base_on):
         raise Usage("Image file '%s' does not exist" %(options.base_on,))
