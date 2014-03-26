@@ -23,7 +23,7 @@ import logging
 
 import yum
 import rpmUtils
-import pykickstart.parser
+from pykickstart.constants import GROUP_DEFAULT, GROUP_REQUIRED, GROUP_ALL
 
 from imgcreate.errors import *
 
@@ -136,13 +136,13 @@ class LiveCDYum(yum.YumBase):
         else:
             logging.warn("No such package %s to remove" %(pkg,))
 
-    def selectGroup(self, grp, include = pykickstart.parser.GROUP_DEFAULT):
+    def selectGroup(self, grp, include = GROUP_DEFAULT):
         # default to getting mandatory and default packages from a group
         # unless we have specific options from kickstart
         package_types = ['mandatory', 'default']
-        if include == pykickstart.parser.GROUP_REQUIRED:
+        if include == GROUP_REQUIRED:
             package_types.remove('default')
-        elif include == pykickstart.parser.GROUP_ALL:
+        elif include == GROUP_ALL:
             package_types.append('optional')
         yum.YumBase.selectGroup(self, grp, group_package_types=package_types)
 
