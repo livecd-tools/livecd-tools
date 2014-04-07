@@ -560,22 +560,22 @@ checkMBR $USBDEV
 
 
 if [ "$overlaysizemb" -gt 0 -a "$USBFS" = "vfat" ]; then
-    if [ "$overlaysizemb" -gt 2047 ]; then
-        echo "Can't have an overlay of 2048MB or greater on VFAT"
+    if [ "$overlaysizemb" -gt 4095 ]; then
+        echo "Can't have an overlay of 4095MB or greater on VFAT"
         exitclean
     fi
 fi
 
 if [ "$homesizemb" -gt 0 -a "$USBFS" = "vfat" ]; then
-    if [ "$homesizemb" -gt 2047 ]; then
-        echo "Can't have a home overlay greater than 2048MB on VFAT"
+    if [ "$homesizemb" -gt 4095 ]; then
+        echo "Can't have a home overlay greater than 4095MB on VFAT"
         exitclean
     fi
 fi
 
 if [ "$swapsizemb" -gt 0 -a "$USBFS" = "vfat" ]; then
-    if [ "$swapsizemb" -gt 2047 ]; then
-        echo "Can't have a swap file greater than 2048MB on VFAT"
+    if [ "$swapsizemb" -gt 4095 ]; then
+        echo "Can't have a swap file greater than 4095MB on VFAT"
         exitclean
     fi
 fi
