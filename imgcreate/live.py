@@ -428,7 +428,7 @@ class x86LiveImageCreator(LiveImageCreatorBase):
         return "mboot.c32"
 
     def __copy_syslinux_files(self, isodir, menu, mboot = None):
-        files = ["isolinux.bin", menu]
+        files = ["isolinux.bin", "ldlinux.c32", "libcom32.c32", "libutil.c32", menu]
         if mboot:
             files += [mboot]
 
