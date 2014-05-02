@@ -630,19 +630,6 @@ def get_fsvalue(filesystem, tag):
 
     return fs_type.rstrip()
 
-def rebuild_iso_symlinks(isodir):
-    # remove duplicate files and rebuild symlinks to reduce iso size
-    efi_vmlinuz = "%s/EFI/BOOT/vmlinuz0" % isodir
-    isolinux_vmlinuz = "%s/isolinux/vmlinuz0" % isodir
-    efi_initrd = "%s/EFI/BOOT/initrd0.img" % isodir
-    isolinux_initrd = "%s/isolinux/initrd0.img" % isodir
-
-    if os.path.exists(efi_vmlinuz):
-        os.remove(efi_vmlinuz)
-        os.remove(efi_initrd)
-        os.symlink(isolinux_vmlinuz,efi_vmlinuz)
-        os.symlink(isolinux_initrd,efi_initrd)
-
 def main():
     # LiveOS set to <LIVEIMG.src>
     (LiveOS, options) = parse_options(sys.argv[1:])
@@ -699,7 +686,6 @@ def main():
             print "Launching shell. Exit to continue."
             print "----------------------------------"
             editor.launch_shell()
-        rebuild_iso_symlinks(editor._LiveImageCreatorBase__isodir)
         editor.unmount()
         editor.package(output)
         logging.info("%s.iso saved to %s"  % (editor.name, output))
