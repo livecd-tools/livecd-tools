@@ -175,7 +175,7 @@ class FirewallConfig(KickstartConfig):
     def apply(self, ksfirewall):
         if not os.path.exists(self.path("/usr/sbin/lokkit")):
             return
-        args = ["/usr/sbin/lokkit", "-f", "--quiet", "--nostart"]
+        args = ["/usr/sbin/lokkit", "--quiet", "--nostart"]
         if ksfirewall.enabled:
             args.append("--enabled")
 
