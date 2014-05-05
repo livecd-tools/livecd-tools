@@ -1196,9 +1196,9 @@ if [ -n "$packages" -a -z "$skipcopy" ]; then
         copyFile "$SRC" "$TGTMNT/"
 
         # Setup a repo= to point to the .iso
-        sed -i -e "s;initrd.img;initrd.img repo=hd:$TGTLABEL:/;g" $BOOTCONFIG
+        sed -i -e "s;initrd.img;initrd.img inst.repo=hd:$TGTLABEL:/;g" $BOOTCONFIG
         if [ -n "$efi" ]; then
-            sed -i -e "s;vmlinuz;vmlinuz repo=hd:$TGTLABEL:/;g" $BOOTCONFIG_EFI
+            sed -i -e "s;vmlinuz;vmlinuz inst.repo=hd:$TGTLABEL:/;g" $BOOTCONFIG_EFI
         fi
     else
         echo "Copying package data from $SRC to device"
@@ -1262,13 +1262,13 @@ fi
 # DVD Installer for netinst
 if [ "$srctype" != "live" ]; then
     if [ "$imgtype" = "install" ]; then
-        sed -i -e "s;initrd.img;initrd.img stage2=hd:$TGTLABEL:/images/install.img;g" $BOOTCONFIG
+        sed -i -e "s;initrd.img;initrd.img inst.stage2=hd:$TGTLABEL:/images/install.img;g" $BOOTCONFIG
         if [ -n "$efi" ]; then
-            sed -i -e "s;vmlinuz;vmlinuz stage2=hd:$TGTLABEL:/images/install.img;g" $BOOTCONFIG_EFI
+            sed -i -e "s;vmlinuz;vmlinuz inst.stage2=hd:$TGTLABEL:/images/install.img;g" $BOOTCONFIG_EFI
         fi
     else
         # The initrd has everything, so no stage2
-        sed -i -e "s;stage2=\S*;;g" $BOOTCONFIG $BOOTCONFIG_EFI
+        sed -i -e "s;\S*stage2=\S*;;g" $BOOTCONFIG $BOOTCONFIG_EFI
     fi
 fi
 
