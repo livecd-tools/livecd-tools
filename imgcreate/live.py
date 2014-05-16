@@ -847,8 +847,9 @@ class ppcLiveImageCreator(LiveImageCreatorBase):
                LiveImageCreatorBase._get_excluded_packages(self)
 
     def __copy_boot_file(self, destdir, file):
-        for dir in ["/usr/share/ppc64-utils",
-                    "/usr/lib/anaconda-runtime/boot"]:
+        for dir in [self._instroot+"/usr/share/ppc64-utils",
+                    self._instroot+"/usr/lib/anaconda-runtime/boot",
+                    "/usr/share/lorax/config_files/ppc"]:
             path = self._instroot + dir + "/" + file
             if not os.path.exists(path):
                 continue
