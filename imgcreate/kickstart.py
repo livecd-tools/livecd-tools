@@ -121,7 +121,7 @@ class KickstartConfig(object):
     def call(self, args):
         if not os.path.exists("%s/%s" %(self.instroot, args[0])):
             raise errors.KickstartError("Unable to run %s!" %(args))
-        subprocess.call(args, preexec_fn = self.chroot)
+        return subprocess.call(args, preexec_fn = self.chroot)
 
     def apply(self):
         pass
@@ -450,7 +450,12 @@ class SelinuxConfig(KickstartConfig):
         if not os.path.exists(self.path("/sbin/setfiles")):
             return
 
-        self.call(["/sbin/setfiles", "-p", "-e", "/proc", "-e", "/sys", "-e", "/dev", selinux.selinux_file_context_path(), "/"])
+        rc = self.call(["/sbin/setfiles", "-p", "-e", "/proc", "-e", "/sys", "-e", "/dev", selinux.selinux_file_context_path(), "/"])
+        if rc:
+            if ksselinux.selinux == ksconstants.SELINUX_ENFORCING:
+                raise errors.KickstartError("SELinux relabel failed.")
+            else:
+                logging.error("SELinux relabel failed.")
 
     def apply(self, ksselinux):
         selinux_config = "/etc/selinux/config"
