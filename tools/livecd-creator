@@ -23,6 +23,7 @@ import sys
 import time
 import optparse
 import logging
+from yum.Errors import YumBaseError
 
 import imgcreate
 
@@ -216,7 +217,7 @@ def main():
             creator.launch_shell()
         creator.unmount()
         creator.package()
-    except imgcreate.CreatorError, e:
+    except (imgcreate.CreatorError, YumBaseError) as e:
         logging.error(u"Error creating Live CD : %s" % e)
         return 1
     finally:
