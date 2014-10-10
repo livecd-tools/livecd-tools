@@ -87,6 +87,7 @@ class ImageCreator(object):
 
         self.__builddir = None
         self.__bindmounts = []
+        self.__fstype = kickstart.get_image_fstype(self.ks, "ext3")
 
         self.__sanity_check()
 
@@ -135,6 +136,24 @@ class ImageCreator(object):
     Note, this directory does not exist before ImageCreator.mount() is called.
 
     Note also, this is a read-only attribute.
+
+    """
+
+    def __get_fstype(self):
+        return self.__fstype
+    def __set_fstype(self, val):
+        if val not in ("ext2", "ext3", "ext4"):
+            raise CreatorError("Unknown _fstype '%s' supplied" % val)
+        self.__fstype = val
+    _fstype = property(__get_fstype, __set_fstype)
+    """The type of filesystem used for the image.
+
+    This is the filesystem type used when creating the filesystem image.
+    Subclasses may change this if they wish to use something other ext3.
+
+    Note, only ext2, ext3, ext4 are currently supported.
+
+    Note also, this attribute may only be set before calling mount().
 
     """
 
@@ -802,7 +821,6 @@ class LoopImageCreator(ImageCreator):
 
         self.__minsize_KB = 0
         self.__blocksize = 4096
-        self.__fstype = kickstart.get_image_fstype(self.ks, "ext3")
 
         self.__instloop = None
         self.__imgdir = None
@@ -872,24 +890,6 @@ class LoopImageCreator(ImageCreator):
 
     """
 
-    def __get_fstype(self):
-        return self.__fstype
-    def __set_fstype(self, val):
-        if val not in ("ext2", "ext3", "ext4"):
-            raise CreatorError("Unknown _fstype '%s' supplied" % val)
-        self.__fstype = val
-    _fstype = property(__get_fstype, __set_fstype)
-    """The type of filesystem used for the image.
-
-    This is the filesystem type used when creating the filesystem image.
-    Subclasses may change this if they wish to use something other ext3.
-
-    Note, only ext2, ext3, ext4 are currently supported.
-
-    Note also, this attribute may only be set before calling mount().
-
-    """
-
     #
     # Helpers for subclasses
     #
@@ -927,7 +927,7 @@ class LoopImageCreator(ImageCreator):
         self.__instloop = ExtDiskMount(SparseLoopbackDisk(self._image,
                                                           self.__image_size),
                                        self._instroot,
-                                       self.__fstype,
+                                       self._fstype,
                                        self.__blocksize,
                                        self.fslabel,
                                        self.tmpdir)
