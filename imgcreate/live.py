@@ -717,7 +717,7 @@ menu end
         """
         fail = False
         missing = []
-        files = [("/boot/efi/EFI/*/shim.efi", "/EFI/BOOT/BOOT%s.efi" % (self.efiarch,)),
+        files = [("/boot/efi/EFI/*/shim.efi", "/EFI/BOOT/BOOT%s.EFI" % (self.efiarch,)),
                  ("/boot/efi/EFI/*/gcdx64.efi", "/EFI/BOOT/grubx64.efi"),
                  ("/boot/efi/EFI/*/fonts/unicode.pf2", "/EFI/BOOT/fonts/"),
                 ]
@@ -822,8 +822,8 @@ submenu 'Troubleshooting -->' {
 
         # first gen mactel machines get the bootloader name wrong apparently
         if rpmUtils.arch.getBaseArch() == "i386":
-            os.link(isodir + "/EFI/BOOT/BOOT%s.efi" % (self.efiarch),
-                    isodir + "/EFI/BOOT/BOOT.efi")
+            os.link(isodir + "/EFI/BOOT/BOOT%s.EFI" % (self.efiarch),
+                    isodir + "/EFI/BOOT/BOOT.EFI")
 
 
     def _configure_bootloader(self, isodir):
