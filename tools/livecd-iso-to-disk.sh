@@ -305,6 +305,16 @@ isdevloop() {
     [ x"${1#/dev/loop}" != x"$1" ]
 }
 
+# Return the matching file ignoring case or 1 if no match
+nocase_path() {
+    local ret=0
+    shopt -s nocaseglob
+    [ -e "$1" ] || ret=1
+    echo $1
+    shopt -u nocaseglob
+    return $ret
+}
+
 getdisk() {
     DEV=$1
 
@@ -1136,8 +1146,8 @@ if [ -n "$efi" ]; then
     #   grub.cfg
     if [ -e $TGTMNT$EFI_BOOT/grub.cfg ]; then
         BOOTCONFIG_EFI=$TGTMNT$EFI_BOOT/grub.cfg
-    elif [ -e $TGTMNT$EFI_BOOT/+(BOOT|boot)?*.conf ]; then
-        BOOTCONFIG_EFI=$TGTMNT$EFI_BOOT/+(BOOT|boot)?*.conf
+    elif [ -e $(nocase_path "$TGTMNT$EFI_BOOT/boot*.conf") ]; then
+        BOOTCONFIG_EFI=$(nocase_path "$TGTMNT$EFI_BOOT/boot*.conf")
     else
         echo "Unable to find EFI config file."
         exitclean
@@ -1148,10 +1158,10 @@ if [ -n "$efi" ]; then
     # the eltorito image, so try to extract it if it is missing
 
     # test for presence of *.efi grub binary
-    if [ ! -f $TGTMNT$EFI_BOOT/+(BOOT|boot)?*.efi ]; then
+    if [ ! -f $(nocase_path "$TGTMNT$EFI_BOOT/boot*efi") ]; then
         if [ ! -x /usr/bin/dumpet ]; then
             echo "No /usr/bin/dumpet tool found. EFI image will not boot."
-            echo "Source media is missing grub binary in /EFI/BOOT/*efi"
+            echo "Source media is missing grub binary in /EFI/BOOT/*EFI"
             exitclean
         else
             # dump the eltorito image with dumpet, output is $SRC.1
@@ -1159,10 +1169,10 @@ if [ -n "$efi" ]; then
             EFIMNT=$(mktemp -d /media/srctmp.XXXXXX)
             mount -o loop "$SRC".1 $EFIMNT
 
-            if [ -f $EFIMNT$EFI_BOOT/+(BOOT|boot)?*.efi ]; then
-                cp $EFIMNT$EFI_BOOT/+(BOOT|boot)?*.efi $TGTMNT$EFI_BOOT
+            if [ -f $(nocase_path "$EFIMNT$EFI_BOOT/boot*efi") ]; then
+                cp $(nocase_path "$EFIMNT$EFI_BOOT/boot*efi") $TGTMNT$EFI_BOOT
             else
-                echo "No BOOT*.efi found in eltorito image. EFI will not boot"
+                echo "No BOOT*.EFI found in eltorito image. EFI will not boot"
                 umount $EFIMNT
                 rm "$SRC".1
                 exitclean
