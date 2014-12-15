@@ -57,9 +57,9 @@ def parse_options(args):
     imgopt.add_option("", "--compression-type", type="string", dest="compress_type",
                       help="Compression type recognized by mksquashfs "
                            "(default xz needs a 2.6.38+ kernel, gzip works "
-                           "with all kernels, lzo needs a 2.6.36+ kernel, lzma "
-                           "needs custom kernel.) Set to 'None' to force read "
-                           "from base_on.",
+                           "with all kernels, lzo needs a 2.6.36+ kernel, lz4 "
+                           "needs a 3.19+ kernel, lzma needs custom kernel.) "
+                           "Set to 'None' to force read from base_on.",
                       default="xz")
     imgopt.add_option("", "--releasever", type="string", dest="releasever",
                       default=None,
