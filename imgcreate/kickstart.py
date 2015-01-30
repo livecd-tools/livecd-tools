@@ -139,7 +139,7 @@ class KeyboardConfig(KickstartConfig):
     """A class to apply a kickstart keyboard configuration to a system."""
     def apply(self, kskeyboard):
         vcconf_file = self.path("/etc/vconsole.conf")
-        DEFAULT_VC_FONT = "latarcyrheb-sun16"
+        DEFAULT_VC_FONT = "eurlatgr"
 
         if not kskeyboard.keyboard:
             kskeyboard.keyboard = "us"
