@@ -26,6 +26,7 @@ import logging
 from yum.Errors import YumBaseError
 
 import imgcreate
+from imgcreate.errors import KickstartError
 
 class Usage(Exception):
     def __init__(self, msg = None, no_error = False):
@@ -174,7 +175,12 @@ def main():
             product = "Linux"
     logging.info("Using title '%s' and product '%s'" % (title, product))
 
-    ks = imgcreate.read_kickstart(options.kscfg)
+    try:
+        ks = imgcreate.read_kickstart(options.kscfg)
+    except KickstartError as e:
+        logging.error("kickstart error: %s", e)
+        return 1
+
     if not ks.handler.repo.seen:
         print >> sys.stderr, "Kickstart (%s) must have at least one repository." % (options.kscfg)
         return 1
