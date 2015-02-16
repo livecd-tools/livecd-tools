@@ -1418,6 +1418,17 @@ if [ -z "$multi" ]; then
         cp /usr/lib/syslinux/menu.c32 $TGTMNT/$SYSLINUXPATH/menu.c32
     fi
 
+    # syslinux >= 6.02 requires also requires ldlinux.c32, libcom32.c32, libutil.c32
+    # since the version of syslinux being used is the one on the host they may or may not
+    # be available.
+    for f in ldlinux.c32 libcom32.c32 libutil.c32; do
+        if [ -f "/usr/share/syslinux/$f" ]; then
+            cp /usr/share/syslinux/$f $TGTMNT/$SYSLINUXPATH/$f
+        else
+            echo "Failed to find /usr/share/syslinux/$f, USB may not boot."
+        fi
+    done
+
     if [ "$TGTFS" == "vfat" -o "$TGTFS" == "msdos" ]; then
         # syslinux expects the config to be named syslinux.cfg
         # and has to run with the file system unmounted
