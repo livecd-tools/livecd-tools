@@ -344,6 +344,18 @@ getdisk() {
     partnum=${p##$device}
 }
 
+get_partition1() {
+    # Get the name of partition one. Devices that end with a digit need to have
+    # a 'p' appended before the partition number.
+    local dev=$1
+
+    if [[ $dev =~ .*[0..9]+$ ]]; then
+        echo -n "${dev}p1"
+    else
+        echo -n "${dev}1"
+    fi
+}
+
 resetMBR() {
     if isdevloop "$DEV"; then
         return
@@ -459,7 +471,7 @@ createGPTLayout() {
     echo "Waiting for devices to settle..."
     /sbin/udevadm settle
     sleep 5
-    TGTDEV=${device}1
+    TGTDEV=$(get_partition1 ${device})
     umount $TGTDEV &> /dev/null || :
     /sbin/mkdosfs -n $label $TGTDEV
     TGTLABEL="UUID=$(/sbin/blkid -s UUID -o value $TGTDEV)"
@@ -492,7 +504,7 @@ createMSDOSLayout() {
     /sbin/udevadm settle
     sleep 5
     if ! isdevloop "$DEV"; then
-        TGTDEV=${device}1
+        TGTDEV=$(get_partition1 ${device})
     else
         TGTDEV=${device}
     fi
@@ -527,7 +539,7 @@ createEXTFSLayout() {
     echo "Waiting for devices to settle..."
     /sbin/udevadm settle
     sleep 5
-    TGTDEV=${device}1
+    TGTDEV=$(get_partition1 ${device})
     umount $TGTDEV &> /dev/null || :
 
     # Check extlinux version
