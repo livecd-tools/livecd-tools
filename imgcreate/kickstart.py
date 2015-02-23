@@ -17,6 +17,7 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 import os
+import errno
 import os.path
 import shutil
 import subprocess
@@ -383,6 +384,12 @@ class NetworkConfig(KickstartConfig):
             return
 
         path = self.path("/etc/resolv.conf")
+        # Explicitly overwrite what's there now, see https://bugzilla.redhat.com/show_bug.cgi?id=1116651
+        try:
+            os.unlink(path)
+        except OSError, e:
+            if e.errno != errno.ENOENT:
+                raise
         f = file(path, "w+")
         os.chmod(path, 0644)
 
@@ -440,9 +447,10 @@ class SelinuxConfig(KickstartConfig):
         # touch some files which get unhappy if they're not labeled correctly
         for fn in ("/etc/resolv.conf",):
             path = self.path(fn)
-            f = file(path, "w+")
-            os.chmod(path, 0644)
-            f.close()
+            if not os.path.islink(path):
+                f = file(path, "w+")
+                os.chmod(path, 0644)
+                f.close()
 
         if ksselinux.selinux == ksconstants.SELINUX_DISABLED:
             return
