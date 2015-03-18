@@ -269,7 +269,7 @@ class LiveImageCreatorBase(LoopImageCreator):
         for module in self.__modules:
             if module == "=usb":
                 retval = retval + "ehci_hcd uhci_hcd ohci_hcd "
-                retval = retval + "usb_storage usbhid "
+                retval = retval + "usb_storage usbhid uas "
             elif module == "=firewire":
                 retval = retval + "firewire-sbp2 firewire-ohci "
                 retval = retval + "sbp2 ohci1394 ieee1394 "
