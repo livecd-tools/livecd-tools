@@ -46,11 +46,10 @@ uninstall:
 	rm -f $(DESTDIR)/usr/bin/mkbiarch
 
 dist : all
-	git archive --format=tar --prefix=livecd-tools-$(VERSION)/ HEAD | bzip2 -9v > livecd-tools-$(VERSION).tar.bz2
+	git archive --format=tar --prefix=livecd-tools-$(VERSION)/ HEAD | gzip -9v > livecd-tools-$(VERSION).tar.gz
 
 release: dist
 	git tag -s -a -m "Tag as livecd-tools-$(VERSION)" livecd-tools-$(VERSION)
-	scp livecd-tools-$(VERSION).tar.bz2 fedorahosted.org:livecd
 
 clean:
 	rm -f *~ creator/*~ installer/*~ config/*~ docs/*.8
