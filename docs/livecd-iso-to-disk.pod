@@ -2,11 +2,11 @@
 
 =head1 NAME
 
-livecd-iso-to-disk - installs bootable Live images onto USB/SD storage devices.
+livecd-iso-to-disk - Installs bootable Live images onto USB/SD storage devices.
 
 =head1 SYNOPSIS
 
-B<livecd-iso-to-disk>  [--help] [--noverify] [--format] [--reset-mbr] [--efi] [--skipcopy] [--force] [--xo] [--xo-no-home] [--timeout <time>] [--totaltimeout <time>] [--extra-kernel-args <args>] [--multi] [--livedir <dir>] [--compress] [--skipcompress] [--swap-size-mb <size>] [--overlay-size-mb <size>] [--home-size-mb <size>] [--delete-home] [--crypted-home] [--unencrypted-home] [--updates updates.img] [--ks kickstart] <source> <target device>
+B<livecd-iso-to-disk>  [--help] [--noverify] [--format] [--msdos] [--reset-mbr] [--efi] [--skipcopy] [--force] [--xo] [--xo-no-home] [--timeout <time>] [--totaltimeout <time>] [--extra-kernel-args <args>] [--multi] [--livedir <dir>] [--compress] [--skipcompress] [--swap-size-mb <size>] [--overlay-size-mb <size>] [--home-size-mb <size>] [--delete-home] [--crypted-home] [--unencrypted-home] [--updates <updates.img>] [--ks <kickstart>] [--label <label>] <source> <target device>
 
 Simplest
 
@@ -14,13 +14,13 @@ The script may be run in simplest form with just the two arguments:
 
 B<livecd-iso-to-disk> <source> <target device>
 
-To execute the script to completion, you will need to run it with root user permissions.  SYSLINUX must be installed on the computer running the installation script.
+To execute the script to completion, you will need to run it with root user permissions.  SYSLINUX must be installed on the computer running this script.
 
 =over 4
 
 =item <source>
 
-This may be the filesystem path to a LiveOS .iso image file, such as from a CD-ROM, DVD, or download.  It could also be the device node reference for the mount point of another LiveOS filesystem, including the currently-running one (such as a booted Live CD/DVD/USB, where /dev/live references the running image device).
+This may be the filesystem path to a LiveOS .iso image file, such as from a CD-ROM, DVD, or download.  It could also be the device node reference for the mount point of another LiveOS filesystem, including the currently-running one (such as a booted Live CD/DVD/USB, where /run/initramfs/livedev links to the booted LiveOS device).
 
 =item <target device>
 
@@ -30,11 +30,11 @@ This should be the device partition name for the attached, target device, such a
 
 =head1 DESCRIPTION
 
-B<livecd-iso-to-disk> installs a Live CD/DVD/USB image (LiveOS) onto a USB/SD storage device (or any storage partition that will boot with a SYSLINUX bootloader).  The target storage device can then boot the installed operating system on systems that support booting via the USB or the SD interface.  The script requires a LiveOS source image and a target storage device.  The source image may be either a LiveOS .iso file, the currently-running LiveOS image, the device node reference for an attached device with an installed LiveOS image, or a file backed by a block device with an installed LiveOS image.  If the operating system supports persistent overlays for saving system changes, a pre-sized overlay may be included with the installation.
+B<livecd-iso-to-disk> installs a Live CD/DVD/USB image (LiveOS) onto a USB/SD storage device (or any storage partition that will boot with a SYSLINUX bootloader).  The target storage device can then boot the installed operating system on systems that support booting via the USB or the SD interface.  The script requires a LiveOS source image and a target storage device.  The source image may be either a LiveOS .iso file, the currently-running LiveOS image, the device node reference for an attached device installed with a LiveOS image, or a file backed by a block device installed with a LiveOS image.  If the operating system supports persistent overlays for saving system changes, a pre-sized overlay may be included with the installed image.
 
-Unless you request the --format option, the installation does not destroy data outside of the LiveOS, syslinux, & EFI folders on your target device.  This allows one to maintain other files on the target disk outside of the LiveOS filesystem.
+Unless you request the --format option, installing an image does not destroy data outside of the LiveOS, syslinux, & EFI directories on your target device.  This allows one to maintain other files on the target disk outside of the LiveOS filesystem.
 
-LiveOS images provide embedded filesystems through the Device-mapper component of the Linux kernel.  The embedded filesystems exist within files such as /LiveOS/squashfs.img (the default compressed storage) or /LiveOS/ext3fs.img (an uncompressed version) on the primary volume partition of the storage device.  In use, these are read-only filesystems. Optionally, one may specify a persistent LiveOS overlay to hold image-change snapshots (that use write-once, difference-tracking storage) in the /LiveOS/overlay-<device_id> file, which, *one should note*, always grows in size due to the storage mechanism.  (The fraction of allocated space that has been consumed by system activity and changes may be displayed by issuing the 'dmsetup status' command in a terminal session of a running LiveOS image.)  One way to conserve the unrecoverable, overlay file space, is to specify a persistent home folder for user files, which will be saved in a /LiveOS/home.img filesystem image file.  This file space is encrypted by default, but is not compressed.  (One may bypass encryption with the --unencrypted-home installation option.)  Files in this home folder may be erased to recover and reuse their storage space.  The home.img file is also convenient for backing up or swapping user account files.
+LiveOS images employ embedded filesystems through the Device-mapper component of the Linux kernel.  The filesystems are embedded within files in the /LiveOS/ directory of the storage device.  The /LiveOS/squashfs.img file is the default, compressed filesystem containing one directory and the file /LiveOS/ext3fs.img that contains the root filesystem for the distribution.  These are read-only filesystems that are usually fixed in size to within +1 GiB of the size of the full root filesystem at build time.  At boot time, a Device-mapper snapshot with a default 0.5 GiB, in-memory, read-write overlay is created for the root filesystem.  Optionally, one may specify a fixed-size, persistent on disk overlay to hold changes to the root filesystem.  The build-time size of the root filesystem will limit the maximum size of the working root filesystem--even if an overlay file larger than the apparent free space on the root filesystem is used.  *Note well* that deletion of any original files in the read-only root filesystem does not recover any storage space on your LiveOS device.  Storage in the persistent /LiveOS/overlay-<device_id> file is allocated as needed, but the system will crash *without warning* and fail to boot once the overlay has been totally consumed.  If significant changes or updates to the root filesystem are to be made, carefully watch the fraction of space allocated in the overlay by issuing the 'dmsetup status' command at a command line of the running LiveOS image.  Some consumption of root filesystem and overlay space can be avoided by specifying a persistent home filesystem for user files, which will be saved in a fixed-size /LiveOS/home.img file.  This filesystem is encrypted by default.  (One may bypass encryption with the --unencrypted-home option.)  This filesystem is mounted on the /home directory.  When its storage space is full, out-of-space warnings will be issued by the operating system.
 
 =head1 OPTIONS
 
@@ -46,11 +46,15 @@ Displays usage information and exits.
 
 =item --noverify
 
-Disables the image validation process that occurs before the image is installed from the original Live CD .iso image.  When this option is specified, the image is not verified before loading onto the target storage device.
+Disables the image validation process that occurs before the image is copied from the original Live CD .iso image.  When this option is specified, the image is not verified before it is copied onto the target storage device.
 
 =item --format
 
 Formats the target device and creates an MS-DOS partition table (or GUID partition table, if the --efi option is passed).
+
+=item --msdos
+
+Forces format to use the msdos (vfat) filesystem instead of ext4.
 
 =item --reset-mbr
 
@@ -62,7 +66,7 @@ Creates a GUID partition table when --format is passed, and installs a hybrid Ex
 
 =item --skipcopy
 
-Skips the copying of the live image to the target device, bypassing the actions of the --format, --overlay-size-mb, --home-size-mb, & --swap-size-mb options, if present on the command line. (The --skipcopy option may be used while testing the script, in order to avoid repeated and lengthy copy commands, or to repair boot configuration files on a previously installed device.)
+Skips the copying of the live image to the target device, bypassing the actions of the --format, --overlay-size-mb, --home-size-mb, & --swap-size-mb options, if present on the command line. (The --skipcopy option may be used while testing the script, in order to avoid repeated and lengthy copy commands, or with --reset-mbr to repair the boot configuration files on a previously installed LiveOS device.)
 
 =item --force
 
@@ -80,13 +84,13 @@ Used to prepare an image for the OLPC XO-1 laptop with its compressed, JFFS2 fil
 
 =item --xo-no-home
 
-Used together with the --xo option to prepare an image for an OLPC XO laptop with the home folder on an SD card instead of the internal flash storage.
+Used together with the --xo option to prepare an image for an OLPC XO laptop with the home directory on an SD card instead of the internal flash storage.
 
-=item --timeout
+=item --timeout <time>
 
 Modifies the bootloader's timeout value, which indicates how long to pause at the boot: prompt before booting automatically.  This overrides the value set during iso creation.  Units are 1/10 s.  The timeout is canceled when any key is pressed, the assumption being that the user will complete the command line.  A timeout of zero will disable the timeout completely.
 
-=item --totaltimeout
+=item --totaltimeout <time>
 
 Adds a bootloader totaltimeout, which indicates how long to wait before booting automatically.  This is used to force an automatic boot.  This timeout cannot be canceled by the user.  Units are 1/10 s.
 
@@ -96,52 +100,55 @@ Specifies additional kernel arguments, <args>, that will be inserted into the sy
 
 =item --multi
 
-Used when installing multiple image copies to signal configuration of the boot files for the image in the --livedir <dir> parameter.
+Used when installing multiple images, to signal configuration of boot files for the image in the --livedir <dir> parameter.
 
 =item --livedir <dir>
 
-Used with multiple image installations to designate the directory <dir> for the particular image.
+Used when multiple LiveOS images are installed on a device to designate the directory <dir> for the particular image.
 
-=item --compress   (default state for the operating system files)
+=item --compress   (default state for the original root filesystem)
 
-The default, compressed SquashFS filesystem image is copied on installation.  This option has no effect when the source filesystem
-is already expanded.
+The default, compressed SquashFS filesystem image is copied on installation.  (This option has no effect if the source filesystem is already expanded.)
 
 =item --skipcompress   (default option when  --xo is specified)
 
-Expands the source SquashFS image on installation into the read-only /LiveOS/ext3fs.img filesystem image file.
+Expands the source SquashFS.img on installation into the read-only /LiveOS/ext3fs.img root filesystem image file.  This avoids the system overhead of decompression during use at the expense of storage space.
 
 =item --swap-size-mb <size>
 
-Sets up a swap file of <size> mebibytes (integer values only) on the target device.
+Sets up a swap file of <size> mebibytes (integer values only) on the target device.  A maximum <size> of 4095 MiB is permitted for vfat-formatted devices.
 
 =item --overlay-size-mb <size>
 
-This option sets the overlay size in mebibytes (integer values only).  The overlay makes persistent storage available to the live operating system, if the operating system supports it.  The persistent LiveOS overlay holds image-change snapshots (using write-once, difference-tracking  storage) in the /LiveOS/overlay-<device_id> file, which, *one should note*, always grows in size due to the storage mechanism.  (The fraction of allocated space that has been consumed may be displayed by issuing the 'dmsetup status' command in a terminal session of a running LiveOS installation.)  One way to conserve the unrecoverable, overlay file space, is to specify a persistent home folder for user files, see --home-size-mb below.  The target storage device must have enough free space for the image and the overlay.  A maximum <size> of 4095 MiB is permitted for vfat-formatted devices.  If there is insufficient room on your device, you will be given information to help in adjusting your settings.
+Specifies creation of a filesystem overlay of <size> mebibytes (integer values only).  The overlay makes persistent storage available to the live operating system, if the operating system supports it.  The overlay holds a snapshot of changes to the root filesystem.  *Note well* that deletion of any original files in the read-only root filesystem does not recover any storage space on your LiveOS device.  Storage in the persistent /LiveOS/overlay-<device_id> file is allocated as needed, but the system will crash *without warning* and fail to boot once the overlay has been totally consumed.  If significant changes or updates to the root filesystem are to be made, carefully watch the fraction of space allocated in the overlay by issuing the 'dmsetup status' command at a command line of the running LiveOS image.  Some consumption of root filesystem and overlay space can be avoided by specifying a persistent home filesystem for user files, see --home-size-mb below.  The target storage device must have enough free space for the image and the overlay.  A maximum <size> of 4095 MiB is permitted for vfat-formatted devices.  If there is not enough room on your device, you will be given information to help in adjusting your settings.
 
 =item --home-size-mb <size>
 
-Sets the home directory size in mebibytes (integer values only).  A persistent home directory will be made in the /LiveOS/home.img filesystem image file.  This file space is encrypted by default, but not compressed (one may bypass encryption with the --unencrypted-home installation option).  Files in this home folder may be erased to recover and reuse their storage space.  The target storage device must have enough free space for the image, any overlay, and the home directory.  Note that the --delete-home option must also be selected to replace an existing persistent home with a new, empty one.  A maximum <size> of 4095 MiB is permitted for vfat-formatted devices.  If there is insufficient room on your device, you will be given information to help in adjusting your settings.
+Specifies creation of a home filesystem of <size> mebibytes (integer values only).  A persistent home directory will be stored in the /LiveOS/home.img filesystem image file.  This filesystem is encrypted by default and not compressed  (one may bypass encryption with the --unencrypted-home option).  When the home filesystem storage space is full, one will get out-of-space warnings from the operating system.  The target storage device must have enough free space for the image, any overlay, and the home filesystem.  Note that the --delete-home option must also be selected to replace an existing persistent home with a new, empty one.  A maximum <size> of 4095 MiB is permitted for vfat-formatted devices.  If there is not enough room on your device, you will be given information to help in adjusting your settings.
 
 =item --delete-home
 
-To prevent unwitting deletion of user files, this option must be explicitly selected when the option --home-size-mb <size> is selected and there is an existing persistent home directory on the target device.
+One must explicitly select this option in the case where there is an existing persistent home filesystem on the target device and the --home-size-mb <size> option is selected to create an empty, new home filesystem.  This prevents unwitting deletion of user files.
 
 =item --crypted-home   (default that only applies to new home-size-mb requests)
 
-Specifies the default option to encrypt a new persistent home directory if --home-size-mb <size> is specified.
+Specifies the default option to encrypt a new persistent home filesystem when --home-size-mb <size> is specified.
 
 =item --unencrypted-home
 
-Prevents the default option to encrypt a new persistent home directory.
+Prevents the default option to encrypt a new persistent home directory filesystem.
 
-=item --updates updates.img
+=item --updates <updates.img>
 
 Setup inst.updates to point to an updates image on the device. Anaconda uses this for testing updates to an iso without needing to make a new iso.
 
-=item --ks kickstart
+=item --ks <kickstart>
 
-Setup inst.ks to point to an kickstart file on the device. Use this for automating installs on boot.
+Setup inst.ks to point to an kickstart file on the device. Use this for automating package installs on boot.
+
+=item --label <label>
+
+Specifies a specific filesystem label instead of default LIVE. Useful when you do unattended installs that pass a label to inst.ks
 
 =back
 
