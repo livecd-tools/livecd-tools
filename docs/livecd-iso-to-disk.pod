@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-livecd-iso-to-disk - Loads bootable Live images onto USB/SD storage devices.
+livecd-iso-to-disk - Installs bootable Live images onto USB/SD storage devices.
 
 =head1 SYNOPSIS
 
@@ -30,11 +30,11 @@ This should be the device partition name for the attached, target device, such a
 
 =head1 DESCRIPTION
 
-B<livecd-iso-to-disk> loads a Live CD/DVD/USB image (LiveOS) onto a USB/SD storage device (or any storage partition that will boot with a SYSLINUX bootloader).  The target storage device can then boot the loaded operating system on systems that support booting via the USB or the SD interface.  The script requires a LiveOS source image and a target storage device.  The source image may be either a LiveOS .iso file, the currently-running LiveOS image, the device node reference for an attached device loaded with a LiveOS image, or a file backed by a block device loaded with a LiveOS image.  If the operating system supports persistent overlays for saving system changes, a pre-sized overlay may be included with the loaded image.
+B<livecd-iso-to-disk> installs a Live CD/DVD/USB image (LiveOS) onto a USB/SD storage device (or any storage partition that will boot with a SYSLINUX bootloader).  The target storage device can then boot the installed operating system on systems that support booting via the USB or the SD interface.  The script requires a LiveOS source image and a target storage device.  The source image may be either a LiveOS .iso file, the currently-running LiveOS image, the device node reference for an attached device installed with a LiveOS image, or a file backed by a block device installed with a LiveOS image.  If the operating system supports persistent overlays for saving system changes, a pre-sized overlay may be included with the installed image.
 
-Unless you request the --format option, loading an image does not destroy data outside of the LiveOS, syslinux, & EFI directories on your target device.  This allows one to maintain other files on the target disk outside of the LiveOS filesystem.
+Unless you request the --format option, installing an image does not destroy data outside of the LiveOS, syslinux, & EFI directories on your target device.  This allows one to maintain other files on the target disk outside of the LiveOS filesystem.
 
-LiveOS images employ embedded filesystems through the Device-mapper component of the Linux kernel.  The filesystems are embedded within files in the /LiveOS/ directory of the storage device.  The /LiveOS/squashfs.img file is the default, compressed filesystem containing one directory and the file /LiveOS/ext3fs.img that contains the root filesystem for the distribution.  These are read-only filesystems that are usually fixed in size to within +1 GiB of the size of the full root filesystem at build time.  At boot time, a Device-mapper snapshot with a default 0.5 GiB, in-memory, read-write overlay is created for the root filesystem.  Optionally, one may specify a fixed-size, persistent on disk overlay to hold changes to the root filesystem.  The build-time size of the root filesystem will limit the maximum size of the working root filesystem--even if an overlay file larger than the apparent free space on the root filesystem is used.  *Note well* that deletion of any original files in the read-only root filesystem does not recover any storage space on your LiveOS device.  Storage in the persistent /LiveOS/overlay-<device_id> file is allocated as needed, but the system will crash *without warning* and fail to boot once the overlay has been totally consumed.  If significant changes or updates to the root filesystem are to be made, carefully watch the fraction of space allocated in the overlay by issuing the 'dmsetup status' command at a command line of the running LiveOS image.  Some consumption of root filesystem and overlay space can be avoided by specifying a persistent home filesystem for user files, which will be saved in a fixed-size /LiveOS/home.img file.  This filesystem is encrypted by default.  (One may bypass encryption with the --unencrypted-home loading option.)  This filesystem is mounted on the /home directory.  When its storage space is full, out-of-space warnings will be issued by the operating system.
+LiveOS images employ embedded filesystems through the Device-mapper component of the Linux kernel.  The filesystems are embedded within files in the /LiveOS/ directory of the storage device.  The /LiveOS/squashfs.img file is the default, compressed filesystem containing one directory and the file /LiveOS/ext3fs.img that contains the root filesystem for the distribution.  These are read-only filesystems that are usually fixed in size to within +1 GiB of the size of the full root filesystem at build time.  At boot time, a Device-mapper snapshot with a default 0.5 GiB, in-memory, read-write overlay is created for the root filesystem.  Optionally, one may specify a fixed-size, persistent on disk overlay to hold changes to the root filesystem.  The build-time size of the root filesystem will limit the maximum size of the working root filesystem--even if an overlay file larger than the apparent free space on the root filesystem is used.  *Note well* that deletion of any original files in the read-only root filesystem does not recover any storage space on your LiveOS device.  Storage in the persistent /LiveOS/overlay-<device_id> file is allocated as needed, but the system will crash *without warning* and fail to boot once the overlay has been totally consumed.  If significant changes or updates to the root filesystem are to be made, carefully watch the fraction of space allocated in the overlay by issuing the 'dmsetup status' command at a command line of the running LiveOS image.  Some consumption of root filesystem and overlay space can be avoided by specifying a persistent home filesystem for user files, which will be saved in a fixed-size /LiveOS/home.img file.  This filesystem is encrypted by default.  (One may bypass encryption with the --unencrypted-home option.)  This filesystem is mounted on the /home directory.  When its storage space is full, out-of-space warnings will be issued by the operating system.
 
 =head1 OPTIONS
 
@@ -46,7 +46,7 @@ Displays usage information and exits.
 
 =item --noverify
 
-Disables the image validation process that occurs before the image is loaded from the original Live CD .iso image.  When this option is specified, the image is not verified before loading onto the target storage device.
+Disables the image validation process that occurs before the image is copied from the original Live CD .iso image.  When this option is specified, the image is not verified before it is copied onto the target storage device.
 
 =item --format
 
@@ -58,7 +58,7 @@ Forces format to use the msdos (vfat) filesystem instead of ext4.
 
 =item --reset-mbr
 
-Sets the Master Boot Record (MBR) of the target storage device to the mbr.bin file from the loading host system's syslinux directory.  This may be helpful in recovering a damaged or corrupted device.
+Sets the Master Boot Record (MBR) of the target storage device to the mbr.bin file from the installation system's syslinux directory.  This may be helpful in recovering a damaged or corrupted device.
 
 =item --efi
 
@@ -66,11 +66,11 @@ Creates a GUID partition table when --format is passed, and installs a hybrid Ex
 
 =item --skipcopy
 
-Skips the copying of the live image to the target device, bypassing the actions of the --format, --overlay-size-mb, --home-size-mb, & --swap-size-mb options, if present on the command line. (The --skipcopy option may be used while testing the script, in order to avoid repeated and lengthy copy commands, or with --reset-mbr to repair the boot configuration files on a previously loaded LiveOS device.)
+Skips the copying of the live image to the target device, bypassing the actions of the --format, --overlay-size-mb, --home-size-mb, & --swap-size-mb options, if present on the command line. (The --skipcopy option may be used while testing the script, in order to avoid repeated and lengthy copy commands, or with --reset-mbr to repair the boot configuration files on a previously installed LiveOS device.)
 
 =item --force
 
-This option allows the loading script to bypass a delete confirmation dialog in the event that a pre-existing LiveOS directory is found on the target device.
+This option allows the installation script to bypass a delete confirmation dialog in the event that a pre-existing LiveOS directory is found on the target device.
 
 =item --xo
 
@@ -100,19 +100,19 @@ Specifies additional kernel arguments, <args>, that will be inserted into the sy
 
 =item --multi
 
-Used when loading multiple images, to signal configuration of boot files for the image in the --livedir <dir> parameter.
+Used when installing multiple images, to signal configuration of boot files for the image in the --livedir <dir> parameter.
 
 =item --livedir <dir>
 
-Used when multiple LiveOS images are loaded on a device to designate the directory <dir> for the particular image.
+Used when multiple LiveOS images are installed on a device to designate the directory <dir> for the particular image.
 
 =item --compress   (default state for the original root filesystem)
 
-The default, compressed SquashFS filesystem image is copied on image loading.  (This option has no effect if the source filesystem is already expanded.)
+The default, compressed SquashFS filesystem image is copied on installation.  (This option has no effect if the source filesystem is already expanded.)
 
 =item --skipcompress   (default option when  --xo is specified)
 
-Expands the source SquashFS.img on image loading into the read-only /LiveOS/ext3fs.img root filesystem image file.  This avoids the system overhead of decompression during use at the expense of storage space.
+Expands the source SquashFS.img on installation into the read-only /LiveOS/ext3fs.img root filesystem image file.  This avoids the system overhead of decompression during use at the expense of storage space.
 
 =item --swap-size-mb <size>
 
