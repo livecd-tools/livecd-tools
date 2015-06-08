@@ -349,7 +349,7 @@ getdisk() {
     else
         device=$(basename $(readlink -f /sys/$p/../))
     fi
-    if [ ! -e /sys/block/$device -o ! -e /dev/$device ]; then
+    if [ -z "$device" -o ! -e /sys/block/$device -o ! -e /dev/$device ]; then
         echo "Error finding block device of $DEV.  Aborting!"
         exitclean
     fi
@@ -387,6 +387,8 @@ resetMBR() {
             exitclean
         fi
     fi
+    # Wait for changes to show up/settle down
+    /sbin/udevadm settle
 }
 
 checkMBR() {
