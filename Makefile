@@ -1,5 +1,5 @@
 
-VERSION = 22.1
+VERSION = 22.2
 
 INSTALL = /usr/bin/install -c
 INSTALL_PROGRAM = ${INSTALL}
