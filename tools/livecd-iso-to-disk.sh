@@ -357,7 +357,9 @@ getdisk() {
     device="/dev/$device"
     # FIXME: weird dev names could mess this up I guess
     p=/dev/$(basename $p)
-    partnum=${p##$device}
+    p=${p##$device}
+    # Strip off leading p from partnum, eg. with /dev/mmcblk0p1
+    partnum=${p##p}
 }
 
 get_partition1() {
