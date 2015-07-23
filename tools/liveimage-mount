@@ -1,6 +1,6 @@
 #!/usr/bin/python -tt
 # coding: latin-1
-# 2015-07-18 21:46:48
+# 2015-07-23 13:03:05
 #
 # liveimage-mount: Mount a LiveOS at the specified point, and log into a shell.
 #
@@ -320,7 +320,7 @@ def main():
             os.makedirs(mntlive)
         mount(['--bind', liveosmnt, mntlive])
         livedevlink = os.path.join(destmnt, 'run', 'initramfs', 'livedev')
-        if os.path.exists(livedevlink):
+        if os.path.lexists(livedevlink):
             os.unlink(livedevlink)
         os.symlink(os.path.join('/dev', os.path.basename(os.readlink(
                              os.path.join('/dev', 'block',
