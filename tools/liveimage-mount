@@ -208,8 +208,8 @@ def main():
                       'bs=1024', 'count=1', 'seek=%s' % (512 * 1024)])
                 call(['/sbin/losetup', overlayloop, overlay.name])
                 dm_cow = 'live-ro'
-            call(['/sbin/dmsetup', '--noudevrules', '--noudevsync',
-                 'create', dm_cow, '--table=0 %s snapshot %s %s p 8' %
+            call(['/sbin/dmsetup', 'create', dm_cow,
+                  '--table=0 %s snapshot %s %s p 8' %
                  (imgsize, imgloop, overlayloop)])
             call(['/bin/mount', os.path.join('/dev/mapper', dm_cow), destmnt])
             home_path = os.path.join(liveosdir, 'home.img')
@@ -274,8 +274,7 @@ def main():
                 call(['/bin/umount', destmnt])
             if img_type is 'blk':
                 if dm_cow:
-                    call(['/sbin/dmsetup', '--noudevrules', '--noudevsync',
-                          'remove', dm_cow])
+                    call(['/sbin/dmsetup', 'remove', dm_cow])
                 if overlayloop:
                     call(['/sbin/losetup', '-d', overlayloop])
             if imgloop:
