@@ -1303,12 +1303,9 @@ fi
 
 # DVD Installer for netinst
 if [ "$srctype" != "live" ]; then
-    if [ "$imgtype" = "install" ]; then
-        sed -i -e "s;initrd.img;initrd.img inst.stage2=hd:$TGTLABEL:/images/install.img;g" $BOOTCONFIG
-        if [ -n "$efi" ]; then
-            sed -i -e "s;vmlinuz;vmlinuz inst.stage2=hd:$TGTLABEL:/images/install.img;g" $BOOTCONFIG_EFI
-        fi
-    else
+    # install images will have already had their stage2 setup by the LABEL substitution
+    # and non-install will have everything in the initrd
+    if [ "$imgtype" != "install" ]; then
         # The initrd has everything, so no stage2
         sed -i -e "s;\S*stage2=\S*;;g" $BOOTCONFIG $BOOTCONFIG_EFI
     fi
