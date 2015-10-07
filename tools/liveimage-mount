@@ -1,9 +1,9 @@
 #!/usr/bin/python -tt
+# coding: utf-8
+
+# liveimage-mount: Mount a LiveOS at the specified point, and log into a shell.
 #
-# liveimage-mount: Mount a LiveOS at the specified point, and log
-# into a shell.
-#
-# Copyright 2011, Red Hat  Inc.
+# Copyright 2011, 2015-11-02, Red Hat, Inc., Sugar Labs®
 #   Code for Live mounting an attached LiveOS device added by Frederick Grose,
 #   <fgrose at sugarlabs.org>
 #
@@ -27,8 +27,6 @@ import getopt
 import tempfile
 import subprocess
 
-from imgcreate.errors import *
-
 def usage():
     print '''Usage:
         liveimage-mount [opts] ISO|DEVICE  MOUNTPOINT  [command] [args ...]
@@ -46,58 +44,85 @@ def usage():
 
                 and [args ...] = [arg1[ arg2[ ...]]]
 
-Mount a LiveOS at the specified directory, and log into a command shell.
+  Mount a LiveOS at the specified directory, and log into a command shell.
 
-positional arguments:
+Positional arguments:
+
   ISO|DEVICE|DIR        A path to the source ISO.iso file, block device,
-                          mount point, or directory bearing a LiveOS image.
+                        mount point, or directory bearing a LiveOS image.
+
   MOUNTPOINT            The mount point desired for the LiveOS image's root
-                          filesystem.
+                        filesystem.
 
-optional arguments:
+Optional arguments:
+
   -h, -?, --help        Show this help message and exit.
-  -u, --unmount         Specify unmounting a LiveOS image's filesystems.
-  -r, --read-only       Specify read-only mounting of image filesystems.
-  --chroot              Specify mounting the image root filesystem in a
-                          change-root directory.
-  --mount-hacks         Specify mounting of the /proc kernel filesystem
-                          and /run temporary filesystem.
-  --persist             Keep the specified mounts active on exit. (If a
-                          command is requested, it will run in the current
-                          root filesytem.)
 
-                          Call liveimage-mount -u ISO|DEVICE|DIR  MOUNTPOINT
-                          to unmount the image.
-  -o SIZE, --overlay SIZE  
+  -u, --unmount         Specify unmounting a LiveOS image's filesystems.
+
+  -r, --read-only       Specify read-only mounting of image filesystems.
+
+  --chroot              Specify mounting the image root filesystem in a
+                        change-root directory.
+
+  --mount-hacks         Specify mounting of the /proc kernel filesystem
+                        and /run temporary filesystem.
+
+  --persist             Keep the specified mounts active on exit. (If a
+                        command is requested, it will run in the current
+                        root filesytem.)
+
+                        Call liveimage-mount -u ISO|DEVICE|DIR  MOUNTPOINT
+                        to unmount the image.
+
+  -o SIZE, --overlay SIZE
                         Specify a size in mebibytes, MiB, for temporary
-                          overlay files.  Default is 512 MiB.
+                        overlay files.  Default is 512 MiB.
+
   -y PATH, --yumcache PATH  (requires --mount-hacks)
                         Specify bind mounting of a Yum repository directory,
-                          otherwise a tmpfs is mounted.
+                        otherwise a tmpfs is mounted.
+
   -f PATH, --dnfcache PATH  (requires --mount-hacks)
                         Specify bind mounting of a DNF repository directory,
-                          otherwise a tmpfs is mounted.
+                        otherwise a tmpfs is mounted.
+
   -t PATH, --tmpdir PATH
                         Specify a directory for mounting interim filesystems
-                          and holding temporary overlays.
+                        and holding temporary overlays.
 
   [command] [args ...]  A shell command with one or more arguments that will
-                          be run in a change-root directory.
+                        be run in a change-root directory.
 
-The optional command and arguments will be run after the LiveOS is mounted.
+  The optional command and arguments will be run after the LiveOS is mounted.
 
 '''
+
+
+class LiveImageMountError(Exception):
+    """An exception base class for all liveimage-mount errors."""
+    def __init__(self, msg):
+        Exception.__init__(self, msg)
+    def __str__(self):
+        try:
+            return str(self.message)
+        except UnicodeEncodeError:
+            return repr(self.message)
+
+    def __unicode__(self):
+        return unicode(self.message)
+
 
 def sys_exit(ecode):
     """Exit this Python program."""
     sys.exit(ecode)
 
 def call(*popenargs, **kwargs):
-    '''
-        Calls subprocess.Popen() with the provided arguments.  All stdout and
-        stderr output is sent to print.  The return value is the exit
-        code of the command.
-    '''
+    """
+    Calls subprocess.Popen() with the provided arguments.  All stdout and
+    stderr output is sent to print.  The return value is the exit
+    code of the command.
+    """
     p = subprocess.Popen(*popenargs, stdout=subprocess.PIPE,
                          stderr=subprocess.STDOUT, **kwargs)
     rc = p.wait()
@@ -113,6 +138,7 @@ def call(*popenargs, **kwargs):
     return rc
 
 def rcall(args, env=None):
+    """Return stdout, stderr, & returncode from a subprocess call."""
     if env:
         environ = os.environ.copy()
         environ.update(env)
@@ -123,16 +149,17 @@ def rcall(args, env=None):
                              stderr=subprocess.PIPE, env=environ)
         out, err = p.communicate()
     except OSError, e:
-        raise CreatorError(u"Failed to execute:\n'%s'\n'%s'" % (args, e))
+        raise LiveImageMountError(u"Failed to execute:\n'%s'\n'%s'"
+                                  (args, e))
     except:
-        raise CreatorError(u"""Failed to execute:\n'%s'
-            \renviron: '%s'\nstdout: '%s'\nstderr: '%s'\nreturncode: '%s'""" %
-            (args, environ, out, err, p.returncode))
+        raise LiveImageMountError(u"Failed to execute:\n'%s'\nenviron: '%s'\n"
+                                 "stdout: '%s'\nstderr: '%s'\nreturncode: '%s'"
+                                  % (args, environ, out, err, p.returncode))
     else:
         if p.returncode != 0:
-            raise CreatorError(u"""Error in call:\n'%s'\nenviron: '%s'
-                \rstdout: '%s'\nstderr: '%s'\nreturncode: '%s'""" %
-                (args, environ, out, err, p.returncode))
+            raise LiveImageMountError(u"Error in call:\n'%s'\nenviron: '%s'\n"
+                                 "stdout: '%s'\nstderr: '%s'\nreturncode: '%s'"
+                                     % (args, environ, out, err, p.returncode))
         return out
 
 def lsblk(userargs, ops=None):
@@ -167,7 +194,7 @@ def mount(userargs, ops=None):
             args.insert(1, i)
     rc = call(args)
     if rc != 0:
-        raise CreatorError(u'Return code: %s\n\n**Check for a message '
+        raise LiveImageMountError(u'Return code: %s\n\n**Check for a message '
               'above the Traceback.**\nFailed mount command:\n%s' % (rc, args))
 
 def loop_setup(path, ops=None):
@@ -204,7 +231,7 @@ def cryptsetup(userargs, ops=None):
 
     rc = call(args)
     if rc != 0:
-        raise CreatorError(u'Return code: %s\n**Check for a message '
+        raise LiveImageMountError(u'Return code: %s\n\n**Check for a message '
          'above the Traceback.**\nFailed cryptsetup command:\n%s' % (rc, args))
 
 def dmsetup(userargs, ops=None):
@@ -216,8 +243,8 @@ def dmsetup(userargs, ops=None):
 
     rc = call(args)
     if rc != 0:
-        raise CreatorError(u'Return code: %s\n\n**Check for a message above '
-                  'the Traceback.**\nFailed dmsetup command:\n%s' % (rc, args))
+        raise LiveImageMountError(u'Return code: %s\n\n**Check for a message '
+            'above the Traceback.**\nFailed dmsetup command:\n%s' % (rc, args))
 
 def get_dm_table(target):
     """Return the table for a Device-mapper target."""
@@ -273,8 +300,8 @@ def real_directory_path(path, linkn, remove_mp, unmount):
 
 def main():
     if os.geteuid() != 0:
-        print >> sys.stderr, """\n  Exiting...
-        \r  You must run liveimage-mount with root priviledges.\n"""
+        print >> sys.stderr, '''\n  Exiting...
+        \r  You must run liveimage-mount with root priviledges.\n'''
         sys_exit(1)
 
     try:
@@ -349,10 +376,10 @@ def main():
         sys_exit(2)
 
     def cleanup():
-        """Unmount filesystems and remove device-mapper targets and loop
+        """
+        Unmount filesystems and remove device-mapper targets and loop
         devices associated with a LiveOS image.
         """
-
         call(['sync'])
         if os.path.ismount(destmnt):
             call(['umount', '-Rd', destmnt])
