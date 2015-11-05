@@ -27,10 +27,11 @@ usage() {
 }
 
 cleanup() {
+    [ -d "$STRIPPEDISO" ] && rm -rf $STRIPPEDISO
     [ -d "$CDMNT" ] && umount $CDMNT && rmdir $CDMNT
 }
 
-exitclean() {
+cleanup_error() {
     echo "Cleaning up to exit..."
     cleanup
     exit 1
@@ -67,16 +68,17 @@ if [ -d tftpboot ]; then
 fi
 
 # Mount the ISO.
-# FIXME: would be better if we had better mountpoints
-CDMNT=$(mktemp -d /media/cdtmp.XXXXXX)
-mount -o loop "$ISO" $CDMNT || exitclean
+CDMNT=$(mktemp -d /var/tmp/$0-mount.XXXXXX)
+STRIPPEDISO=$(mktemp -d /var/tmp/$0-stripped.XXXXXX)
+mount -o loop "$ISO" $CDMNT || cleanup_error
 
-trap exitclean SIGINT SIGTERM
+trap cleanup_error SIGINT SIGTERM
+trap cleanup EXIT
 
 # Does it look like an ISO?
 if [[ ( ! -d $CDMNT/isolinux ) || ( ! -f $CDMNT/isolinux/initrd0.img && ! -f $CDMNT/isolinux/initrd.img  ) ]]; then
     echo "The ISO image doesn't look like a LiveCD ISO image to me."
-    exitclean
+    cleanup_error
 fi
 
 if [[ -f $CDMNT/isolinux/initrd0.img ]]; then
@@ -93,9 +95,11 @@ mkdir tftpboot
 # initrd image.  The Linux kernel will do the right thing,
 # aggregating both cpio archives (initrd + ISO) into a single
 # filesystem.
-ISOBASENAME=`basename "$ISO"`
-ISODIRNAME=`dirname "$ISO"`
-( cd "$ISODIRNAME" && echo "$ISOBASENAME" | cpio -H newc --quiet -L -o ) |
+NEWISO=$STRIPPEDISO/`basename "$ISO"`
+mkisofs --quiet -J -joliet-long -r -T -o $NEWISO --root LiveOS $CDMNT/LiveOS/squashfs.img
+ISOBASENAME=`basename "$NEWISO"`
+ISODIRNAME=`dirname "$NEWISO"`
+( cd "$STRIPPEDISO" && echo "$ISOBASENAME" | cpio -H newc --quiet -L -o ) |
   gzip -9 |
   cat $CDMNT/isolinux/$INITRD - > tftpboot/$INITRD
 
@@ -127,10 +131,6 @@ LABEL pxeboot
 	APPEND rootflags=loop $APPEND
 ONERROR LOCALBOOT 0
 EOF
-
-# All done, clean up.
-umount $CDMNT
-rmdir $CDMNT
 
 echo "Your pxeboot image is complete."
 echo
