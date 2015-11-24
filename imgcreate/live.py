@@ -1033,7 +1033,7 @@ elif arch in ("ppc",):
     LiveImageCreator = ppcLiveImageCreator
 elif arch in ("ppc64",):
     LiveImageCreator = ppc64LiveImageCreator
-elif arch.startswith('arm'):
+elif arch.startswith(('arm', 'arch64')):
     LiveImageCreator = LiveImageCreatorBase
 
 else:
