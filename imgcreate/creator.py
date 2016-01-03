@@ -975,8 +975,7 @@ class LoopImageCreator(ImageCreator):
                                        self._instroot,
                                        self._fstype,
                                        self.__blocksize,
-                                       self.fslabel,
-                                       self.tmpdir)
+                                       self.fslabel)
 
         try:
             self.__instloop.mount()
