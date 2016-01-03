@@ -356,8 +356,7 @@ class LiveImageCreatorBase(LoopImageCreator):
 
             if not self.skip_minimize:
                 create_image_minimizer(self.__isodir + "/LiveOS/osmin.img",
-                                       self._image, self.compress_type,
-                                       tmpdir = self.tmpdir)
+                                       self._image, self.compress_type)
 
             if self.skip_compression:
                 shutil.move(self._image, self.__isodir + "/LiveOS/ext3fs.img")
