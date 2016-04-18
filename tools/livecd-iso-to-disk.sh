@@ -1330,9 +1330,9 @@ if [ "$overlaysizemb" -gt 0 ]; then
             dd if=/dev/null of=$TGTMNT/$LIVEOS/$OVERFILE count=1 bs=1M seek=$overlaysizemb
         fi
     fi
-    sed -i -e "s/r*d*.*live.*ima*ge*/& rd.live.overlay=${TGTLABEL}/"\
+    sed -i -e "s/r*d*.*live.*ima*ge*/& rd.live.overlay=${TGTLABEL} rw/"\
               $BOOTCONFIG $BOOTCONFIG_EFI
-    sed -i -e "s/\ ro\ /\ rw\ /" $BOOTCONFIG  $BOOTCONFIG_EFI
+    sed -i -e "s/\ ro\ / /" $BOOTCONFIG  $BOOTCONFIG_EFI
 fi
 
 if [ "$swapsizemb" -gt 0 -a -z "$skipcopy" ]; then
