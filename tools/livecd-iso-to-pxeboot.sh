@@ -109,8 +109,10 @@ cp $CDMNT/isolinux/$VMLINUZ tftpboot/$VMLINUZ
 # pxelinux bootloader.
 if [ -f /usr/share/syslinux/pxelinux.0 ]; then
     cp /usr/share/syslinux/pxelinux.0 tftpboot
+    cp /usr/share/syslinux/ldlinux.c32 tftpboot
 elif [ -f /usr/lib/syslinux/pxelinux.0 ]; then
     cp /usr/lib/syslinux/pxelinux.0 tftpboot
+    cp /usr/lib/syslinux/ldlinux.c32 tftpboot
 else
     echo "Warning: You need to add pxelinux.0 to tftpboot/ subdirectory"
 fi
