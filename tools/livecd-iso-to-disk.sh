@@ -370,7 +370,7 @@ get_partition1() {
     # a 'p' appended before the partition number.
     local dev=$1
 
-    if [[ $dev =~ .*[0..9]+$ ]]; then
+    if [[ $dev =~ .*[0-9]+$ ]]; then
         echo -n "${dev}p1"
     else
         echo -n "${dev}1"
