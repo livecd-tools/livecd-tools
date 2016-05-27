@@ -335,8 +335,7 @@ getdisk() {
     DEV=$1
 
     if isdevloop "$DEV"; then
-        device="$DEV"
-        return
+        [[ -b $DEV ]] && loop=True
     fi
 
     p=$(udevadm info -q path -n $DEV)
@@ -344,7 +343,11 @@ getdisk() {
         echo "Error getting udev path to $DEV"
         exitclean
     fi
-    if [ -e /sys/$p/device ]; then
+    if [[ -n $loop ]]; then
+        node=${DEV#/dev/loop}
+        p=$(basename $DEV)
+        device=loop${node%p*}
+    elif [ -e /sys/$p/device ]; then
         device=$(basename /sys/$p)
     else
         device=$(basename $(readlink -f /sys/$p/../))
@@ -375,9 +378,6 @@ get_partition1() {
 }
 
 resetMBR() {
-    if isdevloop "$DEV"; then
-        return
-    fi
     getdisk $1
     # if efi, we need to use the hybrid MBR
     if [ -n "$efi" ]; then
@@ -406,9 +406,6 @@ resetMBR() {
 }
 
 checkMBR() {
-    if isdevloop "$DEV"; then
-        return 0
-    fi
     getdisk $1
 
     bs=$(mktemp /tmp/bs.XXXXXX)
@@ -435,9 +432,6 @@ checkPartActive() {
     # if we're installing to whole-disk and not a partition, then we
     # don't need to worry about being active
     if [ "$dev" = "$device" ]; then
-        return
-    fi
-    if isdevloop "$DEV"; then
         return
     fi
 
@@ -521,11 +515,7 @@ createMSDOSLayout() {
     echo "Waiting for devices to settle..."
     /sbin/udevadm settle
     sleep 5
-    if ! isdevloop "$DEV"; then
-        TGTDEV=$(get_partition1 ${device})
-    else
-        TGTDEV=${device}
-    fi
+    TGTDEV=$(get_partition1 ${device})
     umount $TGTDEV &> /dev/null || :
     /sbin/mkdosfs -n LIVE $TGTDEV
     TGTLABEL="UUID=$(/sbin/blkid -s UUID -o value $TGTDEV)"
