@@ -321,14 +321,12 @@ isdevloop() {
     [ x"${1#/dev/loop}" != x"$1" ]
 }
 
-# Return the matching file ignoring case or 1 if no match
+# Return the matching file with the right case, or original string
+# which, when checked with -f or -e doesn't actually exist.
 nocase_path() {
-    local ret=0
     shopt -s nocaseglob
-    [ -e "$1" ] || ret=1
     echo $1
     shopt -u nocaseglob
-    return $ret
 }
 
 getdisk() {
@@ -1222,21 +1220,13 @@ fi
 # Before Fedora17 we could copy the .iso and setup a repo=
 # F17 and later look for repodata on the source media.
 # The presence of packages and LiveOS indicates F17 or later.
+# And then in F23 the LiveOS/squashfs.img moved back to images/install.img
+# So copy over Packages, repodata and all other top level directories, anaconda
+# should detect them and use them automatically.
 if [ -n "$packages" -a -z "$skipcopy" ]; then
-    if [ "$srctype" != "live" ]; then
-        echo "Copying $SRC to device"
-        copyFile "$SRC" "$TGTMNT/"
-
-        # Setup a repo= to point to the .iso
-        sed -i -e "s;initrd.img;initrd.img inst.repo=hd:$TGTLABEL:/;g" $BOOTCONFIG
-        if [ -n "$efi" ]; then
-            sed -i -e "s;vmlinuz;vmlinuz inst.repo=hd:$TGTLABEL:/;g" $BOOTCONFIG_EFI
-        fi
-    else
-        echo "Copying package data from $SRC to device"
-        rsync --inplace -rLDP --exclude EFI/ --exclude images/ --exclude isolinux/ \
-            --exclude TRANS.TBL --exclude LiveOS/ "$SRCMNT/" "$TGTMNT/"
-    fi
+    echo "Copying package data from $SRC to device"
+    rsync --inplace -rLDP --exclude EFI/ --exclude images/ --exclude isolinux/ \
+        --exclude TRANS.TBL --exclude LiveOS/ "$SRCMNT/" "$TGTMNT/"
     echo "Waiting for device to finish writing"
     sync
 fi
