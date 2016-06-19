@@ -540,6 +540,11 @@ class ImageCreator(object):
         from the install root.
 
         """
+        try:
+            os.unlink(self._instroot + "/etc/mtab")
+        except OSError:
+            pass
+
         self.__destroy_selinuxfs()
 
         self._undo_bindmounts()
