@@ -68,8 +68,8 @@ if [ -d tftpboot ]; then
 fi
 
 # Mount the ISO.
-CDMNT=$(mktemp -d /var/tmp/$0-mount.XXXXXX)
-STRIPPEDISO=$(mktemp -d /var/tmp/$0-stripped.XXXXXX)
+CDMNT=$(mktemp -d /var/tmp/$(basename $0)-mount.XXXXXX)
+STRIPPEDISO=$(mktemp -d /var/tmp/$(basename $0)-stripped.XXXXXX)
 mount -o loop "$ISO" $CDMNT || cleanup_error
 
 trap cleanup_error SIGINT SIGTERM
