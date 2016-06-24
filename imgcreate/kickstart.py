@@ -412,9 +412,10 @@ class SelinuxConfig(KickstartConfig):
         # touch some files which get unhappy if they're not labeled correctly
         for fn in ("/etc/resolv.conf",):
             path = self.path(fn)
-            f = file(path, "w+")
-            os.chmod(path, 0644)
-            f.close()
+            if not os.path.islink(path):
+                f = file(path, "a")
+                os.chmod(path, 0644)
+                f.close()
 
         if ksselinux.selinux == ksconstants.SELINUX_DISABLED:
             return
