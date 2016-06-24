@@ -448,7 +448,7 @@ class SelinuxConfig(KickstartConfig):
         for fn in ("/etc/resolv.conf",):
             path = self.path(fn)
             if not os.path.islink(path):
-                f = file(path, "w+")
+                f = file(path, "a")
                 os.chmod(path, 0644)
                 f.close()
 
