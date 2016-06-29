@@ -329,6 +329,11 @@ nocase_path() {
     shopt -u nocaseglob
 }
 
+
+run_parted() {
+    LC_ALL=C parted "$@"
+}
+
 getdisk() {
     DEV=$1
 
@@ -388,7 +393,7 @@ resetMBR() {
             exitclean
         fi
         # Make it bootable on EFI and BIOS
-        parted -s $device set $partnum legacy_boot on
+        run_parted -s $device set $partnum legacy_boot on
     else
         if [ -f /usr/lib/syslinux/mbr.bin ]; then
             cat /usr/lib/syslinux/mbr.bin > $device
@@ -464,8 +469,8 @@ createGPTLayout() {
     read
     umount ${device}* &> /dev/null || :
     wipefs -a ${device}
-    /sbin/parted --script $device mklabel gpt
-    partinfo=$(LC_ALL=C /sbin/parted --script -m $device "unit MB print" |grep ^$device:)
+    run_parted -s $device mklabel gpt
+    partinfo=$(run_parted -s -m $device "unit MB print" |grep ^$device:)
     dev_size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/MB$//')
     p1_size=$(($dev_size - 3))
 
@@ -476,7 +481,7 @@ createGPTLayout() {
     fi
     p1_start=1
     p1_end=$(($p1_size + 1))
-    /sbin/parted -s $device u MB mkpart '"EFI System Partition"' fat32 $p1_start $p1_end set 1 boot on
+    run_parted -s $device u MB mkpart '"EFI System Partition"' fat32 $p1_start $p1_end set 1 boot on
     # Sometimes automount can be _really_ annoying.
     echo "Waiting for devices to settle..."
     /sbin/udevadm settle
@@ -496,8 +501,8 @@ createMSDOSLayout() {
     read
     umount ${device}* &> /dev/null || :
     wipefs -a ${device}
-    /sbin/parted --script $device mklabel msdos
-    partinfo=$(LC_ALL=C /sbin/parted --script -m $device "unit MB print" |grep ^$device:)
+    run_parted -s $device mklabel msdos
+    partinfo=$(run_parted -s -m $device "unit MB print" |grep ^$device:)
     dev_size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/MB$//')
     p1_size=$(($dev_size - 3))
 
@@ -508,7 +513,7 @@ createMSDOSLayout() {
     fi
     p1_start=1
     p1_end=$(($p1_size + 1))
-    /sbin/parted -s $device u MB mkpart primary fat32 $p1_start $p1_end set 1 boot on
+    run_parted -s $device u MB mkpart primary fat32 $p1_start $p1_end set 1 boot on
     # Sometimes automount can be _really_ annoying.
     echo "Waiting for devices to settle..."
     /sbin/udevadm settle
@@ -528,8 +533,8 @@ createEXTFSLayout() {
     read
     umount ${device}* &> /dev/null || :
     wipefs -a ${device}
-    /sbin/parted -s $device mklabel msdos
-    partinfo=$(LC_ALL=C /sbin/parted -s -m $device "u MB print" |grep ^$device:)
+    run_parted -s $device mklabel msdos
+    partinfo=$(run_parted -s -m $device "u MB print" |grep ^$device:)
     dev_size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/MB$//')
     p1_size=$(($dev_size - 3))
 
@@ -540,7 +545,7 @@ createEXTFSLayout() {
     fi
     p1_start=1
     p1_end=$(($p1_size + 1))
-    /sbin/parted -s $device u MB mkpart primary ext2 $p1_start $p1_end set 1 boot on
+    run_parted -s $device u MB mkpart primary ext2 $p1_start $p1_end set 1 boot on
     # Sometimes automount can be _really_ annoying.
     echo "Waiting for devices to settle..."
     /sbin/udevadm settle
@@ -562,13 +567,13 @@ checkGPT() {
     dev=$1
     getdisk $dev
 
-    if [ "$(LC_ALL=C /sbin/parted -s -m $device p 2>/dev/null |grep -ic :gpt:)" -eq "0" ]; then
+    if [ "$(run_parted -s -m $device p 2>/dev/null |grep -ic :gpt:)" -eq "0" ]; then
         echo "EFI boot requires a GPT partition table."
         echo "This can be done manually or you can run with --format"
         exitclean
     fi
 
-    partinfo=$(LC_ALL=C /sbin/parted --script -m $device "print" |grep ^$partnum:)
+    partinfo=$(run_parted -s -m $device "print" |grep ^$partnum:)
     volname=$(echo $partinfo |cut -d : -f 6)
     flags=$(echo $partinfo |cut -d : -f 7)
     if [ "$volname" != "EFI System Partition" ]; then
