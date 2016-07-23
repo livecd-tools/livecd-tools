@@ -3,7 +3,7 @@
 
 # liveimage-mount: Mount a LiveOS at the specified point, and log into a shell.
 #
-# Copyright 2011, 2016-06-03, Red Hat, Inc., Sugar Labs®
+# Copyright 2011, 2016-11-04, Red Hat, Inc., Sugar Labs®
 #   Code for Live mounting an attached LiveOS device added by Frederick Grose,
 #   <fgrose at sugarlabs.org>
 #
@@ -38,7 +38,8 @@ def usage():
                                  [--chroot
                                  [--mount-hacks
                                  [--persist
-                                 [-o|--overlay=SIZE
+                                 [-s|--ovlsize=SIZE
+                                 [-o|--overlay=PATH
                                  [-y|--yumcache=PATH
                                  [-f|--dnfcache=PATH
                                  [-t|--tmpdir=PATH]]]]]]]]]]
@@ -76,9 +77,12 @@ Optional arguments:
                         Call liveimage-mount -u ISO|DEVICE|DIR MOUNTPOINT
                         to unmount the image.
 
-  -o SIZE, --overlay SIZE
+  -s SIZE, --ovlsize SIZE
                         Specify a size in mebibytes, MiB, for temporary
                         overlay files.  Default is 32768 MiB.
+
+  -o PATH, --overlay PATH
+                        Specify a path to a Device mapper overlay file.
 
   -y PATH, --yumcache PATH  (requires --mount-hacks)
                         Specify bind mounting of a Yum repository directory,
@@ -205,7 +209,7 @@ def mount(userargs, ops=None):
 def loop_setup(path, ops=None):
     """Make and associate a loop device with an image file or device."""
 
-    args = ['losetup', '-P', '-f', '--show', path]
+    args = ['losetup', '--direct-io', '-P', '-f', '--show', path]
     if ops:
         args += ops.split()
     return rcall(args)[0].rstrip()
@@ -310,10 +314,11 @@ def main():
         sys_exit(1)
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'h?uro:y:f:t:', ['help',
+        opts, args = getopt.getopt(sys.argv[1:], 'h?urs:o:y:f:t:', ['help',
                                    'unmount', 'read-only', 'chroot',
-                                   'mount-hacks', 'persist', 'overlay=',
-                                   'yumcache=', 'dnfcache=', 'tmpdir='])
+                                   'mount-hacks', 'persist', 'ovlsize',
+                                   'overlay=', 'yumcache=', 'dnfcache=',
+                                   'tmpdir='])
     except getopt.GetoptError as e:
         usage()
         print '  Error:  ' + str(e) + '.\n\tSee usage statement above.'
@@ -325,6 +330,7 @@ def main():
     mount_hacks = False
     persist = False
     osize = 32768
+    overlay = ''
     ovl_mp = ''
     yumcache = ''
     dnfcache = ''
@@ -343,7 +349,7 @@ def main():
             mount_hacks = True
         elif o in ('--persist', ):
             persist = True
-        elif o in ('-o', '--overlay'):
+        elif o in ('-s', '--ovlsize'):
             try:
                 osize = int(a)
             except ValueError:
@@ -356,17 +362,23 @@ def main():
                     Exiting...  Invalid overlay size, '%d' MiB.
                     It must be greater than zero MiB.\n''' % osize
                     sys_exit(1)
-        elif o in ('-y', '--yumcache'):
-            yumcache = a
-            if not os.path.isdir(yumcache):
-                print >> sys.stderr, '''\n    Exiting...  Invalid yumcache,
-                '%s' is not a directory.\n''' % yumcache
+        elif o in ('-o', '--overlay'):
+            overlay = a
+            if not os.path.isfile(overlay):
+                print >> sys.stderr, '''\n    Exiting...  Invalid overlay,
+                '%s' is not a file.\n''' % overlay
                 sys_exit(1)
         elif o in ('-f', '--dnfcache'):
             dnfcache = a
             if not os.path.isdir(dnfcache):
                 print >> sys.stderr, '''\n    Exiting...  Invalid dnfcache,
                 '%s' is not a directory.\n''' % dnfcache
+                sys_exit(1)
+        elif o in ('-y', '--yumcache'):
+            yumcache = a
+            if not os.path.isdir(yumcache):
+                print >> sys.stderr, '''\n    Exiting...  Invalid yumcache,
+                '%s' is not a directory.\n''' % yumcache
                 sys_exit(1)
         elif o in ('-t', '--tmpdir'):
             tmpdir = a
@@ -554,14 +566,16 @@ def main():
                 mount(['-o', 'remount,ro', liveos, liveosmnt])
                 if liveosmnt == liveos:
                     remountrw = True
+        if overlay:
+            roflag = ''
 
         liveosdir = os.path.join(liveosmnt, 'LiveOS')
         squash_img = os.path.join(liveosdir, 'squashfs.img')
         if not os.path.exists(squash_img):
             opts = ''
-            rootfs_img = os.path.join(liveosdir, 'ext3fs.img')
+            rootfs_img = os.path.join(liveosdir, 'rootfs.img')
             if not os.path.exists(rootfs_img):
-                rootfs_img = os.path.join(liveosdir, 'rootfs.img')
+                rootfs_img = os.path.join(liveosdir, 'ext3fs.img')
             if not os.path.exists(rootfs_img):
                 print "\n\tNo LiveOS was found on '%s'\n\t  Exiting...\n%s" \
                        % (liveos, linkn[0])
@@ -571,28 +585,31 @@ def main():
             squashmnt = tempfile.mkdtemp(prefix=Y + '-mp-squash-')
             remove_mp.append(squashmnt)
             mount(['-r', squash_img, squashmnt])
-            rootfs_img = os.path.join(squashmnt, 'LiveOS', 'ext3fs.img')
+            rootfs_img = os.path.join(squashmnt, 'LiveOS', 'rootfs.img')
             if not os.path.exists(rootfs_img):
-                rootfs_img = os.path.join(squashmnt, 'LiveOS', 'rootfs.img')
+                rootfs_img = os.path.join(squashmnt, 'LiveOS', 'ext3fs.img')
             if not os.path.exists(rootfs_img):
                 print >> sys.stderr, "\n\tNo rootfs.img was found on '%s'\n" \
                                     "\r\t  Exiting...\n%s" % (liveos, linkn[0])
                 sys_exit(1)
         overlayfs = None
-        for f in os.listdir(liveosdir):
-            if f.find('overlay-') == 0:
-                if os.path.isdir(os.path.join(liveosdir, f)):
-                    overlayfs = os.path.join(liveosdir, f)
-                else:
-                    overlayloop = loop_setup(os.path.join(liveosdir, f), roflag)
-                    call(['udevadm', 'settle'])
-                    if lsblk('-nrdo FSTYPE ' + overlayloop) not in (
-                                                        '', 'DM_snapshot_cow'):
-                        ovl_mp = tempfile.mkdtemp(prefix=Y + '-ovl-')
-                        remove_mp.append(ovl_mp)
-                        overlayfs = os.path.join(ovl_mp, 'overlayfs')
-                opts = '-r'
-                break
+        if not overlay:
+            for f in os.listdir(liveosdir):
+                if f.find('overlay-') == 0:
+                    overlay = os.path.join(liveosdir, f)
+                    break
+        if overlay:
+            if os.path.isdir(overlay):
+                overlayfs = overlay
+            else:
+                overlayloop = loop_setup(overlay, roflag)
+                call(['udevadm', 'settle'])
+                if lsblk('-nrdo FSTYPE ' + overlayloop) not in (
+                                                    '', 'DM_snapshot_cow'):
+                    ovl_mp = tempfile.mkdtemp(prefix=Y + '-ovl-')
+                    remove_mp.append(ovl_mp)
+                    overlayfs = os.path.join(ovl_mp, 'overlayfs')
+            opts = '-r'
         imgloop = loop_setup(rootfs_img, opts)
         imgsize = rcall(['blockdev', '--getsz', imgloop])[0].rstrip()
         dm_path = os.path.join('/dev', 'mapper', 'live-base')
@@ -676,8 +693,8 @@ def main():
                 tmphomeoverlayloop = loop_setup(tmpoverlay.name)
                 del tmpoverlay
                 if home_path == os.path.join(liveosdir, 'home.img'):
-                    homedev = loop_setup(
-                                 os.path.join(liveosdir, 'home.img'), '-r')
+                    homedev = loop_setup(os.path.join(liveosdir,
+                                         'home.img'), '-r')
                 imgsize = rcall(['blockdev', '--getsz', homedev])[0].rstrip()
                 dmsetup('create Home' + X, ['--table=0 %s snapshot %s %s N 8' %
                                        (imgsize, homedev, tmphomeoverlayloop)])
@@ -691,22 +708,28 @@ def main():
                        os.path.join(destmnt, 'run')], stderr=sys.stderr)
             subprocess.check_call(['mount', '-t', 'sysfs', 'sys',
                 os.path.join(destmnt, 'sys')], stderr=sys.stderr)
-            subprocess.check_call(['mount', '-t', 'devpts', 'devpts',
-                os.path.join(destmnt, 'dev', 'pts')], stderr=sys.stderr)
+            tmpfs = os.path.join(destmnt, 'dev', 'pts')
+            if not os.path.exists(tmpfs):
+                os.makedirs(tmpfs)
+            subprocess.check_call(['mount', '-t', 'devpts', 'devpts', tmpfs],
+                                  stderr=sys.stderr)
             tmpfs = os.path.join(destmnt, 'dev', 'shm')
             if not os.path.exists(tmpfs):
                 os.makedirs(tmpfs)
             subprocess.check_call(['mount', '-t', 'tmpfs', 'tmpfs', tmpfs],
                                   stderr=sys.stderr)
-            mount(['--bind', '/etc/resolv.conf',
-                   os.path.join(destmnt, 'etc', 'resolv.conf')])
+            tmpfs = os.path.join(destmnt, 'etc', 'resolv.conf')
+            if os.path.lexists(tmpfs):
+                os.unlink(tmpfs)
+            os.symlink('/run/NetworkManager/resolv.conf', tmpfs)
+            tmpfs = os.path.join(destmnt, 'var', 'cache', 'yum')
+            if not os.path.exists(tmpfs):
+                os.makedirs(tmpfs)
             if yumcache:
-                mount(['--bind', yumcache,
-                       os.path.join(destmnt, 'var', 'cache', 'yum')])
+                mount(['--bind', yumcache, tmpfs])
             else:
                 subprocess.check_call(['mount', '-t', 'tmpfs', 'varcacheyum',
-                    os.path.join(destmnt, 'var', 'cache', 'yum')],
-                    stderr=sys.stderr)
+                                       tmpfs], stderr=sys.stderr)
             if dnfcache:
                 mount(['--bind', dnfcache,
                        os.path.join(destmnt, 'var', 'cache', 'dnf')])
