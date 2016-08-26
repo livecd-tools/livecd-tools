@@ -197,6 +197,7 @@ class LiveCDYum(yum.YumBase):
 
 
     def runInstall(self):
+        import yum.Errors
         os.environ["HOME"] = "/"
         try:
             (res, resmsg) = self.buildTransaction()
