@@ -95,7 +95,7 @@ The command
 # livecd-creator \
   --config=/usr/share/doc/livecd-tools/livecd-fedora-minimal.ks
 
-will create a live CD that will boot to a login prompt. Not that since
+will create a live CD that will boot to a login prompt. Note that since
 no configuration is done the user will not be able to login to the
 system as the root password is not set / cleared.
 
