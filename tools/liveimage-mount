@@ -1,9 +1,9 @@
 #!/usr/bin/python -tt
+# coding: utf-8
+
+# liveimage-mount: Mount a LiveOS at the specified point, and log into a shell.
 #
-# liveimage-mount: Mount a LiveOS at the specified point, and log
-# into a shell.
-#
-# Copyright 2011, Red Hat  Inc.
+# Copyright 2011, 2016-11-04, Red Hat, Inc., Sugar Labs®
 #   Code for Live mounting an attached LiveOS device added by Frederick Grose,
 #   <fgrose at sugarlabs.org>
 #
@@ -23,31 +23,111 @@
 import os
 import sys
 import stat
+import shutil
 import getopt
 import tempfile
 import subprocess
 
-from imgcreate.errors import *
+def usage():
+    print '''Usage:
+        liveimage-mount [opts] ISO|DEVICE|DIR  MOUNTPOINT  [command] [args ...]
 
-def usage(ecode):
-    print """Usage:
-        liveimage-mount [opts] ISO.iso|LiveOSdevice MOUNTPOINT [COMMAND] [ARGS]
-
-                  where [opts] = [-h|--help
+                  where [opts] = [-h|-?|--help
+                                 [-u|--unmount
+                                 [-r|--read-only
                                  [--chroot
                                  [--mount-hacks
-                                 [--persist]]]]]
+                                 [--persist
+                                 [-s|--ovlsize=SIZE
+                                 [-o|--overlay=PATH
+                                 [-y|--yumcache=PATH
+                                 [-f|--dnfcache=PATH
+                                 [-t|--tmpdir=PATH]]]]]]]]]]
 
-                    and [ARGS] = [arg1[ arg2[ ...]]]\n"""
+                and [args ...] = [arg1[ arg2[ ...]]]
+
+  Mount a LiveOS at the specified directory, and log into a command shell.
+
+Positional arguments:
+
+  ISO|DEVICE|DIR        A path to the source ISO.iso file, block device,
+                        mount point, or directory bearing a LiveOS image.
+
+  MOUNTPOINT            The mount point desired for the LiveOS image's root
+                        filesystem.
+
+Optional arguments:
+
+  -h, -?, --help        Show this help message and exit.
+
+  -u, --unmount         Specify unmounting a LiveOS image's filesystems.
+
+  -r, --read-only       Specify read-only mounting of image filesystems.
+
+  --chroot              Specify mounting the image root filesystem in a
+                        change-root directory.
+
+  --mount-hacks         Specify mounting of the /proc kernel filesystem
+                        and /run temporary filesystem.
+
+  --persist             Keep the specified mounts active on exit. (If a
+                        command is requested, it will run in the current
+                        root filesytem.)
+
+                        Call liveimage-mount -u ISO|DEVICE|DIR MOUNTPOINT
+                        to unmount the image.
+
+  -s SIZE, --ovlsize SIZE
+                        Specify a size in mebibytes, MiB, for temporary
+                        overlay files.  Default is 32768 MiB.
+
+  -o PATH, --overlay PATH
+                        Specify a path to a Device mapper overlay file.
+
+  -y PATH, --yumcache PATH  (requires --mount-hacks)
+                        Specify bind mounting of a Yum repository directory,
+                        otherwise a tmpfs is mounted.
+
+  -f PATH, --dnfcache PATH  (requires --mount-hacks)
+                        Specify bind mounting of a DNF repository directory,
+                        otherwise a tmpfs is mounted.
+
+  -t PATH, --tmpdir PATH
+                        Specify a directory for mounting interim filesystems
+                        and holding temporary overlays.
+
+  [command] [args ...]  A shell command with one or more arguments that will
+                        be run in a change-root directory.
+
+  The optional command and arguments will be run after the LiveOS is mounted.
+
+'''
+
+
+class LiveImageMountError(Exception):
+    """An exception base class for all liveimage-mount errors."""
+    def __init__(self, msg):
+        Exception.__init__(self, msg)
+    def __str__(self):
+        try:
+            return str(self.message)
+        except UnicodeEncodeError:
+            return repr(self.message)
+
+    def __unicode__(self):
+        return unicode(self.message)
+
+
+def sys_exit(ecode):
+    """Exit this Python program."""
     sys.exit(ecode)
 
-
 def call(*popenargs, **kwargs):
-    '''
-        Calls subprocess.Popen() with the provided arguments.  All stdout and
-        stderr output is sent to print.  The return value is the exit
-        code of the command.
-    '''
+    """
+    Calls subprocess.Popen() with the provided arguments.  All stdout and
+    stderr output is sent to print.  The return value is the exit
+    code of the command.
+    """
     p = subprocess.Popen(*popenargs, stdout=subprocess.PIPE,
                          stderr=subprocess.STDOUT, **kwargs)
     rc = p.wait()
@@ -62,237 +142,663 @@ def call(*popenargs, **kwargs):
 
     return rc
 
+def rcall(args, stdin=None, raise_err=True, cwd=None, env=None):
+    """Return stdout, stderr, & returncode from a subprocess call."""
 
-def rcall(args, env=None):
-    if env:
+    out, err, p, environ = '', '', None, None
+    if env is not None:
         environ = os.environ.copy()
         environ.update(env)
-    else:
-        environ = None
     try:
-        p = subprocess.Popen(args, stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE, env=environ)
-        out, err = p.communicate()
-    except OSError, e:
-        raise CreatorError(u"Failed to execute:\n'%s'\n'%s'" % (args, e))
-    except:
-        raise CreatorError(u"""Failed to execute:\n'%s'
-            \renviron: '%s'\nstdout: '%s'\nstderr: '%s'\nreturncode: '%s'""" %
-            (args, environ, out, err, p.returncode))
+        p = subprocess.Popen(args, stdin=subprocess.PIPE, cwd=cwd, env=environ,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = p.communicate(stdin)
+    except OSError as e:
+        err = u'Failed executing:\n%s\nerror: %s' % (args, e)
+        if raise_err:
+            raise CreatorError(u'Failed executing:\n%s\nerror: %s' % (args, e))
+    except Exception as e:
+        err = u'Failed to execute:\n%s\nerror: %s' % (args, e)
+        if raise_err:
+            raise CreatorError(u'Failed ta execute:\n%s\n'
+                                'error: %s\nstdout: %s\nstderr: %s' %
+                               (args, e, out, err))
     else:
-        if p.returncode != 0:
-            raise CreatorError(u"""Error in call:\n'%s'\nenviron: '%s'
-                \rstdout: '%s'\nstderr: '%s'\nreturncode: '%s'""" %
-                (args, environ, out, err, p.returncode))
-        return out
+        if p.returncode != 0 and raise_err:
+            raise CreatorError(u'Error in call:\n%s\nenviron: %s\n'
+                                'stdout: %s\nstderr: %s\nreturncode: %s' %
+                               (args, environ, out, err, p.returncode))
+    finally:
+        return out, err
 
+def lsblk(userargs, ops=None):
+    """Use command lsblk from the util-linux package."""
 
-def get_device_mountpoint(path):
-    """Return the device and mountpoint for a file or device path."""
+    args = ['lsblk'] + userargs.split()
+    if ops:
+        ops = ops.split()
+        ops.reverse()
+        for i in ops:
+            args.insert(1, i)
+    return rcall(args)[0].strip()
 
-    info = list()
-    info[0:5] = [None] * 6
-    if os.path.exists(path):
-        st_mode = os.stat(path).st_mode
-        if stat.S_ISBLK(st_mode) or os.path.ismount(path):
-            devinfo = rcall(['/bin/df', path]).splitlines()
-            info = devinfo[1].split(None)
-            if len(info) == 1:
-                info.extend(devinfo[2].split(None))
-    return [info[0], info[5]]
+def findmnt(search, ops=None):
+    """Use command findmnt from the util-linux package."""
+
+    args = ['findmnt'] + search.split()
+    if ops:
+        ops = ops.split()
+        ops.reverse()
+        for i in ops:
+            args.insert(1, i)
+    return rcall(args)[0].strip()
+
+def mount(userargs, ops=None):
+    """Call for a mount with options."""
+
+    args = ['mount'] + userargs
+    if ops:
+        ops = ops.split()
+        for i in ops:
+            args.insert(1, i)
+    rc = call(args)
+    if rc != 0:
+        raise LiveImageMountError(u'Return code: %s\n\n**Check for a message '
+              'above the Traceback.**\nFailed mount command:\n%s' % (rc, args))
+
+def loop_setup(path, ops=None):
+    """Make and associate a loop device with an image file or device."""
+
+    args = ['losetup', '--direct-io', '-P', '-f', '--show', path]
+    if ops:
+        args += ops.split()
+    return rcall(args)[0].rstrip()
+
+def losetup(userargs, ops=None):
+    """Use command losetup from the util-linux package."""
+
+    args = ['losetup'] + userargs.split()
+    if ops:
+        ops = ops.split()
+        ops.reverse()
+        for i in ops:
+            args.insert(1, i)
+    return rcall(args)[0].strip()
+
+def loop_detach(devloop):
+    """Detach a loop device if associated."""
+
+    if devloop and losetup('-nO BACK-FILE ' + devloop):
+        losetup('-d ' + devloop)
+
+def cryptsetup(userargs, ops=None):
+    """Call cryptsetup with options."""
+
+    args = ['cryptsetup'] + userargs.split()
+    if ops:
+        args += ops
+
+    rc = call(args)
+    if rc != 0:
+        raise LiveImageMountError(u'Return code: %s\n\n**Check for a message '
+         'above the Traceback.**\nFailed cryptsetup command:\n%s' % (rc, args))
+
+def dmsetup(userargs, ops=None):
+    """Call device-mapper setup with options."""
+
+    args = ['dmsetup'] + userargs.split()
+    if ops:
+        args += ops
+
+    rc = call(args)
+    if rc != 0:
+        raise LiveImageMountError(u'Return code: %s\n\n**Check for a message '
+            'above the Traceback.**\nFailed dmsetup command:\n%s' % (rc, args))
+
+def get_dm_table(target):
+    """Return the table for a Device-mapper target."""
+
+    table = None
+    table = rcall(['dmsetup', 'table', target])[0].rstrip()
+    return table
+
+def link_note(path, rpath):
+    """Return a note when paths are linked."""
+
+    linkn = ''
+    if os.path.islink(os.path.abspath(path)):
+        linkn = "\n      Note: '%s' links to '%s'." % (path, rpath)
+    return linkn
+
+def real_directory_path(path, linkn, remove_mp, unmount):
+    """Return a real directory path, even for missing or faulty links."""
+
+    rpath = os.path.realpath(path)
+    linkn.append(link_note(path, rpath))
+    try:
+        mode = os.stat(rpath).st_mode
+    except OSError as e:
+        if e.errno == 2:
+            os.makedirs(rpath)
+            remove_mp.append(rpath)
+            mode = os.stat(rpath).st_mode
+        else:
+            print >> sys.stderr, '\n    OSError: %s\n%s' % (e, linkn[1])
+            sys_exit(1)
+    except:
+        print 'Unexpected error:', sys.exc_info()[0]
+        raise
+
+    if stat.S_ISREG(mode):
+        print >> sys.stderr, '''\n    Exiting...
+        '%s' is a file and not a directory.\n%s''' % (rpath, linkn[1])
+        sys_exit(1)
+    elif not stat.S_ISDIR(mode):
+        print >> sys.stderr, '''\n    Exiting...
+        '%s' is not a directory.\n%s''' % (rpath, linkn[1])
+        sys_exit(1)
+    elif not unmount and os.path.ismount(rpath):
+        src = findmnt('-nro SOURCE ' + rpath)
+        print >> sys.stderr, '''\n    Exiting...
+        '%s' is already a mount point for these sources:\n
+        \r%s\n%s''' % (rpath, src, linkn[1])
+        sys_exit(1)
+
+    return rpath
 
 
 def main():
     if os.geteuid() != 0:
-        print >> sys.stderr, """\n  Exiting...
-        \r  You must run liveimage-mount with root priviledges.\n"""
-        return 1
+        print >> sys.stderr, '''\n  Exiting...
+        \r  You must run liveimage-mount with root priviledges.\n'''
+        sys_exit(1)
 
     try:
-        opts,args = getopt.getopt(sys.argv[1:], 'h', ['help',
-                                                       'chroot', 'persist',
-                                                       'mount-hacks'])
-    except getopt.GetoptError, e:
-        usage(1)
+        opts, args = getopt.getopt(sys.argv[1:], 'h?urs:o:y:f:t:', ['help',
+                                   'unmount', 'read-only', 'chroot',
+                                   'mount-hacks', 'persist', 'ovlsize',
+                                   'overlay=', 'yumcache=', 'dnfcache=',
+                                   'tmpdir='])
+    except getopt.GetoptError as e:
+        usage()
+        print '  Error:  ' + str(e) + '.\n\tSee usage statement above.'
+        sys_exit(1)
 
-    img_type = None
+    unmount = False
+    roflag = ''
     chroot = False
-    persist = False
     mount_hacks = False
-    for o,a in opts:
-        if o in ('-h', '--help'):
-            usage(0)
+    persist = False
+    osize = 32768
+    overlay = ''
+    ovl_mp = ''
+    yumcache = ''
+    dnfcache = ''
+    tmpdir = '/tmp'
+    for o, a in opts:
+        if o in ('-h', '-?', '--help'):
+            usage()
+            sys_exit(0)
+        elif o in ('-u', '--unmount'):
+            unmount = True
+        elif o in ('-r', '--read-only'):
+            roflag = '-r'
         elif o in ('--chroot', ):
             chroot = True
         elif o in ('--mount-hacks', ):
             mount_hacks = True
         elif o in ('--persist', ):
-            """Option used to run a command in a spawned process."""
             persist = True
+        elif o in ('-s', '--ovlsize'):
+            try:
+                osize = int(a)
+            except ValueError:
+                print >> sys.stderr, '''\n    Exiting...  Invalid overlay size,
+                '%s' is not an integer.\n''' % a
+                sys_exit(1)
+            else:
+                if not osize > 0:
+                    print >> sys.stderr, '''
+                    Exiting...  Invalid overlay size, '%d' MiB.
+                    It must be greater than zero MiB.\n''' % osize
+                    sys_exit(1)
+        elif o in ('-o', '--overlay'):
+            overlay = a
+            if not os.path.isfile(overlay):
+                print >> sys.stderr, '''\n    Exiting...  Invalid overlay,
+                '%s' is not a file.\n''' % overlay
+                sys_exit(1)
+        elif o in ('-f', '--dnfcache'):
+            dnfcache = a
+            if not os.path.isdir(dnfcache):
+                print >> sys.stderr, '''\n    Exiting...  Invalid dnfcache,
+                '%s' is not a directory.\n''' % dnfcache
+                sys_exit(1)
+        elif o in ('-y', '--yumcache'):
+            yumcache = a
+            if not os.path.isdir(yumcache):
+                print >> sys.stderr, '''\n    Exiting...  Invalid yumcache,
+                '%s' is not a directory.\n''' % yumcache
+                sys_exit(1)
+        elif o in ('-t', '--tmpdir'):
+            tmpdir = a
+            if not os.path.isdir(tmpdir):
+                print >> sys.stderr, '''\n    Exiting...  Invalid tmpdir,
+                '%s' is not a directory.\n''' % tmpdir
+                sys_exit(1)
 
     if len(args) < 2:
-        usage(1)
+        usage()
+        print >> sys.stderr, '''  ERROR:
+        A LiveOS source AND a mount point must be provided.\n'''
+        sys_exit(2)
 
-    liveos = args[0]
-    destmnt = args[1]
+    def cleanup():
+        """
+        Unmount filesystems and remove device-mapper targets and loop
+        devices associated with a LiveOS image.
+        """
+        call(['sync'])
+        if os.path.ismount(destmnt):
+            call(['umount', '-Rd', destmnt])
+        if base_mp:
+            call(['umount', '-d', base_mp])
+            if ovl_mp:
+                call(['umount', '-d', ovl_mp])
+            if robase_mp:
+                call(['umount', '-d', robase_mp])
+        if os.path.exists(os.path.join('/dev', 'mapper', 'Home' + X)):
+            dmsetup('remove --retry Home' + X)
+            loop_detach(tmphomeoverlayloop)
+            if homedev.startswith('/dev/loop'):
+                loop_detach(homedev)
+        if os.path.exists(os.path.join('/dev', 'mapper', 'EncHome' + X)):
+            cryptsetup('close EncHome' + X)
+        if os.path.exists(os.path.join('/dev', 'mapper', 'live-rw' + X)):
+            dmsetup('remove --retry live-rw' + X)
+        loop_detach(tmpoverlayloop)
+        if os.path.exists(os.path.join('/dev', 'mapper', 'live-ro' + X)):
+            dmsetup('remove --retry live-ro' + X)
+        loop_detach(overlayloop)
+        if os.path.exists(os.path.join('/dev', 'mapper', 'live-base' + X)):
+            dmsetup('remove --retry live-base' + X)
+        loop_detach(imgloop)
+        if os.path.ismount(squashmnt):
+            call(['umount', '-d', squashmnt])
+        if os.path.ismount(liveosmnt) and liveosmnt != liveos:
+            call(['umount', '-d', liveosmnt])
+        [os.rmdir(mp) for mp in remove_mp]
+        [shutil.rmtree(d) for d in remove_dir]
+        if not unmount:
+            if remountrw:
+                mount(['-o', 'remount,rw', liveos, liveosmnt])
+            if verbose:
+                print 'Cleanup complete.'
 
+    remove_mp = list()
+    remove_dir = list()
+    liveos = os.path.realpath(args[0])
+    linkn = [link_note(args[0], liveos)]
     if not os.path.exists(liveos):
-        print """\n     Exiting...
-        %s is not a file, directory, or device.\n""" % liveos
-        ecode = 1
-        return
+        print >> sys.stderr, '''\n    Exiting...
+        '%s' is not a file, directory, or device.\n%s''' % (liveos, linkn[0])
+        sys_exit(1)
+    destmnt = real_directory_path(args[1], linkn, remove_mp, unmount)
+    X = ''
+    imgloop = ''
+    base_mp = ''
+    robase_mp = ''
+    tmpovl = ''
+    overlayloop = ''
+    tmpoverlayloop = ''
+    squashmnt = ''
 
-    if stat.S_ISBLK(os.stat(liveos).st_mode):
-        img_type = 'blk'
-        imgloop = None
-        overlayloop = None
-    else:
-        img_type = 'iso'
-
-    if img_type is 'blk':
-        liveosmnt = tempfile.mkdtemp(prefix='livemnt-device-')
-    if img_type is 'iso':
-        liveosmnt = tempfile.mkdtemp(prefix='livemnt-iso-')
-
-    liveosdir = os.path.join(liveosmnt, 'LiveOS')
-    homemnt = None
-    dm_cow = None
-    mntlive = None
+    if unmount:
+        if not os.path.ismount(destmnt):
+            print >> sys.stderr, "\n  ERROR:\n    '%s' is not a mount point." \
+            "  Exiting...\n%s" % (destmnt, linkn[1])
+            sys_exit(1)
+        src = findmnt('-nro SOURCE,OPTIONS ' + destmnt).split()
+        if not (src[0] == 'LiveOS_rootfs' or src[0].startswith(os.path.join(
+                                                '/dev', 'mapper', 'live-rw'))):
+            print >> sys.stderr, "\n  ERROR:\n  '%s' is not a LiveOS mount " \
+            "point.  Exiting...\n%s" % (destmnt, linkn[1])
+            sys_exit(1)
+        if src[0] == 'LiveOS_rootfs':
+            if src[1].find('-r-') > -1:
+                robase_mp = src[1][src[1].find(
+                          'lowerdir=')+9:src[1].find(',upperdir=')]
+                remove_mp.append(robase_mp)
+                o = findmnt('-nro OPTIONS --mountpoint ' + robase_mp)
+                base_mp = o[o.find(':')+1:]
+                a = o.find('/overlayfs:')
+                if a > -1:
+                    ovl_mp = o[o.find('lowerdir=')+9:a]
+                tmpovl = src[1][src[1].find(
+                                'upperdir=')+9:src[1].find(',workdir=')]
+                tmpwork = src[1][src[1].find('workdir=')+8:]
+                remove_dir.extend([tmpovl, tmpwork])
+            else:
+                base_mp = src[1][src[1].find(
+                          'lowerdir=')+9:src[1].find(',upperdir=')]
+                ovl_mp = src[1][src[1].find(
+                          'upperdir=')+9:src[1].find(',workdir=')]
+            if os.path.ismount(ovl_mp):
+                remove_mp.append(ovl_mp)
+            remove_mp.append(base_mp)
+        else:
+            src = src[0].rsplit('.', 1)
+            if len(src) > 1:
+                X = '.' + src[1]
+        if os.path.exists(os.path.join('/dev', 'mapper', 'Home' + X)):
+            src = get_dm_table('Home' + X).split()
+            tmphomeoverlayloop = ''.join(('/dev/loop', src[4].split(':')[1]))
+            homedev = src[3]
+            if homedev.startswith('7'):
+                homedev = ''.join(('/dev/loop', homedev.split(':')[1]))
+        if os.path.exists(os.path.join('/dev', 'mapper', 'live-ro' + X)):
+            src = get_dm_table('live-ro' + X).split()
+            tmpoverlayloop = ''.join(('/dev/loop', src[4].split(':')[1]))
+            imgloop = ''.join(('/dev/loop', src[3].split(':')[1]))
+        if base_mp:
+            src = get_dm_table('live-base' + X).split()
+            imgloop = ''.join(('/dev/loop', src[3].split(':')[1]))
+        else:
+            src = get_dm_table('live-rw' + X).split()
+            if not imgloop:
+                imgloop = ''.join(('/dev/loop', src[3].split(':')[1]))
+            overlayloop = ''.join(('/dev/loop', src[4].split(':')[1]))
+        liveosmnt = os.path.normpath(losetup('-nO BACK-FILE ' + imgloop)
+                                     + '/../..')
+        src = findmnt('-nro FSTYPE,SOURCE ' + liveosmnt).split()
+        if src[0] == 'squashfs':
+            squashmnt = liveosmnt
+            remove_mp.append(squashmnt)
+            liveosmnt = os.path.normpath(losetup('-nO BACK-FILE ' + src[1])
+                                         + '/../..')
+        if os.path.ismount(liveosmnt) and liveosmnt != liveos:
+            remove_mp.append(liveosmnt)
+        src = os.path.join(destmnt, 'mnt', 'live')
+        if os.path.ismount(src):
+            call(['umount', src])
+            os.rmdir(src)
+        cleanup()
+        print '''\n    '%s' filesystems have been unmounted.\n%s\n
+        \r    The '%s' mount point has NOT been deleted.\n%s''' % (
+                                           liveos, linkn[0], destmnt, linkn[1])
+        if os.path.ismount(liveosmnt) and liveosmnt == liveos:
+            print "\n    Note: '%s' may still be read-only mounted.\n" % liveos
+        sys_exit(0)
 
     command = args[2:]
     verbose = not command
+    remountrw = False
 
-    squashmnt = tempfile.mkdtemp(prefix='livemnt-squash-')
-    squashloop = None
-    imgloop = None
-    losetup_args = ['/sbin/losetup', '-f', '--show']
+    liveosmnt = tempfile.mkdtemp(prefix='', suffix='-dev-mp')
+    Y = os.path.basename(liveosmnt)[:-7]
+
+    if os.path.ismount(liveos) or os.path.isdir(liveos):
+        os.rmdir(liveosmnt)
+        liveosmnt = liveos
+    else:
+        remove_mp.append(liveosmnt)
+
+        if rcall(['file', '-rb', liveos])[0].startswith('ISO 9660'):
+            roflag = '-r'
+        elif not lsblk('-nrdo TYPE ' + liveos) in ('part', 'loop'):
+            print >> sys.stderr, "\n    Exiting...\n\t'%s' is not a device " \
+            "partition or an ISO file.\n%s" % (liveos, linkn[0])
+            sys_exit(1)
 
     try:
-        if img_type is 'blk':
-            call(['/bin/mount', liveos, liveosmnt])
-        elif img_type is 'iso':
-            liveosloop = rcall(losetup_args + [liveos]).rstrip()
-            call(['/bin/mount', '-o', 'ro', liveosloop, liveosmnt])
+        if liveosmnt != liveos:
+            if roflag and rcall(['findmnt','-nfro', 'FS-OPTIONS', liveos],
+                                raise_err=False)[0].startswith('rw'):
+                a = findmnt(liveos)
+                mount(['-o', 'remount,ro', liveos])
 
+            mount([liveos, liveosmnt], ops=roflag)
+
+        if not os.access(liveosmnt, os.W_OK):
+            roflag = '-r'
+        elif roflag:
+            if os.path.ismount(liveos):
+                mount(['-o', 'remount,ro', liveos, liveosmnt])
+                if liveosmnt == liveos:
+                    remountrw = True
+        if overlay:
+            roflag = ''
+
+        liveosdir = os.path.join(liveosmnt, 'LiveOS')
         squash_img = os.path.join(liveosdir, 'squashfs.img')
         if not os.path.exists(squash_img):
-            ext3_img = os.path.join(liveosdir, 'ext3fs.img')
-            if not os.path.exists(ext3_img):
-                print """
-                \r\tNo LiveOS was found on %s\n\t  Exiting...\n""" % liveos
-                ecode = 1
-                return
+            opts = ''
+            rootfs_img = os.path.join(liveosdir, 'rootfs.img')
+            if not os.path.exists(rootfs_img):
+                rootfs_img = os.path.join(liveosdir, 'ext3fs.img')
+            if not os.path.exists(rootfs_img):
+                print "\n\tNo LiveOS was found on '%s'\n\t  Exiting...\n%s" \
+                       % (liveos, linkn[0])
+                sys_exit(1)
         else:
-            squashloop = rcall(losetup_args + [squash_img]).rstrip()
-            call(['/bin/mount', '-o', 'ro', squashloop, squashmnt])
-            ext3_img = os.path.join(squashmnt, 'LiveOS', 'ext3fs.img')
-
-        if img_type is 'blk':
-            imgloop = rcall(losetup_args + [ext3_img]).rstrip()
-            imgsize = rcall(['/sbin/blockdev', '--getsz', imgloop]).rstrip()
-            files = os.listdir(liveosdir)
-            overlay = None
-            for f in files:
+            opts = '-r'
+            squashmnt = tempfile.mkdtemp(prefix=Y + '-mp-squash-')
+            remove_mp.append(squashmnt)
+            mount(['-r', squash_img, squashmnt])
+            rootfs_img = os.path.join(squashmnt, 'LiveOS', 'rootfs.img')
+            if not os.path.exists(rootfs_img):
+                rootfs_img = os.path.join(squashmnt, 'LiveOS', 'ext3fs.img')
+            if not os.path.exists(rootfs_img):
+                print >> sys.stderr, "\n\tNo rootfs.img was found on '%s'\n" \
+                                    "\r\t  Exiting...\n%s" % (liveos, linkn[0])
+                sys_exit(1)
+        overlayfs = None
+        if not overlay:
+            for f in os.listdir(liveosdir):
                 if f.find('overlay-') == 0:
-                    overlay = f
+                    overlay = os.path.join(liveosdir, f)
                     break
-            overlayloop = rcall(['/sbin/losetup', '-f']).rstrip()
-            if overlay:
-                call(['/sbin/losetup', overlayloop, os.path.join(liveosdir,
-                                                                 overlay)])
-                dm_cow = 'live-rw'
+        if overlay:
+            if os.path.isdir(overlay):
+                overlayfs = overlay
             else:
-                overlay = tempfile.NamedTemporaryFile(dir='/dev/shm')
-                print "\npreparing temporary overlay..."
-                call(['/bin/dd', 'if=/dev/null', 'of=%s' % overlay.name,
-                      'bs=1024', 'count=1', 'seek=%s' % (512 * 1024)])
-                call(['/sbin/losetup', overlayloop, overlay.name])
-                dm_cow = 'live-ro'
-            call(['/sbin/dmsetup', '--noudevrules', '--noudevsync',
-                 'create', dm_cow, '--table=0 %s snapshot %s %s p 8' %
-                 (imgsize, imgloop, overlayloop)])
-            call(['/bin/mount', os.path.join('/dev/mapper', dm_cow), destmnt])
-            home_path = os.path.join(liveosdir, 'home.img')
-            if os.path.exists(home_path):
-                homemnt = os.path.join(destmnt, 'home')
-                homeloop = rcall(losetup_args + [home_path]).rstrip()
-                call(['/bin/mount', homeloop, homemnt])
-            mntlive = os.path.join(destmnt, 'mnt', 'live')
-            if not os.path.exists(mntlive):
-                os.makedirs(mntlive)
-            call(['/bin/mount', '--bind', liveosmnt, mntlive])
-        elif img_type is 'iso':
-            imgloop = rcall(losetup_args + [ext3_img]).rstrip()
-            call(['/bin/mount', '-o', 'ro', imgloop, destmnt])
+                overlayloop = loop_setup(overlay, roflag)
+                call(['udevadm', 'settle'])
+                if lsblk('-nrdo FSTYPE ' + overlayloop) not in (
+                                                    '', 'DM_snapshot_cow'):
+                    ovl_mp = tempfile.mkdtemp(prefix=Y + '-ovl-')
+                    remove_mp.append(ovl_mp)
+                    overlayfs = os.path.join(ovl_mp, 'overlayfs')
+            opts = '-r'
+        imgloop = loop_setup(rootfs_img, opts)
+        imgsize = rcall(['blockdev', '--getsz', imgloop])[0].rstrip()
+        dm_path = os.path.join('/dev', 'mapper', 'live-base')
+        if os.path.exists(dm_path):
+            X = tempfile.NamedTemporaryFile(prefix='live-base.',
+                                            dir='/dev/mapper').name
+            X = os.path.basename(X)[9:]
+        dm_path = os.path.join('/dev', 'mapper', 'live-rw' + X)
+        dmsetup('create --readonly live-base' + X,
+                             ['--table=0 %s linear %s 0' % (imgsize, imgloop)])
+        if overlayfs:
+            base_mp = tempfile.mkdtemp(prefix=Y + '-fsbase-')
+            remove_mp.append(base_mp)
+            mount(['-r', rootfs_img, base_mp])
+            if os.path.isdir(overlayfs):
+                workdir = os.path.join(liveosdir, 'ovlwork')
+            else:
+                mount([overlayloop, ovl_mp])
+                workdir = os.path.join(ovl_mp, 'ovlwork')
+
+            os.system('modprobe overlay')
+            if roflag:
+                robase_mp = tempfile.mkdtemp(prefix=Y + '-fsbase-r-')
+                remove_mp.append(robase_mp)
+                mount(['-t', 'overlay', 'LiveOS_rootfs-r', '-oro,lowerdir=' +
+                       overlayfs + ':' + base_mp, robase_mp])
+                tmpovl = tempfile.mkdtemp(prefix=Y + '-tmpovl-')
+                remove_dir.append(tmpovl)
+                tmpwork = tempfile.mkdtemp(prefix=Y + '-tmpwork-')
+                remove_dir.append(tmpwork)
+                mount(['-t', 'overlay', 'LiveOS_rootfs', '-olowerdir=' +
+                       robase_mp + ',upperdir=' + tmpovl + ',workdir=' +
+                       tmpwork, destmnt])
+            else:
+                mount(['-t', 'overlay', 'LiveOS_rootfs', '-olowerdir=' +
+                       base_mp + ',upperdir=' + overlayfs +
+                       ',workdir=' + workdir, destmnt])
+        else:
+            persistent = 'PO'
+            if roflag or (not overlayloop and opts):
+                persistent = 'N'
+                tmpoverlay = tempfile.NamedTemporaryFile(prefix='overlay-')
+                print '\npreparing temporary overlay...'
+                call(['dd', 'if=/dev/null', 'of=%s' % tmpoverlay.name,
+                            'bs=1024', 'count=1', 'seek=%s' % (osize * 1024)])
+                tmpoverlayloop = loop_setup(tmpoverlay.name)
+                del tmpoverlay
+                if not overlayloop:
+                    overlayloop = tmpoverlayloop
+            dm_roflag = ''
+            if roflag and overlayloop != tmpoverlayloop:
+                dm_path = os.path.join('/dev', 'mapper', 'live-ro' + X)
+                dm_roflag = roflag
+            dm_id = os.path.basename(dm_path)
+            if not opts and not overlayloop:
+                dmsetup('create ' + dm_id, ['--table=0 %s linear %s 0' %
+                                            (imgsize, imgloop)])
+            else:
+                dmsetup('create ' + dm_id, [dm_roflag,
+                                  '--table=0 %s snapshot %s %s %s 8' %
+                                  (imgsize, imgloop, overlayloop, persistent)])
+            if roflag and overlayloop != tmpoverlayloop:
+                dmsetup('create live-rw' + X,
+                        ['--table=0 %s snapshot %s %s N 8' %
+                                           (imgsize, dm_path, tmpoverlayloop)])
+            mount([os.path.join('/dev/mapper', 'live-rw' + X), destmnt])
+
+        home_path = os.path.join(liveosdir, 'home.img')
+        if os.path.exists(home_path):
+            homemnt = os.path.join(destmnt, 'home')
+            if call(['cryptsetup', 'isLuks', home_path]) == 0:
+                cryptsetup('open ' + home_path, ['EncHome' + X, roflag])
+                home_path = os.path.join('/dev', 'mapper', 'EncHome' + X)
+                homedev = home_path
+            if roflag or tmpoverlayloop:
+                tmpoverlay = tempfile.NamedTemporaryFile(
+                             prefix='home-overlay-')
+                print '\npreparing temporary home overlay...'
+                call(['dd', 'if=/dev/null', 'of=%s' % tmpoverlay.name,
+                            'bs=1024', 'count=1', 'seek=%s' % (osize * 1024)])
+                tmphomeoverlayloop = loop_setup(tmpoverlay.name)
+                del tmpoverlay
+                if home_path == os.path.join(liveosdir, 'home.img'):
+                    homedev = loop_setup(os.path.join(liveosdir,
+                                         'home.img'), '-r')
+                imgsize = rcall(['blockdev', '--getsz', homedev])[0].rstrip()
+                dmsetup('create Home' + X, ['--table=0 %s snapshot %s %s N 8' %
+                                       (imgsize, homedev, tmphomeoverlayloop)])
+                home_path = os.path.join('/dev', 'mapper', 'Home' + X)
+            mount([home_path, homemnt])
 
         if mount_hacks:
-            subprocess.check_call(['mount', '-t', 'proc', 'proc', os.path.join(destmnt, 'proc')], stderr=sys.stderr)
-            subprocess.check_call(['mount', '-t', 'tmpfs', 'tmpfs', os.path.join(destmnt, 'var', 'run')], stderr=sys.stderr)
-
-        if len(command) > 0 and persist:
-            args = []
-            args.extend(command)
-            live = ''
-            if img_type is 'blk':
-                live = 'live-'
-            print """Starting process with this command line:
-            \r%s\n  %s is %smounted.""" % (' '.join(command), liveos, live)
-            p = subprocess.Popen(args, close_fds=True)
-            print "Process id: %s" % p.pid
-            ecode = p.returncode
-        elif len(command) > 0:
-            args = ['chroot', destmnt]
-            args.extend(command)
-            ecode = subprocess.call(args, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
-        elif chroot:
-            print "Starting subshell in chroot, press Ctrl-D to exit..."
-            ecode = subprocess.call(['chroot', destmnt], stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
-        else:
-            if dm_cow == 'live-ro':
-                status = ' with NO LiveOS persistence,'
+            subprocess.check_call(['mount', '-t', 'proc', 'proc',
+                             os.path.join(destmnt, 'proc')], stderr=sys.stderr)
+            subprocess.check_call(['mount', '-t', 'tmpfs', 'tmpfs',
+                       os.path.join(destmnt, 'run')], stderr=sys.stderr)
+            subprocess.check_call(['mount', '-t', 'sysfs', 'sys',
+                os.path.join(destmnt, 'sys')], stderr=sys.stderr)
+            tmpfs = os.path.join(destmnt, 'dev', 'pts')
+            if not os.path.exists(tmpfs):
+                os.makedirs(tmpfs)
+            subprocess.check_call(['mount', '-t', 'devpts', 'devpts', tmpfs],
+                                  stderr=sys.stderr)
+            tmpfs = os.path.join(destmnt, 'dev', 'shm')
+            if not os.path.exists(tmpfs):
+                os.makedirs(tmpfs)
+            subprocess.check_call(['mount', '-t', 'tmpfs', 'tmpfs', tmpfs],
+                                  stderr=sys.stderr)
+            tmpfs = os.path.join(destmnt, 'etc', 'resolv.conf')
+            if os.path.lexists(tmpfs):
+                os.unlink(tmpfs)
+            os.symlink('/run/NetworkManager/resolv.conf', tmpfs)
+            tmpfs = os.path.join(destmnt, 'var', 'cache', 'yum')
+            if not os.path.exists(tmpfs):
+                os.makedirs(tmpfs)
+            if yumcache:
+                mount(['--bind', yumcache, tmpfs])
             else:
-                status = ''
-            print "Entering subshell,%s press Ctrl-D to exit..." % status
-            ecode = subprocess.call([os.environ['SHELL']], cwd=destmnt, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
-    finally:
-        call(['/bin/sync'])
-        if not persist:
-            if verbose:
-                print """Cleaning up...
-                Please wait if large files were written."""
-            if mount_hacks:
-                subprocess.call(['umount', os.path.join(destmnt, 'var', 'run')])
-                subprocess.call(['umount', os.path.join(destmnt, 'proc')])
-            if homemnt:
-                call(['/bin/umount', homemnt])
-                call(['/sbin/losetup', '-d', homeloop])
-            if img_type is 'blk':
-                if mntlive:
-                    call(['/bin/umount', mntlive])
-                    os.rmdir(mntlive)
-            if os.path.ismount(destmnt):
-                call(['/bin/umount', destmnt])
-            if img_type is 'blk':
-                if dm_cow:
-                    call(['/sbin/dmsetup', '--noudevrules', '--noudevsync',
-                          'remove', dm_cow])
-                if overlayloop:
-                    call(['/sbin/losetup', '-d', overlayloop])
-            if imgloop:
-                call(['/sbin/losetup', '-d', imgloop])
-            if squashloop:
-                call(['/bin/umount', squashloop])
-                call(['/sbin/losetup', '-d', squashloop])
-            call(['/bin/umount', liveosmnt])
-            if not img_type is 'blk':
-                call(['/sbin/losetup', '-d', liveosloop])
-            os.rmdir(squashmnt)
-            if not os.path.ismount(liveosmnt):
-                os.rmdir(liveosmnt)
-            if verbose:
-                print "Cleanup complete"
+                subprocess.check_call(['mount', '-t', 'tmpfs', 'varcacheyum',
+                                       tmpfs], stderr=sys.stderr)
+            if dnfcache:
+                mount(['--bind', dnfcache,
+                       os.path.join(destmnt, 'var', 'cache', 'dnf')])
+            elif os.path.exists(os.path.join(destmnt, 'var', 'cache', 'dnf')):
+                subprocess.check_call(['mount', '-t', 'tmpfs', 'varcachednf',
+                                 os.path.join(destmnt, 'var', 'cache', 'dnf')],
+                                 stderr=sys.stderr)
 
-    sys.exit(ecode)
+        # Create a mount and a link that appear in the booted environment.
+        src = os.path.join(destmnt, 'run', 'initramfs', 'live')
+        if not os.path.exists(src):
+            os.makedirs(src)
+        mount(['--bind', liveosmnt, src])
+        src = os.path.join(destmnt, 'run', 'initramfs', 'livedev')
+        if os.path.lexists(src):
+            os.unlink(src)
+        os.symlink(findmnt('-nro SOURCE -T ' + liveosmnt), src)
+
+        mode = "'" + liveos + "' filesystems "
+        if tmpoverlayloop or tmpovl:
+            mode += 'are only temporary.\n  Changes will NOT persist'
+        else:
+            mode += 'WILL persist'
+        mode += ' after rebooting.'
+
+        a = X
+        if overlayfs:
+            a = Y
+        environ = os.environ.copy()
+        if a:
+            # This is overridden if PS1 is set in /root/.bashrc.
+            environ['PS1'] = a + '-[\u@\h \W]\$ '
+
+        if command and persist:
+            print '''Starting process with this command line:
+                     \r%s\n%s\n''' % (command, 'Changes to ' + mode)
+            p = subprocess.Popen(command, close_fds=True, env=environ)
+            print "Process id: %s\n" % p.pid
+            ecode = p.returncode
+        elif command:
+            print 'Entering chroot with command:\n%s\n' % command
+            command = ['chroot', destmnt] + command
+            ecode = subprocess.call(command, env=environ, stdin=sys.stdin,
+                                    stdout=sys.stdout, stderr=sys.stderr)
+            print '\nCommand completed, returned from subprocess.\n'
+        elif chroot:
+            print 'Starting subshell in a chroot.\n  Changes to ' + mode + '''
+            Press Ctrl D to exit...'''
+            ecode = subprocess.call(['chroot', destmnt], env=environ,
+                                    stdin=sys.stdin, stdout=sys.stdout,
+                                    stderr=sys.stderr)
+        else:
+            print 'Entering subshell...\n  Changes to ' + mode + '''
+            Press Ctrl D to exit...'''
+            ecode = subprocess.call([os.environ['SHELL']], env=environ,
+                                    cwd=destmnt, stdin=sys.stdin,
+                                    stdout=sys.stdout, stderr=sys.stderr)
+    finally:
+        call(['sync'])
+        if persist and os.path.ismount(destmnt):
+            print "\n    NOTE: '%s' LiveOS filesystems are still mounted\n" \
+            "       at '%s'.\n%s" % (liveos, destmnt, linkn[1])
+        elif not persist:
+            if verbose:
+                print '''Cleaning up...
+                Please wait if large files were written.'''
+            cleanup()
+
+    sys_exit(ecode)
 
 if __name__ == '__main__':
     main()
