@@ -5,7 +5,8 @@ INSTALL = /usr/bin/install -c
 INSTALL_PROGRAM = $(INSTALL)
 INSTALL_DATA = $(INSTALL) -m 644
 INSTALL_SCRIPT = $(INSTALL_PROGRAM)
-PYTHON_PROGRAM = /usr/bin/python
+PYTHON = python
+PYTHON_PROGRAM = $(shell which $(PYTHON))
 SED_PROGRAM = /usr/bin/sed
 
 INSTALL_PYTHON = $(INSTALL) -m 644
@@ -23,7 +24,6 @@ man:
 
 
 install: man
-	$(SED_PROGRAM) -i "s:#!/usr/bin/python:#!$(PYTHON_PROGRAM):g" tools/*
 	$(INSTALL_PROGRAM) -D tools/livecd-creator $(DESTDIR)/usr/bin/livecd-creator
 	ln -s ./livecd-creator $(DESTDIR)/usr/bin/image-creator
 	$(INSTALL_PROGRAM) -D tools/liveimage-mount $(DESTDIR)/usr/bin/liveimage-mount
@@ -41,6 +41,10 @@ install: man
 	$(call COMPILE_PYTHON,$(DESTDIR)/$(PYTHONDIR)/imgcreate)
 	mkdir -p $(DESTDIR)/usr/share/man/man8
 	$(INSTALL_DATA) -D docs/*.8 $(DESTDIR)/usr/share/man/man8
+	$(SED_PROGRAM) -i "s:#!/usr/bin/python:#!$(PYTHON_PROGRAM):g" $(DESTDIR)/usr/bin/livecd-creator
+	$(SED_PROGRAM) -i "s:#!/usr/bin/python:#!$(PYTHON_PROGRAM):g" $(DESTDIR)/usr/bin/liveimage-mount
+	$(SED_PROGRAM) -i "s:#!/usr/bin/python:#!$(PYTHON_PROGRAM):g" $(DESTDIR)/usr/bin/edit-livecd
+	$(SED_PROGRAM) -i "s:#!/usr/bin/python:#!$(PYTHON_PROGRAM):g" $(DESTDIR)/usr/bin/mkbiarch
 
 uninstall:
 	rm -f $(DESTDIR)/usr/bin/livecd-creator
