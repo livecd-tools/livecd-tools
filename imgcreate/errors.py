@@ -18,8 +18,8 @@
 
 class CreatorError(Exception):
     """An exception base class for all imgcreate errors."""
-    def __init__(self, msg):
-        Exception.__init__(self, msg)
+    def __init__(self, message):
+        Exception.__init__(self, message)
 
     # Some error messages may contain unicode strings (especially if your system
     # locale is different from 'C', e.g. 'de_DE'). Python's exception class does
