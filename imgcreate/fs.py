@@ -19,6 +19,7 @@
 
 from __future__ import print_function
 from __future__ import absolute_import
+from __future__ import division
 import os
 import os.path
 import sys
@@ -101,7 +102,7 @@ def resize2fs(fs, size = None, minimal = False, tmpdir = "/tmp"):
     if minimal:
         args.append("-M")
     else:
-        args.append("%sK" %(size / 1024,))
+        args.append("%sK" %(size // 1024,))
     ret = call(args)
     if ret != 0:
         raise ResizeError("resize2fs returned an error (%d)!" % (ret,))
@@ -563,7 +564,7 @@ class DeviceMapperSnapshot(object):
 
         size = os.stat(self.imgloop.lofile)[stat.ST_SIZE]
 
-        table = "0 %d snapshot %s %s p 8" % (size / 512,
+        table = "0 %d snapshot %s %s p 8" % (size // 512,
                                              self.imgloop.device,
                                              self.cowloop.device)
 
