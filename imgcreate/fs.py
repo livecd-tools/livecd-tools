@@ -309,7 +309,7 @@ class LoopbackDisk(Disk):
             raise MountError("Failed to allocate loop device for '%s'" %
                              self.lofile)
 
-        device = losetupOutput.split()[0]
+        device = losetupOutput.split()[0].decode("utf-8")
 
         logging.info("Losetup add %s mapping to %s"  % (device, self.lofile))
         rc = call(["/sbin/losetup", device, self.lofile])
