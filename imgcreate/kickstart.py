@@ -27,8 +27,11 @@ import time
 import logging
 try:
     import urllib.request as urllib_request
+    from urllib.request import pathname2url as urllib_pathname2url
 except ImportError:
     import urllib2 as urllib_request
+    from urllib import pathname2url as urllib_pathname2url
+
 import selinux
 
 import pykickstart.commands as kscommands
@@ -53,6 +56,8 @@ def read_kickstart(path):
     version = ksversion.makeVersion()
     ks = ksparser.KickstartParser(version)
     try:
+        if "://" not in path:
+            path = "file://%s" % (urllib_pathname2url(os.path.abspath(path)))
         ksdata = urllib_request.urlopen(path).read().decode("utf-8")
         ks.readKickstartFromString(ksdata, reset=False)
 # Fallback to e.args[0] is a workaround for bugs in urlgragger and pykickstart.
