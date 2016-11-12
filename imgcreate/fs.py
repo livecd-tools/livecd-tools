@@ -614,7 +614,7 @@ class DeviceMapperSnapshot(object):
         # where C is the number of 512 byte sectors in use
         #
         try:
-            return int((out.split()[3]).split('/')[0]) * 512
+            return int((out.split()[3]).split(b'/')[0]) * 512
         except ValueError:
             raise SnapshotError("Failed to parse dmsetup status: " + out)
 
