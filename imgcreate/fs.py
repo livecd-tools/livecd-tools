@@ -87,7 +87,7 @@ def mksquashfs(in_img, out_img, compress_type):
     ret = call(args)
     if ret != 0:
         raise SquashfsError("'%s' exited with error (%d)" %
-                            (string.join(args, " "), ret))
+                            (" ".join(args), ret))
 
 def resize2fs(fs, size = None, minimal = False, tmpdir = "/tmp"):
     if minimal and size is not None:
@@ -574,7 +574,7 @@ class DeviceMapperSnapshot(object):
             self.cowloop.cleanup()
             self.imgloop.cleanup()
             raise SnapshotError("Could not create snapshot device using: " +
-                                string.join(args, " "))
+                                " ".join(args))
 
         self.__created = True
 
