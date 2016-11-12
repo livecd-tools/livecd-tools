@@ -346,7 +346,7 @@ class SparseLoopbackDisk(LoopbackDisk):
         if size <= 0:
             size = 1
         os.lseek(fd, size-1, 0)
-        os.write(fd, '\x00')
+        os.write(fd, b'\x00')
         os.close(fd)
 
     def truncate(self, size = None):
