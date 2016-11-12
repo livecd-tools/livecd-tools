@@ -78,7 +78,7 @@ class LiveCDYum(dnf.Base):
         conf += "keepcache=1\n"
         conf += "tsflags=nocontexts\n"
 
-        f = file(confpath, "w+")
+        f = open(confpath, "w+")
         f.write(conf)
         f.close()
 

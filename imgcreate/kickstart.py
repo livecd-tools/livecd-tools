@@ -291,7 +291,7 @@ class NetworkConfig(KickstartConfig):
     def write_ifcfg(self, network):
         p = self.path("/etc/sysconfig/network-scripts/ifcfg-" + network.device)
 
-        f = file(p, "w+")
+        f = open(p, "w+")
         os.chmod(p, 0o644)
 
         f.write("DEVICE=%s\n" % network.device)
@@ -332,14 +332,14 @@ class NetworkConfig(KickstartConfig):
             return
 
         p = self.path("/etc/sysconfig/network-scripts/keys-" + network.device)
-        f = file(p, "w+")
+        f = open(p, "w+")
         os.chmod(p, 0o600)
         f.write("KEY=%s\n" % network.wepkey)
         f.close()
 
     def write_sysconfig(self, useipv6, hostname, gateway):
         path = self.path("/etc/sysconfig/network")
-        f = file(path, "w+")
+        f = open(path, "w+")
         os.chmod(path, 0o644)
 
         f.write("NETWORKING=yes\n")
@@ -364,7 +364,7 @@ class NetworkConfig(KickstartConfig):
         localline += "localhost.localdomain localhost"
 
         path = self.path("/etc/hosts")
-        f = file(path, "w+")
+        f = open(path, "w+")
         os.chmod(path, 0o644)
         f.write("127.0.0.1\t\t%s\n" % localline)
         f.write("::1\t\tlocalhost6.localdomain6 localhost6\n")
@@ -375,7 +375,7 @@ class NetworkConfig(KickstartConfig):
             return
 
         path = self.path("/etc/hostname")
-        f = file(path, "w+")
+        f = open(path, "w+")
         os.chmod(path, 0o644)
         f.write("%s\n" % (hostname,))
         f.close()
@@ -391,7 +391,7 @@ class NetworkConfig(KickstartConfig):
         except OSError as e:
             if e.errno != errno.ENOENT:
                 raise
-        f = file(path, "w+")
+        f = open(path, "w+")
         os.chmod(path, 0o644)
 
         for ns in (nameservers):
@@ -449,7 +449,7 @@ class SelinuxConfig(KickstartConfig):
         for fn in ("/etc/resolv.conf",):
             path = self.path(fn)
             if not os.path.islink(path):
-                f = file(path, "a")
+                f = open(path, "a")
                 os.chmod(path, 0o644)
                 f.close()
 
