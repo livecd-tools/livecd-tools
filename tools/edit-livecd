@@ -4,9 +4,13 @@
 #                   iso image file.
 #
 # Copyright 2009, Red Hat  Inc.
+# Copyright 2016, Kevin Kofler
+# Copyright 2016, Neal Gompa
+#
 # Written by Perry Myers <pmyers at redhat.com> & David Huff <dhuff at redhat.com>
 #   Cloning code added by Frederick Grose <fgrose at sugarlabs.org>
-#
+#   Ported to DNF by Kevin Kofler <Kevin at tigcc.ticalc.org>
+#   Ported to Python 3 by Neal Gompa <ngompa13 at gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,6 +25,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
+from __future__ import print_function
 import os
 import sys
 import stat
@@ -150,7 +155,7 @@ class LiveImageEditor(LiveImageCreator):
 
             self._LoopImageCreator__fslabel = out.strip()
 
-        except IOError, e:
+        except IOError as e:
             raise CreatorError("Failed to determine fsimage LABEL: %s" % e )
         finally:
             os.close(dev_null)
@@ -162,7 +167,8 @@ class LiveImageEditor(LiveImageCreator):
         try:
             self._ImageCreator__builddir = tempfile.mkdtemp(dir =  os.path.abspath(self.tmpdir),
                                                prefix = "edit-liveos-")
-        except OSError, (err, msg):
+        except OSError as builddir_creation_except:
+            (err, msg) = builddir_creation_except.args
             raise CreatorError("Failed create build directory in %s: %s" %
                                (self.tmpdir, msg))
 
@@ -174,13 +180,13 @@ class LiveImageEditor(LiveImageCreator):
         logging.debug("copying script to install root: %s" % path)
         shutil.copy(os.path.abspath(script), path)
         os.close(fd)
-        os.chmod(path, 0700)
+        os.chmod(path, 0o700)
 
         script = "/tmp/" + os.path.basename(path)
 
         try:
             subprocess.call([script], preexec_fn = self._chroot)
-        except OSError, e:
+        except OSError as e:
             raise CreatorError("Failed to execute script %s, %s " % (script, e))
         finally:
             os.unlink(path)
@@ -238,7 +244,7 @@ class LiveImageEditor(LiveImageCreator):
                 self.tmpdir)
         try:
             self._LoopImageCreator__instloop.mount()
-        except MountError, e:
+        except MountError as e:
             raise CreatorError("Failed to loopback mount '%s' : %s" %
                                (self._image, e))
 
@@ -261,7 +267,7 @@ class LiveImageEditor(LiveImageCreator):
         """Clone the running LiveOS image as the basis for the new image."""
 
         self.__fstype = 'ext4'
-        self.__image_size = 4096L * 1024 * 1024
+        self.__image_size = 4096 * 1024 * 1024
         self.__blocksize = 4096
 
         self.__instloop = ExtDiskMount(SparseLoopbackDisk(self._image,
@@ -273,7 +279,7 @@ class LiveImageEditor(LiveImageCreator):
                                        self.tmpdir)
         try:
             self.__instloop.mount()
-        except MountError, e:
+        except MountError as e:
             raise CreatorError("Failed to loopback mount '%s' : %s" %
                                (self._image, e))
 
@@ -319,7 +325,7 @@ class LiveImageEditor(LiveImageCreator):
 
         try:
             imgmnt.mount()
-        except MountError, e:
+        except MountError as e:
             raise CreatorError("Failed to mount '%s' : %s" % (base_on, e))
         else:
             # include specified files or directories
@@ -335,7 +341,7 @@ class LiveImageEditor(LiveImageCreator):
                         self.compress_type = 'gzip'
 
                 dst = self._LiveImageCreatorBase__isodir
-                print includes
+                print(includes)
                 for fd in includes.split(', /'):
                     src = os.path.join(imgmnt.mountdir, fd)
                     if os.path.isfile(src):
@@ -372,7 +378,7 @@ class LiveImageEditor(LiveImageCreator):
         # Get build name from boot configuration file.
         try:
             cfgf = open(fpath, 'r')
-        except IOError, e:
+        except IOError as e:
             raise CreatorError("Failed to open '%s' : %s" % (fpath, e))
         else:
             release = None
@@ -397,7 +403,7 @@ class LiveImageEditor(LiveImageCreator):
                     with open(self._instroot + fn, 'r') as f:
                         text = ntext + '\n' + f.read()
                         open(f.name, 'w').write(text)
-                except IOError, e:
+                except IOError as e:
                     raise CreatorError("Failed to open or write '%s' : %s" %
                                        (f.name, e))
 
@@ -453,7 +459,7 @@ class LiveImageEditor(LiveImageCreator):
                              stderr = dev_null).communicate()[0]
             return 0
 
-        except IOError, e:
+        except IOError as e:
             raise CreatorError("Failed to configure bootloader file: %s" % e)
             return 1
         finally:
@@ -466,7 +472,7 @@ class LiveImageEditor(LiveImageCreator):
 
             os.write(fd, s.script)
             os.close(fd)
-            os.chmod(path, 0700)
+            os.chmod(path, 0o700)
 
             env = self._get_post_scripts_env(s.inChroot)
 
@@ -481,10 +487,10 @@ class LiveImageEditor(LiveImageCreator):
             try:
                 subprocess.check_call([s.interp, script],
                                       preexec_fn = preexec, env = env)
-            except OSError, e:
+            except OSError as e:
                 raise CreatorError("Failed to execute %%post script "
                                    "with '%s' : %s" % (s.interp, e.strerror))
-            except subprocess.CalledProcessError, err:
+            except subprocess.CalledProcessError as err:
                 if s.errorOnFail:
                     raise CreatorError("%%post script failed with code %d "
                                        % err.returncode)
@@ -503,7 +509,7 @@ class LiveImageEditor(LiveImageCreator):
 
             elif what == rpm.RPMCALLBACK_INST_OPEN_FILE:
                 hdr, path = mydata
-                print "Installing %s\r" % (hdr["name"])
+                print("Installing %s\r" % (hdr["name"]))
                 fd = os.open(path, os.O_RDONLY)
                 nvr = '%s-%s-%s' % ( hdr['name'], hdr['version'], hdr['release'] )
                 self.fdnos[nvr] = fd
@@ -516,7 +522,7 @@ class LiveImageEditor(LiveImageCreator):
 
             elif what == rpm.RPMCALLBACK_INST_PROGRESS:
                 hdr, path = mydata
-                print "%s:  %.5s%% done\r" % (hdr["name"], (float(amount) / total) * 100),
+                print("%s:  %.5s%% done\r" % (hdr["name"], (float(amount) / total) * 100), end=' ')
 
     def install_rpms(self):
         if kickstart.exclude_docs(self.ks):
@@ -627,7 +633,7 @@ def parse_options(args):
         parser.print_usage()
         sys.exit(1)
 
-    print args[0]
+    print(args[0])
 
     return (args[0], options)
 
@@ -638,7 +644,7 @@ def get_fsvalue(filesystem, tag):
         fs_type = subprocess.Popen(args,
                                stdout=subprocess.PIPE,
                                stderr=dev_null).communicate()[0]
-    except IOError, e:
+    except IOError as e:
         raise CreatorError("Failed to determine fs %s: %s" % value, e )
     finally:
         os.close(dev_null)
@@ -663,7 +669,7 @@ def main():
     (LiveOS, options) = parse_options(sys.argv[1:])
 
     if os.geteuid () != 0:
-        print >> sys.stderr, "You must run edit-liveos as root"
+        print("You must run edit-liveos as root", file=sys.stderr)
         return 1
 
     if options.name:
@@ -699,7 +705,7 @@ def main():
             editor._LoopImageCreator__image_size = kickstart.get_image_size(editor.ks)
         if options.script:
             if not os.path.exists(options.script):
-                print "Invalid Script Path '%s'" % options.script
+                print("Invalid Script Path '%s'" % options.script)
                 return 1
         editor.mount(LiveOS, cachedir = None)
         editor._configure_bootloader(editor._LiveImageCreatorBase__isodir)
@@ -708,17 +714,17 @@ def main():
             editor.install_rpms()
             editor._run_post_scripts()
         elif options.script:
-            print "Running edit script '%s'" % options.script
+            print("Running edit script '%s'" % options.script)
             editor._run_script(options.script)
         else:
-            print "Launching shell. Exit to continue."
-            print "----------------------------------"
+            print("Launching shell. Exit to continue.")
+            print("----------------------------------")
             editor.launch_shell()
         rebuild_iso_symlinks(editor._LiveImageCreatorBase__isodir)
         editor.unmount()
         editor.package(output)
         logging.info("%s.iso saved to %s"  % (editor.name, output))
-    except CreatorError, e:
+    except CreatorError as e:
         logging.error(u"Error editing LiveOS : %s" % e)
         return 1
     finally:

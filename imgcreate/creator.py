@@ -3,6 +3,7 @@
 #
 # Copyright 2007, Red Hat  Inc.
 # Copyright 2016, Kevin Kofler
+# Copyright 2016, Neal Gompa
 #
 # Portions from Anaconda dnfpayload.py
 # DNF/rpm software payload management.
@@ -434,7 +435,7 @@ class ImageCreator(object):
         try:
             self.__builddir = tempfile.mkdtemp(dir =  os.path.abspath(self.tmpdir),
                                                prefix = "imgcreate-")
-        except OSError, e:
+        except OSError as e:
             raise CreatorError("Failed create build directory in %s: %s" %
                                (self.tmpdir, e.strerror))
 
@@ -457,13 +458,13 @@ class ImageCreator(object):
     def __create_minimal_dev(self):
         """Create a minimal /dev so that we don't corrupt the host /dev"""
         origumask = os.umask(0000)
-        devices = (('null',   1, 3, 0666),
-                   ('urandom',1, 9, 0666),
-                   ('random', 1, 8, 0666),
-                   ('full',   1, 7, 0666),
-                   ('ptmx',   5, 2, 0666),
-                   ('tty',    5, 0, 0666),
-                   ('zero',   1, 5, 0666))
+        devices = (('null',   1, 3, 0o666),
+                   ('urandom',1, 9, 0o666),
+                   ('random', 1, 8, 0o666),
+                   ('full',   1, 7, 0o666),
+                   ('ptmx',   5, 2, 0o666),
+                   ('tty',    5, 0, 0o666),
+                   ('zero',   1, 5, 0o666))
         links = (("/proc/self/fd", "/dev/fd"),
                  ("/proc/self/fd/0", "/dev/stdin"),
                  ("/proc/self/fd/1", "/dev/stdout"),
@@ -610,7 +611,7 @@ class ImageCreator(object):
             try:
                 ayum.selectGroup('core', excludedPkgs)
                 logging.info("selected group: core")
-            except dnf.exceptions.MarkingError, e:
+            except dnf.exceptions.MarkingError as e:
                 if kickstart.ignore_missing(self.ks):
                     raise CreatorError("Failed to find group 'core' : %s" %
                                        (e,))
@@ -625,7 +626,7 @@ class ImageCreator(object):
             try:
                 ayum.selectEnvironment(env, excludedGroups, excludedPkgs)
                 logging.info("selected env: %s", env)
-            except dnf.exceptions.MarkingError, e:
+            except dnf.exceptions.MarkingError as e:
                 if kickstart.ignore_missing(self.ks):
                     raise CreatorError("Failed to find environment '%s' : %s" %
                                        (env, e))
@@ -639,7 +640,7 @@ class ImageCreator(object):
             try:
                 ayum.selectGroup(group.name, excludedPkgs, group.include)
                 logging.info("selected group: %s", group.name)
-            except dnf.exceptions.MarkingError, e:
+            except dnf.exceptions.MarkingError as e:
                 if kickstart.ignore_missing(self.ks):
                     raise CreatorError("Failed to find group '%s' : %s" %
                                        (group.name, e))
@@ -651,7 +652,7 @@ class ImageCreator(object):
             try:
                 ayum.selectPackage(pkg_name)
                 logging.info("selected package: '%s'", pkg_name)
-            except dnf.exceptions.MarkingError, e:
+            except dnf.exceptions.MarkingError as e:
                 if kickstart.ignore_missing(self.ks):
                     logging.warn("Skipping missing package '%s'" % (pkg,))
                 else:
@@ -704,9 +705,9 @@ class ImageCreator(object):
             self.__apply_selections(ayum)
 
             ayum.runInstall()
-        except (dnf.exceptions.DownloadError, dnf.exceptions.RepoError), e:
+        except (dnf.exceptions.DownloadError, dnf.exceptions.RepoError) as e:
             raise CreatorError("Unable to download from repo : %s" % (e,))
-        except dnf.exceptions.Error, e:
+        except dnf.exceptions.Error as e:
             raise CreatorError("Unable to install: %s" % (e,))
         finally:
             ayum.close()
@@ -728,7 +729,7 @@ class ImageCreator(object):
 
             os.write(fd, s.script)
             os.close(fd)
-            os.chmod(path, 0700)
+            os.chmod(path, 0o700)
 
             env = self._get_post_scripts_env(s.inChroot)
 
@@ -743,10 +744,10 @@ class ImageCreator(object):
             try:
                 subprocess.check_call([s.interp, script],
                                       preexec_fn = preexec, env = env)
-            except OSError, e:
+            except OSError as e:
                 raise CreatorError("Failed to execute %%post script "
                                    "with '%s' : %s" % (s.interp, e.strerror))
-            except subprocess.CalledProcessError, err:
+            except subprocess.CalledProcessError as err:
                 if s.errorOnFail:
                     raise CreatorError("%%post script failed with code %d "
                                        % err.returncode)
@@ -856,7 +857,7 @@ class LoopImageCreator(ImageCreator):
         self.__imgdir = None
 
         self.__image_size = kickstart.get_image_size(self.ks,
-                                                     4096L * 1024 * 1024)
+                                                     4096 * 1024 * 1024)
 
     #
     # Properties
@@ -964,7 +965,7 @@ class LoopImageCreator(ImageCreator):
 
         try:
             self.__instloop.mount()
-        except MountError, e:
+        except MountError as e:
             raise CreatorError("Failed to loopback mount '%s' : %s" %
                                (self._image, e))
 

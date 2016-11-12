@@ -3,6 +3,8 @@
 # livecd-creator : Creates Live CD based for Fedora.
 #
 # Copyright 2007, Red Hat  Inc.
+# Copyright 2016, Kevin Kofler
+# Copyright 2016, Neal Gompa
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,6 +19,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
+from __future__ import print_function
 import os
 import os.path
 import sys
@@ -129,7 +132,8 @@ def parse_options(args):
 def main():
     try:
         options = parse_options(sys.argv[1:])
-    except Usage, (msg, no_error):
+    except Usage as livecd_creator_optparse_except:
+        (msg, no_error) = livecd_creator_optparse_except.args
         if no_error:
             out = sys.stdout
             ret = 0
@@ -137,11 +141,11 @@ def main():
             out = sys.stderr
             ret = 2
         if msg:
-            print >> out, msg
+            print(msg, file=out)
         return ret
 
     if os.geteuid () != 0:
-        print >> sys.stderr, "You must run %s as root" % sys.argv[0]
+        print("You must run %s as root" % sys.argv[0], file=sys.stderr)
         return 1
 
     if options.fslabel:
@@ -182,7 +186,7 @@ def main():
         return 1
 
     if not ks.handler.repo.seen:
-        print >> sys.stderr, "Kickstart (%s) must have at least one repository." % (options.kscfg)
+        print("Kickstart (%s) must have at least one repository." % (options.kscfg), file=sys.stderr)
         return 1
 
     try:
@@ -218,8 +222,8 @@ def main():
         creator.install()
         creator.configure()
         if options.give_shell:
-            print "Launching shell. Exit to continue."
-            print "----------------------------------"
+            print("Launching shell. Exit to continue.")
+            print("----------------------------------")
             creator.launch_shell()
         creator.unmount()
         creator.package()

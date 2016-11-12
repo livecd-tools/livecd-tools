@@ -2,6 +2,7 @@
 # debug.py: Helper routines for debugging
 #
 # Copyright 2008, Red Hat  Inc.
+# Copyright 2016, Neal Gompa
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -31,7 +32,7 @@ def handle_logfile(option, opt, val, parser, logger):
 
     try:
         logfile = logging.FileHandler(val,"a")
-    except IOError, e:
+    except IOError as e:
         raise optparse.OptionValueError("Cannot open file '%s' : %s" %
                                         (val, e.strerror))
     logger.addHandler(logfile)

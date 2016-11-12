@@ -3,6 +3,7 @@
 #
 # Copyright 2007, Red Hat  Inc.
 # Copyright 2016, Kevin Kofler
+# Copyright 2016, Neal Gompa
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -57,11 +58,11 @@ def read_kickstart(path):
         ksfile = urlgrabber.urlgrab(path)
         ks.readKickstart(ksfile)
 # Fallback to e.args[0] is a workaround for bugs in urlgragger and pykickstart.
-    except IOError, e:
+    except IOError as e:
         raise errors.KickstartError("Failed to read kickstart file "
                                     "'%s' : %s" % (path, e.strerror or
                                     e.args[0]))
-    except kserrors.KickstartError, e:
+    except kserrors.KickstartError as e:
         raise errors.KickstartError("Failed to parse kickstart file "
                                     "'%s' : %s" % (path, e))
     return ks
@@ -292,7 +293,7 @@ class NetworkConfig(KickstartConfig):
         p = self.path("/etc/sysconfig/network-scripts/ifcfg-" + network.device)
 
         f = file(p, "w+")
-        os.chmod(p, 0644)
+        os.chmod(p, 0o644)
 
         f.write("DEVICE=%s\n" % network.device)
         f.write("BOOTPROTO=%s\n" % network.bootProto)
@@ -333,14 +334,14 @@ class NetworkConfig(KickstartConfig):
 
         p = self.path("/etc/sysconfig/network-scripts/keys-" + network.device)
         f = file(p, "w+")
-        os.chmod(p, 0600)
+        os.chmod(p, 0o600)
         f.write("KEY=%s\n" % network.wepkey)
         f.close()
 
     def write_sysconfig(self, useipv6, hostname, gateway):
         path = self.path("/etc/sysconfig/network")
         f = file(path, "w+")
-        os.chmod(path, 0644)
+        os.chmod(path, 0o644)
 
         f.write("NETWORKING=yes\n")
 
@@ -365,7 +366,7 @@ class NetworkConfig(KickstartConfig):
 
         path = self.path("/etc/hosts")
         f = file(path, "w+")
-        os.chmod(path, 0644)
+        os.chmod(path, 0o644)
         f.write("127.0.0.1\t\t%s\n" % localline)
         f.write("::1\t\tlocalhost6.localdomain6 localhost6\n")
         f.close()
@@ -376,7 +377,7 @@ class NetworkConfig(KickstartConfig):
 
         path = self.path("/etc/hostname")
         f = file(path, "w+")
-        os.chmod(path, 0644)
+        os.chmod(path, 0o644)
         f.write("%s\n" % (hostname,))
         f.close()
 
@@ -388,11 +389,11 @@ class NetworkConfig(KickstartConfig):
         # Explicitly overwrite what's there now, see https://bugzilla.redhat.com/show_bug.cgi?id=1116651
         try:
             os.unlink(path)
-        except OSError, e:
+        except OSError as e:
             if e.errno != errno.ENOENT:
                 raise
         f = file(path, "w+")
-        os.chmod(path, 0644)
+        os.chmod(path, 0o644)
 
         for ns in (nameservers):
             if ns:
@@ -450,7 +451,7 @@ class SelinuxConfig(KickstartConfig):
             path = self.path(fn)
             if not os.path.islink(path):
                 f = file(path, "a")
-                os.chmod(path, 0644)
+                os.chmod(path, 0o644)
                 f.close()
 
         if ksselinux.selinux == ksconstants.SELINUX_DISABLED:
@@ -497,7 +498,7 @@ def get_image_size(ks, default = None):
         if p.mountpoint == "/" and p.size:
             __size = p.size
     if __size > 0:
-        return int(__size) * 1024L * 1024L
+        return int(__size) * 1024 * 1024
     else:
         return default
 
@@ -563,7 +564,7 @@ def get_repos(ks, repo_urls = {}):
             baseurl = repo_urls[repo.name]
             mirrorlist = None
 
-        if repos.has_key(repo.name):
+        if repo.name in repos:
             logging.warn("Overriding already specified repo %s" %(repo.name,))
         repos[repo.name] = (repo.name, baseurl, mirrorlist, proxy, inc, exc, repo.cost, sslverify)
 

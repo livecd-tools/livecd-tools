@@ -2,6 +2,7 @@
 # fs.py : Filesystem related utilities and classes
 #
 # Copyright 2007, Red Hat  Inc.
+# Copyright 2016, Neal Gompa
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,6 +17,8 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
+from __future__ import print_function
+from __future__ import absolute_import
 import os
 import os.path
 import sys
@@ -27,7 +30,7 @@ import string
 import logging
 import tempfile
 import time
-from util import call
+from imgcreate.util import call
 
 from imgcreate.errors import *
 
@@ -37,7 +40,7 @@ def makedirs(dirname):
     """
     try:
         os.makedirs(dirname)
-    except OSError, e:
+    except OSError as e:
         if e.errno != errno.EEXIST:
             raise
 
@@ -53,7 +56,7 @@ def squashfs_compression_type(sqfs_img):
         p = subprocess.Popen(args, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE, env=env)
         out, err = p.communicate()
-    except OSError, e:
+    except OSError as e:
         raise SquashfsError(u"Error white stat-ing '%s'\n'%s'" % (args, e))
     except:
         raise SquashfsError(u"Error while stat-ing '%s'" % args)
@@ -148,7 +151,7 @@ class BindChrootMount:
                 raise MountError("Unable to unmount fs at %s" % self.dest)
             else:
                 logging.info("lazy umount succeeded on %s" % self.dest)
-                print >> sys.stdout, "lazy umount succeeded on %s" % self.dest
+                print("lazy umount succeeded on %s" % self.dest, file=sys.stdout)
  
         self.mounted = False
 
@@ -397,19 +400,19 @@ class DiskMount(Mount):
                 self.mounted = False
             else:
                 logging.warn("Unmounting directory %s failed, using lazy umount" % self.mountdir)
-                print >> sys.stdout, "Unmounting directory %s failed, using lazy umount" %self.mountdir
+                print("Unmounting directory %s failed, using lazy umount" %self.mountdir, file=sys.stdout)
                 rc = call(["/bin/umount", "-l", self.mountdir])
                 if rc != 0:
                     raise MountError("Unable to unmount filesystem at %s" % self.mountdir)
                 else:
                     logging.info("lazy umount succeeded on %s" % self.mountdir)
-                    print >> sys.stdout, "lazy umount succeeded on %s" % self.mountdir
+                    print("lazy umount succeeded on %s" % self.mountdir, file=sys.stdout)
                     self.mounted = False
 
         if self.rmdir and not self.mounted:
             try:
                 os.rmdir(self.mountdir)
-            except OSError, e:
+            except OSError as e:
                 pass
             self.rmdir = False
 
@@ -461,7 +464,7 @@ class ExtDiskMount(DiskMount):
         elif self.fstype == "btrfs":
             args = args + [ "-L", self.fslabel ]
         args = args + [self.disk.device]
-        print args
+        print(args)
         rc = call(args)
 
         if rc != 0:
@@ -635,7 +638,7 @@ def create_image_minimizer(path, image, compress_type, target_size = None,
     imgloop = LoopbackDisk(image, None) # Passing bogus size - doesn't matter
 
     cowloop = SparseLoopbackDisk(os.path.join(os.path.dirname(path), "osmin"),
-                                 64L * 1024L * 1024L)
+                                 64 * 1024 * 1024)
 
     snapshot = DeviceMapperSnapshot(imgloop, cowloop)
 

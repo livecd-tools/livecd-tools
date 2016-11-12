@@ -1,4 +1,5 @@
 #!/usr/bin/python
+from __future__ import print_function
 import os
 import sys
 
@@ -15,7 +16,7 @@ def main():
 
     def usage():
         usage = 'usage: mkbiarch.py <x86 Live ISO File> <x64 Live ISO File> <Target Multi Arch Image File>'
-        print >> sys.stdout, usage
+        print(usage, file=sys.stdout)
 
 
     def mount(src, dst, options=None):
