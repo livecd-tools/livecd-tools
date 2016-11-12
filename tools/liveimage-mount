@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#!/usr/bin/python
 #
 # liveimage-mount: Mount a LiveOS at the specified point, and log
 # into a shell.

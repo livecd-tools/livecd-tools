@@ -2,16 +2,18 @@
 VERSION = 23.4
 
 INSTALL = /usr/bin/install -c
-INSTALL_PROGRAM = ${INSTALL}
-INSTALL_DATA = ${INSTALL} -m 644
-INSTALL_SCRIPT = ${INSTALL_PROGRAM}
+INSTALL_PROGRAM = $(INSTALL)
+INSTALL_DATA = $(INSTALL) -m 644
+INSTALL_SCRIPT = $(INSTALL_PROGRAM)
+PYTHON_PROGRAM = /usr/bin/python
+SED_PROGRAM = /usr/bin/sed
 
-INSTALL_PYTHON = ${INSTALL} -m 644
+INSTALL_PYTHON = $(INSTALL) -m 644
 define COMPILE_PYTHON
-	python -c "import compileall as c; c.compile_dir('$(1)', force=1)"
-	python -O -c "import compileall as c; c.compile_dir('$(1)', force=1)"
+	$(PYTHON_PROGRAM) -c "import compileall as c; c.compile_dir('$(1)', force=1)"
+	$(PYTHON_PROGRAM) -O -c "import compileall as c; c.compile_dir('$(1)', force=1)"
 endef
-PYTHONDIR := $(shell python -c "import distutils.sysconfig as d; print d.get_python_lib()")
+PYTHONDIR := $(shell $(PYTHON_PROGRAM) -c "import distutils.sysconfig as d; print d.get_python_lib()")
 
 all: 
 
@@ -21,13 +23,14 @@ man:
 
 
 install: man
+	$(SED_PROGRAM) -i "s:#!/usr/bin/python:#!$(PYTHON_PROGRAM):g" tools/*
 	$(INSTALL_PROGRAM) -D tools/livecd-creator $(DESTDIR)/usr/bin/livecd-creator
 	ln -s ./livecd-creator $(DESTDIR)/usr/bin/image-creator
 	$(INSTALL_PROGRAM) -D tools/liveimage-mount $(DESTDIR)/usr/bin/liveimage-mount
 	$(INSTALL_PROGRAM) -D tools/livecd-iso-to-disk.sh $(DESTDIR)/usr/bin/livecd-iso-to-disk
 	$(INSTALL_PROGRAM) -D tools/livecd-iso-to-pxeboot.sh $(DESTDIR)/usr/bin/livecd-iso-to-pxeboot
 	$(INSTALL_PROGRAM) -D tools/edit-livecd $(DESTDIR)/usr/bin/edit-livecd
-	$(INSTALL_PROGRAM) -D tools/mkbiarch.py $(DESTDIR)/usr/bin/mkbiarch
+	$(INSTALL_PROGRAM) -D tools/mkbiarch $(DESTDIR)/usr/bin/mkbiarch
 	$(INSTALL_DATA) -D AUTHORS $(DESTDIR)/usr/share/doc/livecd-tools/AUTHORS
 	$(INSTALL_DATA) -D COPYING $(DESTDIR)/usr/share/doc/livecd-tools/COPYING
 	$(INSTALL_DATA) -D README $(DESTDIR)/usr/share/doc/livecd-tools/README

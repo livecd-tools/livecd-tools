@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#!/usr/bin/python
 #
 # edit-liveos: Edit a LiveOS to insert files or to clone an instance onto a new
 #                   iso image file.
