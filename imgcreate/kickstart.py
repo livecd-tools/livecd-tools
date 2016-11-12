@@ -31,11 +31,6 @@ except ImportError:
     import urllib2 as urllib_request
 import selinux
 
-try:
-    import system_config_keyboard.keyboard as keyboard
-except ImportError:
-    import rhpl.keyboard as keyboard
-
 import pykickstart.commands as kscommands
 import pykickstart.constants as ksconstants
 import pykickstart.errors as kserrors
