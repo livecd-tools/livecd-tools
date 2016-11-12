@@ -2,6 +2,7 @@
 # fs.py : Filesystem related utilities and classes
 #
 # Copyright 2007, Red Hat  Inc.
+# Copyright 2016, Neal Gompa
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,6 +17,9 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
+from __future__ import print_function
+from __future__ import absolute_import
+from __future__ import division
 import os
 import os.path
 import sys
@@ -27,7 +31,7 @@ import string
 import logging
 import tempfile
 import time
-from util import call
+from imgcreate.util import call
 
 from imgcreate.errors import *
 
@@ -37,7 +41,7 @@ def makedirs(dirname):
     """
     try:
         os.makedirs(dirname)
-    except OSError, e:
+    except OSError as e:
         if e.errno != errno.EEXIST:
             raise
 
@@ -53,7 +57,7 @@ def squashfs_compression_type(sqfs_img):
         p = subprocess.Popen(args, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE, env=env)
         out, err = p.communicate()
-    except OSError, e:
+    except OSError as e:
         raise SquashfsError(u"Error white stat-ing '%s'\n'%s'" % (args, e))
     except:
         raise SquashfsError(u"Error while stat-ing '%s'" % args)
@@ -83,7 +87,7 @@ def mksquashfs(in_img, out_img, compress_type):
     ret = call(args)
     if ret != 0:
         raise SquashfsError("'%s' exited with error (%d)" %
-                            (string.join(args, " "), ret))
+                            (" ".join(args), ret))
 
 def resize2fs(fs, size = None, minimal = False, tmpdir = "/tmp"):
     if minimal and size is not None:
@@ -98,7 +102,7 @@ def resize2fs(fs, size = None, minimal = False, tmpdir = "/tmp"):
     if minimal:
         args.append("-M")
     else:
-        args.append("%sK" %(size / 1024,))
+        args.append("%sK" %(size // 1024,))
     ret = call(args)
     if ret != 0:
         raise ResizeError("resize2fs returned an error (%d)!" % (ret,))
@@ -148,7 +152,7 @@ class BindChrootMount:
                 raise MountError("Unable to unmount fs at %s" % self.dest)
             else:
                 logging.info("lazy umount succeeded on %s" % self.dest)
-                print >> sys.stdout, "lazy umount succeeded on %s" % self.dest
+                print("lazy umount succeeded on %s" % self.dest, file=sys.stdout)
  
         self.mounted = False
 
@@ -305,7 +309,7 @@ class LoopbackDisk(Disk):
             raise MountError("Failed to allocate loop device for '%s'" %
                              self.lofile)
 
-        device = losetupOutput.split()[0]
+        device = losetupOutput.split()[0].decode("utf-8")
 
         logging.info("Losetup add %s mapping to %s"  % (device, self.lofile))
         rc = call(["/sbin/losetup", device, self.lofile])
@@ -343,7 +347,7 @@ class SparseLoopbackDisk(LoopbackDisk):
         if size <= 0:
             size = 1
         os.lseek(fd, size-1, 0)
-        os.write(fd, '\x00')
+        os.write(fd, b'\x00')
         os.close(fd)
 
     def truncate(self, size = None):
@@ -397,19 +401,19 @@ class DiskMount(Mount):
                 self.mounted = False
             else:
                 logging.warn("Unmounting directory %s failed, using lazy umount" % self.mountdir)
-                print >> sys.stdout, "Unmounting directory %s failed, using lazy umount" %self.mountdir
+                print("Unmounting directory %s failed, using lazy umount" %self.mountdir, file=sys.stdout)
                 rc = call(["/bin/umount", "-l", self.mountdir])
                 if rc != 0:
                     raise MountError("Unable to unmount filesystem at %s" % self.mountdir)
                 else:
                     logging.info("lazy umount succeeded on %s" % self.mountdir)
-                    print >> sys.stdout, "lazy umount succeeded on %s" % self.mountdir
+                    print("lazy umount succeeded on %s" % self.mountdir, file=sys.stdout)
                     self.mounted = False
 
         if self.rmdir and not self.mounted:
             try:
                 os.rmdir(self.mountdir)
-            except OSError, e:
+            except OSError as e:
                 pass
             self.rmdir = False
 
@@ -461,7 +465,7 @@ class ExtDiskMount(DiskMount):
         elif self.fstype == "btrfs":
             args = args + [ "-L", self.fslabel ]
         args = args + [self.disk.device]
-        print args
+        print(args)
         rc = call(args)
 
         if rc != 0:
@@ -507,8 +511,8 @@ class ExtDiskMount(DiskMount):
 
     def __get_size_from_filesystem(self):
         def parse_field(output, field):
-            for line in output.split("\n"):
-                if line.startswith(field + ":"):
+            for line in output.split(b"\n"):
+                if line.startswith(field.encode("utf-8") + b":"):
                     return line[len(field) + 1:].strip()
 
             raise KeyError("Failed to find field '%s' in output" % field)
@@ -560,7 +564,7 @@ class DeviceMapperSnapshot(object):
 
         size = os.stat(self.imgloop.lofile)[stat.ST_SIZE]
 
-        table = "0 %d snapshot %s %s p 8" % (size / 512,
+        table = "0 %d snapshot %s %s p 8" % (size // 512,
                                              self.imgloop.device,
                                              self.cowloop.device)
 
@@ -570,7 +574,7 @@ class DeviceMapperSnapshot(object):
             self.cowloop.cleanup()
             self.imgloop.cleanup()
             raise SnapshotError("Could not create snapshot device using: " +
-                                string.join(args, " "))
+                                " ".join(args))
 
         self.__created = True
 
@@ -610,7 +614,7 @@ class DeviceMapperSnapshot(object):
         # where C is the number of 512 byte sectors in use
         #
         try:
-            return int((out.split()[3]).split('/')[0]) * 512
+            return int((out.split()[3]).split(b'/')[0]) * 512
         except ValueError:
             raise SnapshotError("Failed to parse dmsetup status: " + out)
 
@@ -635,7 +639,7 @@ def create_image_minimizer(path, image, compress_type, target_size = None,
     imgloop = LoopbackDisk(image, None) # Passing bogus size - doesn't matter
 
     cowloop = SparseLoopbackDisk(os.path.join(os.path.dirname(path), "osmin"),
-                                 64L * 1024L * 1024L)
+                                 64 * 1024 * 1024)
 
     snapshot = DeviceMapperSnapshot(imgloop, cowloop)
 

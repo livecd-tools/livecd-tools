@@ -3,6 +3,7 @@
 #
 # Copyright 2007-2012, Red Hat, Inc.
 # Copyright 2016, Kevin Kofler
+# Copyright 2016, Neal Gompa
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -160,7 +161,7 @@ class LiveImageCreatorBase(LoopImageCreator):
 
         try:
             isoloop.mount()
-        except MountError, e:
+        except MountError as e:
             raise CreatorError("Failed to loopback mount '%s' : %s" %
                                (base_on, e))
 
@@ -197,7 +198,7 @@ class LiveImageCreatorBase(LoopImageCreator):
 
             try:
                 squashloop.mount()
-            except MountError, e:
+            except MountError as e:
                 raise CreatorError("Failed to loopback mount squashfs.img "
                                    "from '%s' : %s" % (base_on, e))
 
@@ -214,7 +215,7 @@ class LiveImageCreatorBase(LoopImageCreator):
 
             try:
                 shutil.copyfile(os_image, self._image)
-            except IOError, e:
+            except IOError as e:
                 raise CreatorError("Failed to copy base live image to %s for modification: %s" %(self._image, e))
         finally:
             squashloop.cleanup()

@@ -1,4 +1,6 @@
 #!/usr/bin/python
+from __future__ import print_function
+from __future__ import division
 import os
 import sys
 
@@ -15,7 +17,7 @@ def main():
 
     def usage():
         usage = 'usage: mkbiarch.py <x86 Live ISO File> <x64 Live ISO File> <Target Multi Arch Image File>'
-        print >> sys.stdout, usage
+        print(usage, file=sys.stdout)
 
 
     def mount(src, dst, options=None):
@@ -108,7 +110,7 @@ def main():
             return os.stat(ent).st_size
 
     def bs(size):
-        return size / 2048
+        return size // 2048
 
     def partition(device):
         dev = parted.Device(path=device)

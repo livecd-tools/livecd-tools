@@ -1,11 +1,13 @@
-#!/usr/bin/python -tt
+#!/usr/bin/python
 #
 # liveimage-mount: Mount a LiveOS at the specified point, and log
 # into a shell.
 #
 # Copyright 2011, Red Hat  Inc.
+# Copyright 2016, Neal Gompa
 #   Code for Live mounting an attached LiveOS device added by Frederick Grose,
 #   <fgrose at sugarlabs.org>
+#   Ported to Python 3 by Neal Gompa <ngompa13 at gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,6 +22,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
+from __future__ import print_function
 import os
 import sys
 import stat
@@ -30,7 +33,7 @@ import subprocess
 from imgcreate.errors import *
 
 def usage(ecode):
-    print """Usage:
+    print("""Usage:
         liveimage-mount [opts] ISO.iso|LiveOSdevice MOUNTPOINT [COMMAND] [ARGS]
 
                   where [opts] = [-h|--help
@@ -38,7 +41,7 @@ def usage(ecode):
                                  [--mount-hacks
                                  [--persist]]]]]
 
-                    and [ARGS] = [arg1[ arg2[ ...]]]\n"""
+                    and [ARGS] = [arg1[ arg2[ ...]]]\n""")
     sys.exit(ecode)
 
 
@@ -58,7 +61,7 @@ def call(*popenargs, **kwargs):
         buf = p.stdout.read(4096)
         if not buf:
             break
-        print buf
+        print(buf)
 
     return rc
 
@@ -73,7 +76,7 @@ def rcall(args, env=None):
         p = subprocess.Popen(args, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE, env=environ)
         out, err = p.communicate()
-    except OSError, e:
+    except OSError as e:
         raise CreatorError(u"Failed to execute:\n'%s'\n'%s'" % (args, e))
     except:
         raise CreatorError(u"""Failed to execute:\n'%s'
@@ -104,15 +107,15 @@ def get_device_mountpoint(path):
 
 def main():
     if os.geteuid() != 0:
-        print >> sys.stderr, """\n  Exiting...
-        \r  You must run liveimage-mount with root priviledges.\n"""
+        print("""\n  Exiting...
+        \r  You must run liveimage-mount with root priviledges.\n""", file=sys.stderr)
         return 1
 
     try:
         opts,args = getopt.getopt(sys.argv[1:], 'h', ['help',
                                                        'chroot', 'persist',
                                                        'mount-hacks'])
-    except getopt.GetoptError, e:
+    except getopt.GetoptError as e:
         usage(1)
 
     img_type = None
@@ -137,8 +140,8 @@ def main():
     destmnt = args[1]
 
     if not os.path.exists(liveos):
-        print """\n     Exiting...
-        %s is not a file, directory, or device.\n""" % liveos
+        print("""\n     Exiting...
+        %s is not a file, directory, or device.\n""" % liveos)
         ecode = 1
         return
 
@@ -178,8 +181,8 @@ def main():
         if not os.path.exists(squash_img):
             ext3_img = os.path.join(liveosdir, 'ext3fs.img')
             if not os.path.exists(ext3_img):
-                print """
-                \r\tNo LiveOS was found on %s\n\t  Exiting...\n""" % liveos
+                print("""
+                \r\tNo LiveOS was found on %s\n\t  Exiting...\n""" % liveos)
                 ecode = 1
                 return
         else:
@@ -203,7 +206,7 @@ def main():
                 dm_cow = 'live-rw'
             else:
                 overlay = tempfile.NamedTemporaryFile(dir='/dev/shm')
-                print "\npreparing temporary overlay..."
+                print("\npreparing temporary overlay...")
                 call(['/bin/dd', 'if=/dev/null', 'of=%s' % overlay.name,
                       'bs=1024', 'count=1', 'seek=%s' % (512 * 1024)])
                 call(['/sbin/losetup', overlayloop, overlay.name])
@@ -235,31 +238,31 @@ def main():
             live = ''
             if img_type is 'blk':
                 live = 'live-'
-            print """Starting process with this command line:
-            \r%s\n  %s is %smounted.""" % (' '.join(command), liveos, live)
+            print("""Starting process with this command line:
+            \r%s\n  %s is %smounted.""" % (' '.join(command), liveos, live))
             p = subprocess.Popen(args, close_fds=True)
-            print "Process id: %s" % p.pid
+            print("Process id: %s" % p.pid)
             ecode = p.returncode
         elif len(command) > 0:
             args = ['chroot', destmnt]
             args.extend(command)
             ecode = subprocess.call(args, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
         elif chroot:
-            print "Starting subshell in chroot, press Ctrl-D to exit..."
+            print("Starting subshell in chroot, press Ctrl-D to exit...")
             ecode = subprocess.call(['chroot', destmnt], stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
         else:
             if dm_cow == 'live-ro':
                 status = ' with NO LiveOS persistence,'
             else:
                 status = ''
-            print "Entering subshell,%s press Ctrl-D to exit..." % status
+            print("Entering subshell,%s press Ctrl-D to exit..." % status)
             ecode = subprocess.call([os.environ['SHELL']], cwd=destmnt, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
     finally:
         call(['/bin/sync'])
         if not persist:
             if verbose:
-                print """Cleaning up...
-                Please wait if large files were written."""
+                print("""Cleaning up...
+                Please wait if large files were written.""")
             if mount_hacks:
                 subprocess.call(['umount', os.path.join(destmnt, 'var', 'run')])
                 subprocess.call(['umount', os.path.join(destmnt, 'proc')])
@@ -290,7 +293,7 @@ def main():
             if not os.path.ismount(liveosmnt):
                 os.rmdir(liveosmnt)
             if verbose:
-                print "Cleanup complete"
+                print("Cleanup complete")
 
     sys.exit(ecode)
 

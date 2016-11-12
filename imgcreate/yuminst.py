@@ -3,6 +3,7 @@
 #
 # Copyright 2007, Red Hat  Inc.
 # Copyright 2016, Kevin Kofler
+# Copyright 2016, Neal Gompa
 #
 # Portions from Anaconda dnfpayload.py
 # DNF/rpm software payload management.
@@ -22,6 +23,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
+from __future__ import print_function
 import glob
 import os
 import sys
@@ -76,11 +78,11 @@ class LiveCDYum(dnf.Base):
         conf += "keepcache=1\n"
         conf += "tsflags=nocontexts\n"
 
-        f = file(confpath, "w+")
+        f = open(confpath, "w+")
         f.write(conf)
         f.close()
 
-        os.chmod(confpath, 0644)
+        os.chmod(confpath, 0o644)
 
     def _cleanupRpmdbLocks(self, installroot):
         # cleans up temporary files left by bdb so that differing
@@ -165,7 +167,7 @@ class LiveCDYum(dnf.Base):
         try:
             # dnf 2
             repo = dnf.repo.Repo(name, parent_conf = self.conf)
-        except TypeError, e:
+        except TypeError as e:
             # dnf 1
             repo = dnf.repo.Repo(name, cachedir = self.conf.cachedir)
         if url:
@@ -182,9 +184,9 @@ class LiveCDYum(dnf.Base):
         os.environ["HOME"] = "/"
         try:
             res = self.resolve()
-        except dnf.exceptions.RepoError, e:
+        except dnf.exceptions.RepoError as e:
             raise CreatorError("Unable to download from repo : %s" %(e,))
-        except dnf.exceptions.Error, e:
+        except dnf.exceptions.Error as e:
             raise CreatorError("Failed to build transaction : %s" %(e,))
         # Empty transactions are generally fine, we might be rebuilding an
         # existing image with no packages added
@@ -196,6 +198,6 @@ class LiveCDYum(dnf.Base):
         # FIXME: sigcheck?
 
         ret = self.do_transaction(TransactionProgress())
-        print ""
+        print("")
         self._cleanupRpmdbLocks(self.conf.installroot)
         return ret

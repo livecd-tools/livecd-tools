@@ -1,9 +1,9 @@
 
-                       The Fedora live CD tools
+                       The Fedora Live CD tools
                     David Zeuthen <davidz@redhat.com>
                     Jeremy Katz <katzj@redhat.com>
 
-                    Last updated: March 10, 2014 (v20.5)
+                    Last updated: November 12, 2016
 
 This project concerns tools to generate live CD's on Fedora based
 systems including derived distributions such as RHEL, CentOS and
@@ -61,7 +61,7 @@ In a nutshell, the livecd-creator program
    default configuration options.  The format of this file is the same
    as is used for installing a system via kickstart.
 
- o Installs, using yum, the requested packages into the installation
+ o Installs, using DNF, the requested packages into the installation
    using the given repositories
 
  o Optionally runs scripts as specified by the live CD configuration file. 
@@ -121,7 +121,7 @@ then the following command
   --config=/usr/share/spin-kickstarts/fedora-livecd-desktop.ks \
   --fslabel=Fedora-20-LiveCD-1-foo
 
-will create a live CD called "Fedora-7-LiveCD-1-foo". The name
+will create a live CD called "Fedora-20-LiveCD-1-foo". The name
 given by --fslabel is used.
 
  o as a file system label on the ext3 and iso960 file systems
