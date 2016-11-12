@@ -2,6 +2,12 @@
 # yum.py : yum utilities
 #
 # Copyright 2007, Red Hat  Inc.
+# Copyright 2016, Kevin Kofler
+#
+# Portions from Anaconda dnfpayload.py
+# DNF/rpm software payload management.
+#
+# Copyright (C) 2013-2015  Red Hat, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,37 +26,25 @@ import glob
 import os
 import sys
 import logging
+import itertools
 
-import yum
-import rpmUtils
+import dnf
+import dnf.rpm
+# FIXME: Why are these hidden inside dnf.cli? Any text-mode app should be able
+#        to make use of these.
+from dnf.cli.progress import MultiFileProgressMeter as DownloadProgress
+from dnf.cli.output import CliTransactionDisplay as TransactionProgress
+import hawkey
 from pykickstart.constants import GROUP_DEFAULT, GROUP_REQUIRED, GROUP_ALL
 
 from imgcreate.errors import *
 
-class TextProgress(object):
-    logger = logging.getLogger()
-    def emit(self, lvl, msg):
-        '''play nice with the logging module'''
-        for hdlr in self.logger.handlers:
-            if lvl >= self.logger.level:
-                hdlr.stream.write(msg)
-                hdlr.stream.flush()
-
-    def start(self, filename=None, url=None, *args, **kwargs):
-        text = kwargs.get("text", "")
-        self.emit(logging.INFO, "Retrieving %s " % (url or text))
-        self.url = url
-    def update(self, *args):
-        pass
-    def end(self, *args):
-        self.emit(logging.INFO, "...OK\n")
-
-class LiveCDYum(yum.YumBase):
+class LiveCDYum(dnf.Base):
     def __init__(self, releasever=None, useplugins=False):
         """
         releasever = optional value to use in replacing $releasever in repos
         """
-        yum.YumBase.__init__(self)
+        dnf.Base.__init__(self)
         self.releasever = releasever
         self.useplugins = useplugins
 
@@ -61,10 +55,10 @@ class LiveCDYum(yum.YumBase):
 
     def close(self):
         try:
-            os.unlink(self.conf.installroot + "/yum.conf")
+            os.unlink(self.conf.installroot + "/dnf.conf")
         except:
             pass
-        yum.YumBase.close(self)
+        dnf.Base.close(self)
 
     def __del__(self):
         pass
@@ -72,7 +66,7 @@ class LiveCDYum(yum.YumBase):
     def _writeConf(self, confpath, installroot):
         conf  = "[main]\n"
         conf += "installroot=%s\n" % installroot
-        conf += "cachedir=/var/cache/yum\n"
+        conf += "cachedir=/var/cache/dnf\n"
         if self.useplugins:
             conf += "plugins=1\n"
         else:
@@ -94,63 +88,64 @@ class LiveCDYum(yum.YumBase):
         for f in glob.glob(installroot + "/var/lib/rpm/__db*"):
             os.unlink(f)
 
-    def setup(self, confpath, installroot, cacheonly=False):
+    def setup(self, confpath, installroot, cacheonly=False, excludeWeakdeps=False):
         self._writeConf(confpath, installroot)
         self._cleanupRpmdbLocks(installroot)
-        self.doConfigSetup(fn = confpath, root = installroot)
+        self.conf.read(confpath)
+        self.conf.installroot = installroot
+        self.conf.prepend_installroot("cachedir")
+        self.conf.prepend_installroot("persistdir")
+        self.conf.install_weak_deps = not excludeWeakdeps
         if cacheonly:
-            self.conf.cache = 1
+            dnf.repo.Repo.DEFAULT_SYNC = dnf.repo.SYNC_ONLY_CACHE
         else:
-            self.conf.cache = 0
-        self.doTsSetup()
-        self.doRpmDBSetup()
-        self.doRepoSetup()
-        self.doSackSetup()
+            dnf.repo.Repo.DEFAULT_SYNC = dnf.repo.SYNC_TRY_CACHE
 
     def selectPackage(self, pkg):
         """Select a given package.  Can be specified with name.arch or name*"""
-        return self.install(pattern = pkg)
+        return self.install(pkg)
         
-    def deselectPackage(self, pkg):
-        """Deselect package.  Can be specified as name.arch or name*"""
-        sp = pkg.rsplit(".", 2)
-        txmbrs = []
-        if len(sp) == 2:
-            txmbrs = self.tsInfo.matchNaevr(name=sp[0], arch=sp[1])
-
-        if len(txmbrs) == 0:
-            exact, match, unmatch = yum.packages.parsePackages(self.pkgSack.returnPackages(), [pkg], casematch=1)
-            for p in exact + match:
-                txmbrs.append(p)
-
-        if len(txmbrs) > 0:
-            for x in txmbrs:
-                self.tsInfo.remove(x.pkgtup)
-                # we also need to remove from the conditionals
-                # dict so that things don't get pulled back in as a result
-                # of them.  yes, this is ugly.  conditionals should die.
-                for req, pkgs in self.tsInfo.conditionals.iteritems():
-                    if x in pkgs:
-                        pkgs.remove(x)
-                        self.tsInfo.conditionals[req] = pkgs
-        else:
-            logging.warn("No such package %s to remove" %(pkg,))
-
-    def selectGroup(self, grp, include = GROUP_DEFAULT):
+    def selectGroup(self, group_id, exclude, include = GROUP_DEFAULT):
+        grp = self.comps.group_by_pattern(group_id)
+        if grp is None:
+            raise dnf.exceptions.MarkingError('no such group', '@' + group_id)
         # default to getting mandatory and default packages from a group
         # unless we have specific options from kickstart
-        package_types = ['mandatory', 'default']
+        package_types = {'mandatory', 'default'}
         if include == GROUP_REQUIRED:
             package_types.remove('default')
         elif include == GROUP_ALL:
-            package_types.append('optional')
-        yum.YumBase.selectGroup(self, grp, group_package_types=package_types)
+            package_types.add('optional')
+        try:
+            self.group_install(grp.id, package_types, exclude=exclude)
+        except dnf.exceptions.CompsError as e:
+            # DNF raises this when it is already selected
+            pass
+
+    def environmentGroups(self, environmentid, optional=True):
+        env = self.comps.environment_by_pattern(environmentid)
+        if env is None:
+            dnf.exceptions.MarkingError('no such environment', '@^' + environmentid)
+        group_ids = (id_.name for id_ in env.group_ids)
+        option_ids = (id_.name for id_ in env.option_ids)
+        if optional:
+            return list(itertools.chain(group_ids, option_ids))
+        else:
+            return list(group_ids)
+
+    def selectEnvironment(self, env_id, excluded, excludedPkgs):
+        # dnf.base.environment_install excludes on packages instead of groups,
+        # which is unhelpful. Instead, use group_install for each group in
+        # the environment so we can skip the ones that are excluded.
+        for groupid in set(self.environmentGroups(env_id, optional=False)) - set(excluded):
+            self.selectGroup(groupid, excludedPkgs)
 
     def addRepository(self, name, url = None, mirrorlist = None):
         def _varSubstitute(option):
             # takes a variable and substitutes like yum configs do
-            option = option.replace("$basearch", rpmUtils.arch.getBaseArch())
-            option = option.replace("$arch", rpmUtils.arch.getCanonArch())
+            arch = hawkey.detect_arch()
+            option = option.replace("$basearch", dnf.rpm.basearch(arch))
+            option = option.replace("$arch", arch)
             # If the url includes $releasever substitute user's value or
             # current system's version.
             if option.find("$releasever") > -1:
@@ -158,80 +153,49 @@ class LiveCDYum(yum.YumBase):
                     option = option.replace("$releasever", self.releasever)
                 else:
                     try:
-                        option = option.replace("$releasever", yum.config._getsysver("/", ("system-release(release)", "redhat-release")))
-                    except yum.Errors.YumBaseError:
+                        detected_releasever = dnf.rpm.detect_releasever("/")
+                    except dnf.exceptions.Error:
+                        detected_releasever = None
+                    if detected_releasever:
+                        option = option.replace("$releasever", detected_releasever)
+                    else:
                         raise CreatorError("$releasever in repo url, but no releasever set")
             return option
 
-        repo = yum.yumRepo.YumRepository(name)
+        try:
+            # dnf 2
+            repo = dnf.repo.Repo(name, parent_conf = self.conf)
+        except TypeError, e:
+            # dnf 1
+            repo = dnf.repo.Repo(name, cachedir = self.conf.cachedir)
         if url:
             repo.baseurl.append(_varSubstitute(url))
         if mirrorlist:
             repo.mirrorlist = _varSubstitute(mirrorlist)
-        conf = yum.config.RepoConf()
-        for k, v in conf.iteritems():
-            if v or not hasattr(repo, k):
-                repo.setAttribute(k, v)
-        repo.basecachedir = self.conf.cachedir
-        repo.base_persistdir = self.conf.cachedir
-        repo.failovermethod = "priority"
-        repo.metadata_expire = 0
-        repo.mirrorlist_expire = 0
-        repo.timestamp_check = 0
-        # disable gpg check???
-        repo.gpgcheck = 0
         repo.enable()
-        repo.setup(self.conf.cache)
-        repo.setCallback(TextProgress())
+        repo.set_progress_bar(DownloadProgress())
         self.repos.add(repo)
         return repo
 
-    def installHasFile(self, file):
-        provides_pkg = self.whatProvides(file, None, None)
-        dlpkgs = map(lambda x: x.po, filter(lambda txmbr: txmbr.ts_state in ("i", "u"), self.tsInfo.getMembers()))
-        for p in dlpkgs:
-            for q in provides_pkg:
-                if (p == q):
-                    return True
-        return False
-
-
     def runInstall(self):
-        import yum.Errors
+        import dnf.exceptions
         os.environ["HOME"] = "/"
         try:
-            (res, resmsg) = self.buildTransaction()
-        except yum.Errors.RepoError, e:
+            res = self.resolve()
+        except dnf.exceptions.RepoError, e:
             raise CreatorError("Unable to download from repo : %s" %(e,))
+        except dnf.exceptions.Error, e:
+            raise CreatorError("Failed to build transaction : %s" %(e,))
         # Empty transactions are generally fine, we might be rebuilding an
         # existing image with no packages added
-        if resmsg and resmsg[0].endswith(" - empty transaction"):
-            return res
-        if res != 2:
-            raise CreatorError("Failed to build transaction : %s" % str.join("\n", resmsg))
+        if not res:
+            return True
 
-        dlpkgs = map(lambda x: x.po, filter(lambda txmbr: txmbr.ts_state in ("i", "u"), self.tsInfo.getMembers()))
-        self.downloadPkgs(dlpkgs)
+        dlpkgs = self.transaction.install_set
+        self.download_packages(dlpkgs, DownloadProgress())
         # FIXME: sigcheck?
 
-        self.initActionTs()
-        self.populateTs(keepold=0)
-        deps = self.ts.check()
-        if len(deps) != 0:
-            raise CreatorError("Dependency check failed : %s" % "\n".join([str(d) for d in deps]))
-        rc = self.ts.order()
-        if rc != 0:
-            raise CreatorError("ordering packages for installation failedr. rc = %s" % rc)
-
-        # FIXME: callback should be refactored a little in yum 
-        sys.path.append('/usr/share/yum-cli')
-        import yum.misc
-        yum.misc.setup_locale()
-        import callback
-        cb = callback.RPMInstallCallback()
-        cb.tsInfo = self.tsInfo
-        cb.filelog = False
-        ret = self.runTransaction(cb)
+        ret = self.do_transaction(TransactionProgress())
         print ""
         self._cleanupRpmdbLocks(self.conf.installroot)
         return ret

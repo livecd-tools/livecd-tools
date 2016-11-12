@@ -2,6 +2,7 @@
 # kickstart.py : Apply kickstart configuration to a system
 #
 # Copyright 2007, Red Hat  Inc.
+# Copyright 2016, Kevin Kofler
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -580,8 +581,17 @@ def get_packages(ks, required = []):
 def get_groups(ks, required = []):
     return ks.handler.packages.groupList + required
 
+def get_environment(ks):
+    if hasattr(ks.handler.packages, "environment"):
+        if ks.handler.packages.environment:
+            return ks.handler.packages.environment
+    return None
+
 def get_excluded(ks, required = []):
     return ks.handler.packages.excludedList + required
+
+def get_excluded_groups(ks, required = []):
+    return ks.handler.packages.excludedGroupList + required
 
 def get_partitions(ks, required = []):
     return ks.handler.partition.partitions
@@ -591,6 +601,12 @@ def ignore_missing(ks):
 
 def exclude_docs(ks):
     return ks.handler.packages.excludeDocs
+
+def exclude_weakdeps(ks):
+    return ks.handler.packages.excludeWeakdeps
+
+def nocore(ks):
+    return ks.handler.packages.nocore
 
 def inst_langs(ks):
     if hasattr(ks.handler.packages, "instLange"):

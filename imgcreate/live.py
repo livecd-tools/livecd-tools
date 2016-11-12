@@ -2,6 +2,7 @@
 # live.py : LiveImageCreator class for creating Live CD images
 #
 # Copyright 2007-2012, Red Hat, Inc.
+# Copyright 2016, Kevin Kofler
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,6 +25,8 @@ import shutil
 import subprocess
 import logging
 import re
+import hawkey
+import dnf.rpm
 
 from imgcreate.errors import *
 from imgcreate.fs import *
@@ -704,7 +707,7 @@ menu end
         if not self._efiarch:
             # for most things, we want them named boot$efiarch
             efiarch = {"i386": "IA32", "x86_64": "X64"}
-            self._efiarch = efiarch[rpmUtils.arch.getBaseArch()]
+            self._efiarch = efiarch[dnf.rpm.basearch(hawkey.detect_arch())]
         return self._efiarch
 
     def __copy_efi_files(self, isodir):
@@ -821,7 +824,7 @@ submenu 'Troubleshooting -->' {
         cfgf.close()
 
         # first gen mactel machines get the bootloader name wrong apparently
-        if rpmUtils.arch.getBaseArch() == "i386":
+        if dnf.rpm.basearch(hawkey.detect_arch()) == "i386":
             os.link(isodir + "/EFI/BOOT/BOOT%s.EFI" % (self.efiarch),
                     isodir + "/EFI/BOOT/BOOT.EFI")
 
@@ -1026,7 +1029,7 @@ class ppc64LiveImageCreator(ppcLiveImageCreator):
         return ["kernel.ppc"] + \
                ppcLiveImageCreator._get_excluded_packages(self)
 
-arch = rpmUtils.arch.getBaseArch()
+arch = dnf.rpm.basearch(hawkey.detect_arch())
 if arch in ("i386", "x86_64"):
     LiveImageCreator = x86LiveImageCreator
 elif arch in ("ppc",):

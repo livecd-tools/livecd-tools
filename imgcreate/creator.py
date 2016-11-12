@@ -2,6 +2,12 @@
 # creator.py : ImageCreator and LoopImageCreator base classes
 #
 # Copyright 2007, Red Hat  Inc.
+# Copyright 2016, Kevin Kofler
+#
+# Portions from Anaconda dnfpayload.py
+# DNF/rpm software payload management.
+#
+# Copyright (C) 2013-2015  Red Hat, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,7 +32,7 @@ import logging
 import subprocess
 
 import selinux
-import yum
+import dnf
 import rpm
 
 from imgcreate.errors import *
@@ -84,6 +90,7 @@ class ImageCreator(object):
 
         self.cacheonly = cacheonly
         self.docleanup = docleanup
+        self.excludeWeakdeps = kickstart.exclude_weakdeps(self.ks)
 
         self.__builddir = None
         self.__bindmounts = []
@@ -523,23 +530,25 @@ class ImageCreator(object):
 
         self._mount_instroot(base_on)
 
-        for d in ("/dev/pts", "/etc", "/boot", "/var/log", "/var/cache/yum", "/sys", "/proc"):
+        for d in ("/dev/pts", "/etc", "/boot", "/var/log", "/var/cache/dnf", "/sys", "/proc"):
             makedirs(self._instroot + d)
 
-        cachesrc = cachedir or (self.__builddir + "/yum-cache")
+        cachesrc = cachedir or (self.__builddir + "/dnf-cache")
         makedirs(cachesrc)
 
         # bind mount system directories into _instroot
         for (f, dest) in [("/sys", None), ("/proc", None),
                           ("/dev/pts", None), ("/dev/shm", None),
                           (self.__selinux_mountpoint, self.__selinux_mountpoint),
-                          (cachesrc, "/var/cache/yum")]:
+                          (cachesrc, "/var/cache/dnf")]:
             if os.path.exists(f):
                 self.__bindmounts.append(BindChrootMount(f, self._instroot, dest))
             else:
                 logging.warn("Skipping (%s,%s) because source doesn't exist." % (f, dest))
 
         self._do_bindmounts()
+
+        makedirs(self._instroot + "/var/lib/dnf")
 
         self.__create_selinuxfs()
 
@@ -592,41 +601,62 @@ class ImageCreator(object):
         shutil.rmtree(self.__builddir, ignore_errors = True)
         self.__builddir = None
 
-    def __select_packages(self, ayum):
-        skipped_pkgs = []
-        for pkg in kickstart.get_packages(self.ks,
-                                          self._get_required_packages()):
+    def __apply_selections(self, ayum):
+        excludedPkgs = kickstart.get_excluded(self.ks, self._get_excluded_packages())
+
+        if kickstart.nocore(self.ks):
+            logging.info("skipping core group due to %%packages --nocore; system may not be complete")
+        else:
             try:
-                ayum.selectPackage(pkg)
-            except yum.Errors.InstallError, e:
+                ayum.selectGroup('core', excludedPkgs)
+                logging.info("selected group: core")
+            except dnf.exceptions.MarkingError, e:
                 if kickstart.ignore_missing(self.ks):
-                    skipped_pkgs.append(pkg)
+                    raise CreatorError("Failed to find group 'core' : %s" %
+                                       (e,))
                 else:
-                    raise CreatorError("Failed to find package '%s' : %s" %
-                                       (pkg, e))
+                    logging.warn("Skipping missing group 'core'")
 
-        for pkg in skipped_pkgs:
-            logging.warn("Skipping missing package '%s'" % (pkg,))
+        env = kickstart.get_environment(self.ks)
 
-    def __select_groups(self, ayum):
-        skipped_groups = []
-        for group in kickstart.get_groups(self.ks):
+        excludedGroups = [group.name for group in kickstart.get_excluded_groups(self.ks)]
+
+        if env:
             try:
-                ayum.selectGroup(group.name, group.include)
-            except (yum.Errors.InstallError, yum.Errors.GroupsError), e:
+                ayum.selectEnvironment(env, excludedGroups, excludedPkgs)
+                logging.info("selected env: %s", env)
+            except dnf.exceptions.MarkingError, e:
+                if kickstart.ignore_missing(self.ks):
+                    raise CreatorError("Failed to find environment '%s' : %s" %
+                                       (env, e))
+                else:
+                    logging.warn("Skipping missing environment '%s'" % (env,))
+
+        for group in kickstart.get_groups(self.ks):
+            if group.name == 'core' or group.name in excludedGroups:
+                continue
+
+            try:
+                ayum.selectGroup(group.name, excludedPkgs, group.include)
+                logging.info("selected group: %s", group.name)
+            except dnf.exceptions.MarkingError, e:
                 if kickstart.ignore_missing(self.ks):
                     raise CreatorError("Failed to find group '%s' : %s" %
                                        (group.name, e))
                 else:
-                    skipped_groups.append(group)
+                    logging.warn("Skipping missing group '%s'" % (group.name,))
 
-        for group in skipped_groups:
-            logging.warn("Skipping missing group '%s'" % (group.name,))
-
-    def __deselect_packages(self, ayum):
-        for pkg in kickstart.get_excluded(self.ks,
-                                          self._get_excluded_packages()):
-            ayum.deselectPackage(pkg)
+        for pkg_name in set(kickstart.get_packages(self.ks,
+                                                   self._get_required_packages())) - set(excludedPkgs):
+            try:
+                ayum.selectPackage(pkg_name)
+                logging.info("selected package: '%s'", pkg_name)
+            except dnf.exceptions.MarkingError, e:
+                if kickstart.ignore_missing(self.ks):
+                    logging.warn("Skipping missing package '%s'" % (pkg,))
+                else:
+                    raise CreatorError("Failed to find package '%s' : %s" %
+                                       (pkg, e))
 
     def install(self, repo_urls = {}):
         """Install packages into the install root.
@@ -640,10 +670,11 @@ class ImageCreator(object):
                      the kickstart to be overridden.
 
         """
-        yum_conf = self._mktemp(prefix = "yum.conf-")
+        dnf_conf = self._mktemp(prefix = "dnf.conf-")
 
         ayum = LiveCDYum(releasever=self.releasever, useplugins=self.useplugins)
-        ayum.setup(yum_conf, self._instroot, cacheonly=self.cacheonly)
+        ayum.setup(dnf_conf, self._instroot, cacheonly=self.cacheonly,
+                   excludeWeakdeps=self.excludeWeakdeps)
 
         for repo in kickstart.get_repos(self.ks, repo_urls):
             (name, baseurl, mirrorlist, proxy, inc, exc, cost, sslverify) = repo
@@ -658,7 +689,6 @@ class ImageCreator(object):
             if cost is not None:
                 yr.cost = cost
             yr.sslverify = sslverify
-        ayum.setup(yum_conf, self._instroot)
 
         if kickstart.exclude_docs(self.ks):
             rpm.addMacro("_excludedocs", "1")
@@ -667,20 +697,20 @@ class ImageCreator(object):
         if kickstart.inst_langs(self.ks) != None:
             rpm.addMacro("_install_langs", kickstart.inst_langs(self.ks))
 
+        ayum.fill_sack(load_system_repo = os.path.exists(self._instroot + "/var/lib/rpm/Packages"))
+        ayum.read_comps()
+
         try:
-            self.__select_packages(ayum)
-            self.__select_groups(ayum)
-            self.__deselect_packages(ayum)
+            self.__apply_selections(ayum)
 
             ayum.runInstall()
-        except yum.Errors.RepoError, e:
+        except (dnf.exceptions.DownloadError, dnf.exceptions.RepoError), e:
             raise CreatorError("Unable to download from repo : %s" % (e,))
-        except yum.Errors.YumBaseError, e:
+        except dnf.exceptions.Error, e:
             raise CreatorError("Unable to install: %s" % (e,))
         finally:
-            ayum.closeRpmDB()
             ayum.close()
-            os.unlink(yum_conf)
+            os.unlink(dnf_conf)
 
         # do some clean up to avoid lvm info leakage.  this sucks.
         for subdir in ("cache", "backup", "archive"):

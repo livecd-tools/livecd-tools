@@ -23,7 +23,7 @@ import sys
 import time
 import optparse
 import logging
-from yum.Errors import YumBaseError
+from dnf.exceptions import Error as YumBaseError
 
 import imgcreate
 from imgcreate.errors import KickstartError

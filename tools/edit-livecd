@@ -31,6 +31,8 @@ import optparse
 import logging
 import rpm
 import glob
+import hawkey
+import dnf.rpm
 
 from imgcreate.debug import *
 from imgcreate.errors import *
@@ -727,7 +729,7 @@ def main():
 if __name__ == "__main__":
     sys.exit(main())
 
-arch = rpmUtils.arch.getBaseArch()
+arch = dnf.rpm.basearch(hawkey.detect_arch())
 if arch in ("i386", "x86_64"):
     LiveImageCreator = x86LiveImageCreator
 elif arch in ("ppc",):
