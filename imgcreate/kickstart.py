@@ -25,7 +25,10 @@ import shutil
 import subprocess
 import time
 import logging
-import urlgrabber
+try:
+    import urllib.request as urllib_request
+except ImportError:
+    import urllib2 as urllib_request
 import selinux
 
 try:
@@ -55,8 +58,8 @@ def read_kickstart(path):
     version = ksversion.makeVersion()
     ks = ksparser.KickstartParser(version)
     try:
-        ksfile = urlgrabber.urlgrab(path)
-        ks.readKickstart(ksfile)
+        ksdata = urllib_request.urlopen(path).read().decode("utf-8")
+        ks.readKickstartFromString(ksdata, reset=False)
 # Fallback to e.args[0] is a workaround for bugs in urlgragger and pykickstart.
     except IOError as e:
         raise errors.KickstartError("Failed to read kickstart file "
