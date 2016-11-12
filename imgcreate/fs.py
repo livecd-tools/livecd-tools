@@ -510,8 +510,8 @@ class ExtDiskMount(DiskMount):
 
     def __get_size_from_filesystem(self):
         def parse_field(output, field):
-            for line in output.split("\n"):
-                if line.startswith(field + ":"):
+            for line in output.split(b"\n"):
+                if line.startswith(field.encode("utf-8") + b":"):
                     return line[len(field) + 1:].strip()
 
             raise KeyError("Failed to find field '%s' in output" % field)
