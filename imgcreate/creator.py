@@ -730,7 +730,7 @@ class ImageCreator(object):
             (fd, path) = tempfile.mkstemp(prefix = "ks-script-",
                                           dir = self._instroot + "/tmp")
 
-            os.write(fd, s.script)
+            os.write(fd, s.script.encode("utf-8"))
             os.close(fd)
             os.chmod(path, 0o700)
 
