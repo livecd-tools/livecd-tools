@@ -14,7 +14,7 @@ define COMPILE_PYTHON
 	$(PYTHON_PROGRAM) -c "import compileall as c; c.compile_dir('$(1)', force=1)"
 	$(PYTHON_PROGRAM) -O -c "import compileall as c; c.compile_dir('$(1)', force=1)"
 endef
-PYTHONDIR := $(shell $(PYTHON_PROGRAM) -c "import distutils.sysconfig as d; print d.get_python_lib()")
+PYTHONDIR := $(shell $(PYTHON_PROGRAM) -c "from __future__ import print_function; from distutils.sysconfig import get_python_lib; print(get_python_lib())")
 
 all: 
 
