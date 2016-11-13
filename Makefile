@@ -14,7 +14,7 @@ define COMPILE_PYTHON
 	$(PYTHON_PROGRAM) -c "import compileall as c; c.compile_dir('$(1)', force=1)"
 	$(PYTHON_PROGRAM) -O -c "import compileall as c; c.compile_dir('$(1)', force=1)"
 endef
-PYTHONDIR := $(shell $(PYTHON_PROGRAM) -c "import distutils.sysconfig as d; print d.get_python_lib()")
+PYTHONDIR := $(shell $(PYTHON_PROGRAM) -c "from __future__ import print_function; from distutils.sysconfig import get_python_lib; print(get_python_lib())")
 
 all: 
 
@@ -25,7 +25,7 @@ man:
 
 install: man
 	$(INSTALL_PROGRAM) -D tools/livecd-creator $(DESTDIR)/usr/bin/livecd-creator
-	ln -s ./livecd-creator $(DESTDIR)/usr/bin/image-creator
+	ln -sf livecd-creator $(DESTDIR)/usr/bin/image-creator
 	$(INSTALL_PROGRAM) -D tools/liveimage-mount $(DESTDIR)/usr/bin/liveimage-mount
 	$(INSTALL_PROGRAM) -D tools/livecd-iso-to-disk.sh $(DESTDIR)/usr/bin/livecd-iso-to-disk
 	$(INSTALL_PROGRAM) -D tools/livecd-iso-to-pxeboot.sh $(DESTDIR)/usr/bin/livecd-iso-to-pxeboot
