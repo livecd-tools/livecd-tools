@@ -616,10 +616,10 @@ class ImageCreator(object):
                 logging.info("selected group: core")
             except dnf.exceptions.MarkingError as e:
                 if kickstart.ignore_missing(self.ks):
+                    logging.warn("Skipping missing group 'core'")
+                else:
                     raise CreatorError("Failed to find group 'core' : %s" %
                                        (e,))
-                else:
-                    logging.warn("Skipping missing group 'core'")
 
         env = kickstart.get_environment(self.ks)
 
@@ -631,10 +631,10 @@ class ImageCreator(object):
                 logging.info("selected env: %s", env)
             except dnf.exceptions.MarkingError as e:
                 if kickstart.ignore_missing(self.ks):
+                    logging.warn("Skipping missing environment '%s'" % (env,))
+                else:
                     raise CreatorError("Failed to find environment '%s' : %s" %
                                        (env, e))
-                else:
-                    logging.warn("Skipping missing environment '%s'" % (env,))
 
         for group in kickstart.get_groups(self.ks):
             if group.name == 'core' or group.name in excludedGroups:
@@ -645,10 +645,10 @@ class ImageCreator(object):
                 logging.info("selected group: %s", group.name)
             except dnf.exceptions.MarkingError as e:
                 if kickstart.ignore_missing(self.ks):
+                    logging.warn("Skipping missing group '%s'" % (group.name,))
+                else:
                     raise CreatorError("Failed to find group '%s' : %s" %
                                        (group.name, e))
-                else:
-                    logging.warn("Skipping missing group '%s'" % (group.name,))
 
         for pkg_name in set(kickstart.get_packages(self.ks,
                                                    self._get_required_packages())) - set(excludedPkgs):
@@ -657,10 +657,10 @@ class ImageCreator(object):
                 logging.info("selected package: '%s'", pkg_name)
             except dnf.exceptions.MarkingError as e:
                 if kickstart.ignore_missing(self.ks):
-                    logging.warn("Skipping missing package '%s'" % (pkg,))
+                    logging.warn("Skipping missing package '%s'" % (pkg_name,))
                 else:
                     raise CreatorError("Failed to find package '%s' : %s" %
-                                       (pkg, e))
+                                       (pkg_name, e))
 
     def install(self, repo_urls = {}):
         """Install packages into the install root.
