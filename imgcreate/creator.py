@@ -540,6 +540,14 @@ class ImageCreator(object):
         cachesrc = cachedir or (self.__builddir + "/dnf-cache")
         makedirs(cachesrc)
 
+        # delete any leftover @System.solv from a previous run from the cache,
+        # which confuses Hawkey/DNF very badly (it thinks the rpmdb is corrupt
+        # when it is actually just the cache that is stale)
+        try:
+            os.unlink(cachesrc + "/@System.solv")
+        except OSError:
+            pass
+
         # bind mount system directories into _instroot
         for (f, dest) in [("/sys", None), ("/proc", None),
                           ("/dev/pts", None), ("/dev/shm", None),
