@@ -347,7 +347,7 @@ class LiveImageCreatorBase(LoopImageCreator):
         elif os.path.exists("/usr/lib/anaconda-runtime/implantisomd5"):
             implantisomd5 = "/usr/lib/anaconda-runtime/implantisomd5"
         else:
-            logging.warn("isomd5sum not installed; not setting up mediacheck")
+            logging.warning("isomd5sum not installed; not setting up mediacheck")
             return
 
         subprocess.call([implantisomd5, iso])
@@ -367,7 +367,7 @@ class LiveImageCreatorBase(LoopImageCreator):
                 shutil.move(self._image, self.__isodir + "/LiveOS/ext3fs.img")
                 if os.stat(self.__isodir + "/LiveOS/ext3fs.img").st_size >= 4*1024*1024*1024:
                     self._isofstype = "udf"
-                    logging.warn("Switching to UDF due to size of LiveOS/ext3fs.img")
+                    logging.warning("Switching to UDF due to size of LiveOS/ext3fs.img")
             else:
                 makedirs(os.path.join(os.path.dirname(self._image), "LiveOS"))
                 shutil.move(self._image,
@@ -378,7 +378,7 @@ class LiveImageCreatorBase(LoopImageCreator):
                            self.compress_type)
                 if os.stat(self.__isodir + "/LiveOS/squashfs.img").st_size >= 4*1024*1024*1024:
                     self._isofstype = "udf"
-                    logging.warn("Switching to UDF due to size of LiveOS/squashfs.img")
+                    logging.warning("Switching to UDF due to size of LiveOS/squashfs.img")
 
 
             self.__create_iso(self.__isodir)
@@ -813,7 +813,7 @@ submenu 'Troubleshooting -->' {
         """Set up the configuration for an EFI bootloader"""
         if self.__copy_efi_files(isodir):
             shutil.rmtree(isodir + "/EFI")
-            logging.warn("Failed to copy EFI files, no EFI Support will be included.")
+            logging.warning("Failed to copy EFI files, no EFI Support will be included.")
             return
 
         cfg = self.__get_basic_efi_config(isolabel = self.fslabel,

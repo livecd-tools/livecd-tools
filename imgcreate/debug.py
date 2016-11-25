@@ -58,7 +58,7 @@ def setup_logging(parser = None):
     """
     logger = logging.getLogger()
 
-    logger.setLevel(logging.WARN)
+    logger.setLevel(logging.WARNING)
 
     stream = logging.StreamHandler(sys.stderr)
 
