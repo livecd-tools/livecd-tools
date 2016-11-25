@@ -556,7 +556,7 @@ class ImageCreator(object):
             if os.path.exists(f):
                 self.__bindmounts.append(BindChrootMount(f, self._instroot, dest))
             else:
-                logging.warn("Skipping (%s,%s) because source doesn't exist." % (f, dest))
+                logging.warning("Skipping (%s,%s) because source doesn't exist." % (f, dest))
 
         self._do_bindmounts()
 
@@ -602,7 +602,7 @@ class ImageCreator(object):
 
         """
         if not self.docleanup:
-            logging.warn("Skipping cleanup of temporary files")
+            logging.warning("Skipping cleanup of temporary files")
             return
 
         if not self.__builddir:
@@ -624,7 +624,7 @@ class ImageCreator(object):
                 logging.info("selected group: core")
             except dnf.exceptions.MarkingError as e:
                 if kickstart.ignore_missing(self.ks):
-                    logging.warn("Skipping missing group 'core'")
+                    logging.warning("Skipping missing group 'core'")
                 else:
                     raise CreatorError("Failed to find group 'core' : %s" %
                                        (e,))
@@ -639,7 +639,7 @@ class ImageCreator(object):
                 logging.info("selected env: %s", env)
             except dnf.exceptions.MarkingError as e:
                 if kickstart.ignore_missing(self.ks):
-                    logging.warn("Skipping missing environment '%s'" % (env,))
+                    logging.warning("Skipping missing environment '%s'" % (env,))
                 else:
                     raise CreatorError("Failed to find environment '%s' : %s" %
                                        (env, e))
@@ -653,7 +653,7 @@ class ImageCreator(object):
                 logging.info("selected group: %s", group.name)
             except dnf.exceptions.MarkingError as e:
                 if kickstart.ignore_missing(self.ks):
-                    logging.warn("Skipping missing group '%s'" % (group.name,))
+                    logging.warning("Skipping missing group '%s'" % (group.name,))
                 else:
                     raise CreatorError("Failed to find group '%s' : %s" %
                                        (group.name, e))
@@ -665,7 +665,7 @@ class ImageCreator(object):
                 logging.info("selected package: '%s'", pkg_name)
             except dnf.exceptions.MarkingError as e:
                 if kickstart.ignore_missing(self.ks):
-                    logging.warn("Skipping missing package '%s'" % (pkg_name,))
+                    logging.warning("Skipping missing package '%s'" % (pkg_name,))
                 else:
                     raise CreatorError("Failed to find package '%s' : %s" %
                                        (pkg_name, e))

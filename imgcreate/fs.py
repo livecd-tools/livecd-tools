@@ -400,7 +400,7 @@ class DiskMount(Mount):
             if rc == 0:
                 self.mounted = False
             else:
-                logging.warn("Unmounting directory %s failed, using lazy umount" % self.mountdir)
+                logging.warning("Unmounting directory %s failed, using lazy umount" % self.mountdir)
                 print("Unmounting directory %s failed, using lazy umount" %self.mountdir, file=sys.stdout)
                 rc = call(["/bin/umount", "-l", self.mountdir])
                 if rc != 0:
