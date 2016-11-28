@@ -103,6 +103,14 @@ class LiveCDYum(dnf.Base):
         else:
             dnf.repo.Repo.DEFAULT_SYNC = dnf.repo.SYNC_TRY_CACHE
 
+    def deselectPackage(self, pkg):
+        """Deselect a given package.  Can be specified with name.arch or name*"""
+        subj = dnf.subject.Subject(pkg)
+        pkgs = subj.get_best_query(self.sack)
+        # The only way to get expected behavior is to declare it
+        # as excluded from the installable set
+        return self.sack.add_excludes(pkgs)
+
     def selectPackage(self, pkg):
         """Select a given package.  Can be specified with name.arch or name*"""
         return self.install(pkg)

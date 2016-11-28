@@ -658,6 +658,10 @@ class ImageCreator(object):
                     raise CreatorError("Failed to find group '%s' : %s" %
                                        (group.name, e))
 
+        for pkg_name in set(excludedPkgs):
+            ayum.deselectPackage(pkg_name)
+            logging.info("excluding package: '%s'", pkg_name)
+
         for pkg_name in set(kickstart.get_packages(self.ks,
                                                    self._get_required_packages())) - set(excludedPkgs):
             try:
