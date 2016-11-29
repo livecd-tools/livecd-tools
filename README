@@ -1,11 +1,11 @@
 
-                       The Fedora Live CD tools
+                       The Fedora Live CD Tools
                     David Zeuthen <davidz@redhat.com>
                     Jeremy Katz <katzj@redhat.com>
 
-                    Last updated: November 12, 2016
+                    Last Updated: November 28, 2016
 
-This project concerns tools to generate live CD's on Fedora based
+This project concerns tools to generate live CDs on Fedora based
 systems including derived distributions such as RHEL, CentOS and
 others. See the project Wiki at 
 
@@ -118,13 +118,13 @@ Assuming that you use the livecd-fedora-desktop.ks configuration file,
 then the following command
 
 # livecd-creator \
-  --config=/usr/share/spin-kickstarts/fedora-livecd-desktop.ks \
-  --fslabel=Fedora-20-LiveCD-1-foo
+  --config=/usr/share/spin-kickstarts/fedora-live-workstation.ks \
+  --fslabel=Fedora-24-WS-Live-foo
 
-will create a live CD called "Fedora-20-LiveCD-1-foo". The name
+will create a live CD called "Fedora-24-WS-Live-foo". The name
 given by --fslabel is used.
 
- o as a file system label on the ext3 and iso960 file systems
+ o as a file system label on the ext3 and iso9660 file systems
    (as such it's visible on the desktop as the CD name)
 
  o in the isolinux boot loader
@@ -135,7 +135,7 @@ configuration file to point to your local repositories.
 
 3. LIVE CD INSTALLS
 
-As of Fedora 7, anaconda has support for doing an installation
+As of Fedora 7, Anaconda has support for doing an installation
 from a live CD.  To use this, double click on the "Install to Hard
 Drive" item on the desktop or run /usr/bin/liveinst if you don't have
 such an icon.
@@ -143,15 +143,13 @@ such an icon.
 4. LIVE CD MEDIA VERIFICATION
 
 The live CD can incorporate functionality to verify itself.  To do so,
-you need to have anaconda-runtime installed both on the system used
-for creating the image and installed into the image.  This is so that
-the implantisomd5 and checkisomd5 utilities can be used.  These
-utilities take advantage of embedding an md5sum into the application
-area of the iso9660 image.  This then gets verified before mounting
-the real root filesystem.
+you need to have isomd5sum installed both on the system used for creating
+the image and installed into the image.  This is so that the implantisomd5
+and checkisomd5 utilities can be used. These utilities take advantage of
+embedding an md5sum into the application area of the iso9660 image.
+This then gets verified before mounting the real root filesystem.
 
-In a future release, the isomd5 utilities will probably be split out
-of anaconda.
+These utilities used to be part of the anaconda-runtime package.
 
 5. USING LIVE IMAGES FROM USB MEDIA 
 

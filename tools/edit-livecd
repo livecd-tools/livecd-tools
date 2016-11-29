@@ -203,7 +203,7 @@ class LiveImageEditor(LiveImageCreator):
         base_on --  the <LIVEIMG.src> a LiveOS.iso file or an attached LiveOS
                     device, such as, /dev/live for a currently running image.
 
-        cachedir -- a directory in which to store a Yum cache;
+        cachedir -- a directory in which to store a DNF cache;
                     Not used in edit-liveos.
 
         """
@@ -248,12 +248,12 @@ class LiveImageEditor(LiveImageCreator):
             raise CreatorError("Failed to loopback mount '%s' : %s" %
                                (self._image, e))
 
-        cachesrc = cachedir or (self._ImageCreator__builddir + "/yum-cache")
+        cachesrc = cachedir or (self._ImageCreator__builddir + "/dnf-cache")
         makedirs(cachesrc)
 
         for (f, dest) in [("/sys", None), ("/proc", None),
                           ("/dev/pts", None), ("/dev/shm", None),
-                          (cachesrc, "/var/cache/yum")]:
+                          (cachesrc, "/var/cache/dnf")]:
             self._ImageCreator__bindmounts.append(BindChrootMount(f, self._instroot, dest))
 
         self._do_bindmounts()
@@ -538,7 +538,7 @@ class LiveImageEditor(LiveImageCreator):
             if baseurl.startswith("file://"):
                baseurl=baseurl[7:]
             elif not baseurl.startswith("/"):
-                raise CreatorError("edit-livecd accepts only --baseurl pointing to a local folder with RPMs (not YUM repo)")
+                raise CreatorError("edit-livecd accepts only --baseurl pointing to a local folder with RPMs (not RPM-MD repo)")
             if not baseurl.endswith("/"):
                 baseurl+="/"
             for pkg_from_list in kickstart.get_packages(self.ks):
