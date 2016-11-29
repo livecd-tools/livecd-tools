@@ -3,7 +3,7 @@
                     David Zeuthen <davidz@redhat.com>
                     Jeremy Katz <katzj@redhat.com>
 
-                    Last Updated: November 28, 2016
+                    Last Updated: November 29, 2016
 
 This project concerns tools to generate live CDs on Fedora based
 systems including derived distributions such as RHEL, CentOS and
@@ -11,12 +11,12 @@ others. See the project Wiki at
 
  http://fedoraproject.org/wiki/FedoraLiveCD
 
-for more details. Discussion of  this project takes places at the
-fedora-livecd@redhat.com mailing list
+for more details. Discussion of this project takes place at the
+livecd@lists.fedoraproject.org mailing list
 
- http://www.redhat.com/mailman/listinfo/fedora-livecd-list
+ https://lists.fedoraproject.org/admin/lists/livecd.lists.fedoraproject.org/
 
-This project and it's source files is licensed under the GPLv2
+This project and its source files are licensed under the GPLv2
 license. See the file COPYING for details.
 
 1. LIVE CD DESIGN GOALS
