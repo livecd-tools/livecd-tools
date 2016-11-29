@@ -88,7 +88,7 @@ livecd-creator \
 =head1 REPO EXTENSIONS
 
 livecd-creator provides for some extensions to the repo commands similar
-to what yum supports. The strings $arch, $basearch and $releasever
+to what DNF supports. The strings $arch, $basearch and $releasever
 are replaced with the system arch, basearch and release version respectively.
 When no --releasever is passed it defaults to the current system's version.
 The allows the use of repo commands such as the following:

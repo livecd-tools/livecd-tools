@@ -26,7 +26,7 @@ import sys
 import time
 import optparse
 import logging
-from dnf.exceptions import Error as YumBaseError
+from dnf.exceptions import Error as DnfBaseError
 
 import imgcreate
 from imgcreate.errors import KickstartError
@@ -54,7 +54,7 @@ def parse_options(args):
     imgopt.add_option("-n", "--name", type="string", dest="fslabel",
                       help=optparse.SUPPRESS_HELP)
     imgopt.add_option("-p", "--plugins", action="store_true", dest="plugins",
-                      help="Use yum plugins during image creation",
+                      help="Use DNF plugins during image creation",
                       default=False)
     imgopt.add_option("", "--image-type", type="string", dest="image_type",
                       help=optparse.SUPPRESS_HELP)
@@ -227,7 +227,7 @@ def main():
             creator.launch_shell()
         creator.unmount()
         creator.package()
-    except (imgcreate.CreatorError, YumBaseError) as e:
+    except (imgcreate.CreatorError, DnfBaseError) as e:
         logging.error(u"Error creating Live CD : %s" % e)
         return 1
     finally:

@@ -1,5 +1,5 @@
 #
-# yum.py : yum utilities
+# dnfinst.py : dnf utilities
 #
 # Copyright 2007, Red Hat  Inc.
 # Copyright 2016, Kevin Kofler
@@ -41,7 +41,7 @@ from pykickstart.constants import GROUP_DEFAULT, GROUP_REQUIRED, GROUP_ALL
 
 from imgcreate.errors import *
 
-class LiveCDYum(dnf.Base):
+class DnfLiveCD(dnf.Base):
     def __init__(self, releasever=None, useplugins=False):
         """
         releasever = optional value to use in replacing $releasever in repos
@@ -152,7 +152,7 @@ class LiveCDYum(dnf.Base):
 
     def addRepository(self, name, url = None, mirrorlist = None):
         def _varSubstitute(option):
-            # takes a variable and substitutes like yum configs do
+            # takes a variable and substitutes like dnf configs do
             arch = hawkey.detect_arch()
             option = option.replace("$basearch", dnf.rpm.basearch(arch))
             option = option.replace("$arch", arch)

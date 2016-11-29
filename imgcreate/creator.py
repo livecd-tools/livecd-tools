@@ -38,7 +38,7 @@ import rpm
 
 from imgcreate.errors import *
 from imgcreate.fs import *
-from imgcreate.yuminst import *
+from imgcreate.dnfinst import *
 from imgcreate import kickstart
 
 FSLABEL_MAXLEN = 32
@@ -521,7 +521,7 @@ class ImageCreator(object):
         base_on -- a previous install on which to base this install; defaults
                    to None, causing a new image to be created
 
-        cachedir -- a directory in which to store the Yum cache; defaults to
+        cachedir -- a directory in which to store the DNF cache; defaults to
                     None, causing a new cache to be created; by setting this
                     to another directory, the same cache can be reused across
                     multiple installs.
@@ -613,14 +613,14 @@ class ImageCreator(object):
         shutil.rmtree(self.__builddir, ignore_errors = True)
         self.__builddir = None
 
-    def __apply_selections(self, ayum):
+    def __apply_selections(self, dbo):
         excludedPkgs = kickstart.get_excluded(self.ks, self._get_excluded_packages())
 
         if kickstart.nocore(self.ks):
             logging.info("skipping core group due to %%packages --nocore; system may not be complete")
         else:
             try:
-                ayum.selectGroup('core', excludedPkgs)
+                dbo.selectGroup('core', excludedPkgs)
                 logging.info("selected group: core")
             except dnf.exceptions.MarkingError as e:
                 if kickstart.ignore_missing(self.ks):
@@ -635,7 +635,7 @@ class ImageCreator(object):
 
         if env:
             try:
-                ayum.selectEnvironment(env, excludedGroups, excludedPkgs)
+                dbo.selectEnvironment(env, excludedGroups, excludedPkgs)
                 logging.info("selected env: %s", env)
             except dnf.exceptions.MarkingError as e:
                 if kickstart.ignore_missing(self.ks):
@@ -649,7 +649,7 @@ class ImageCreator(object):
                 continue
 
             try:
-                ayum.selectGroup(group.name, excludedPkgs, group.include)
+                dbo.selectGroup(group.name, excludedPkgs, group.include)
                 logging.info("selected group: %s", group.name)
             except dnf.exceptions.MarkingError as e:
                 if kickstart.ignore_missing(self.ks):
@@ -659,13 +659,13 @@ class ImageCreator(object):
                                        (group.name, e))
 
         for pkg_name in set(excludedPkgs):
-            ayum.deselectPackage(pkg_name)
+            dbo.deselectPackage(pkg_name)
             logging.info("excluding package: '%s'", pkg_name)
 
         for pkg_name in set(kickstart.get_packages(self.ks,
                                                    self._get_required_packages())) - set(excludedPkgs):
             try:
-                ayum.selectPackage(pkg_name)
+                dbo.selectPackage(pkg_name)
                 logging.info("selected package: '%s'", pkg_name)
             except dnf.exceptions.MarkingError as e:
                 if kickstart.ignore_missing(self.ks):
@@ -688,14 +688,14 @@ class ImageCreator(object):
         """
         dnf_conf = self._mktemp(prefix = "dnf.conf-")
 
-        ayum = LiveCDYum(releasever=self.releasever, useplugins=self.useplugins)
-        ayum.setup(dnf_conf, self._instroot, cacheonly=self.cacheonly,
+        dbo = DnfLiveCD(releasever=self.releasever, useplugins=self.useplugins)
+        dbo.setup(dnf_conf, self._instroot, cacheonly=self.cacheonly,
                    excludeWeakdeps=self.excludeWeakdeps)
 
         for repo in kickstart.get_repos(self.ks, repo_urls):
             (name, baseurl, mirrorlist, proxy, inc, exc, cost, sslverify) = repo
 
-            yr = ayum.addRepository(name, baseurl, mirrorlist)
+            yr = dbo.addRepository(name, baseurl, mirrorlist)
             if inc:
                 yr.includepkgs = inc
             if exc:
@@ -713,19 +713,19 @@ class ImageCreator(object):
         if kickstart.inst_langs(self.ks) != None:
             rpm.addMacro("_install_langs", kickstart.inst_langs(self.ks))
 
-        ayum.fill_sack(load_system_repo = os.path.exists(self._instroot + "/var/lib/rpm/Packages"))
-        ayum.read_comps()
+        dbo.fill_sack(load_system_repo = os.path.exists(self._instroot + "/var/lib/rpm/Packages"))
+        dbo.read_comps()
 
         try:
-            self.__apply_selections(ayum)
+            self.__apply_selections(dbo)
 
-            ayum.runInstall()
+            dbo.runInstall()
         except (dnf.exceptions.DownloadError, dnf.exceptions.RepoError) as e:
             raise CreatorError("Unable to download from repo : %s" % (e,))
         except dnf.exceptions.Error as e:
             raise CreatorError("Unable to install: %s" % (e,))
         finally:
-            ayum.close()
+            dbo.close()
             os.unlink(dnf_conf)
 
         # do some clean up to avoid lvm info leakage.  this sucks.

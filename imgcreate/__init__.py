@@ -18,7 +18,7 @@
 
 from imgcreate.live import *
 from imgcreate.creator import *
-from imgcreate.yuminst import *
+from imgcreate.dnfinst import *
 from imgcreate.kickstart import *
 from imgcreate.fs import *
 from imgcreate.debug import *
