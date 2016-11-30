@@ -191,24 +191,30 @@ class AuthConfig(KickstartConfig):
 class FirewallConfig(KickstartConfig):
     """A class to apply a kickstart firewall configuration to a system."""
     def apply(self, ksfirewall):
-        args = ["/usr/bin/firewall-offline-cmd"]
-        # enabled is None if neither --enable or --disable is passed
-        # default to enabled if nothing has been set.
-        if ksfirewall.enabled == False:
-            args += ["--disabled"]
+        # Run only if firewalld is available
+        if os.path.exists(os.path.join(self.instroot, self.path("/usr/bin/firewall-offline-cmd"))):
+            args = ["/usr/bin/firewall-offline-cmd"]
+            # enabled is None if neither --enable or --disable is passed
+            # default to enabled if nothing has been set.
+            if ksfirewall.enabled == False:
+                args += ["--disabled"]
+            else:
+                args += ["--enabled"]
+
+                for dev in ksfirewall.trusts:
+                    args += [ "--trust=%s" % (dev,) ]
+
+                for port in ksfirewall.ports:
+                    args += [ "--port=%s" % (port,) ]
+
+                for service in ksfirewall.services:
+                    args += [ "--service=%s" % (service,) ]
+
+                self.call(args)
         else:
-            args += ["--enabled"]
+            # Throw a warning indicating firewall configuration is ignored
+            logging.warning("firewalld is not installed, ignoring firewall configuration settings!")
 
-        for dev in ksfirewall.trusts:
-            args += [ "--trust=%s" % (dev,) ]
-
-        for port in ksfirewall.ports:
-            args += [ "--port=%s" % (port,) ]
-
-        for service in ksfirewall.services:
-            args += [ "--service=%s" % (service,) ]
-
-        self.call(args)
 
 class RootPasswordConfig(KickstartConfig):
     """A class to apply a kickstart root password configuration to a system."""
