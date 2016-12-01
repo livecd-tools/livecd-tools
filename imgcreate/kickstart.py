@@ -191,6 +191,11 @@ class AuthConfig(KickstartConfig):
 class FirewallConfig(KickstartConfig):
     """A class to apply a kickstart firewall configuration to a system."""
     def apply(self, ksfirewall):
+        # Check to see if firewalld is available in the install image
+        if not os.path.exists(os.path.join(self.instroot, self.path("/usr/bin/firewall-offline-cmd"))):
+            # Throw a warning indicating firewall configuration is ignored and return
+            logging.warning("firewalld is not installed, ignoring firewall configuration settings!")
+            return
         args = ["/usr/bin/firewall-offline-cmd"]
         # enabled is None if neither --enable or --disable is passed
         # default to enabled if nothing has been set.
