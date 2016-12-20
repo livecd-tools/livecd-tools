@@ -184,6 +184,18 @@ def loop_detach(devloop):
     if devloop and losetup('-nO BACK-FILE ' + devloop):
         losetup('-d ' + devloop)
 
+def cryptsetup(userargs, ops=None):
+    """Call cryptsetup with options."""
+
+    args = ['cryptsetup'] + userargs.split()
+    if ops:
+        args += ops
+
+    rc = call(args)
+    if rc != 0:
+        raise CreatorError(u'Return code: %s\n**Check for a message '
+         'above the Traceback.**\nFailed cryptsetup command:\n%s' % (rc, args))
+
 def dmsetup(userargs, ops=None):
     """Call device-mapper setup with options."""
 
@@ -312,7 +324,10 @@ def main():
         if os.path.exists(os.path.join('/dev', 'mapper', 'Home')):
             dmsetup('remove --retry Home')
             loop_detach(tmphomeoverlayloop)
-            loop_detach(homedev)
+            if homedev.startswith('/dev/loop'):
+                loop_detach(homedev)
+        if os.path.exists(os.path.join('/dev', 'mapper', 'EncHome')):
+            cryptsetup('close EncHome')
         if os.path.exists(os.path.join('/dev', 'mapper', 'live-rw')):
             dmsetup('remove --retry live-rw')
         loop_detach(tmpoverlayloop)
@@ -512,6 +527,10 @@ def main():
         home_path = os.path.join(liveosdir, 'home.img')
         if os.path.exists(home_path):
             homemnt = os.path.join(destmnt, 'home')
+            if call(['cryptsetup', 'isLuks', home_path]) == 0:
+                cryptsetup('open ' + home_path, ['EncHome', roflag])
+                home_path = os.path.join('/dev', 'mapper', 'EncHome')
+                homedev = home_path
             if roflag or tmpoverlayloop:
                 tmpoverlay = tempfile.NamedTemporaryFile(
                              prefix='home-overlay-')
