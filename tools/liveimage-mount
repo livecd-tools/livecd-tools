@@ -41,7 +41,11 @@ def usage():
                                  [-r|--read-only
                                  [--chroot
                                  [--mount-hacks
-                                 [--persist]]]]]]
+                                 [--persist
+                                 [-o|--overlay=PATH
+                                 [-s|--ovlsize=SIZE
+                                 [-f|--dnfcache=PATH
+                                 [-t|--tmpdir=PATH]]]]]]]]]]
 
                 and [args ...] = [arg1[ arg2[ ...]]]
 
@@ -62,8 +66,23 @@ optional arguments:
   --mount-hacks         Specify mounting of the /proc kernel filesystem
                           and /run temporary filesystem.
   --persist             Keep the specified mounts active on exit. (If a
-                          command is supplied, it will run in the current
+                          command is requested, it will run in the current
                           root filesytem.)
+
+                          Call liveimage-mount -u MOUNTPOINT
+                          to unmount the image.
+  -o PATH, --overlay PATH
+                        Specify a path to a Device mapper overlay file.
+  -s SIZE, --ovlsize SIZE
+                        Specify a size in mebibytes, MiB, for temporary
+                          overlay files.  Default is 32768 MiB.
+  -f PATH, --dnfcache PATH  (requires --mount-hacks)
+                        Specify bind mounting of a DNF repository directory,
+                          otherwise a tmpfs is mounted.
+  -t PATH, --tmpdir PATH
+                        Specify a directory for mounting interim filesystems
+                          and holding temporary overlays.
+
   [command] [args ...]  A shell command with one or more arguments that will
                           be run in a change-root directory.
 
@@ -270,9 +289,10 @@ def main():
         sys_exit(1)
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'h?ur',
-                                   ['help', 'unmount', 'read-only', 'chroot',
-                                    'mount-hacks', 'persist'])
+        opts, args = getopt.getopt(sys.argv[1:], 'h?uro:s:f:t:', ['help',
+                                   'unmount', 'read-only', 'chroot',
+                                   'mount-hacks', 'persist', 'overlay=',
+                                   'ovlsize=', 'dnfcache=', 'tmpdir='])
     except getopt.GetoptError as e:
         usage()
         print('  Error:  ' + str(e) + '.\n\tSee usage statement above.')
@@ -284,6 +304,10 @@ def main():
     mount_hacks = False
     persist = False
     ii = 0
+    overlay = ''
+    osize = 32768
+    dnfcache = ''
+    tmpdir = '/tmp'
     for o, a in opts:
         if o in ('-h', '-?', '--help'):
             usage()
@@ -299,6 +323,37 @@ def main():
             mount_hacks = True
         elif o in ('--persist', ):
             persist = True
+        elif o in ('-o', '--overlay'):
+            overlay = a
+            if not os.path.isfile(overlay):
+                print('''\n    Exiting...  Invalid overlay,
+                '%s' is not a file.\n''' % overlay, file=sys.stderr)
+                sys_exit(1)
+        elif o in ('-s', '--ovlsize'):
+            try:
+                osize = int(a)
+            except ValueError:
+                print('''\n    Exiting...  Invalid overlay size,
+                '%s' is not an integer.\n''' % a, file=sys.stderr)
+                sys_exit(1)
+            else:
+                if not osize > 0:
+                    print('''\n    Exiting...  Invalid overlay size, '%d' MiB.
+                    It must be greater than zero MiB.\n''' % osize,
+                    file=sys.stderr)
+                    sys_exit(1)
+        elif o in ('-f', '--dnfcache'):
+            dnfcache = a
+            if not os.path.isdir(dnfcache):
+                print('''\n    Exiting...  Invalid dnfcache,
+                '%s' is not a directory.\n''' % dnfcache, file=sys.stderr)
+                sys_exit(1)
+        elif o in ('-t', '--tmpdir'):
+            tmpdir = a
+            if not os.path.isdir(tmpdir):
+                print('''\n    Exiting...  Invalid tmpdir,
+                '%s' is not a directory.\n''' % tmpdir, file=sys.stderr)
+                sys_exit(1)
 
     if len(args) < 1 and unmount:
         usage()
@@ -334,6 +389,8 @@ def main():
         if os.path.exists(os.path.join('/dev', 'mapper', 'live-ro')):
             dmsetup('remove --retry live-ro')
         loop_detach(overlayloop)
+        if os.path.exists(os.path.join('/dev', 'mapper', 'live-base')):
+            dmsetup('remove --retry live-base')
         loop_detach(imgloop)
         if os.path.ismount(squashmnt):
             call(['umount', '-d', squashmnt])
@@ -414,7 +471,7 @@ def main():
         if os.path.ismount(src):
             call(['umount', src])
             os.rmdir(src)
-        if liveosmnt.startswith('/tmp/mp^'):
+        if liveosmnt.startswith(os.path.join(tmpdir, 'mp^')):
             remove_mp.append(liveosmnt)
             unmount = 'yes'
         cleanup()
@@ -428,8 +485,8 @@ def main():
     command = args[2:]
     verbose = not command
     remountrw = False
-    mntlive = ''
     opts = ''
+    tempfile.tempdir = tmpdir
 
     if os.path.ismount(liveos) or os.path.isdir(liveos):
         liveosmnt = liveos
@@ -454,6 +511,7 @@ def main():
     try:
         if liveosmnt != liveos:
             mount([liveos, liveosmnt], ops=roflag)
+            unmount = 'yes'
 
         if not os.access(liveosmnt, os.W_OK):
             roflag = '-r'
@@ -489,21 +547,29 @@ def main():
                 [os.rmdir(mp) for mp in remove_mp]
                 sys_exit(1)
 
-        for f in os.listdir(liveosdir):
-            if f.find('overlay-') == 0:
-                overlayloop = loop_setup(os.path.join(liveosdir, f), roflag)
-                opts = '-r'
-                break
+        if not overlay:
+            for f in os.listdir(liveosdir):
+                if f.find('overlay-') == 0:
+                    overlay = os.path.join(liveosdir, f)
+                    opts = '-r'
+                    break
+        if overlay:
+            overlayloop = loop_setup(overlay, roflag)
+            call(['udevadm', 'settle'])
+            opts = '-r'
+
         imgloop = loop_setup(rootfs_img, opts)
         imgsize = rcall(['blockdev', '--getsz', imgloop])[0].rstrip()
         dm_path = os.path.join('/dev', 'mapper', 'live-rw')
+        dmsetup('create --readonly live-base',
+                             ['--table=0 %s linear %s 0' % (imgsize, imgloop)])
         persistent = 'PO'
         if roflag or (not overlayloop and opts):
             persistent = 'N'
             tmpoverlay = tempfile.NamedTemporaryFile(prefix='overlay-')
             print('\npreparing temporary overlay...')
             call(['dd', 'if=/dev/null', 'of=%s' % tmpoverlay.name, 'bs=1024',
-                                        'count=1', 'seek=%s' % (512 * 1024)])
+                                        'count=1', 'seek=%s' % (osize * 1024)])
             tmpoverlayloop = loop_setup(tmpoverlay.name)
             del tmpoverlay
             if not overlayloop:
@@ -547,16 +613,45 @@ def main():
                                        (imgsize, homedev, tmphomeoverlayloop)])
                 home_path = os.path.join('/dev', 'mapper', 'Home')
             mount([home_path, homemnt])
-        mntlive = os.path.join(destmnt, 'run', 'initramfs', 'live')
-        if not os.path.exists(mntlive):
-            os.makedirs(mntlive)
-        mount(['--bind', liveosmnt, mntlive])
 
         if mount_hacks:
             subprocess.check_call(['mount', '-t', 'proc', 'proc',
                              os.path.join(destmnt, 'proc')], stderr=sys.stderr)
             subprocess.check_call(['mount', '-t', 'tmpfs', 'tmpfs',
-                       os.path.join(destmnt, 'var', 'run')], stderr=sys.stderr)
+                       os.path.join(destmnt, 'run')], stderr=sys.stderr)
+            subprocess.check_call(['mount', '-t', 'sysfs', 'sys',
+                os.path.join(destmnt, 'sys')], stderr=sys.stderr)
+            tmpfs = os.path.join(destmnt, 'dev', 'pts')
+            if not os.path.exists(tmpfs):
+                os.makedirs(tmpfs)
+            subprocess.check_call(['mount', '-t', 'devpts', 'devpts', tmpfs],
+                                  stderr=sys.stderr)
+            tmpfs = os.path.join(destmnt, 'dev', 'shm')
+            if not os.path.exists(tmpfs):
+                os.makedirs(tmpfs)
+            subprocess.check_call(['mount', '-t', 'tmpfs', 'tmpfs', tmpfs],
+                                  stderr=sys.stderr)
+            tmpfs = os.path.join(destmnt, 'etc', 'resolv.conf')
+            if os.path.lexists(tmpfs):
+                os.unlink(tmpfs)
+            os.symlink('/run/NetworkManager/resolv.conf', tmpfs)
+            if dnfcache:
+                mount(['--bind', dnfcache,
+                       os.path.join(destmnt, 'var', 'cache', 'dnf')])
+            elif os.path.exists(os.path.join(destmnt, 'var', 'cache', 'dnf')):
+                subprocess.check_call(['mount', '-t', 'tmpfs', 'varcachednf',
+                                 os.path.join(destmnt, 'var', 'cache', 'dnf')],
+                                 stderr=sys.stderr)
+
+        # Create a mount and a link that appear in the booted environment.
+        src = os.path.join(destmnt, 'run', 'initramfs', 'live')
+        if not os.path.exists(src):
+            os.makedirs(src)
+        mount(['--bind', liveosmnt, src])
+        a = os.path.join(destmnt, 'run', 'initramfs', 'livedev')
+        if os.path.lexists(a):
+            os.unlink(a)
+        os.symlink(findmnt('-nro SOURCE -T ' + liveosmnt), a)
 
         mode = "'" + liveos + "' filesystems "
         if tmpoverlayloop:
@@ -597,9 +692,9 @@ def main():
             if verbose:
                 print('''Cleaning up...
                 Please wait if large files were written.''')
-            if mntlive and os.path.ismount(mntlive):
-                call(['umount', mntlive])
-                os.rmdir(mntlive)
+            if os.path.ismount(src):
+                call(['umount', src])
+                os.rmdir(src)
             cleanup()
 
     sys_exit(ecode)
