@@ -559,7 +559,7 @@ createEXTFSLayout() {
     else
         mkfs=/sbin/mkfs.ext4
     fi
-    $mkfs -L $label $TGTDEV
+    $mkfs -O ^64bit -L $label $TGTDEV
     TGTLABEL="UUID=$(/sbin/blkid -s UUID -o value $TGTDEV)"
 }
 
