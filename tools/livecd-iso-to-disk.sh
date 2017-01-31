@@ -1267,7 +1267,7 @@ fi
 
 echo "Updating boot config file"
 # adjust label and fstype
-sed -i -e "s/CDLABEL=[^ ]*/$TGTLABEL/" -e "s/rootfstype=[^ ]*/rootfstype=$TGTFS/" -e "s/LABEL=[^ :]*/$TGTLABEL/" $BOOTCONFIG  $BOOTCONFIG_EFI
+sed -i -e "s/CDLABEL=[^ ]*/$TGTLABEL/g" -e "s/rootfstype=[^ ]*/rootfstype=$TGTFS/" -e "s/LABEL=[^ :]*/$TGTLABEL/g" $BOOTCONFIG  $BOOTCONFIG_EFI
 if [ -n "$kernelargs" ]; then
     sed -i -e "s;initrd.\?\.img;& ${kernelargs};" $BOOTCONFIG
     if [ -n "$efi" ]; then
