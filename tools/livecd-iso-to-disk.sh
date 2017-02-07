@@ -471,7 +471,7 @@ createGPTLayout() {
     wipefs -a ${device}
     run_parted -s $device mklabel gpt
     partinfo=$(run_parted -s -m $device "unit MB print" |grep ^$device:)
-    dev_size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/MB$//')
+    dev_size=$(echo $partinfo | cut -d : -f 2 | sed 's/MB$//')
     p1_size=$(($dev_size - 3))
 
     if [ $p1_size -le 0 ]; then
@@ -503,7 +503,7 @@ createMSDOSLayout() {
     wipefs -a ${device}
     run_parted -s $device mklabel msdos
     partinfo=$(run_parted -s -m $device "unit MB print" |grep ^$device:)
-    dev_size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/MB$//')
+    dev_size=$(echo $partinfo | cut -d : -f 2 | sed 's/MB$//')
     p1_size=$(($dev_size - 3))
 
     if [ $p1_size -le 0 ]; then
@@ -535,7 +535,7 @@ createEXTFSLayout() {
     wipefs -a ${device}
     run_parted -s $device mklabel msdos
     partinfo=$(run_parted -s -m $device "u MB print" |grep ^$device:)
-    dev_size=$(echo $partinfo |cut -d : -f 2 |sed -e 's/MB$//')
+    dev_size=$(echo $partinfo | cut -d : -f 2 | sed 's/MB$//')
     p1_size=$(($dev_size - 3))
 
     if [ $p1_size -le 0 ]; then
@@ -1245,11 +1245,11 @@ if [ "$srctype" = "live" ]; then
     # file to a base state before updating.
     if [[ -d $SRCMNT/syslinux/ ]]; then
         echo "Preparing boot config file."
-        sed -i -e "s/root=live:[^ ]*/root=live:CDLABEL=name/"\
-               -e "s/\(r*d*.*live.*ima*ge*\) .* quiet/\1 quiet/"\
-                    $BOOTCONFIG $BOOTCONFIG_EFI
-        sed -i -e "s/^timeout.*$/timeout\ 100/"\
-               -e "/^totaltimeout.*$/d" $BOOTCONFIG
+        sed -i "s/root=live:[^ ]*/root=live:CDLABEL=name/
+                s/\(r*d*.*live.*ima*ge*\) .* quiet/\1 quiet/
+               " $BOOTCONFIG $BOOTCONFIG_EFI
+        sed -i "s/^timeout.*$/timeout\ 100/
+                /^totaltimeout.*$/d" $BOOTCONFIG
     fi
 fi
 
@@ -1267,23 +1267,25 @@ fi
 
 echo "Updating boot config file"
 # adjust label and fstype
-sed -i -e "s/CDLABEL=[^ ]*/$TGTLABEL/" -e "s/rootfstype=[^ ]*/rootfstype=$TGTFS/" -e "s/LABEL=[^ :]*/$TGTLABEL/" $BOOTCONFIG  $BOOTCONFIG_EFI
+sed -i "s/CDLABEL=[^ ]*/$TGTLABEL/
+        s/rootfstype=[^ ]*/rootfstype=$TGTFS/
+        s/LABEL=[^ :]*/$TGTLABEL/" $BOOTCONFIG $BOOTCONFIG_EFI
 if [ -n "$kernelargs" ]; then
-    sed -i -e "s;initrd.\?\.img;& ${kernelargs};" $BOOTCONFIG
+    sed -i "s;initrd.\?\.img;& ${kernelargs};" $BOOTCONFIG
     if [ -n "$efi" ]; then
-        sed -i -e "s;vmlinuz.\?;& ${kernelargs} ;" $BOOTCONFIG_EFI
+        sed -i "s;vmlinuz.\?;& ${kernelargs};" $BOOTCONFIG_EFI
     fi
 fi
 if [ "$LIVEOS" != "LiveOS" ]; then
-    sed -i -e "s;r*d*.*live.*ima*ge*;& live_dir=$LIVEOS;"\
-              $BOOTCONFIG $BOOTCONFIG_EFI
+    sed -i "s;r*d*.*live.*ima*ge*;& live_dir=$LIVEOS;
+           " $BOOTCONFIG $BOOTCONFIG_EFI
 fi
 
 # EFI images are in $SYSLINUXPATH now
 if [ -n "$efi" ]; then
-    sed -i -e "s;/isolinux/;/$SYSLINUXPATH/;g" $BOOTCONFIG_EFI
-    sed -i -e "s;/images/pxeboot/;/$SYSLINUXPATH/;g" $BOOTCONFIG_EFI
-    sed -i -e "s;findiso;;g" $BOOTCONFIG_EFI
+    sed -i "s;/isolinux/;/$SYSLINUXPATH/;g
+            s;/images/pxeboot/;/$SYSLINUXPATH/;g
+            s;findiso;;g" $BOOTCONFIG_EFI
 fi
 
 # DVD Installer for netinst
@@ -1292,16 +1294,16 @@ if [ "$srctype" != "live" ]; then
     # and non-install will have everything in the initrd
     if [ "$imgtype" != "install" ]; then
         # The initrd has everything, so no stage2
-        sed -i -e "s;\S*stage2=\S*;;g" $BOOTCONFIG $BOOTCONFIG_EFI
+        sed -i "s;\S*stage2=\S*;;g" $BOOTCONFIG $BOOTCONFIG_EFI
     fi
 fi
 
 # Adjust the boot timeouts
 if [ -n "$timeout" ]; then
-    sed -i -e "s/^timeout.*$/timeout\ $timeout/" $BOOTCONFIG
+    sed -i "s/^timeout.*$/timeout\ $timeout/" $BOOTCONFIG
 fi
 if [ -n "$totaltimeout" ]; then
-    sed -i -e "/^timeout.*$/a\totaltimeout\ $totaltimeout" $BOOTCONFIG
+    sed -i "/^timeout.*$/a\totaltimeout\ $totaltimeout" $BOOTCONFIG
 fi
 
 if [ "$overlaysizemb" -gt 0 ]; then
@@ -1315,9 +1317,8 @@ if [ "$overlaysizemb" -gt 0 ]; then
             dd if=/dev/null of=$TGTMNT/$LIVEOS/$OVERFILE count=1 bs=1M seek=$overlaysizemb
         fi
     fi
-    sed -i -e "s/r*d*.*live.*ima*ge*/& rd.live.overlay=${TGTLABEL} rw/"\
-              $BOOTCONFIG $BOOTCONFIG_EFI
-    sed -i -e "s/\ ro\ / /" $BOOTCONFIG  $BOOTCONFIG_EFI
+    sed -i "s/r*d*.*live.*ima*ge*/& rd.live.overlay=${TGTLABEL} rw/
+            s/\ ro\ / /" $BOOTCONFIG $BOOTCONFIG_EFI
 fi
 
 if [ "$swapsizemb" -gt 0 -a -z "$skipcopy" ]; then
@@ -1363,12 +1364,13 @@ fi
 # boot on the XO anyway.
 if [ -n "$xo" ]; then
     echo "Setting up /boot/olpc.fth file"
-    args=$(grep "^ *append" $TGTMNT/$SYSLINUXPATH/isolinux.cfg |head -n1 |sed -e 's/.*initrd=[^ ]*//')
+    args=$(grep "^ *append" $TGTMNT/$SYSLINUXPATH/isolinux.cfg | head -n1 |
+           sed 's/.*initrd=[^ ]*//')
     if [ -z "$xonohome" -a ! -f $TGTMNT/$LIVEOS/$HOMEFILE ]; then
         args="$args persistenthome=mtd0"
     fi
     args="$args reset_overlay"
-    xosyspath=$(echo $SYSLINUXPATH | sed -e 's;/;\\;')
+    xosyspath=$(echo $SYSLINUXPATH | sed 's;/;\\;')
     if [ ! -d $TGTMNT/boot ]; then
         mkdir -p $TGTMNT/boot
     fi
@@ -1472,8 +1474,9 @@ if [ -z "$multi" ]; then
     fi
 else
     # we need to do some more config file tweaks for multi-image mode
-    sed -i -e "s;kernel vm;kernel /$LIVEOS/syslinux/vm;" $TGTMNT/$SYSLINUXPATH/isolinux.cfg
-    sed -i -e "s;initrd=i;initrd=/$LIVEOS/syslinux/i;" $TGTMNT/$SYSLINUXPATH/isolinux.cfg
+    sed -i "s;kernel vm;kernel /$LIVEOS/syslinux/vm;
+            s;initrd=i;initrd=/$LIVEOS/syslinux/i;
+           " $TGTMNT/$SYSLINUXPATH/isolinux.cfg
     mv $TGTMNT/$SYSLINUXPATH/isolinux.cfg $TGTMNT/$SYSLINUXPATH/syslinux.cfg
     cleanup
 fi
