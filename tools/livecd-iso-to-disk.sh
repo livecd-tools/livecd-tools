@@ -507,8 +507,7 @@ createGPTLayout() {
     sleep 5
     TGTDEV=$(get_partition1 ${device})
     umount $TGTDEV &> /dev/null || :
-    /sbin/mkdosfs -n $label $TGTDEV
-    TGTLABEL="UUID=$(/sbin/blkid -s UUID -o value $TGTDEV)"
+    /sbin/mkdosfs -n "$label" $TGTDEV
 }
 
 createMSDOSLayout() {
@@ -539,8 +538,7 @@ createMSDOSLayout() {
     sleep 5
     TGTDEV=$(get_partition1 ${device})
     umount $TGTDEV &> /dev/null || :
-    /sbin/mkdosfs -n LIVE $TGTDEV
-    TGTLABEL="UUID=$(/sbin/blkid -s UUID -o value $TGTDEV)"
+    /sbin/mkdosfs -n "$label" $TGTDEV
 }
 
 createEXTFSLayout() {
@@ -611,52 +609,24 @@ checkGPT() {
 }
 
 checkFilesystem() {
-    dev=$1
+    local dev=$1
 
-    TGTFS=$(/sbin/blkid -s TYPE -o value $dev || :)
-    if [ "$TGTFS" != "vfat" ] && [ "$TGTFS" != "msdos" ]; then
-        if [ "$TGTFS" != "ext2" ] && [ "$TGTFS" != "ext3" ] && [ "$TGTFS" != "ext4" ] && [ "$TGTFS" != "btrfs" ]; then
-            echo "Target filesystem ($dev:$TGTFS) must be vfat, ext[234] or btrfs"
-            exitclean
+    TGTFS=$(blkid -s TYPE -o value $dev || :)
+    if [[ -n $format ]]; then
+        if [[ -n $efi || -n $usemsdos || ! -x /usr/sbin/extlinux ]]; then
+            TGTFS=vfat
+        else
+            TGTFS=ext4
         fi
     fi
-
-    if [ "$TGTFS" = "ext2" -o "$TGTFS" = "ext3" -o "$TGTFS" = "ext4" ] && [ ! -x /usr/sbin/extlinux ]; then
-        echo "Target filesystem ($TGTFS) requires syslinux-extlinux to be installed."
+    if [[ $TGTFS != @(vfat|msdos|ext[234]|btrfs) ]]; then
+        printf '\n        ALERT:
+        The target filesystem must have a vfat, ext[234], or btrfs format.
+        Exiting...\n'
         exitclean
     fi
-
-
-    TGTLABEL=$(/sbin/blkid -s LABEL -o value $dev)
-    if [ "$TGTLABEL" != "$label" ]; then
-        if [ "$TGTFS" = "vfat" -o "$TGTFS" = "msdos" ]; then
-            /sbin/dosfslabel $dev $label
-            if [ $? -gt 0 ]; then
-                echo "dosfslabel failed on $dev, device not setup"
-                exitclean
-            fi
-        elif [ "$TGTFS" = "ext2" -o "$TGTFS" = "ext3" -o "$TGTFS" = "ext4" ]; then
-            /sbin/e2label $dev $label
-            if [ $? -gt 0 ]; then
-                echo "e2label failed on $dev, device not setup"
-                exitclean
-            fi
-        else
-            echo "Unknown filesystem type. Try setting its label to $label and re-running"
-            exitclean
-        fi
-    fi
-
-    # Use UUID if available
-    TGTUUID=$(/sbin/blkid -s UUID -o value $dev)
-    if [ -n "$TGTUUID" ]; then
-        TGTLABEL="UUID=$TGTUUID"
-    else
-        TGTLABEL="LABEL=$label"
-    fi
-
-    if [ "$TGTFS" = "vfat" -o "$TGTFS" = "msdos" ]; then
-        mountopts="-o shortname=winnt,umask=0077"
+    if [[ $TGTFS == @(vfat|msdos) ]]; then
+        mountopts='-o shortname=winnt,umask=0077'
     fi
 }
 
@@ -796,7 +766,7 @@ LIVEOS=LiveOS
 HOMEFILE="home.img"
 updates=
 ks=
-label="LIVE"
+label=''
 
 while true ; do
     case $1 in
@@ -965,6 +935,57 @@ fi
 # Figure out what needs to be done based on the source image
 detectsrctype
 
+fs_label_msg() {
+    if [[ $TGTFS == @(vfat|msdos) ]]; then
+        printf '
+        A label can be set with the fatlabel command.'
+    elif [[ $TGTFS == ext[234] ]]; then
+        printf '
+        A label can be set with the e2label command.'
+    elif [[ btrfs == $TGTFS ]]; then
+        printf '
+        A label can be set with the btrfs filesystem label command.'
+    fi
+    exitclean
+}
+
+labelTargetDevice() {
+    local dev=$1
+
+    TGTLABEL=$(lsblk -nro LABEL $dev)
+    # Remove newline, if present such as for a loop device, of parent device.
+    TGTLABEL="${TGTLABEL#$'\n'}"
+    [[ -z $TGTLABEL ]] && TGTLABEL=LIVE
+    if [[ -z $skipcopy ]]; then
+        if [[ -n $label && $TGTLABEL != "$label" ]]; then
+            if [[ $TGTFS == @(vfat|msdos) ]]; then
+                fatlabel $dev "$label"
+                if (($? > 0)); then
+                    echo "
+                    ERROR:   fatlabel failed on $dev, device not setup."
+                    fs_label_msg
+                fi
+            elif [[ $TGTFS == ext[234] ]]; then
+                e2label $dev "$label"
+                if (($? > 0)); then
+                    echo "
+                    ERROR:   e2label failed on $dev, device not setup."
+                    fs_label_msg
+                fi
+            else
+                echo "
+                ALERT:  Unknown filesystem type.
+                Try setting its label to $label and re-running."
+                fs_label_msg
+            fi
+            TGTLABEL="$label"
+        fi
+    fi
+    label=$TGTLABEL
+}
+
+labelTargetDevice $TGTDEV
+
 # Format the device
 if [ -n "$format" -a -z "$skipcopy" ]; then
     checkLVM $TGTDEV
@@ -989,17 +1010,20 @@ checkSyslinuxVersion
 [ -n "$resetmbr" ] && resetMBR $TGTDEV
 checkMBR $TGTDEV
 
-
-if [ "$overlaysizemb" -gt 0 ]; then
-    if [ "$TGTFS" = "vfat" -a "$overlaysizemb" -gt 4095 ]; then
-        echo "Can't have an overlay of 4095 MB or greater on VFAT"
+if ((overlaysizemb > 0)); then
+    if [[ $TGTFS == @(vfat|msdos) ]] && ((overlaysizemb > 4095)); then
+        printf '\n        ALERT:
+        An overlay size greater than 4095 MiB
+        is not allowed on VFAT formatted filesystems.\n'
         exitclean
     fi
-    LABEL=$(/sbin/blkid -s LABEL -o value $TGTDEV)
-    if [[ "$LABEL" =~ ( ) ]]; then
-        echo "The LABEL($LABEL) on $TGTDEV has spaces in it, which do not work with the overlay"
-        echo "You can re-format or use dosfslabel/e2fslabel to change it"
-        exitclean
+    if [[ $label =~ [:space:] ]]; then
+        printf '\n        ALERT:
+        The LABEL (%s) on %s has spaces, newlines, or tabs in it.
+        Whitespace does not work with the overlay.
+        An attempt to rename the device will be made.\n\n' "$label" $TGTDEV
+        label=$(echo -e "$label" | sed ':a ; N ; s/[[:space:]]/_/g ; t a')
+        labelTargetDevice $TGTDEV
     fi
 fi
 
@@ -1300,6 +1324,19 @@ s;(linuxefi|initrdefi)\s+[^ ]+(initrd.?.img|vmlinuz.?);\1 /images/pxeboot/\2;
     fi
 fi
 
+# Use UUID if available.
+TGTUUID=$(blkid -s UUID -o value $TGTDEV)
+if [[ -n $TGTUUID ]]; then
+    TGTLABEL=UUID=$TGTUUID
+elif [[ -n $TGTLABEL ]]; then
+        TGTLABEL="LABEL=$TGTLABEL"
+else
+    printf '\n    ALERT:
+    You need to have a filesystem label or
+    UUID for your target device.\n'
+    fs_label_msg
+fi
+
 # Setup the updates.img
 if [ -n "$updates" ]; then
     copyFile "$updates" "$TGTMNT/updates.img"
@@ -1361,15 +1398,17 @@ if [ -n "$totaltimeout" ]; then
     sed -i "/^timeout.*$/a\totaltimeout\ $totaltimeout" $BOOTCONFIG
 fi
 
-if [ "$overlaysizemb" -gt 0 ]; then
+if ((overlaysizemb > 0)); then
     echo "Initializing persistent overlay file"
-    OVERFILE="overlay-$( /sbin/blkid -s LABEL -o value $TGTDEV )-$( /sbin/blkid -s UUID -o value $TGTDEV )"
+    OVERNAME="overlay-$label-$TGTUUID"
     if [ -z "$skipcopy" ]; then
-        if [ "$TGTFS" = "vfat" ]; then
+        if [[ $TGTFS == @(vfat|msdos) ]]; then
             # vfat can't handle sparse files
-            dd if=/dev/zero of=$TGTMNT/$LIVEOS/$OVERFILE count=$overlaysizemb bs=1M
+            dd if=/dev/zero of=$TGTMNT/$LIVEOS/$OVERNAME \
+                count=$overlaysizemb bs=1M
         else
-            dd if=/dev/null of=$TGTMNT/$LIVEOS/$OVERFILE count=1 bs=1M seek=$overlaysizemb
+            dd if=/dev/null of=$TGTMNT/$LIVEOS/$OVERNAME \
+                count=1 bs=1M seek=$overlaysizemb
         fi
     fi
     sed -i "s/r*d*.*live.*ima*ge*/& rd.live.overlay=${TGTLABEL}/
