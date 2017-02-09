@@ -6,7 +6,7 @@ livecd-iso-to-disk - Installs bootable Live images onto USB/SD storage devices.
 
 =head1 SYNOPSIS
 
-B<livecd-iso-to-disk>  [--help] [--noverify] [--format] [--msdos] [--reset-mbr] [--efi] [--skipcopy] [--force] [--xo] [--xo-no-home] [--timeout <time>] [--totaltimeout <time>] [--extra-kernel-args <args>] [--multi] [--livedir <dir>] [--compress] [--skipcompress] [--swap-size-mb <size>] [--overlay-size-mb <size>] [--home-size-mb <size>] [--delete-home] [--crypted-home] [--unencrypted-home] [--updates <updates.img>] [--ks <kickstart>] [--label <label>] <source> <target device>
+B<livecd-iso-to-disk>  [--help] [--noverify] [--format] [--msdos] [--reset-mbr] [--efi] [--skipcopy] [--force] [--xo] [--xo-no-home] [--timeout <duration>] [--totaltimeout <duration>] [--extra-kernel-args <args>] [--multi] [--livedir <dir>] [--compress] [--skipcompress] [--swap-size-mb <size>] [--overlay-size-mb <size>] [--home-size-mb <size>] [--delete-home] [--crypted-home] [--unencrypted-home] [--updates <updates.img>] [--ks <kickstart>] [--label <label>] <source> <target device>
 
 Simplest
 
@@ -86,13 +86,23 @@ Used to prepare an image for the OLPC XO-1 laptop with its compressed, JFFS2 fil
 
 Used together with the --xo option to prepare an image for an OLPC XO laptop with the home directory on an SD card instead of the internal flash storage.
 
-=item --timeout <time>
+=item --timeout <duration>
 
-Modifies the bootloader's timeout value, which indicates how long to pause at the boot: prompt before booting automatically.  This overrides the value set during iso creation.  Units are 1/10 s.  The timeout is canceled when any key is pressed, the assumption being that the user will complete the command line.  A timeout of zero will disable the timeout completely.
+Modifies the bootloader's timeout value, which indicates how long to pause at the boot prompt before booting automatically.  This overrides the value set during iso creation.
 
-=item --totaltimeout <time>
+=over 4
 
-Adds a bootloader totaltimeout, which indicates how long to wait before booting automatically.  This is used to force an automatic boot.  This timeout cannot be canceled by the user.  Units are 1/10 s.
+For SYSLINUX, a timeout unit is 1/10 second; the timeout is canceled when any key is pressed (the assumption being that the user will complete the command line); and a timeout of zero will disable the timeout completely.
+
+For EFI GRUB, the timeout unit is 1 second; timeout specifies the time to wait for keyboard input before booting the default menu entry.  A timeout of ‘0’ means to boot the default entry immediately without displaying the menu; and a timeout of ‘-1’ means to wait indefinitely.
+
+=back
+
+Enter a desired timeout value in 1/10 second units (or ‘-1’) and the appropriate value will be supplied to the configuration file.  For immediate booting, enter ‘-0’ to avoid the ambiguity between systems.  An entry of ‘-0’ will result in an SYSLINUX setting of timeout 1 and totaltimeout 1. ‘0’ or ‘-1’ will result in an SYSLINUX setting of ‘0’ (disable timeout, that is, wait indefinitely), but ‘0’ for EFI GRUB will mean immediate boot of the default, while ‘-1’ will mean EFI GRUB waits indefinitely for a user selection.
+
+=item --totaltimeout <duration>
+
+Adds a SYSLINUX bootloader totaltimeout, which indicates how long to wait before booting automatically.  This is used to force an automatic boot.  This timeout cannot be canceled by the user.  Units are 1/10 s.  A totaltimeout of zero will disable the timeout completely.  (This setting is not available in EFI GRUB.)
 
 =item --extra-kernel-args <args>
 
