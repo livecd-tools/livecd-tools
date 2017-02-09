@@ -30,7 +30,7 @@ shortusage() {
 
     livecd-iso-to-disk [--help] [--noverify] [--format] [--msdos] [--reset-mbr]
                        [--efi] [--skipcopy] [--force] [--xo] [--xo-no-home]
-                       [--timeout <time>] [--totaltimeout <time>]
+                       [--timeout <duration>] [--totaltimeout <duration>]
                        [--extra-kernel-args <args>] [--multi] [--livedir <dir>]
                        [--compress] [--skipcompress] [--swap-size-mb <size>]
                        [--overlay-size-mb <size>] [--home-size-mb <size>]
@@ -171,18 +171,37 @@ usage() {
         laptop with the home directory on an SD card instead of the internal
         flash storage.
 
-    --timeout <time>
+    --timeout <duration>
         Modifies the bootloader's timeout value, which indicates how long to
-        pause at the boot: prompt before booting automatically.  This overrides
-        the value set during iso creation.  Units are 1/10 s.  The timeout is
-        canceled when any key is pressed, the assumption being that the user
-        will complete the command line.  A timeout of zero will disable the
-        timeout completely.
+        pause at the boot prompt before booting automatically.  This overrides
+        the value set during iso creation.
 
-    --totaltimeout <time>
-        Adds a bootloader totaltimeout, which indicates how long to wait before
-        booting automatically.  This is used to force an automatic boot.  This
-        timeout cannot be canceled by the user.  Units are 1/10 s.
+            For SYSLINUX, a timeout unit is 1/10 second; the timeout is
+            canceled when any key is pressed (the assumption being that the
+            user will complete the command line); and a timeout of zero will
+            disable the timeout completely.
+
+            For EFI GRUB, the timeout unit is 1 second; timeout specifies the
+            time to wait for keyboard input before booting the default menu
+            entry. A timeout of ‘0’ means to boot the default entry immediately
+            without displaying the menu; and a timeout of ‘-1’ means to wait
+            indefinitely.
+
+        Enter a desired timeout value in 1/10 second units (or ‘-1’) and the
+        appropriate value will be supplied to the configuration file.  For
+        immediate booting, enter ‘-0’ to avoid the ambiguity between systems.
+        An entry of ‘-0’ will result in an SYSLINUX setting of timeout 1 and
+        totaltimeout 1.  ‘0’ or ‘-1’ will result in an SYSLINUX setting of ‘0’
+        (disable timeout, that is, wait indefinitely), but ‘0’ for EFI GRUB
+        will mean immediate boot of the default, while ‘-1’ will mean EFI GRUB
+        waits indefinitely for a user selection.
+
+    --totaltimeout <duration>
+        Adds a SYSLINUX bootloader totaltimeout, which indicates how long to
+        wait before booting automatically.  This is used to force an automatic
+        boot.  This timeout cannot be canceled by the user.  Units are 1/10 s.
+        A totaltimeout of zero will disable the timeout completely.
+        (This setting is not available in EFI GRUB.)
 
     --extra-kernel-args <args>
         Specifies additional kernel arguments, <args>, that will be inserted
@@ -669,10 +688,29 @@ checkMounted() {
 }
 
 checkint() {
-    if ! test $1 -gt 0 2>/dev/null ; then
-        shortusage
-        exit 1
-    fi
+    case $2 in
+        timeout )
+            if ! [[ $1 == @(0|-0|-1|[1-9]*([0-9])) ]]; then
+                shortusage
+                echo -e "\nERROR: '$1' is not a valid integer for --$2.\n"
+                exit 1
+            fi
+            ;;
+        totaltimeout )
+            if ! [[ $1 == @(0|[1-9]*([0-9])) ]]; then
+                shortusage
+                echo -e "\nERROR: '$1' is not a valid integer for --$2.\n"
+                exit 1
+            fi
+            ;;
+        * )
+            if ! [[ $1 == [1-9]*([0-9]) ]]; then
+                shortusage
+                echo -e "\nERROR: '$1' is not a valid integer entry.\n"
+                exit 1
+            fi
+            ;;
+    esac
 }
 
 if [ $(id -u) != 0 ]; then
@@ -794,12 +832,12 @@ while true ; do
             xonohome=1
             ;;
         --timeout)
-            checkint $2
+            checkint $2 timeout
             timeout=$2
             shift
             ;;
         --totaltimeout)
-            checkint $2
+            checkint $2 totaltimeout
             totaltimeout=$2
             shift
             ;;
@@ -1245,11 +1283,20 @@ if [ "$srctype" = "live" ]; then
     # file to a base state before updating.
     if [[ -d $SRCMNT/syslinux/ ]]; then
         echo "Preparing boot config file."
-        sed -i "s/root=live:[^ ]*/root=live:CDLABEL=name/
-                s/\(r*d*.*live.*ima*ge*\) .* quiet/\1 quiet/
-               " $BOOTCONFIG $BOOTCONFIG_EFI
-        sed -i "s/^timeout.*$/timeout\ 100/
-                /^totaltimeout.*$/d" $BOOTCONFIG
+        sed -i -r "s/^\s*timeout\s+.*/timeout 600/I
+/^\s*totaltimeout\s+.*/Is/^.*//
+s/\s+(initrd=initrd.?.img)\s+.*\s+(root=live:[^\s+]*)/ \1 \2/
+s/\s+(root=live:[^ ]*)\s+.*\s+(r*d*.*live.*ima*ge*)/ \1 \2/
+/^\s*label\s+linux\s*/I,/^\s*label\s+check\s*/Is/(r*d*.*live.*ima*ge*).*/\1 quiet/
+/^\s*label\s+check\s*/I,/^\s*label\s+vesa\s*/Is/(r*d*.*live.*ima*ge*).*/\1 rd.live.check quiet/
+/^\s*label\s+vesa\s*/I,/^\s*menu\s+end\s*/Is/(r*d*.*live.*ima*ge*).*/\1 nomodeset quiet/
+s/^\s*set\s+timeout=.*/set timeout=60/
+/^\s*menuentry\s+'Start\s+/,/\s+}/s/(r*d*.*live.*ima*ge*).*/\1 quiet/
+/^\s*menuentry\s+'Test\s+/,/\s+}/s/(r*d*.*live.*ima*ge*).*/\1 rd.live.check quiet/
+/^\s*submenu\s+'Trouble/,/\s+}/s/(r*d*.*live.*ima*ge*).*/\1 nomodeset quiet/
+s/(linuxefi\s+[^ ]+vmlinuz.?)\s+.*\s+(root=live:[^\s+]*)/\1 \2/
+s;(linuxefi|initrdefi)\s+[^ ]+(initrd.?.img|vmlinuz.?);\1 /images/pxeboot/\2;
+                  " $BOOTCONFIG $BOOTCONFIG_EFI
     fi
 fi
 
@@ -1267,9 +1314,8 @@ fi
 
 echo "Updating boot config file"
 # adjust label and fstype
-sed -i "s/CDLABEL=[^ ]*/$TGTLABEL/
-        s/rootfstype=[^ ]*/rootfstype=$TGTFS/
-        s/LABEL=[^ :]*/$TGTLABEL/" $BOOTCONFIG $BOOTCONFIG_EFI
+sed -i "s/root=[^ ]*/root=live:$TGTLABEL/g
+        s/rootfstype=[^ ]*/rootfstype=$TGTFS/" $BOOTCONFIG $BOOTCONFIG_EFI
 if [ -n "$kernelargs" ]; then
     sed -i "s;initrd.\?\.img;& ${kernelargs};" $BOOTCONFIG
     if [ -n "$efi" ]; then
@@ -1277,7 +1323,7 @@ if [ -n "$kernelargs" ]; then
     fi
 fi
 if [ "$LIVEOS" != "LiveOS" ]; then
-    sed -i "s;r*d*.*live.*ima*ge*;& live_dir=$LIVEOS;
+    sed -i "s;r*d*.*live.*ima*ge*;& rd.live.dir=$LIVEOS;
            " $BOOTCONFIG $BOOTCONFIG_EFI
 fi
 
@@ -1300,7 +1346,16 @@ fi
 
 # Adjust the boot timeouts
 if [ -n "$timeout" ]; then
-    sed -i "s/^timeout.*$/timeout\ $timeout/" $BOOTCONFIG
+    [[ $timeout == "-0" ]] && { timeout=1; totaltimeout=1; }
+    sed -i -r "s/^\s*timeout.*$/timeout $((timeout==-1 ? 0 : timeout))/I" $BOOTCONFIG
+    if [[ -n $efi ]]; then
+        if [[ $timeout != @(0|-1) ]]; then
+            set +e
+            ((timeout = (timeout%10) > 4 ? (timeout/10)+1 : (timeout/10) ))
+            set -e
+        fi
+        sed -i -r "s/^\s*(set\s+timeout=).*$/\1$timeout/" $BOOTCONFIG_EFI
+    fi
 fi
 if [ -n "$totaltimeout" ]; then
     sed -i "/^timeout.*$/a\totaltimeout\ $totaltimeout" $BOOTCONFIG
@@ -1317,13 +1372,15 @@ if [ "$overlaysizemb" -gt 0 ]; then
             dd if=/dev/null of=$TGTMNT/$LIVEOS/$OVERFILE count=1 bs=1M seek=$overlaysizemb
         fi
     fi
-    sed -i "s/r*d*.*live.*ima*ge*/& rd.live.overlay=${TGTLABEL} rw/
-            s/\ ro\ / /" $BOOTCONFIG $BOOTCONFIG_EFI
+    sed -i "s/r*d*.*live.*ima*ge*/& rd.live.overlay=${TGTLABEL}/
+           " $BOOTCONFIG $BOOTCONFIG_EFI
 fi
 
-if [ "$swapsizemb" -gt 0 -a -z "$skipcopy" ]; then
+if [ "$swapsizemb" -gt 0 ]; then
     echo "Initializing swap file"
-    dd if=/dev/zero of=$TGTMNT/$LIVEOS/swap.img count=$swapsizemb bs=1M
+    if [ -z "$skipcopy" ]; then
+        dd if=/dev/zero of=$TGTMNT/$LIVEOS/swap.img count=$swapsizemb bs=1M
+    fi
     mkswap -f $TGTMNT/$LIVEOS/swap.img
 fi
 
@@ -1357,6 +1414,11 @@ if [ "$homesizemb" -gt 0 -a -z "$skipcopy" ]; then
         mkfs.ext4 -F -j $TGTMNT/$LIVEOS/$HOMEFILE
         tune2fs -c0 -i0 -ouser_xattr,acl $TGTMNT/$LIVEOS/$HOMEFILE
     fi
+fi
+
+if [[ live = $srctype ]]; then
+    sed -i -r 's/(\s+ro\s+|\s+ro$)/ /g
+               s/r*d*.*live.*ima*ge*/& rw /' $BOOTCONFIG $BOOTCONFIG_EFI
 fi
 
 # create the forth files for booting on the XO if requested
@@ -1474,9 +1536,9 @@ if [ -z "$multi" ]; then
     fi
 else
     # we need to do some more config file tweaks for multi-image mode
-    sed -i "s;kernel vm;kernel /$LIVEOS/syslinux/vm;
-            s;initrd=i;initrd=/$LIVEOS/syslinux/i;
-           " $TGTMNT/$SYSLINUXPATH/isolinux.cfg
+    sed -i -r "s;kernel\s+vm;kernel /$LIVEOS/syslinux/vm;
+               s;initrd=i;initrd=/$LIVEOS/syslinux/i;
+              " $TGTMNT/$SYSLINUXPATH/isolinux.cfg
     mv $TGTMNT/$SYSLINUXPATH/isolinux.cfg $TGTMNT/$SYSLINUXPATH/syslinux.cfg
     cleanup
 fi
