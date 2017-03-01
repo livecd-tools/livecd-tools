@@ -94,11 +94,11 @@ Modifies the bootloader's timeout value, which indicates how long to pause at th
 
 For SYSLINUX, a timeout unit is 1/10 second; the timeout is canceled when any key is pressed (the assumption being that the user will complete the command line); and a timeout of zero will disable the timeout completely.
 
-For EFI GRUB, the timeout unit is 1 second; timeout specifies the time to wait for keyboard input before booting the default menu entry.  A timeout of ‘0’ means to boot the default entry immediately without displaying the menu; and a timeout of ‘-1’ means to wait indefinitely.
+For EFI GRUB, the timeout unit is 1 second; timeout specifies the time to wait for keyboard input before booting the default menu entry.  A timeout of '0' means to boot the default entry immediately without displaying the menu; and a timeout of '-1' means to wait indefinitely.
 
 =back
 
-Enter a desired timeout value in 1/10 second units (or ‘-1’) and the appropriate value will be supplied to the configuration file.  For immediate booting, enter ‘-0’ to avoid the ambiguity between systems.  An entry of ‘-0’ will result in an SYSLINUX setting of timeout 1 and totaltimeout 1. ‘0’ or ‘-1’ will result in an SYSLINUX setting of ‘0’ (disable timeout, that is, wait indefinitely), but ‘0’ for EFI GRUB will mean immediate boot of the default, while ‘-1’ will mean EFI GRUB waits indefinitely for a user selection.
+Enter a desired timeout value in 1/10 second units (or '-1') and the appropriate value will be supplied to the configuration file.  For immediate booting, enter '-0' to avoid the ambiguity between systems.  An entry of '-0' will result in an SYSLINUX setting of timeout 1 and totaltimeout 1. '0' or '-1' will result in an SYSLINUX setting of '0' (disable timeout, that is, wait indefinitely), but '0' for EFI GRUB will mean immediate boot of the default, while '-1' will mean EFI GRUB waits indefinitely for a user selection.
 
 =item --totaltimeout <duration>
 
