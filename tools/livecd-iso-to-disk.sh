@@ -55,10 +55,10 @@ usage() {
              <source>
                  This may be the filesystem path to a LiveOS .iso image file,
                  such as from a CD-ROM, DVD, or download.  It could also be the
-                 device node reference for the mount point of another LiveOS
-                 filesystem, including the currently-running one (such as a
-                 booted Live CD/DVD/USB, where /run/initramfs/livedev links to
-                 the booted LiveOS device).
+                 device node reference, the LiveOS-containing directory path,
+                 or the mount point for another LiveOS filesystem, including
+                 the currently booted LiveOS device, which is mounted at
+                 /run/initramfs/live.
 
              <target device>
                  This should be the device partition name for the attached,
@@ -79,12 +79,12 @@ usage() {
     bootloader).  The target storage device can then boot the installed
     operating system on systems that support booting via the USB or the SD
     interface.  The script requires a LiveOS source image and a target storage
-    device.  The source image may be either a LiveOS .iso file, the currently-
-    running LiveOS image, the device node reference for an attached device
-    installed with a LiveOS image, or a file backed by a block device installed
-    with a LiveOS image.  If the operating system supports persistent overlays
-    for saving system changes, a pre-sized overlay may be included with the
-    installed image.
+    device.  The source image may be either a LiveOS .iso file, or another
+    reference to a LiveOS image, such as the device node for an attached device
+    installed with a LiveOS image, its mount point, a loop device backed by a
+    file containing an installed LiveOS image, or even the currently-running
+    LiveOS image.  A pre-sized overlay file for persisting root filesystem
+    changes may be included with the installed image.
 
     Unless you request the --format option, installing an image does not
     destroy data outside of the LiveOS, syslinux, & EFI directories on your
@@ -95,29 +95,32 @@ usage() {
     component of the Linux kernel.  The filesystems are embedded within files
     in the /LiveOS/ directory of the storage device.  The /LiveOS/squashfs.img
     file is the default, compressed filesystem containing one directory and the
-    file /LiveOS/ext3fs.img that contains the root filesystem for the
+    file /LiveOS/rootfs.img that contains the root filesystem for the
     distribution.  These are read-only filesystems that are usually fixed in
-    size to within +1 GiB of the size of the full root filesystem at build time.
-    At boot time, a Device-mapper snapshot with a default 0.5 GiB, in-memory,
-    read-write overlay is created for the root filesystem.  Optionally, one may
-    specify a fixed-size, persistent on disk overlay to hold changes to the
-    root filesystem.  The build-time size of the root filesystem will limit the
-    maximum size of the working root filesystem--even if an overlay file larger
-    than the apparent free space on the root filesystem is used.  *Note well*
-    that deletion of any original files in the read-only root filesystem does
-    not recover any storage space on your LiveOS device.  Storage in the
-    persistent /LiveOS/overlay-<device_id> file is allocated as needed, but the
-    system will crash *without warning* and fail to boot once the overlay has
-    been totally consumed.  If significant changes or updates to the root
-    filesystem are to be made, carefully watch the fraction of space allocated
-    in the overlay by issuing the 'dmsetup status' command at a command line of
-    the running LiveOS image.  Some consumption of root filesystem and overlay
-    space can be avoided by specifying a persistent home filesystem for user
-    files, which will be saved in a fixed-size /LiveOS/home.img file.  This
-    filesystem is encrypted by default.  (One may bypass encryption with the
+    size to within a few GiB of the size of the full root filesystem at build
+    time.  At boot time, a Device-mapper snapshot with a default 0.5 GiB, in-
+    memory, read-write overlay is created for the root filesystem.  Optionally,
+    one may specify a fixed-size, persistent on disk overlay to hold changes to
+    the root filesystem.  The build-time size of the root filesystem will limit
+    the maximum size of the working root filesystem--even if supplied with an
+    overlay file larger than the apparent free space on the root filesystem.
+    *Note well* that deletion of any original files in the read-only root
+    filesystem does not recover any storage space on your LiveOS device.
+    Storage in the persistent /LiveOS/overlay-<device_id> file is allocated as
+    needed.  If the overlay storage space is filled, the overlay will enter an
+    'Overflow' state where the root filesystem will continue to operate in a
+    read-only mode.  There will not be an explicit warning or signal when this
+    happens, but applications may begin to report errors due to this
+    restriction.  If significant changes or updates to the root filesystem are
+    to be made, carefully watch the fraction of space allocated in the overlay
+    by issuing the 'dmsetup status' command at a command line of the running
+    LiveOS image.  Some consumption of root filesystem and overlay space can be
+    avoided by specifying a persistent home filesystem for user files, which
+    will be saved in a fixed-size /LiveOS/home.img file.  This filesystem is
+    encrypted by default.  (One may bypass encryption with the
     --unencrypted-home option.)  This filesystem is mounted on the /home
-    directory.  When its storage space is full, out-of-space warnings will be
-    issued by the operating system.
+    directory of the root filesystem.  When its storage space is filled,
+    out-of-space warnings will be issued by the operating system.
 
     OPTIONS
 
@@ -693,11 +696,56 @@ detectsrctype() {
         echo "/Packages found, will copy source packages to target"
         packages=1
     fi
-    if [[ -e "$SRCMNT/LiveOS/squashfs.img" ]]; then
-        # LiveOS style boot image
+    local cmdline=$(< /proc/cmdline)
+    local len=${#cmdline}
+    if [[ -z $livedir ]]; then
+        livedir=${cmdline#* @(rd.live.dir|live_dir)=}
+        if [[ ${#livedir} == $len ]]; then
+            livedir=LiveOS
+        else
+            livedir=${livedir%% *}
+        fi
+    fi
+    squashimg=${cmdline#* rd.live.squashimg=}
+    if [[ ${#squashimg} == $len ]]; then
+        squashimg=squashfs.img
+    else
+        squashimg=${squashimg%% *}
+    fi
+    liveram=${cmdline#* @(rd.live.ram|live_ram)}
+    if [[ ${#liveram} == $len ]]; then
+        liveram=''
+    else
+        liveram=1
+    fi
+    writable_fsimg=${cmdline#* @(rd.writable.fsimg|writable_fsimg)}
+    if [[ ${#writable_fsimg} != $len ]]; then
+        SRCIMG=/run/initramfs/fsimg/rootfs.img
         srctype=live
         return
     fi
+    if [[ -n $liveram ]]; then
+        for f in /run/initramfs/squashed.img \
+                 /run/initramfs/rootfs.img ; do
+            if [[ -e $f ]]; then
+                SRCIMG="$f"
+                break
+            fi
+        done
+        srctype=live
+        return
+    fi
+    for f in "$SRCMNT/$livedir/$squashimg" \
+            "$SRCMNT/$livedir/rootfs.img" \
+            "$SRCMNT/$livedir/ext3fs.img"; do
+        if [[ -e $f ]]; then
+            SRCIMG="$f"
+            srctype=live
+            break
+        fi
+    done
+    [[ -n $srctype ]] && return
+
     if [ -e $SRCMNT/images/install.img -o -e $SRCMNT/isolinux/initrd.img ]; then
         if [ -n "$packages" ]; then
             srctype=installer
@@ -891,9 +939,10 @@ if [ -z "$SRC" ]; then
     exit 1
 fi
 
-if [ ! -b "$SRC" -a ! -f "$SRC" ]; then
+if ! [[ -b $SRC || -f $SRC || -d $SRC ]]; then
     echo "$SRC is not a file or block device"
     shortusage
+    echo -e "\nERROR: '$SRC' is not a file, block device, or directory.\n"
     exit 1
 fi
 
@@ -922,16 +971,31 @@ fi
 # do some basic sanity checks.
 checkMounted $TGTDEV
 
-# FIXME: would be better if we had better mountpoints
 SRCMNT=$(mktemp -d /media/srctmp.XXXXXX)
-if [ -b "$SRC" ]; then
-    mount -o ro "$SRC" $SRCMNT || exitclean
-elif [ -f "$SRC" ]; then
-    mount -o loop,ro "$SRC" $SRCMNT || exitclean
+mountopts='-o ro'
+if [[ -f $SRC ]]; then
+    mountopts+=,loop
+elif [[ -d $SRC ]]; then
+    livedir=$SRC
+    SRC=$(findmnt -nro TARGET -T $livedir)
+    if [[ $livedir == $SRC ]]; then
+        livedir=''
+    else
+        livedir=${livedir##*/}
+    fi
+    mountopts+=\ --bind
+elif [[ $SRC -ef $(readlink -f /run/initramfs/livedev) ]] ||
+     [[ $SRC -ef $(readlink -f /dev/live) ]]; then
+    SRC=/run/initramfs/live
+    mountopts+=\ --bind
 else
-    echo "$SRC is not a file or block device."
+    printf "\n        ATTENTION:
+    '$SRC' is not a file, block device or directory."
     exitclean
 fi
+mount $mountopts "$SRC" $SRCMNT || exitclean
+mountopts=''
+
 # Figure out what needs to be done based on the source image
 detectsrctype
 
@@ -1017,7 +1081,7 @@ if ((overlaysizemb > 0)); then
         is not allowed on VFAT formatted filesystems.\n'
         exitclean
     fi
-    if [[ $label =~ [:space:] ]]; then
+    if [[ $label =~ [[:space:]] ]]; then
         printf '\n        ALERT:
         The LABEL (%s) on %s has spaces, newlines, or tabs in it.
         Whitespace does not work with the overlay.
@@ -1052,71 +1116,87 @@ if [ -f "$TGTMNT/$LIVEOS/$HOMEFILE" -a -n "$keephome" -a "$homesizemb" -gt 0 ]; 
     exitclean
 fi
 
-if [ -n "$efi" ]; then
-    if [ -d $SRCMNT/EFI/BOOT ]; then
-        EFI_BOOT="/EFI/BOOT"
-    elif [ -d $SRCMNT/EFI/boot ]; then
-        EFI_BOOT="/EFI/boot"
-    else
-        echo "ERROR: This live image does not support EFI booting"
-        exitclean
-    fi
+if [[ -d $SRCMNT/EFI/BOOT ]]; then
+    EFI_BOOT=/EFI/BOOT
+elif [[ -d $SRCMNT/EFI/boot ]]; then
+    EFI_BOOT=/EFI/boot
+fi
+if [[ -n $efi && -z $EFI_BOOT ]]; then
+    printf '\n        ATTENTION:
+    You requested EFI booting, but this source image lacks support
+    for EFI booting.  Exiting...\n'
+    exitclean
 fi
 
+thisScriptpath=$(readlink -f "$0")
+checklivespace() {
 # let's try to make sure there's enough room on the target device
-if [[ -d $TGTMNT/$LIVEOS ]]; then
-    tbd=($(du -B 1M $TGTMNT/$LIVEOS))
-    if [[ -s $TGTMNT/$LIVEOS/$HOMEFILE ]] && [[ -n $keephome ]]; then
-        homesize=($(du -B 1M $TGTMNT/$LIVEOS/$HOMEFILE))
-        tbd=$((tbd - homesize))
-    fi
-else
-    tbd=0
-fi
 
-if [[ live == $srctype ]]; then
-   targets="$TGTMNT/$SYSLINUXPATH"
-   [[ -n $efi ]] && targets+=" $TGTMNT$EFI_BOOT"
-   [[ -n $xo ]] && targets+=" $TGTMNT/boot/olpc.fth"
-   target_size=$(du -s -c -B 1M $targets 2> /dev/null | awk '/total$/ {print $1;}') || :
-   tbd=$((tbd + target_size))
-fi
-
-if [[ -n $skipcompress ]] && [[ -s $SRCMNT/LiveOS/squashfs.img ]]; then
-    if mount -o loop $SRCMNT/LiveOS/squashfs.img $SRCMNT; then
-        livesize=($(du -B 1M --apparent-size $SRCMNT/LiveOS/ext3fs.img))
-        umount $SRCMNT
-        if ((livesize > 4095)) &&  [[ vfat == $TGTFS ]]; then
-            echo "
-            An uncompressed image size greater than 4095 MB is not suitable
-            for a VFAT-formatted device.  The compressed SquashFS will be
-            copied to the target device.
-            "
-            skipcompress=""
-            livesize=0
+# var=($(du -B 1M path)) uses the compound array assignment operator to extract
+# the numeric result of du into the index zero position of var.  The index zero
+# value is the default operative value for the array variable when no other
+# indices are specified.
+    if [[ -d $TGTMNT/$LIVEOS ]]; then
+        tbd=($(du -B 1M $TGTMNT/$LIVEOS))
+        if [[ -s $TGTMNT/$LIVEOS/$HOMEFILE ]] && [[ -n $keephome ]]; then
+            homesize=($(du -B 1M $TGTMNT/$LIVEOS/$HOMEFILE))
+            tbd=$((tbd - homesize))
         fi
     else
-        echo "WARNING: --skipcompress or --xo was specified but the
-        currently-running kernel can not mount the SquashFS from the source
-        file to extract it. Instead, the compressed SquashFS will be copied
-        to the target device."
-        skipcompress=""
+        tbd=0
     fi
-fi
-if [[ live == $srctype ]]; then
-    thisScriptpath=$(readlink -f "$0")
-    sources="$SRCMNT/LiveOS/ext3fs.img $SRCMNT/LiveOS/osmin.img"
-    [[ -z $skipcompress ]] && sources+=" $SRCMNT/LiveOS/squashfs.img"
-    sources+=" $SRCMNT/isolinux $SRCMNT/syslinux"
-    [[ -n $efi ]] && sources+=" $SRCMNT$EFI_BOOT"
-    [[ -n $xo ]] && sources+=" $SRCMNT/boot/olpc.fth"
+
+    targets="$TGTMNT/$SYSLINUXPATH $TGTMNT$EFI_BOOT "
+    [[ -n $xo ]] && targets+=$TGTMNT/boot/olpc.fth
+    target_size=$(du -s -c -B 1M $targets 2> /dev/null | awk '/total$/ {print $1;}') || :
+    tbd=$((tbd + target_size))
+
+    if [[ -n $skipcompress ]] && [[ -s $SRCIMG ]]; then
+        if mount -o loop $SRCIMG $SRCMNT; then
+            if [[ -e $SRCMNT/LiveOS/rootfs.img ]]; then
+                SRCIMG=$SRCMNT/LiveOS/rootfs.img
+            elif [[ -e $SRCMNT/LiveOS/ext3fs.img ]]; then
+                SRCIMG=$SRCMNT/LiveOS/ext3fs.img
+            else
+                printf "\n        ERROR:
+                '%s' does not appear to contain a LiveOS image.  Exiting...\n
+                " $SRCIMG
+                exitclean
+            fi
+            livesize=($(du -B 1M --apparent-size $SRCIMG))
+            umount -l $SRCMNT
+        else
+            echo "WARNING: --skipcompress or --xo was specified but the
+            currently-running kernel can not mount the SquashFS from the source
+            file to extract it. Instead, the compressed SquashFS will be copied
+            to the target device."
+            skipcompress=""
+        fi
+    else
+        livesize=($(du -B 1M $SRCIMG))
+    fi
+    if ((livesize > 4095)) &&  [[ vfat == $TGTFS ]]; then
+        echo "
+        An image size greater than 4095 MB is not suitable for a 
+        VFAT-formatted device.
+        "
+        if [[ -n $skipcompress ]]; then
+            echo " The compressed SquashFS will instead be copied
+            to the target device."
+            skipcompress=''
+            livesize=($(du -B 1M $SRCMNT/$livedir/$squashimg))
+        else
+            echo "Exiting..."
+            exitclean
+        fi
+    fi
+    sources="$SRCMNT/$livedir/osmin.img $SRCMNT/$livedir/syslinux"
+    sources+=" $SRCMNT/isolinux $SRCMNT/syslinux $SRCMNT$EFI_BOOT"
     source_size=$(du -s -c -B 1M "$thisScriptpath" $sources 2> /dev/null | awk '/total$/ {print $1;}') || :
     livesize=$((livesize + source_size))
-fi
 
-freespace=$(df -B 1M --total $TGTDEV | awk '/^total/ {print $4;}')
+    freespace=$(df -B 1M --total $TGTDEV | awk '/^total/ {print $4;}')
 
-if [[ live == $srctype ]]; then
     tba=$((overlaysizemb + homesizemb + livesize + swapsizemb))
     if ((tba > freespace + tbd)); then
         needed=$((tba - freespace - tbd))
@@ -1138,7 +1218,8 @@ if [[ live == $srctype ]]; then
         \r  requested size total by:  %6s  MiB\n\n" $needed
         exitclean
     fi
-fi
+}
+[[ -z $skipcopy && live == $srctype ]] && checklivespace
 
 # Verify available space for DVD installer
 if [ "$srctype" = "installer" ]; then
@@ -1183,26 +1264,30 @@ if [ -z "$skipcopy" ] && [ "$srctype" = "live" ]; then
 fi
 
 # Bootloader is always reconfigured, so keep these out of the if skipcopy stuff.
-[ ! -d $TGTMNT/$SYSLINUXPATH ] && mkdir -p $TGTMNT/$SYSLINUXPATH
-[ -n "$efi" -a ! -d $TGTMNT$EFI_BOOT ] && mkdir -p $TGTMNT$EFI_BOOT
+[[ ! -d $TGTMNT/$SYSLINUXPATH ]] && mkdir -p $TGTMNT/$SYSLINUXPATH
+[[ ! -d $TGTMNT$EFI_BOOT ]] && mkdir -p $TGTMNT$EFI_BOOT
+if [[ -n $multi ]]; then
+    mv $TGTMNT$EFI_BOOT $TGTMNT/EFI_previous
+    mkdir -p $TGTMNT$EFI_BOOT
+fi
 
 # Live image copy
 if [ "$srctype" = "live" -a -z "$skipcopy" ]; then
     echo "Copying live image to target device."
     [ ! -d $TGTMNT/$LIVEOS ] && mkdir $TGTMNT/$LIVEOS
     [ -n "$keephome" -a -f "$TGTMNT/$HOMEFILE" ] && mv $TGTMNT/$HOMEFILE $TGTMNT/$LIVEOS/$HOMEFILE
-    if [ -n "$skipcompress" -a -f $SRCMNT/LiveOS/squashfs.img ]; then
-        mount -o loop $SRCMNT/LiveOS/squashfs.img $SRCMNT || exitclean
-        copyFile $SRCMNT/LiveOS/ext3fs.img $TGTMNT/$LIVEOS/ext3fs.img || {
+    if [ -n "$skipcompress" -a -f $SRCMNT/$livedir/$squashimg ]; then
+        mount -o loop $SRCMNT/$livedir/$squashimg $SRCMNT || exitclean
+        copyFile $SRCIMG $TGTMNT/$LIVEOS/rootfs.img || {
             umount $SRCMNT ; exitclean ; }
         umount $SRCMNT
-    elif [ -f $SRCMNT/LiveOS/squashfs.img ]; then
-        copyFile $SRCMNT/LiveOS/squashfs.img $TGTMNT/$LIVEOS/squashfs.img || exitclean
-    elif [ -f $SRCMNT/LiveOS/ext3fs.img ]; then
-        copyFile $SRCMNT/LiveOS/ext3fs.img $TGTMNT/$LIVEOS/ext3fs.img || exitclean
+    elif [ -f $SRCIMG ]; then
+        copyFile $SRCIMG $TGTMNT/$LIVEOS/${SRCIMG##/*/} || exitclean
+        [[ ${SRCIMG##/*/} == squashed.img ]] &&
+            mv $TGTMNT/$LIVEOS/${SRCIMG##/*/} $TGTMNT/$LIVEOS/squashfs.img
     fi
-    if [ -f $SRCMNT/LiveOS/osmin.img ]; then
-        copyFile $SRCMNT/LiveOS/osmin.img $TGTMNT/$LIVEOS/osmin.img || exitclean
+    if [ -f $SRCMNT/$livedir/osmin.img ]; then
+        copyFile $SRCMNT/$livedir/osmin.img $TGTMNT/$LIVEOS/osmin.img || exitclean
     fi
     sync
 fi
@@ -1212,61 +1297,61 @@ fi
 if [[ -d $SRCMNT/isolinux/ ]]; then
     cp $SRCMNT/isolinux/* $TGTMNT/$SYSLINUXPATH
 elif [[ -d $SRCMNT/syslinux/ ]]; then
-    cp $SRCMNT/syslinux/* $TGTMNT/$SYSLINUXPATH
-    if [[ -f $SRCMNT/syslinux/extlinux.conf ]]; then
+    [[ -d $SRCMNT/$livedir/syslinux ]] && subdir=$livedir/
+    cp $SRCMNT/${subdir}syslinux/* $TGTMNT/$SYSLINUXPATH
+    if [[ -f $TGTMNT/$SYSLINUXPATH/extlinux.conf ]]; then
         mv $TGTMNT/$SYSLINUXPATH/extlinux.conf \
             $TGTMNT/$SYSLINUXPATH/isolinux.cfg
-    elif [[ -f $SRCMNT/syslinux/syslinux.cfg ]]; then
+    elif [[ -f $TGTMNT/$SYSLINUXPATH/syslinux.cfg ]]; then
         mv $TGTMNT/$SYSLINUXPATH/syslinux.cfg $TGTMNT/$SYSLINUXPATH/isolinux.cfg
     fi
 fi
 BOOTCONFIG=$TGTMNT/$SYSLINUXPATH/isolinux.cfg
-# Set this to nothing so sed doesn't care
-BOOTCONFIG_EFI=
-if [ -n "$efi" ]; then
-    echo "Setting up $EFI_BOOT"
-    cp -r $SRCMNT$EFI_BOOT/* $TGTMNT$EFI_BOOT
 
-    # The GRUB EFI config file can be one of:
-    #   boot?*.conf
-    #   BOOT?*.conf
-    #   grub.cfg
-    if [ -e $TGTMNT$EFI_BOOT/grub.cfg ]; then
-        BOOTCONFIG_EFI=$TGTMNT$EFI_BOOT/grub.cfg
-    elif [ -e $(nocase_path "$TGTMNT$EFI_BOOT/boot*.conf") ]; then
-        BOOTCONFIG_EFI=$(nocase_path "$TGTMNT$EFI_BOOT/boot*.conf")
-    else
-        echo "Unable to find EFI config file."
+# Always install EFI components so that they are available to propagate, if
+# desired from the installed system.
+echo "Setting up $EFI_BOOT"
+cp -r $SRCMNT$EFI_BOOT/* $TGTMNT$EFI_BOOT
+
+# The GRUB EFI config file can be one of:
+#   boot?*.conf
+#   BOOT?*.conf
+#   grub.cfg
+if [ -e $TGTMNT$EFI_BOOT/grub.cfg ]; then
+    BOOTCONFIG_EFI=$TGTMNT$EFI_BOOT/grub.cfg
+elif [ -e $(nocase_path "$TGTMNT$EFI_BOOT/boot*.conf") ]; then
+    BOOTCONFIG_EFI=$(nocase_path "$TGTMNT$EFI_BOOT/boot*.conf")
+elif [[ -n $efi ]]; then
+    echo "Unable to find EFI config file."
+    exitclean
+fi
+rm -f $TGTMNT$EFI_BOOT/grub.conf
+
+# On some images (RHEL) the BOOT*.efi file isn't in $EFI_BOOT, but is in
+# the eltorito image, so try to extract it if it is missing
+
+# test for presence of *.efi grub binary
+if [ ! -f $(nocase_path "$TGTMNT$EFI_BOOT/boot*efi") ]; then
+    if [[ ! -x /usr/bin/dumpet && -n $efi ]]; then
+        echo "No /usr/bin/dumpet tool found. EFI image will not boot."
+        echo "Source media is missing grub binary in /EFI/BOOT/*EFI"
         exitclean
-    fi
-    rm -f $TGTMNT$EFI_BOOT/grub.conf
+    else
+        # dump the eltorito image with dumpet, output is $SRC.1
+        dumpet -i "$SRC" -d
+        EFIMNT=$(mktemp -d /media/srctmp.XXXXXX)
+        mount -o loop "$SRC".1 $EFIMNT
 
-    # On some images (RHEL) the BOOT*.efi file isn't in $EFI_BOOT, but is in
-    # the eltorito image, so try to extract it if it is missing
-
-    # test for presence of *.efi grub binary
-    if [ ! -f $(nocase_path "$TGTMNT$EFI_BOOT/boot*efi") ]; then
-        if [ ! -x /usr/bin/dumpet ]; then
-            echo "No /usr/bin/dumpet tool found. EFI image will not boot."
-            echo "Source media is missing grub binary in /EFI/BOOT/*EFI"
-            exitclean
-        else
-            # dump the eltorito image with dumpet, output is $SRC.1
-            dumpet -i "$SRC" -d
-            EFIMNT=$(mktemp -d /media/srctmp.XXXXXX)
-            mount -o loop "$SRC".1 $EFIMNT
-
-            if [ -f $(nocase_path "$EFIMNT$EFI_BOOT/boot*efi") ]; then
-                cp $(nocase_path "$EFIMNT$EFI_BOOT/boot*efi") $TGTMNT$EFI_BOOT
-            else
-                echo "No BOOT*.EFI found in eltorito image. EFI will not boot"
-                umount $EFIMNT
-                rm "$SRC".1
-                exitclean
-            fi
+        if [ -f $(nocase_path "$EFIMNT$EFI_BOOT/boot*efi") ]; then
+            cp $(nocase_path "$EFIMNT$EFI_BOOT/boot*efi") $TGTMNT$EFI_BOOT
+        elif [[ -n $efi ]]; then
+            echo "No BOOT*.EFI found in eltorito image. EFI will not boot"
             umount $EFIMNT
             rm "$SRC".1
+            exitclean
         fi
+        umount $EFIMNT
+        rm "$SRC".1
     fi
 fi
 
@@ -1307,13 +1392,20 @@ if [ "$srctype" = "live" ]; then
     # file to a base state before updating.
     if [[ -d $SRCMNT/syslinux/ ]]; then
         echo "Preparing boot config file."
+        title=$(sed -n -r '/^\s*label\s+linux/{n
+                           s/^\s*menu\s+label\s+\^Start\s+(.*)/\1/;s/;/:/gp}
+                          ' $BOOTCONFIG)
+        sed -i -r '/^\s*label .*/I,/^\s*label linux\>/I{
+                   /^\s*label linux\>/I ! {N;N;N;N
+                   /\<kernel\s+vesamenu.c32\>/d};}' $BOOTCONFIG
         sed -i -r "s/^\s*timeout\s+.*/timeout 600/I
-/^\s*totaltimeout\s+.*/Is/^.*//
-s/\s+(initrd=initrd.?.img)\s+.*\s+(root=live:[^\s+]*)/ \1 \2/
-s/\s+(root=live:[^ ]*)\s+.*\s+(r*d*.*live.*ima*ge*)/ \1 \2/
-/^\s*label\s+linux\s*/I,/^\s*label\s+check\s*/Is/(r*d*.*live.*ima*ge*).*/\1 quiet/
-/^\s*label\s+check\s*/I,/^\s*label\s+vesa\s*/Is/(r*d*.*live.*ima*ge*).*/\1 rd.live.check quiet/
-/^\s*label\s+vesa\s*/I,/^\s*menu\s+end\s*/Is/(r*d*.*live.*ima*ge*).*/\1 nomodeset quiet/
+/^\s*totaltimeout\s+.*/Iz
+s;(^\s*menu\s+title\s+Welcome\s+to)\s+.*;\1 $title;I
+s/\<(initrd=initrd.?.img)\>\s+[^\n.]*\<(root=live:[^\s+]*)/\1 \2/
+s/\<(root=live:[^ ]*)\s+[^\n.]*\<(r*d*.*live.*ima*ge*)/\1 \2/
+/^\s*label\s+linux\>/I,/^\s*label\s+check\>/Is/(r*d*.*live.*ima*ge*).*/\1 quiet/
+/^\s*label\s+check\>/I,/^\s*label\s+vesa\>/Is/(r*d*.*live.*ima*ge*).*/\1 rd.live.check quiet/
+/^\s*label\s+vesa\>/I,/^\s*label\s+memtest\>/Is/(r*d*.*live.*ima*ge*).*/\1 nomodeset quiet/
 s/^\s*set\s+timeout=.*/set timeout=60/
 /^\s*menuentry\s+'Start\s+/,/\s+}/s/(r*d*.*live.*ima*ge*).*/\1 quiet/
 /^\s*menuentry\s+'Test\s+/,/\s+}/s/(r*d*.*live.*ima*ge*).*/\1 rd.live.check quiet/
@@ -1351,13 +1443,11 @@ fi
 
 echo "Updating boot config file"
 # adjust label and fstype
-sed -i "s/root=[^ ]*/root=live:$TGTLABEL/g
-        s/rootfstype=[^ ]*/rootfstype=$TGTFS/" $BOOTCONFIG $BOOTCONFIG_EFI
+sed -i -r "s/\<root=[^ ]*\>/root=live:$TGTLABEL/g
+           s/\<rootfstype=[^ ]*\>/rootfstype=$TGTFS/" $BOOTCONFIG $BOOTCONFIG_EFI
 if [ -n "$kernelargs" ]; then
-    sed -i "s;initrd.\?\.img;& ${kernelargs};" $BOOTCONFIG
-    if [ -n "$efi" ]; then
-        sed -i "s;vmlinuz.\?;& ${kernelargs};" $BOOTCONFIG_EFI
-    fi
+    sed -i -r "s;\<initrd.\?\.img\>;& ${kernelargs} ;
+               s;\<vmlinuz.\?\>;& ${kernelargs} ;" $BOOTCONFIG $BOOTCONFIG_EFI
 fi
 if [ "$LIVEOS" != "LiveOS" ]; then
     sed -i "s;r*d*.*live.*ima*ge*;& rd.live.dir=$LIVEOS;
@@ -1365,11 +1455,9 @@ if [ "$LIVEOS" != "LiveOS" ]; then
 fi
 
 # EFI images are in $SYSLINUXPATH now
-if [ -n "$efi" ]; then
-    sed -i "s;/isolinux/;/$SYSLINUXPATH/;g
-            s;/images/pxeboot/;/$SYSLINUXPATH/;g
-            s;findiso;;g" $BOOTCONFIG_EFI
-fi
+sed -i "s;/isolinux/;/$SYSLINUXPATH/;g
+        s;/images/pxeboot/;/$SYSLINUXPATH/;g
+        s;findiso;;g" $BOOTCONFIG_EFI
 
 # DVD Installer for netinst
 if [ "$srctype" != "live" ]; then
@@ -1385,17 +1473,15 @@ fi
 if [ -n "$timeout" ]; then
     [[ $timeout == "-0" ]] && { timeout=1; totaltimeout=1; }
     sed -i -r "s/^\s*timeout.*$/timeout $((timeout==-1 ? 0 : timeout))/I" $BOOTCONFIG
-    if [[ -n $efi ]]; then
-        if [[ $timeout != @(0|-1) ]]; then
-            set +e
-            ((timeout = (timeout%10) > 4 ? (timeout/10)+1 : (timeout/10) ))
-            set -e
-        fi
-        sed -i -r "s/^\s*(set\s+timeout=).*$/\1$timeout/" $BOOTCONFIG_EFI
+    if [[ $timeout != @(0|-1) ]]; then
+        set +e
+        ((timeout = (timeout%10) > 4 ? (timeout/10)+1 : (timeout/10) ))
+        set -e
     fi
+    sed -i -r "s/^\s*(set\s+timeout=).*$/\1$timeout/" $BOOTCONFIG_EFI
 fi
 if [ -n "$totaltimeout" ]; then
-    sed -i "/^timeout.*$/a\totaltimeout\ $totaltimeout" $BOOTCONFIG
+    sed -i -r '/\s*timeout\s+.*/a\totaltimeout\ $totaltimeout' $BOOTCONFIG
 fi
 
 if ((overlaysizemb > 0)); then
@@ -1456,7 +1542,7 @@ if [ "$homesizemb" -gt 0 -a -z "$skipcopy" ]; then
 fi
 
 if [[ live = $srctype ]]; then
-    sed -i -r 's/(\s+ro\s+|\s+ro$)/ /g
+    sed -i -r 's/\s+ro\s+|\s+ro$/ /g
                s/r*d*.*live.*ima*ge*/& rw /' $BOOTCONFIG $BOOTCONFIG_EFI
 fi
 
@@ -1515,7 +1601,16 @@ EOF
 
 fi
 
-if [ -z "$multi" ]; then
+if [[ -n $multi && ! -d $TGTMNT/syslinux ]]; then
+    multi=move
+    # If this is the first image installed, move config directory to the root.
+    move_syslinux_dir() {
+        mv $TGTMNT/$SYSLINUXPATH $TGTMNT/syslinux
+        SYSLINUXPATH=syslinux
+    }
+    rm -r -- $TGTMNT/EFI_previous
+fi
+if [[ -z $multi ]] || [[ $multi == move ]]; then
     echo "Installing boot loader"
     if [ -n "$efi" ]; then
         # replace the ia32 hack
@@ -1546,7 +1641,7 @@ if [ -z "$multi" ]; then
         fi
     done
 
-    if [ "$TGTFS" == "vfat" -o "$TGTFS" == "msdos" ]; then
+    if [[ $TGTFS == @(vfat|msdos) ]]; then
         # syslinux expects the config to be named syslinux.cfg
         # and has to run with the file system unmounted
         mv $TGTMNT/$SYSLINUXPATH/isolinux.cfg $TGTMNT/$SYSLINUXPATH/syslinux.cfg
@@ -1554,16 +1649,18 @@ if [ -z "$multi" ]; then
         if [ -f $TGTMNT/$SYSLINUXPATH/ldlinux.sys ]; then
             rm -f $TGTMNT/$SYSLINUXPATH/ldlinux.sys
         fi
+        [[ $multi == move ]] && move_syslinux_dir
         cleanup
         if [ -n "$SYSLINUXPATH" ]; then
             syslinux -d $SYSLINUXPATH $TGTDEV
         else
             syslinux $TGTDEV
         fi
-    elif [ "$TGTFS" == "ext2" -o "$TGTFS" == "ext3" -o "$TGTFS" == "ext4" -o "$TGTFS" == "btrfs" ]; then
+    elif [[ $TGTFS == @(ext[234]|btrfs) ]]; then
         # extlinux expects the config to be named extlinux.conf
         # and has to be run with the file system mounted
         mv $TGTMNT/$SYSLINUXPATH/isolinux.cfg $TGTMNT/$SYSLINUXPATH/extlinux.conf
+        [[ $multi == move ]] && move_syslinux_dir
         extlinux -i $TGTMNT/$SYSLINUXPATH
         # Starting with syslinux 4 ldlinux.sys is used on all file systems.
         if [ -f "$TGTMNT/$SYSLINUXPATH/extlinux.sys" ]; then
@@ -1573,13 +1670,45 @@ if [ -z "$multi" ]; then
         fi
         cleanup
     fi
-else
+fi
+if [[ $multi == 1 ]]; then
     # we need to do some more config file tweaks for multi-image mode
+    if [[ $TGTFS == @(vfat|msdos) ]]; then
+        CONFIG_FILE=syslinux.cfg
+    elif [[ $TGTFS == @(ext[234]|btrfs) ]]; then
+        CONFIG_FILE=extlinux.conf
+    fi
     sed -i -r "s;kernel\s+vm;kernel /$LIVEOS/syslinux/vm;
                s;initrd=i;initrd=/$LIVEOS/syslinux/i;
               " $TGTMNT/$SYSLINUXPATH/isolinux.cfg
-    mv $TGTMNT/$SYSLINUXPATH/isolinux.cfg $TGTMNT/$SYSLINUXPATH/syslinux.cfg
+    mv $TGTMNT/$SYSLINUXPATH/isolinux.cfg $TGTMNT/$SYSLINUXPATH/$CONFIG_FILE
+    sed -i -r "1,20 s/^\s*(menu\s+title)\s+.*/\1 Multi Live Image Boot Menu/I
+               /^\s*label\s+$LIVEOS/I { N;N;N;N; d }
+               0,/^\s*label\s+.*/I {
+               /^\s*label\s+.*/I {
+               i\
+               label $LIVEOS\\
+\  menu label ^Go to $LIVEOS menu\\
+\  kernel vesamenu.c32\\
+\  APPEND /$LIVEOS/syslinux/$CONFIG_FILE\\
+
+               };}" $TGTMNT/syslinux/$CONFIG_FILE
+    if [[ -d $TGTMNT/EFI_previous ]]; then
+        previous=$TGTMNT/EFI_previous/${BOOTCONFIG_EFI##/*/}
+        sed -i -r "1 i\
+...
+                   /^\s*menuentry\s+/ { N;N;N
+                   /\s+rd.live.dir=$LIVEOS\s+/ d }
+                   /\s*submenu\s+/ { N;N;N;N;N
+                   /\s+rd.live.dir=$LIVEOS\s+/ d }
+                  " $previous
+        cat $previous >> $BOOTCONFIG_EFI
+        sed -i -r '/^...$/,/^\s*menuentry\s+/ {
+                   /^\s*menuentry\s+/ ! d}' $BOOTCONFIG_EFI
+        rm -r -- $TGTMNT/EFI_previous
+    fi
     cleanup
 fi
 
-echo "Target device is now set up with a Live image!"
+[[ -n $multi ]] && multi=Multi\ 
+echo "Target device is now set up with a ${multi}Live image!"
