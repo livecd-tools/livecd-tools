@@ -520,6 +520,7 @@ def main():
     verbose = not command
     remountrw = False
     opts = ''
+    src = ''
 
     if os.path.ismount(liveos) or os.path.isdir(liveos):
         liveosmnt = liveos
@@ -554,31 +555,37 @@ def main():
                 if liveosmnt == liveos:
                     remountrw = True
 
-        liveosdir = os.path.join(liveosmnt, 'LiveOS')
+        for d in ('LiveOS', ''):
+            liveosdir = os.path.join(liveosmnt, d)
+            if not os.path.exists(liveosdir):
+                continue
         squash_img = os.path.join(liveosdir, 'squashfs.img')
         if not os.path.exists(squash_img):
-            rootfs_img = os.path.join(liveosdir, 'rootfs.img')
-            if not os.path.exists(rootfs_img):
-                rootfs_img = os.path.join(liveosdir, 'ext3fs.img')
-                if not os.path.exists(rootfs_img):
-                    print("\n\tNo LiveOS was found on '%s'\n\t  Exiting...\n%s"
-                           % (liveos, linkn[0]), file=sys.stderr)
-                    [os.rmdir(mp) for mp in remove_mp]
-                    sys_exit(1)
+            for f in ('rootfs.img', 'ext3fs.img'):
+                rootfs_img = os.path.join(liveosdir, f)
+                if os.path.exists(rootfs_img):
+                    break
+                else:
+                    rootfs_img = None
+                    d = 'LiveOS'
         else:
             opts = '-r'
             squashmnt = tempfile.mkdtemp(prefix='mp-squash-')
             remove_mp.append(squashmnt)
             mount(['-r', squash_img, squashmnt])
-            rootfs_img = os.path.join(squashmnt, 'LiveOS', 'rootfs.img')
-            if not os.path.exists(rootfs_img):
-                rootfs_img = os.path.join(squashmnt, 'LiveOS', 'ext3fs.img')
-                if not os.path.exists(rootfs_img):
-                    print("\n\tNo rootfs.img was found on '%s'\n"
-                          "\r\t  Exiting...\n%s" % (liveos, linkn[0]),
-                          file=sys.stderr)
-                    [os.rmdir(mp) for mp in remove_mp]
-                    sys_exit(1)
+            for f in ('rootfs.img', 'ext3fs.img'):
+                rootfs_img = os.path.join(squashmnt, 'LiveOS', f)
+                if os.path.exists(rootfs_img):
+                    break
+                else:
+                    rootfs_img = None
+                    d = 'rootfs.img'
+        if rootfs_img is None:
+            print("\n\tNo %s was found on '%s'\n"
+                  "\r\t  Exiting...\n%s" % (d, liveos, linkn[0]),
+                  file=sys.stderr)
+            [os.rmdir(mp) for mp in remove_mp]
+            sys_exit(1)
 
         if not overlay:
             for f in os.listdir(liveosdir):
