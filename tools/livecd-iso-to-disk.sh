@@ -481,130 +481,116 @@ checkLVM() {
 }
 
 createGPTLayout() {
-    dev=$1
+    local dev=$1
     getdisk $dev
 
-    echo "WARNING: THIS WILL DESTROY ANY DATA ON $device!!!"
-    echo "Press Enter to continue or ctrl-c to abort"
+    printf '\n    WARNING: This will DESTROY All DATA on: %s !!\n
+        Press Enter to continue, or Ctrl C to abort.\n' $device
     read
     umount ${device}* &> /dev/null || :
     wipefs -a ${device}
-    run_parted -s $device mklabel gpt
-    partinfo=$(run_parted -s -m $device "unit MB print" |grep ^$device:)
-    dev_size=$(echo $partinfo | cut -d : -f 2 | sed 's/MB$//')
-    p1_size=$(($dev_size - 3))
-
-    if [ $p1_size -le 0 ]; then
-        echo "Your device isn't big enough to hold $SRC"
-        echo "It is $(($p1_size * -1)) MB too small"
-        exitclean
-    fi
-    p1_start=1
-    p1_end=$(($p1_size + 1))
-    run_parted -s $device u MB mkpart '"EFI System Partition"' fat32 $p1_start $p1_end set 1 boot on
+    run_parted --script $device mklabel gpt
+    local sizeinfo=$(run_parted --script -m $device 'unit MiB print')
+    sizeinfo=${sizeinfo#*${device}:}
+    sizeinfo=${sizeinfo%%MiB*}
+    run_parted --script $device unit MiB mkpart '"EFI System Partition"' fat32\
+        4 $((sizeinfo - 2)) set 1 boot on
     # Sometimes automount can be _really_ annoying.
-    echo "Waiting for devices to settle..."
-    /sbin/udevadm settle
+    echo 'Waiting for devices to settle...'
+    udevadm settle
     sleep 5
     TGTDEV=$(get_partition1 ${device})
     umount $TGTDEV &> /dev/null || :
-    /sbin/mkdosfs -n "$label" $TGTDEV
+    mkdosfs -n "$label" $TGTDEV
 }
 
 createMSDOSLayout() {
-    dev=$1
+    local dev=$1
     getdisk $dev
 
-    echo "WARNING: THIS WILL DESTROY ANY DATA ON $device!!!"
-    echo "Press Enter to continue or ctrl-c to abort"
+    printf '\n    WARNING: This will DESTROY ALL DATA on: %s !!\n
+        Press Enter to continue, or Ctrl C to abort.\n' $device
     read
     umount ${device}* &> /dev/null || :
     wipefs -a ${device}
-    run_parted -s $device mklabel msdos
-    partinfo=$(run_parted -s -m $device "unit MB print" |grep ^$device:)
-    dev_size=$(echo $partinfo | cut -d : -f 2 | sed 's/MB$//')
-    p1_size=$(($dev_size - 3))
-
-    if [ $p1_size -le 0 ]; then
-        echo "Your device isn't big enough to hold $SRC"
-        echo "It is $(($p1_size * -1)) MB too small"
-        exitclean
-    fi
-    p1_start=1
-    p1_end=$(($p1_size + 1))
-    run_parted -s $device u MB mkpart primary fat32 $p1_start $p1_end set 1 boot on
-    # Sometimes automount can be _really_ annoying.
-    echo "Waiting for devices to settle..."
-    /sbin/udevadm settle
+    run_parted --script $device mklabel msdos
+    local sizeinfo=$(run_parted --script -m $device 'unit MiB print')
+    sizeinfo=${sizeinfo#*${device}:}
+    sizeinfo=${sizeinfo%%MiB*}
+    run_parted --script $device unit MiB mkpart primary fat32 \
+        4 $((sizeinfo - 2)) set 1 boot on
+    echo 'Waiting for devices to settle...'
+    udevadm settle
     sleep 5
     TGTDEV=$(get_partition1 ${device})
     umount $TGTDEV &> /dev/null || :
-    /sbin/mkdosfs -n "$label" $TGTDEV
+    mkdosfs -n "$label" $TGTDEV
 }
 
 createEXTFSLayout() {
-    dev=$1
+    local dev=$1
     getdisk $dev
 
-    echo "WARNING: THIS WILL DESTROY ANY DATA ON $device!!!"
-    echo "Press Enter to continue or ctrl-c to abort"
+    printf '\n    WARNING: This will DESTROY ALL DATA on: %s !!\n
+        Press Enter to continue, or Ctrl C to abort.\n' $device
     read
     umount ${device}* &> /dev/null || :
     wipefs -a ${device}
-    run_parted -s $device mklabel msdos
-    partinfo=$(run_parted -s -m $device "u MB print" |grep ^$device:)
-    dev_size=$(echo $partinfo | cut -d : -f 2 | sed 's/MB$//')
-    p1_size=$(($dev_size - 3))
-
-    if [ $p1_size -le 0 ]; then
-        echo "Your device isn't big enough to hold $SRC"
-        echo "It is $(($p1_size * -1)) MB too small"
-        exitclean
-    fi
-    p1_start=1
-    p1_end=$(($p1_size + 1))
-    run_parted -s $device u MB mkpart primary ext2 $p1_start $p1_end set 1 boot on
-    # Sometimes automount can be _really_ annoying.
-    echo "Waiting for devices to settle..."
-    /sbin/udevadm settle
+    run_parted --script $device mklabel msdos
+    local sizeinfo=$(run_parted --script -m $device 'unit MiB print')
+    sizeinfo=${sizeinfo#*${device}:}
+    sizeinfo=${sizeinfo%%MiB*}
+    run_parted --script $device unit MiB mkpart primary ext2 \
+        4 $((sizeinfo - 2)) set 1 boot on
+    echo 'Waiting for devices to settle...'
+    udevadm settle
     sleep 5
     TGTDEV=$(get_partition1 ${device})
     umount $TGTDEV &> /dev/null || :
 
     # Check extlinux version
-    if extlinux -v 2>&1 | grep -q 'extlinux 3'; then
-        mkfs=/sbin/mkfs.ext3
+    if [[ $(extlinux -v 2>&1) =~ extlinux\ 3 ]]; then
+        mkfs=mkfs.ext3
     else
-        mkfs=/sbin/mkfs.ext4
+        mkfs=mkfs.ext4
     fi
-    $mkfs -O ^64bit -L $label $TGTDEV
-    TGTLABEL="UUID=$(/sbin/blkid -s UUID -o value $TGTDEV)"
+    $mkfs -O ^64bit -L "$label" $TGTDEV
 }
 
 checkGPT() {
-    dev=$1
+    local dev=$1
     getdisk $dev
-
-    if [ "$(run_parted -s -m $device p 2>/dev/null |grep -ic :gpt:)" -eq "0" ]; then
-        echo "EFI boot requires a GPT partition table."
-        echo "This can be done manually or you can run with --format"
+    local partinfo=$(run_parted --script -m $device 'print')
+    if ! [[ ${partinfo} =~ :gpt: ]]; then
+        printf '\n        ATTENTION:
+        EFI booting requires a GPT partition table on the boot disk.\n
+        This can be set up manually, or you can reformat your disk
+        by running livecd-iso-to-disk with the --format --efi options.'
         exitclean
     fi
 
-    partinfo=$(run_parted -s -m $device "print" |grep ^$partnum:)
-    volname=$(echo $partinfo |cut -d : -f 6)
-    flags=$(echo $partinfo |cut -d : -f 7)
-    if [ "$volname" != "EFI System Partition" ]; then
-        echo "Partition name must be 'EFI System Partition'"
-        echo "This can be set in parted or you can run with --reset-mbr"
+    while IFS=: read -r -a _info; do
+        if [[ $partnum == ${_info[0]} ]]; then
+            volname=${_info[5]}
+            flags=${_info[6]}
+            break
+        fi
+    done <<< "$partinfo"
+
+    if [[ $volname != 'EFI System Partition' ]]; then
+        printf "\n        ALERT:
+        The partition name must be 'EFI System Partition'.\n
+        This can be set with a partition editor, such as parted,
+        or you can run livecd-iso-to-disk with the --reset-mbr option."
         exitclean
     fi
-    if [ "$(echo $flags |grep -c boot)" = "0" ]; then
-        echo "Partition isn't marked bootable!"
-        echo "You can mark the partition as bootable with "
-        echo "    # /sbin/parted $device"
-        echo "    (parted) toggle N boot"
-        echo "    (parted) quit"
+    if ! [[ $flags =~ boot ]]; then
+        printf "\n        ATTENTION:
+        The partition isn't marked bootable!\n
+        You can mark the partition as bootable with the following commands:\n
+        # parted %s
+          (parted) toggle <N> boot
+          (parted) quit\n\n" $device
         exitclean
     fi
 }
