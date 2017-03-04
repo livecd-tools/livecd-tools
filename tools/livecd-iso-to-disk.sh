@@ -431,41 +431,39 @@ resetMBR() {
 }
 
 checkMBR() {
-    getdisk $1
-
-    bs=$(mktemp /tmp/bs.XXXXXX)
-    dd if=$device of=$bs bs=512 count=1 2>/dev/null || exit 2
-
-    mbrword=$(hexdump -n 2 $bs |head -n 1|awk {'print $2;'})
-    rm -f $bs
-    if [ "$mbrword" = "0000" ]; then
-        if [ -z "$format" ]; then
-            echo "MBR appears to be blank."
-            echo "Press Enter to replace the MBR and continue or ctrl-c to abort"
-            read
-        fi
+    mbrword=($(hexdump -n 2 <<< \
+        "$(dd if=$device bs=2 count=1 &> /dev/null)")) || exit 2
+    if [[ ${mbrword[1]} == 0000 ]]; then
+        printf '
+        The Master Boot Record, MBR, appears to be blank.
+        Do you want to replace the MBR on this device?
+        Press Enter to continue, or Ctrl C to abort.'
+        read
         resetMBR $1
     fi
-
     return 0
 }
 
 checkPartActive() {
-    dev=$1
+    local dev=$1
     getdisk $dev
 
-    # if we're installing to whole-disk and not a partition, then we
-    # don't need to worry about being active
-    if [ "$dev" = "$device" ]; then
+    # If we're installing to whole-disk and not a partition, then we
+    # don't need to worry about being active.
+    if [[ $dev == $device ]]; then
         return
     fi
 
-    if [ "$(/sbin/fdisk -l $device 2>/dev/null |grep -m1 $dev |awk {'print $2;'})" != "*" ]; then
-        echo "Partition isn't marked bootable!"
-        echo "You can mark the partition as bootable with "
-        echo "    # /sbin/parted $device"
-        echo "    (parted) toggle N boot"
-        echo "    (parted) quit"
+    local partinfo=$(fdisk -l $device) 2> /dev/null
+    partinfo=${partinfo##*$dev+( )}
+
+    if [[ ${partinfo:0:1} != "*" ]]; then
+        printf "\n        ATTENTION:
+        The partition isn't marked bootable!\n
+        You can mark the partition as bootable with the following commands:\n
+        # parted %s
+          (parted) toggle <N> boot
+          (parted) quit\n\n" $device
         exitclean
     fi
 }
@@ -1064,14 +1062,17 @@ if [ -n "$format" -a -z "$skipcopy" ]; then
 fi
 
 checkFilesystem $TGTDEV
-if [ -n "$efi" ]; then
-    checkGPT $TGTDEV
-fi
 
 checkSyslinuxVersion
-# Because we can't set boot flag for EFI Protective on msdos partition tables
-[ -z "$efi" ] && checkPartActive $TGTDEV
-[ -n "$resetmbr" ] && resetMBR $TGTDEV
+
+if [[ -n $efi ]]; then
+    checkGPT $TGTDEV
+else
+  # Because we can't set boot flag for EFI Protective on msdos partition tables
+    checkPartActive $TGTDEV
+fi
+[[ -n $resetmbr ]] && resetMBR $TGTDEV
+
 checkMBR $TGTDEV
 
 if ((overlaysizemb > 0)); then
@@ -1148,8 +1149,10 @@ checklivespace() {
 
     targets="$TGTMNT/$SYSLINUXPATH $TGTMNT$EFI_BOOT "
     [[ -n $xo ]] && targets+=$TGTMNT/boot/olpc.fth
-    target_size=$(du -s -c -B 1M $targets 2> /dev/null | awk '/total$/ {print $1;}') || :
-    tbd=$((tbd + target_size))
+    duTable=($(du -c -B 1M $targets 2> /dev/null || :))
+    # du -c reports a grand total in the first column of the last row, i.e., at
+    # ${array[*]: -2:1}, the penultimate index position.
+    tbd=$((tbd + ${duTable[*]: -2:1}))
 
     if [[ -n $skipcompress ]] && [[ -s $SRCIMG ]]; then
         if mount -o loop $SRCIMG $SRCMNT; then
@@ -1192,10 +1195,11 @@ checklivespace() {
     fi
     sources="$SRCMNT/$livedir/osmin.img $SRCMNT/$livedir/syslinux"
     sources+=" $SRCMNT/isolinux $SRCMNT/syslinux $SRCMNT$EFI_BOOT"
-    source_size=$(du -s -c -B 1M "$thisScriptpath" $sources 2> /dev/null | awk '/total$/ {print $1;}') || :
-    livesize=$((livesize + source_size))
+    duTable=($(du -c -B 1M "$0" $sources 2> /dev/null || :))
+    livesize=$((livesize + ${duTable[*]: -2:1} + 1))
 
-    freespace=$(df -B 1M --total $TGTDEV | awk '/^total/ {print $4;}')
+    freespace=($(df -B 1M $TGTDEV))
+    freespace=${freespace[*]: -3:1}
 
     tba=$((overlaysizemb + homesizemb + livesize + swapsizemb))
     if ((tba > freespace + tbd)); then
@@ -1228,14 +1232,17 @@ if [ "$srctype" = "installer" ]; then
     else
         imgpath=isolinux/initrd.img
     fi
-    installimgsize=$(du -s -B 1M $SRCMNT/$imgpath | awk {'print $1;'})
+    duTable=($(du -s -B 1M $SRCMNT/$imgpath))
+    installimgsize=${duTable[0]}
 
     tbd=0
-    if [ -e $TGTMNT/$imgpath ]; then
-        tbd=$(du -s -B 1M $TGTMNT/$imgpath | awk {'print $1;'})
+    if [[ -e $TGTMNT/$imgpath ]]; then
+        duTable=($(du -s -B 1M $TGTMNT/$imgpath))
+        tbd=${duTable[0]}
     fi
-    if [ -e "$TGTMNT/$(basename "$SRC")" ]; then
-        tbd=$(($tbd + $(du -s -B 1M "$TGTMNT/$(basename "$SRC")" | awk {'print $1;'})))
+    if [[ -e $TGTMNT/${SRC##*/} ]]; then
+        duTable=($(du -s -B 1M "$TGTMNT/${SRC##*/}"))
+        tbd=$((tbd + ${duTable[0]}))
     fi
     echo "Size of $imgpath: $installimgsize"
     echo "Available space: $((freespace + tbd))"
