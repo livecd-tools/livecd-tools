@@ -24,13 +24,13 @@ This may be the filesystem path to a LiveOS .iso image file, such as from a CD-R
 
 =item <target device>
 
-This should be the device partition name for the attached, target device, such as /dev/sdb1 or /dev/sdc1.  (Issue the df -Th command to get a listing of the mounted partitions, where you can confirm the filesystem types, available space, and device names.)  Be careful to specify the correct device, or you may overwrite important data on another disk!
+This should be the device partition name for the attached, target device, such as /dev/sdc1.  (Issue the df -Th command to get a listing of mounted partitions, so you can confirm the filesystem types, available space, and device names.)  Be careful to specify the correct device, or you may overwrite important data on another disk!
 
 =back
 
 =head1 DESCRIPTION
 
-B<livecd-iso-to-disk> installs a Live CD/DVD/USB image (LiveOS) onto a USB/SD storage device (or any storage partition that will boot with a SYSLINUX bootloader).  The target storage device can then boot the installed operating system on systems that support booting via the USB or the SD interface.  The script requires a LiveOS source image and a target storage device.  The source image may be either a LiveOS .iso file, or another reference to a LiveOS image, such as the device node for an attached device installed with a LiveOS image, its mount point, a loop device backed by a file containing an installed LiveOS image, or even the currently-running LiveOS image.  A pre-sized overlay file for persisting root filesystem changes may be included with the installed image.
+B<livecd-iso-to-disk> installs a Live CD/DVD/USB image (LiveOS) onto a USB/SD storage device (or any storage partition that will boot with a SYSLINUX bootloader).  The target storage device can then boot the installed operating system on systems that support booting via the USB or the SD interface.  The script requires a LiveOS source image and a target storage device.  The script requires a LiveOS source image and a target storage device.  A loop device backed by a file may also be targeted for virtual block device installation.  The source image may be either a LiveOS .iso file, or another reference to a LiveOS image, such as the device node for an attached device installed with a LiveOS image, its mount point, a loop device backed by a file containing an installed LiveOS image, or even the currently-running LiveOS image.  A pre-sized overlay file for persisting root filesystem changes may be included with the installed image.
 
 Unless you request the --format option, installing an image does not destroy data outside of the LiveOS, syslinux, & EFI directories on your target device.  This allows one to maintain other files on the target disk outside of the LiveOS filesystem.
 
@@ -40,7 +40,7 @@ LiveOS images employ embedded filesystems through the Device-mapper component of
 
 =over 4
 
-=item --help
+=item --help|-h|-?
 
 Displays usage information and exits.
 
@@ -56,11 +56,11 @@ Formats the target device and creates an MS-DOS partition table (or GUID partiti
 
 Forces format to use the msdos (vfat) filesystem instead of ext4.
 
-=item --reset-mbr
+=item --reset-mbr|--resetmbr
 
 Sets the Master Boot Record (MBR) of the target storage device to the mbr.bin file from the installation system's syslinux directory.  This may be helpful in recovering a damaged or corrupted device.
 
-=item --efi
+=item --efi|--mactel
 
 Creates a GUID partition table when --format is passed, and installs a hybrid Extensible Firmware Interface (EFI)/MBR bootloader on the disk.  This is necessary for most Intel Macs.
 
@@ -122,7 +122,7 @@ The default, compressed SquashFS filesystem image is copied on installation.  (T
 
 =item --skipcompress   (default option when  --xo is specified)
 
-Expands the source SquashFS.img on installation into the read-only /LiveOS/ext3fs.img root filesystem image file.  This avoids the system overhead of decompression during use at the expense of storage space.
+Expands the source SquashFS.img on installation into the read-only /LiveOS/rootfs.img root filesystem image file.  This avoids the system overhead of decompression during use at the expense of storage space.
 
 =item --swap-size-mb <size>
 
@@ -150,7 +150,7 @@ Prevents the default option to encrypt a new persistent home directory filesyste
 
 =item --updates <updates.img>
 
-Setup inst.updates to point to an updates image on the device. Anaconda uses this for testing updates to an iso without needing to make a new iso.
+Setup a kernel command line argument, inst.updates, to point to an updates image on the device. Used by Anaconda for testing updates to an iso without needing to make a new iso.
 
 =item --ks <kickstart>
 
