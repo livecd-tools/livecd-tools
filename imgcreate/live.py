@@ -127,11 +127,11 @@ class LiveImageCreatorBase(LoopImageCreator):
             r += " rhgb"
         return r
 
-    def _get_mkisofs_options(self, isodir):
-        """Return the architecture specific mkisosfs options.
+    def _get_genisoimage_options(self, isodir):
+        """Return the architecture specific genisoimage options.
 
         This is the hook where subclasses may specify additional arguments to
-        mkisofs, e.g. to enable a bootable ISO to be built.
+        genisoimage, e.g. to enable a bootable ISO to be built.
 
         By default, an empty list is returned.
 
@@ -317,13 +317,13 @@ class LiveImageCreatorBase(LoopImageCreator):
     def __create_iso(self, isodir):
         iso = self._outdir + "/" + self.name + ".iso"
 
-        args = ["/usr/bin/mkisofs",
+        args = ["/usr/bin/genisoimage",
                 "-J", "-r",
                 "-hide-rr-moved", "-hide-joliet-trans-tbl",
                 "-V", self.fslabel,
                 "-o", iso]
 
-        args.extend(self._get_mkisofs_options(isodir))
+        args.extend(self._get_genisoimage_options(isodir))
         if self._isofstype == "udf":
             args.append("-allow-limited-size")
 
@@ -391,7 +391,7 @@ class x86LiveImageCreator(LiveImageCreatorBase):
         LiveImageCreatorBase.__init__(self, *args, **kwargs)
         self._efiarch = None
 
-    def _get_mkisofs_options(self, isodir):
+    def _get_genisoimage_options(self, isodir):
         options = [ "-b", "isolinux/isolinux.bin",
                     "-c", "isolinux/boot.cat",
                     "-no-emul-boot", "-boot-info-table",
@@ -834,7 +834,7 @@ submenu 'Troubleshooting -->' {
         self._configure_efi_bootloader(isodir)
 
 class ppcLiveImageCreator(LiveImageCreatorBase):
-    def _get_mkisofs_options(self, isodir):
+    def _get_genisoimage_options(self, isodir):
         return [ "-hfs", "-no-desktop", "-part",
                  "-map", isodir + "/ppc/mapping",
                  "-hfs-bless", isodir + "/ppc/mac",

@@ -894,8 +894,8 @@ class LoopImageCreator(ImageCreator):
     filesystem label. In the case of ext3 it's 16 characters, but in the case
     of ISO9660 it's 32 characters.
 
-    mke2fs silently truncates the label, but mkisofs aborts if the label is too
-    long. So, for convenience sake, any string assigned to this attribute is
+    mke2fs silently truncates the label, but genisoimage aborts if the label is
+    too long. So, for convenience sake, any string assigned to this attribute is
     silently truncated to FSLABEL_MAXLEN (32) characters.
 
     """
