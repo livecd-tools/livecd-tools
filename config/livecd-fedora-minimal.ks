@@ -1,7 +1,7 @@
 lang en_US.UTF-8
 keyboard us
 timezone US/Eastern
-auth --useshadow --enablemd5
+auth --useshadow --passalgo=sha512
 selinux --enforcing
 firewall --disabled
 part / --size 1024
