@@ -485,19 +485,6 @@ checkPartActive() {
     fi
 }
 
-checkLVM() {
-    local dev=$1
-
-    if type pvs >/dev/null 2>&1 &&
-        "$(pvs -o vg_name --noheadings $dev* 2>/dev/null || :)"; then
-        printf "\n        ATTENTION:
-        Device '$dev' contains a volume group and cannot be formatted!\n\n
-        You can remove the volume group using vgremove.\n"
-        exitclean
-    fi
-    return 0
-}
-
 createGPTLayout() {
     local dev=$1
     getdisk $dev
@@ -1049,8 +1036,6 @@ labelTargetDevice $TGTDEV
 
 # Format the device
 if [[ -n $format && -z $skipcopy ]]; then
-    checkLVM $TGTDEV
-
     if [[ -n $efi ]]; then
         createGPTLayout $TGTDEV
     elif [[ -n $usemsdos ]] || ! type extlinux >/dev/null 2>&1; then
@@ -1173,7 +1158,6 @@ if [[ -z $skipcopy ]] && [[ $srctype == live ]]; then
         rm -rf -- $TGTMNT/$LIVEOS
     fi
 fi
-
 
 if [[ $(syslinux --version 2>&1) != syslinux\ * ]]; then
     SYSLINUXPATH=''
