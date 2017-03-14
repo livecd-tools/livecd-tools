@@ -643,14 +643,6 @@ checkSyslinuxVersion() {
         Exiting...\n\n'
         exit 1
     fi
-    local check=($(syslinux --version 2>&1)) || :
-    if [[ $check != syslinux ]]; then
-        SYSLINUXPATH=''
-    elif [[ -n $multi ]]; then
-        SYSLINUXPATH=$LIVEOS/syslinux
-    else
-        SYSLINUXPATH=syslinux
-    fi
 }
 
 checkMounted() {
@@ -1138,6 +1130,59 @@ if [[ -n $efi && -z $EFI_BOOT ]]; then
     exitclean
 fi
 
+if [[ $srctype == live ]] &&
+   [[ -z $multi && -z $force && -e $TGTMNT/syslinux ]]; then
+    IFS=: read -n 1 -p '
+    ATTENTION:
+
+        >> There may be other LiveOS images on this device. <<
+
+    Do you want a Multi Live Image installation?
+
+        If so, press Enter to continue.
+
+        If not, press the [space bar], and other images
+                will be ignored.
+
+    To abort the installation, press Ctrl C.
+    ' multi
+    if [[ $multi != " " ]]; then
+        multi=1
+    else
+        unset -v multi
+    fi
+fi
+if [[ -z $skipcopy ]] && [[ $srctype == live ]]; then
+    if [[ -d $TGTMNT/$LIVEOS ]] && [[ -z $force ]]; then
+        printf '\nThe destination is already set up with a LiveOS image.\n'
+        if [[ -z $keephome && -e $TGTMNT/$LIVEOS/$HOMEFILE ]]; then
+            printf '\n        WARNING:
+            \r        The old persistent home.img will be deleted!!!\n
+            \r        Press Enter to continue, or Ctrl C to abort.'
+            read
+        else
+            printf '    Press Ctrl C if you wish to abort.
+                Deleting the old OS in     seconds.\b\b\b\b\b\b\b\b\b\b'
+            for (( i=14; i>=0; i=i-1 )); do
+                printf '\b\b%02d' $i
+                sleep 1
+            done
+            [[ -e $TGTMNT/$LIVEOS/$HOMEFILE && -n $keephome ]] &&
+                mv $TGTMNT/$LIVEOS/$HOMEFILE $TGTMNT/$HOMEFILE
+        fi
+        rm -rf -- $TGTMNT/$LIVEOS
+    fi
+fi
+
+
+if [[ $(syslinux --version 2>&1) != syslinux\ * ]]; then
+    SYSLINUXPATH=''
+elif [[ -n $multi ]]; then
+    SYSLINUXPATH=$LIVEOS/syslinux
+else
+    SYSLINUXPATH=syslinux
+fi
+
 thisScriptpath=$(readlink -f "$0")
 checklivespace() {
 # let's try to make sure there's enough room on the target device
@@ -1262,37 +1307,6 @@ if [[ $srctype == installer ]]; then
     fi
 fi
 
-if [[ -z $skipcopy ]] && [[ $srctype == live ]]; then
-    if [[ -d $TGTMNT/$LIVEOS ]] && [[ -z $force ]]; then
-        printf '\nThe destination is already set up with a LiveOS image.\n'
-        if [[ -z $keephome && -e $TGTMNT/$LIVEOS/$HOMEFILE ]]; then
-            printf '\n        WARNING:
-            \r        The old persistent home.img will be deleted!!!\n
-            \r        Press Enter to continue, or Ctrl C to abort.'
-            read
-        else
-            printf '    Press Ctrl C if you wish to abort.
-                Deleting the old OS in     seconds.\b\b\b\b\b\b\b\b\b\b'
-            for (( i=14; i>=0; i=i-1 )); do
-                printf '\b\b%02d' $i
-                sleep 1
-            done
-            [[ -e $TGTMNT/$LIVEOS/$HOMEFILE && -n $keephome ]] &&
-                mv $TGTMNT/$LIVEOS/$HOMEFILE $TGTMNT/$HOMEFILE
-        fi
-        rm -rf -- $TGTMNT/$LIVEOS
-    fi
-fi
-
-# Bootloader is always reconfigured, so keep these out of the if skipcopy stuff.
-[[ ! -d $TGTMNT/$SYSLINUXPATH ]] && mkdir -p $TGTMNT/$SYSLINUXPATH
-[[ ! -d $TGTMNT$EFI_BOOT ]] && mkdir -p $TGTMNT$EFI_BOOT
-if [[ -n $multi ]] && [[ -n $EFI_BOOT ]]; then
-    [[ -e $TGTMNT/EFI_previous ]] && rm -r -- $TGTMNT/EFI_previous
-    mv $TGTMNT$EFI_BOOT $TGTMNT/EFI_previous
-    mkdir -p $TGTMNT$EFI_BOOT
-fi
-
 # Live image copy
 if [[ $srctype == live && -z $skipcopy ]]; then
     printf '\nCopying LiveOS image to target device...\n'
@@ -1316,6 +1330,22 @@ if [[ $srctype == live && -z $skipcopy ]]; then
     printf '\nSyncing filesystem writes to disc.
     Please wait, this may take a while...\n'
     sync
+fi
+
+# Bootloader is always reconfigured, so keep this out of the -z skipcopy stuff.
+[[ ! -d $TGTMNT/$SYSLINUXPATH ]] && mkdir -p $TGTMNT/$SYSLINUXPATH
+if [[ -n $EFI_BOOT ]]; then
+    if [[ -n $multi ]]; then
+        if [[ -e $TGTMNT$EFI_BOOT/grub.cfg ]]; then
+            BOOTCONFIG_EFI=$TGTMNT$EFI_BOOT/grub.cfg
+        elif [[ -e $(nocase_path "$TGTMNT$EFI_BOOT/boot*.conf") ]]; then
+            BOOTCONFIG_EFI=$(nocase_path "$TGTMNT$EFI_BOOT/boot*.conf")
+        fi
+        [[ -e $TGTMNT/EFI_previous ]] && rm $TGTMNT/EFI_previous
+        mv $BOOTCONFIG_EFI $TGTMNT/EFI_previous
+    fi
+    [[ -d $TGTMNT/EFI ]] && rm -r -- $TGTMNT/EFI
+    mkdir -p $TGTMNT$EFI_BOOT
 fi
 
 # Adjust syslinux sources for replication of installed images
@@ -1649,7 +1679,7 @@ if [[ -n $multi && ! -d $TGTMNT/syslinux ]]; then
         mv $TGTMNT/$SYSLINUXPATH $TGTMNT/syslinux
         SYSLINUXPATH=syslinux
     }
-    [[ -e $TGTMNT/EFI_previous ]] && rm -r -- $TGTMNT/EFI_previous
+    [[ -e $TGTMNT/EFI_previous ]] && rm $TGTMNT/EFI_previous
 fi
 if [[ -z $multi ]] || [[ $multi == move ]]; then
     echo "Installing boot loader"
@@ -1745,19 +1775,18 @@ if [[ $multi == 1 ]]; then
 \  APPEND /$LIVEOS/syslinux/$CONFIG_FILE\\
 
                };}" $TGTMNT/syslinux/$CONFIG_FILE
-    if [[ -d $TGTMNT/EFI_previous ]]; then
-        previous=$TGTMNT/EFI_previous/${BOOTCONFIG_EFI##/*/}
+    if [[ -f $TGTMNT/EFI_previous ]]; then
         sed -i -r "1 i\
 ...
                    /^\s*menuentry\s+/ { N;N;N
                    /\s+rd.live.dir=$LIVEOS\s+/ d }
                    /\s*submenu\s+/ { N;N;N;N;N
                    /\s+rd.live.dir=$LIVEOS\s+/ d }
-                  " $previous
-        cat $previous >> $BOOTCONFIG_EFI
+                  " $TGTMNT/EFI_previous
+        cat $TGTMNT/EFI_previous >> $BOOTCONFIG_EFI
         sed -i -r '/^...$/,/^\s*menuentry\s+/ {
                    /^\s*menuentry\s+/ ! d}' $BOOTCONFIG_EFI
-        rm -r -- $TGTMNT/EFI_previous
+        rm $TGTMNT/EFI_previous
     fi
     cleanup
 fi

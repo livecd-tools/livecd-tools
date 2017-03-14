@@ -559,6 +559,8 @@ def main():
             liveosdir = os.path.join(liveosmnt, d)
             if not os.path.exists(liveosdir):
                 continue
+            else:
+                break
         squash_img = os.path.join(liveosdir, 'squashfs.img')
         if not os.path.exists(squash_img):
             for f in ('rootfs.img', 'ext3fs.img'):
@@ -747,7 +749,8 @@ def main():
                 Please wait if large files were written.''')
             if os.path.ismount(src):
                 call(['umount', src])
-                os.rmdir(src)
+                if os.path.exists(src):
+                    os.rmdir(src)
             cleanup()
 
     sys_exit(ecode)
