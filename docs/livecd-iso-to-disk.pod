@@ -6,7 +6,7 @@ livecd-iso-to-disk - Installs bootable Live images onto USB/SD storage devices.
 
 =head1 SYNOPSIS
 
-B<livecd-iso-to-disk>  [--help] [--noverify] [--format] [--msdos] [--reset-mbr] [--efi] [--skipcopy] [--force] [--xo] [--xo-no-home] [--timeout <duration>] [--totaltimeout <duration>] [--extra-kernel-args <args>] [--multi] [--livedir <dir>] [--compress] [--skipcompress] [--swap-size-mb <size>] [--overlay-size-mb <size>] [--home-size-mb <size>] [--delete-home] [--crypted-home] [--unencrypted-home] [--updates <updates.img>] [--ks <kickstart>] [--label <label>] <source> <target device>
+B<livecd-iso-to-disk>  [--help] [--noverify] [--format] [--msdos] [--reset-mbr] [--efi] [--skipcopy] [--force] [--xo] [--xo-no-home] [--timeout <duration>] [--totaltimeout <duration>] [--extra-kernel-args <args>] [--multi] [--livedir <dir>] [--compress] [--skipcompress] [--no-overlay] [--overlay-size-mb <size>] [--reset-overlay] [--home-size-mb <size>] [--delete-home] [--crypted-home] [--unencrypted-home] [--swap-size-mb <size>] [--updates <updates.img>] [--ks <kickstart>] [--label <label>] <source> <target device>
 
 Simplest
 
@@ -124,13 +124,17 @@ The default, compressed SquashFS filesystem image is copied on installation.  (T
 
 Expands the source SquashFS.img on installation into the read-only /LiveOS/rootfs.img root filesystem image file.  This avoids the system overhead of decompression during use at the expense of storage space.
 
-=item --swap-size-mb <size>
+=item --no-overlay   (effective only with skipcompress)
 
-Sets up a swap file of <size> mebibytes (integer values only) on the target device.  A maximum <size> of 4095 MiB is permitted for vfat-formatted devices.
+Installs a kernel option, rd.live.overlay=none, that signals the live boot process to create a writable, linear Device-mapper target for an uncompressed /LiveOS/rootfs.img filesystem image file.  Read-write by default (unless a kernel argument of rd.live.overlay.readonly is given) this configuration avoids the complications of using an overlay of fixed size for persistence when storage format and space allows.
 
 =item --overlay-size-mb <size>
 
 Specifies creation of a filesystem overlay of <size> mebibytes (integer values only).  The overlay makes persistent storage available to the live operating system, if the operating system supports it.  The overlay holds a snapshot of changes to the root filesystem.  *Note well* that deletion of any original files in the read-only root filesystem does not recover any storage space on your LiveOS device.  Storage in the persistent /LiveOS/overlay-<device_id> file is allocated as needed.  If the overlay storage space is filled, the overlay will enter an 'Overflow' state where the root filesystem will continue to operate in a read-only mode.  There will not be an explicit warning or signal when this happens, but applications may begin to report errors due to the restriction.  If significant changes or updates to the root filesystem are to be made, carefully watch the fraction of space allocated in the overlay by issuing the 'dmsetup status' command at a command line of the running LiveOS image.  Some consumption of root filesystem and overlay space can be avoided by specifying a persistent home filesystem for user files, see --home-size-mb below.  The target storage device must have enough free space for the image and the overlay.  A maximum <size> of 4095 MiB is permitted for vfat-formatted devices.  If there is not enough room on your device, you will be given information to help in adjusting your settings.
+
+=item --reset-overlay
+
+This option will reset the persistent overlay to an unallocated state.  This might be used if installing a new or refreshed image onto a device with an existing overlay, and avoids the writing of a large file on a vfat-formatted device.  This option also renames the overlay to match the current device filesystem label and UUID.
 
 =item --home-size-mb <size>
 
@@ -147,6 +151,10 @@ Specifies the default option to encrypt a new persistent home filesystem when --
 =item --unencrypted-home
 
 Prevents the default option to encrypt a new persistent home directory filesystem.
+
+=item --swap-size-mb <size>
+
+Sets up a swap file of <size> mebibytes (integer values only) on the target device.  A maximum <size> of 4095 MiB is permitted for vfat-formatted devices.
 
 =item --updates <updates.img>
 
@@ -172,7 +180,7 @@ Report bugs to the mailing list C<http://admin.fedoraproject.org/mailman/listinf
 
 =head1 COPYRIGHT
 
-Copyright (C) Fedora Project 2008, 2009, 2010 and various contributors. This is free software. You may redistribute copies of it under the terms of the GNU General Public License C<http://www.gnu.org/licenses/gpl.html>. There is NO WARRANTY, to the extent permitted by law.
+Copyright 2008-2010, 2017, Fedora Project and various contributors.  This is free software. You may redistribute copies of it under the terms of the GNU General Public License C<http://www.gnu.org/licenses/gpl.html>. There is NO WARRANTY, to the extent permitted by law.
 
 =head1 SEE ALSO
 

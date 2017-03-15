@@ -1,6 +1,6 @@
 #!/bin/bash
 # Transfer a Live image so that it's bootable off of a USB/SD device.
-# Copyright 2007-2012  Red Hat, Inc.
+# Copyright 2007-2012, 2017,  Red Hat, Inc.
 #
 # Jeremy Katz <katzj@redhat.com>
 # Brian C. Lane <bcl@redhat.com>
@@ -32,9 +32,10 @@ shortusage() {
                        [--efi] [--skipcopy] [--force] [--xo] [--xo-no-home]
                        [--timeout <duration>] [--totaltimeout <duration>]
                        [--extra-kernel-args <args>] [--multi] [--livedir <dir>]
-                       [--compress] [--skipcompress] [--swap-size-mb <size>]
-                       [--overlay-size-mb <size>] [--home-size-mb <size>]
-                       [--delete-home] [--crypted-home] [--unencrypted-home]
+                       [--compress] [--skipcompress] [--no-overlay]
+                       [--overlay-size-mb <size>] [--reset-overlay]
+                       [--home-size-mb <size>] [--delete-home] [--crypted-home]
+                       [--unencrypted-home] [--swap-size-mb <size>]
                        [--updates <updates.img>] [--ks <kickstart>]
                        [--label <label>]
                        <source> <target device>
@@ -231,10 +232,13 @@ usage() {
         /LiveOS/rootfs.img root filesystem image file.  This avoids the system
         overhead of decompression during use at the expense of storage space.
 
-    --swap-size-mb <size>
-        Sets up a swap file of <size> mebibytes (integer values only) on the
-        target device.  A maximum <size> of 4095 MiB is permitted for vfat-
-        formatted devices.
+    --no-overlay   (effective only with skipcompress)
+        Installs a kernel option, rd.live.overlay=none, that signals the live
+        boot process to create a writable, linear Device-mapper target for an
+        uncompressed /LiveOS/rootfs.img filesystem image file.  Read-write by
+        default (unless a kernel argument of rd.live.overlay.readonly is given)
+        this configuration avoids the complications of using an overlay of
+        fixed size for persistence when storage format and space allows.
 
     --overlay-size-mb <size>
         Specifies creation of a filesystem overlay of <size> mebibytes (integer
@@ -255,6 +259,13 @@ usage() {
         overlay.  A maximum <size> of 4095 MiB is permitted for vfat-formatted
         devices.  If there is not enough room on your device, you will be
         given information to help in adjusting your settings.
+
+    --reset-overlay
+        This option will reset the persistent overlay to an unallocated state.
+        This might be used if installing a new or refreshed image onto a device
+        with an existing overlay, and avoids the writing of a large file on a
+        vfat-formatted device.  This option also renames the overlay to match
+        the current device filesystem label and UUID.
 
     --home-size-mb <size>
         Specifies creation of a home filesystem of <size> mebibytes (integer
@@ -283,6 +294,11 @@ usage() {
     --unencrypted-home
         Prevents the default option to encrypt a new persistent home directory
         filesystem.
+
+    --swap-size-mb <size>
+        Sets up a swap file of <size> mebibytes (integer values only) on the
+        target device.  A maximum <size> of 4095 MiB is permitted for vfat-
+        formatted devices.
 
     --updates <updates.img>
         Setup a kernel command line argument, inst.updates, to point to an
@@ -313,7 +329,7 @@ usage() {
 
     COPYRIGHT
 
-    Copyright (C) Fedora Project 2008, 2009, 2010 and various contributors.
+    Copyright 2008-2010, 2017, Fedora Project and various contributors.
     This is free software. You may redistribute copies of it under the terms of
     the GNU General Public License http://www.gnu.org/licenses/gpl.html.
     There is NO WARRANTY, to the extent permitted by law.
@@ -351,8 +367,7 @@ cleanup() {
 
 exitclean() {
     RETVAL=$?
-    if [[ -d $SRCMNT ]] || [[ -d $TGTMNT ]];
-    then
+    if [[ -d $SRCMNT ]] || [[ -d $TGTMNT ]]; then
         [[ $RETVAL == 0 ]] || echo "Cleaning up to exit..."
         cleanup
     fi
@@ -619,7 +634,7 @@ checkFilesystem() {
         exitclean
     fi
     if [[ $TGTFS == @(vfat|msdos) ]]; then
-        mountopts='-o shortname=winnt,umask=0077'
+        tgtmountopts='-o shortname=winnt,umask=0077'
     fi
 }
 
@@ -677,7 +692,6 @@ checkint() {
 }
 
 detectsrctype() {
-    SRCFS=$(findmnt -o FSTYPE -n $SRCMNT)
     if [[ -e $SRCMNT/Packages ]]; then
         echo "/Packages found, will copy source packages to target."
         packages=1
@@ -788,6 +802,8 @@ keephome=1
 homesizemb=0
 swapsizemb=0
 overlaysizemb=0
+resetoverlay=''
+overlay=''
 srctype=
 imgtype=
 packages=
@@ -857,15 +873,16 @@ while true ; do
         --skipcompress)
             skipcompress=1
             ;;
-        --swap-size-mb)
-            checkint $2
-            swapsizemb=$2
-            shift
+        --no-overlay)
+            overlay=none
             ;;
         --overlay-size-mb)
             checkint $2
             overlaysizemb=$2
             shift
+            ;;
+        --reset-overlay)
+            resetoverlay=resetoverlay
             ;;
         --home-size-mb)
             checkint $2
@@ -880,6 +897,11 @@ while true ; do
             ;;
         --delete-home)
             keephome=''
+            ;;
+        --swap-size-mb)
+            checkint $2
+            swapsizemb=$2
+            shift
             ;;
         --updates)
             updates=$2
@@ -942,38 +964,65 @@ fi
 
 # Do some basic sanity checks.
 checkSyslinuxVersion
-
 checkMounted $TGTDEV
+checkFilesystem $TGTDEV
+if [[ -n $efi ]]; then
+    checkGPT $TGTDEV
+else
+  # Because we can't set boot flag for EFI Protective on msdos partition tables
+    checkPartActive $TGTDEV
+fi
 
-SRCMNT=$(mktemp -d /run/srctmp.XXXXXX)
-mountopts='-o ro'
-if [[ -f $SRC ]]; then
-    mountopts+=,loop
-elif [[ -d $SRC ]]; then
-    livedir=$SRC
-    SRC=$(findmnt -nro TARGET -T $livedir)
-    if [[ $livedir == $SRC ]]; then
-        livedir=''
-    else
-        livedir=${livedir##*/}
-    fi
-    mountopts+=\ --bind
-elif [[ $SRC -ef $(readlink -f /run/initramfs/livedev) ]] ||
-     [[ $SRC -ef $(readlink -f /dev/live) ]]; then
-    SRC=/run/initramfs/live
-    mountopts+=\ --bind
-elif ! [[ -b $SRC ]]; then
-    printf "\n        ATTENTION:
-    '$SRC' is not a file, block device or directory.\n"
+if [[ $LIVEOS =~ [[:space:]] ]]; then
+    printf "\n    ALERT:
+    The LiveOS directory name, '%s', contains spaces, newlines or tabs.\n
+    Whitespace does not work with the SYSLINUX boot loader.
+    The whitespace will be replaced by underscores.\n\n" "$LIVEOS"
+    LIVEOS=${LIVEOS//[[:space:]]/_}
+fi
+
+if [[ $overlay == none ]] && ((overlaysizemb > 0)); then
+    printf '\n        ERROR:
+        You have specified --no-overlay AND --overlay-size-mb <size>.\n
+        Only one of these options may be requested at a time.\n
+        Please request only one of these options.  Exiting...\n'
     exitclean
 fi
-mount $mountopts "$SRC" $SRCMNT || exitclean
-mountopts=''
 
-# Figure out what needs to be done based on the source image
-detectsrctype
+if ((overlaysizemb > 0)); then
+    if [[ $TGTFS == @(vfat|msdos) ]] && ((overlaysizemb > 4095)); then
+        printf '\n        ALERT:
+        An overlay size greater than 4095 MiB
+        is not allowed on VFAT formatted filesystems.\n'
+        exitclean
+    fi
+    [[ -z $label ]] && label=$(lsblk -no LABEL $TGTDEV)
+    # Remove newline, if present such as for a loop device, from parent device.
+    label="${label#$'\n'}"
+    if [[ $label =~ [[:space:]] ]]; then
+        printf '\n        ALERT:
+        The LABEL (%s) on %s has spaces, newlines, or tabs in it.
+        Whitespace does not work with the overlay.
+        An attempt to rename the device will be made.\n\n' "$label" $TGTDEV
+        label=${label//[[:space:]]/_}
+    fi
+fi
 
-if [[ -z $noverify && $SRCFS == iso9660 ]]; then
+if ((homesizemb > 0)) && [[ $TGTFS = vfat ]]; then
+    if ((homesizemb > 4095)); then
+        echo "Can't have a home filesystem greater than 4095 MB on VFAT"
+        exitclean
+    fi
+fi
+
+if ((swapsizemb > 0)) && [[ $TGTFS == vfat ]]; then
+    if ((swapsizemb > 4095)); then
+        echo "Can't have a swap file greater than 4095 MB on VFAT"
+        exitclean
+    fi
+fi
+
+if [[ -z $noverify && $(file -br "$SRC") == ISO\ 9660\ * ]]; then
     # verify the image
     echo 'Verifying image...'
     if ! checkisomd5 --verbose "$SRC"; then
@@ -983,6 +1032,48 @@ if [[ -z $noverify && $SRCFS == iso9660 ]]; then
         read
     fi
 fi
+
+SRCMNT=$(mktemp -d /run/srctmp.XXXXXX)
+srcmountopts='-o ro'
+if [[ -f $SRC ]]; then
+    srcmountopts+=,loop
+elif [[ -d $SRC ]]; then
+    livedir=$SRC
+    SRC=$(findmnt -nro TARGET -T "$livedir")
+    if [[ $livedir == $SRC ]]; then
+        livedir=''
+    else
+        livedir=${livedir##*/}
+    fi
+    srcmountopts+=\ --bind
+elif [[ $SRC -ef $(readlink -f /run/initramfs/livedev) ]] ||
+     [[ $SRC -ef $(readlink -f /dev/live) ]]; then
+    SRC=/run/initramfs/live
+    srcmountopts+=\ --bind
+elif ! [[ -b $SRC ]]; then
+    printf "\n        ATTENTION:
+    '$SRC' is not a file, block device, or directory.\n"
+    exitclean
+fi
+mount $srcmountopts "$SRC" $SRCMNT || exitclean
+trap exitclean SIGINT SIGTERM
+
+# Figure out what needs to be done based on the source image.
+detectsrctype
+
+# Format the device
+if [[ -n $format && -z $skipcopy ]]; then
+    if [[ -n $efi ]]; then
+        createGPTLayout $TGTDEV
+    elif [[ -n $usemsdos ]] || ! type extlinux >/dev/null 2>&1; then
+        createMSDOSLayout $TGTDEV
+    else
+        createEXTFSLayout $TGTDEV
+    fi
+fi
+
+[[ -n $resetmbr ]] && resetMBR $TGTDEV
+checkMBR $TGTDEV
 
 fs_label_msg() {
     if [[ $TGTFS == @(vfat|msdos) ]]; then
@@ -1001,106 +1092,86 @@ fs_label_msg() {
 labelTargetDevice() {
     local dev=$1
 
-    TGTLABEL=$(lsblk -nro LABEL $dev)
+    TGTLABEL=$(lsblk -no LABEL $dev)
     # Remove newline, if present such as for a loop device, of parent device.
     TGTLABEL="${TGTLABEL#$'\n'}"
-    [[ -z $TGTLABEL ]] && TGTLABEL=LIVE
-    if [[ -z $skipcopy ]]; then
-        if [[ -n $label && $TGTLABEL != "$label" ]]; then
-            if [[ $TGTFS == @(vfat|msdos) ]]; then
-                fatlabel $dev "$label"
-                if (($? > 0)); then
-                    echo "
-                    ERROR:   fatlabel failed on $dev, device not setup."
-                    fs_label_msg
-                fi
-            elif [[ $TGTFS == ext[234] ]]; then
-                e2label $dev "$label"
-                if (($? > 0)); then
-                    echo "
-                    ERROR:   e2label failed on $dev, device not setup."
-                    fs_label_msg
-                fi
-            elif [[ -z $format ]]; then
-                printf "
-                ALERT:  Unknown filesystem type.
-                Try setting its label to '$label' and re-running.\n"
+    TGTLABEL=${TGTLABEL//[[:space:]]/_}
+    [[ -z $TGTLABEL && -z $label ]] && label=LIVE
+    if [[ -n $label && $TGTLABEL != "$label" ]]; then
+        if [[ $TGTFS == @(vfat|msdos) ]]; then
+            fatlabel $dev "$label"
+            if (($? > 0)); then
+                echo "
+                ERROR:   fatlabel failed on $dev, device not setup."
+                fs_label_msg
             fi
-            TGTLABEL="$label"
+        elif [[ $TGTFS == ext[234] ]]; then
+            e2label $dev "$label"
+            if (($? > 0)); then
+                echo "
+                ERROR:   e2label failed on $dev, device not setup."
+                fs_label_msg
+            fi
+        elif [[ $TGTFS == btrfs ]]; then
+            btrfs filesystem label $dev "$label"
+            if (($? > 0)); then
+                echo "
+                ERROR:   btrfs filesystem label failed. '$dev' not setup."
+                fs_label_msg
+            fi
+        else
+            printf "
+            ALERT:  Unknown filesystem type.
+            Try setting its label to '$label' and re-running.\n"
         fi
+        TGTLABEL="$label"
     fi
     label=$TGTLABEL
 }
 
 labelTargetDevice $TGTDEV
 
-# Format the device
-if [[ -n $format && -z $skipcopy ]]; then
-    if [[ -n $efi ]]; then
-        createGPTLayout $TGTDEV
-    elif [[ -n $usemsdos ]] || ! type extlinux >/dev/null 2>&1; then
-        createMSDOSLayout $TGTDEV
-    else
-        createEXTFSLayout $TGTDEV
-    fi
-fi
-
-checkFilesystem $TGTDEV
-
-if [[ -n $efi ]]; then
-    checkGPT $TGTDEV
+# Use UUID if available.
+TGTUUID=$(blkid -s UUID -o value $TGTDEV)
+if [[ -n $TGTUUID ]]; then
+    TGTLABEL=UUID=$TGTUUID
+elif [[ -n $TGTLABEL ]]; then
+        TGTLABEL="LABEL=$TGTLABEL"
 else
-  # Because we can't set boot flag for EFI Protective on msdos partition tables
-    checkPartActive $TGTDEV
+    printf '\n    ALERT:
+    You need to have a filesystem label or
+    UUID for your target device.\n'
+    fs_label_msg
 fi
-[[ -n $resetmbr ]] && resetMBR $TGTDEV
-
-checkMBR $TGTDEV
-
-if ((overlaysizemb > 0)); then
-    if [[ $TGTFS == @(vfat|msdos) ]] && ((overlaysizemb > 4095)); then
-        printf '\n        ALERT:
-        An overlay size greater than 4095 MiB
-        is not allowed on VFAT formatted filesystems.\n'
-        exitclean
-    fi
-    if [[ $label =~ [[:space:]] ]]; then
-        printf '\n        ALERT:
-        The LABEL (%s) on %s has spaces, newlines, or tabs in it.
-        Whitespace does not work with the overlay.
-        An attempt to rename the device will be made.\n\n' "$label" $TGTDEV
-        label=$(echo -e "$label" | sed ':a ; N ; s/[[:space:]]/_/g ; t a')
-        labelTargetDevice $TGTDEV
-    fi
-fi
-
-if ((homesizemb > 0)) && [[ $TGTFS = vfat ]]; then
-    if ((homesizemb > 4095)); then
-        echo "Can't have a home filesystem greater than 4095 MB on VFAT"
-        exitclean
-    fi
-fi
-
-if ((swapsizemb > 0)) && [[ $TGTFS == vfat ]]; then
-    if ((swapsizemb > 4095)); then
-        echo "Can't have a swap file greater than 4095 MB on VFAT"
-        exitclean
-    fi
-fi
+OVERNAME="overlay-$label-$TGTUUID"
 
 TGTMNT=$(mktemp -d /run/tgttmp.XXXXXX)
-mount $mountopts $TGTDEV $TGTMNT || exitclean
+mount $tgtmountopts $TGTDEV $TGTMNT || exitclean
 
-trap exitclean SIGINT SIGTERM
-
-if [[ -f $TGTMNT/$LIVEOS/$HOMEFILE ]] && [[ -n $keephome ]] &&
-    ((homesizemb > 0)); then
+if [[ -z $skipcopy ]] && [[ -f $TGTMNT/$LIVEOS/$HOMEFILE ]] &&
+    [[ -n $keephome ]] && ((homesizemb > 0)); then
     printf '\n        ERROR:
         The target has an existing home.img file and you requested that a new
         home.img be created.  To remove an existing home.img on the target,
         you must explicitly specify --delete-home as an installation option.\n
-        Please adjust your home.img options.  Exiting...\n'
+        Please adjust your home.img options.  Exiting...\n\n'
     exitclean
+fi
+if [[ -n $resetoverlay ]]; then
+    existing=($(find $TGTMNT/$LIVEOS/ -name overlay-* -print || :))
+    if [[ ! -s $existing ]]; then
+        printf '\n        NOTICE:
+        A persistent overlay was not found on the target device to reset.\n
+        Press Enter to continue, or Ctrl C to abort.\n'
+        read
+    elif ((overlaysizemb > 0)) && [[ -z $skipcopy ]]; then
+        printf '\n        ERROR:
+        You requested a new persistent overlay AND to reset the current one.\n
+        Please select only one of these options.  Exiting...\n\n'
+        exitclean
+    elif [[ $existing != $TGTMNT/$LIVEOS/$OVERNAME ]]; then
+        mv $existing $TGTMNT/$LIVEOS/$OVERNAME
+    fi
 fi
 
 if [[ -d $SRCMNT/EFI/BOOT ]]; then
@@ -1139,7 +1210,8 @@ if [[ $srctype == live ]] &&
 fi
 if [[ -z $skipcopy ]] && [[ $srctype == live ]]; then
     if [[ -d $TGTMNT/$LIVEOS ]] && [[ -z $force ]]; then
-        printf '\nThe destination is already set up with a LiveOS image.\n'
+        printf "\nThe '%s' directory is already set up with a LiveOS image.\n
+               " $LIVEOS
         if [[ -z $keephome && -e $TGTMNT/$LIVEOS/$HOMEFILE ]]; then
             printf '\n        WARNING:
             \r        The old persistent home.img will be deleted!!!\n
@@ -1154,6 +1226,8 @@ if [[ -z $skipcopy ]] && [[ $srctype == live ]]; then
             done
             [[ -e $TGTMNT/$LIVEOS/$HOMEFILE && -n $keephome ]] &&
                 mv $TGTMNT/$LIVEOS/$HOMEFILE $TGTMNT/$HOMEFILE
+            [[ -e $TGTMNT/$LIVEOS/$OVERNAME && -n $resetoverlay ]] &&
+                mv $TGTMNT/$LIVEOS/$OVERNAME $TGTMNT/$OVERNAME
         fi
         rm -rf -- $TGTMNT/$LIVEOS
     fi
@@ -1193,7 +1267,7 @@ checklivespace() {
     tbd=$((tbd + ${duTable[*]: -2:1}))
 
     if [[ -n $skipcompress ]] && [[ -s $SRCIMG ]]; then
-        if mount -o loop $SRCIMG $SRCMNT; then
+        if mount -o loop "$SRCIMG" $SRCMNT; then
             if [[ -e $SRCMNT/LiveOS/rootfs.img ]]; then
                 SRCIMG=$SRCMNT/LiveOS/rootfs.img
             elif [[ -e $SRCMNT/LiveOS/ext3fs.img ]]; then
@@ -1201,10 +1275,10 @@ checklivespace() {
             else
                 printf "\n        ERROR:
                 '%s' does not appear to contain a LiveOS image.  Exiting...\n
-                " $SRCIMG
+                " "$SRCIMG"
                 exitclean
             fi
-            livesize=($(du -B 1M --apparent-size $SRCIMG))
+            livesize=($(du -B 1M --apparent-size "$SRCIMG"))
             umount -l $SRCMNT
         else
             echo "WARNING: --skipcompress or --xo was specified but the
@@ -1214,7 +1288,7 @@ checklivespace() {
             skipcompress=""
         fi
     else
-        livesize=($(du -B 1M $SRCIMG))
+        livesize=($(du -B 1M "$SRCIMG"))
     fi
     if ((livesize > 4095)) &&  [[ vfat == $TGTFS ]]; then
         echo "
@@ -1225,13 +1299,13 @@ checklivespace() {
             echo " The compressed SquashFS will instead be copied
             to the target device."
             skipcompress=''
-            livesize=($(du -B 1M $SRCMNT/$livedir/$squashimg))
+            livesize=($(du -B 1M "$SRCMNT/$livedir/$squashimg"))
         else
             echo "Exiting..."
             exitclean
         fi
     fi
-    sources="$SRCMNT/$livedir/osmin.img $SRCMNT/$livedir/syslinux"
+    sources="$SRCMNT/$livedir/osmin.img"\ "$SRCMNT/$livedir/syslinux"
     sources+=" $SRCMNT/isolinux $SRCMNT/syslinux $SRCMNT$EFI_BOOT"
     duTable=($(du -c -B 1M "$0" $sources 2> /dev/null || :))
     livesize=$((livesize + ${duTable[*]: -2:1} + 1))
@@ -1297,18 +1371,20 @@ if [[ $srctype == live && -z $skipcopy ]]; then
     [[ ! -d $TGTMNT/$LIVEOS ]] && mkdir $TGTMNT/$LIVEOS
     [[ -n $keephome && -f $TGTMNT/$HOMEFILE ]] &&
         mv $TGTMNT/$HOMEFILE $TGTMNT/$LIVEOS/$HOMEFILE
+    [[ -n $resetoverlay && -e $TGTMNT/$OVERNAME ]] &&
+        mv $TGTMNT/$OVERNAME $TGTMNT/$LIVEOS/$OVERNAME
     if [[ -n $skipcompress && -f $SRCMNT/$livedir/$squashimg ]]; then
-        mount -o loop $SRCMNT/$livedir/$squashimg $SRCMNT || exitclean
-        $copyFile $SRCIMG $TGTMNT/$LIVEOS/rootfs.img || {
+        mount -o loop "$SRCMNT/$livedir/$squashimg" $SRCMNT || exitclean
+        $copyFile "$SRCIMG" $TGTMNT/$LIVEOS/rootfs.img || {
             umount $SRCMNT ; exitclean ; }
         umount $SRCMNT
     elif [[ -f $SRCIMG ]]; then
-        $copyFile $SRCIMG $TGTMNT/$LIVEOS/${SRCIMG##/*/} || exitclean
+        $copyFile "$SRCIMG" $TGTMNT/$LIVEOS/${SRCIMG##/*/} || exitclean
         [[ ${SRCIMG##/*/} == squashed.img ]] &&
             mv $TGTMNT/$LIVEOS/${SRCIMG##/*/} $TGTMNT/$LIVEOS/squashfs.img
     fi
     if [[ -f $SRCMNT/$livedir/osmin.img ]]; then
-        $copyFile $SRCMNT/$livedir/osmin.img $TGTMNT/$LIVEOS/osmin.img ||
+        $copyFile "$SRCMNT/$livedir/osmin.img" $TGTMNT/$LIVEOS/osmin.img ||
             exitclean
     fi
     printf '\nSyncing filesystem writes to disc.
@@ -1337,13 +1413,14 @@ fi
 if [[ -d $SRCMNT/isolinux/ ]]; then
     cp $SRCMNT/isolinux/* $TGTMNT/$SYSLINUXPATH
 elif [[ -d $SRCMNT/syslinux/ ]]; then
-    [[ -d $SRCMNT/$livedir/syslinux ]] && subdir=$livedir/
-    cp $SRCMNT/${subdir}syslinux/* $TGTMNT/$SYSLINUXPATH
+    [[ -d $SRCMNT/$livedir/syslinux ]] && subdir="$livedir"/
+    cp "$SRCMNT/${subdir}syslinux/"* $TGTMNT/$SYSLINUXPATH
     if [[ -f $TGTMNT/$SYSLINUXPATH/extlinux.conf ]]; then
         mv $TGTMNT/$SYSLINUXPATH/extlinux.conf \
             $TGTMNT/$SYSLINUXPATH/isolinux.cfg
     elif [[ -f $TGTMNT/$SYSLINUXPATH/syslinux.cfg ]]; then
-        mv $TGTMNT/$SYSLINUXPATH/syslinux.cfg $TGTMNT/$SYSLINUXPATH/isolinux.cfg
+        mv $TGTMNT/$SYSLINUXPATH/syslinux.cfg \
+            $TGTMNT/$SYSLINUXPATH/isolinux.cfg
     fi
 fi
 BOOTCONFIG=$TGTMNT/$SYSLINUXPATH/isolinux.cfg
@@ -1433,8 +1510,8 @@ if [[ $srctype == live ]]; then
     cp -fT "$thisScriptpath" $TGTMNT/$LIVEOS/livecd-iso-to-disk
     chmod +x $TGTMNT/$LIVEOS/livecd-iso-to-disk &> /dev/null || :
 
-    # When the source is an installed Live USB/SD image, restore the boot config
-    # file to a base state before updating.
+    # When the source is an installed Live USB/SD image, restore the boot
+    # config file to a base state before updating.
     if [[ -d $SRCMNT/syslinux/ ]]; then
         echo "Preparing boot config file."
         title=$(sed -n -r '/^\s*label\s+linux/{n
@@ -1459,19 +1536,6 @@ s/(linuxefi\s+[^ ]+vmlinuz.?)\s+.*\s+(root=live:[^\s+]*)/\1 \2/
 s;(linuxefi|initrdefi)\s+[^ ]+(initrd.?.img|vmlinuz.?);\1 /images/pxeboot/\2;
                   " $BOOTCONFIG $BOOTCONFIG_EFI
     fi
-fi
-
-# Use UUID if available.
-TGTUUID=$(blkid -s UUID -o value $TGTDEV)
-if [[ -n $TGTUUID ]]; then
-    TGTLABEL=UUID=$TGTUUID
-elif [[ -n $TGTLABEL ]]; then
-        TGTLABEL="LABEL=$TGTLABEL"
-else
-    printf '\n    ALERT:
-    You need to have a filesystem label or
-    UUID for your target device.\n'
-    fs_label_msg
 fi
 
 # Setup the updates.img
@@ -1532,9 +1596,13 @@ if [[ -n $totaltimeout ]]; then
     sed -i -r "/\s*timeout\s+.*/ a\totaltimeout\ $totaltimeout" $BOOTCONFIG
 fi
 
+if [[ $overlay == none ]]; then
+    sed -i 's/r*d*.*live.*ima*ge*/& rd.live.overlay=none /
+           ' $BOOTCONFIG $BOOTCONFIG_EFI
+fi
+
 if ((overlaysizemb > 0)); then
     echo "Initializing persistent overlay file"
-    OVERNAME="overlay-$label-$TGTUUID"
     if [[ -z $skipcopy ]]; then
         if [[ $TGTFS == @(vfat|msdos) ]]; then
             # vfat can't handle sparse files
@@ -1546,6 +1614,13 @@ if ((overlaysizemb > 0)); then
         fi
     fi
     sed -i "s/r*d*.*live.*ima*ge*/& rd.live.overlay=${TGTLABEL}/
+           " $BOOTCONFIG $BOOTCONFIG_EFI
+fi
+
+if [[ -n $resetoverlay ]]; then
+    printf 'Resetting the overlay.\n'
+    dd if=/dev/zero of=$TGTMNT/$LIVEOS/$OVERNAME bs=64k count=1 conv=notrunc
+    sed -i "s/r*d*.*live.*ima*ge*/& rd.live.overlay=${TGTLABEL} /
            " $BOOTCONFIG $BOOTCONFIG_EFI
 fi
 
@@ -1570,8 +1645,7 @@ if ((homesizemb > 0)) && [[ -z $skipcopy ]]; then
            count=1 bs=1M seek=$homesizemb
     fi
     if [[ -n $cryptedhome ]]; then
-        loop=$(losetup -f)
-        losetup $loop $TGTMNT/$LIVEOS/$HOMEFILE
+        loop=$(losetup -f --show $TGTMNT/$LIVEOS/$HOMEFILE)
 
         echo "Encrypting persistent /home"
         while ! cryptsetup luksFormat -y -q $loop; do :; done;
