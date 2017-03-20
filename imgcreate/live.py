@@ -121,9 +121,7 @@ class LiveImageCreatorBase(LoopImageCreator):
 
         """
         r = kickstart.get_kernel_args(self.ks)
-        if os.path.exists(self._instroot + "/usr/bin/rhgb"):
-            r += " rhgb"
-        if os.path.exists(self._instroot + "/usr/bin/plymouth"):
+        if chroottypecheck('rhgb') or chroottypecheck('plymouth'):
             r += " rhgb"
         return r
 
@@ -147,7 +145,7 @@ class LiveImageCreatorBase(LoopImageCreator):
             return os.path.exists(instroot + path)
 
         if (exists(self._instroot, "/usr/lib/anaconda-runtime/checkisomd5") or
-            exists(self._instroot, "/usr/bin/checkisomd5")):
+            chroottypecheck('checkisomd5')):
             return True
 
         return False
@@ -317,7 +315,7 @@ class LiveImageCreatorBase(LoopImageCreator):
     def __create_iso(self, isodir):
         iso = self._outdir + "/" + self.name + ".iso"
 
-        args = ["/usr/bin/genisoimage",
+        args = ["genisoimage",
                 "-J", "-r",
                 "-hide-rr-moved", "-hide-joliet-trans-tbl",
                 "-V", self.fslabel,
@@ -332,25 +330,24 @@ class LiveImageCreatorBase(LoopImageCreator):
         if subprocess.call(args) != 0:
             raise CreatorError("ISO creation failed!")
 
-        if os.path.exists("/usr/bin/isohybrid"):
+        if subprocess.call(['type', 'isohybrid']):
             if os.path.exists(isodir + "/isolinux/efiboot.img"):
-                subprocess.call(["/usr/bin/isohybrid", "-u", "-m", iso])
+                subprocess.call(["isohybrid", "-u", "-m", iso])
             else:
-                subprocess.call(["/usr/bin/isohybrid", iso])
+                subprocess.call(["isohybrid", iso])
 
         self.__implant_md5sum(iso)
 
     def __implant_md5sum(self, iso):
         """Implant an isomd5sum."""
-        if os.path.exists("/usr/bin/implantisomd5"):
-            implantisomd5 = "/usr/bin/implantisomd5"
+        if subprocess.call(['type', 'implantisomd5']):
+            subprocess.call([implantisomd5, iso])
         elif os.path.exists("/usr/lib/anaconda-runtime/implantisomd5"):
             implantisomd5 = "/usr/lib/anaconda-runtime/implantisomd5"
+            subprocess.call([implantisomd5, iso])
         else:
             logging.warning("isomd5sum not installed; not setting up mediacheck")
             return
-
-        subprocess.call([implantisomd5, iso])
 
     def _stage_final_image(self):
         try:
@@ -988,7 +985,7 @@ image=/ppc/ppc32/vmlinuz
         shutil.copyfile(self._instroot + "/usr/lib/yaboot/yaboot",
                         isodir + "/ppc/chrp/yaboot")
 
-        subprocess.call(["/usr/sbin/addnote", isodir + "/ppc/chrp/yaboot"])
+        subprocess.call(["addnote", isodir + "/ppc/chrp/yaboot"])
 
         #
         # FIXME: ppc should support multiple kernels too...

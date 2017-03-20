@@ -121,7 +121,7 @@ class KickstartConfig(object):
         os.chdir("/")
 
     def call(self, args):
-        if not os.path.exists("%s/%s" %(self.instroot, args[0])):
+        if not chroottypecheck(args[0]):
             raise errors.KickstartError("Unable to run %s!" %(args))
         return subprocess.call(args, preexec_fn = self.chroot)
 
@@ -181,22 +181,22 @@ class TimezoneConfig(KickstartConfig):
 class AuthConfig(KickstartConfig):
     """A class to apply a kickstart authconfig configuration to a system."""
     def apply(self, ksauthconfig):
-        if not os.path.exists(self.path("/usr/sbin/authconfig")):
+        if not chroottypecheck('authconfig'):
             return
 
         auth = ksauthconfig.authconfig or "--useshadow --enablemd5"
-        args = ["/usr/sbin/authconfig", "--update", "--nostart"]
+        args = ["authconfig", "--update", "--nostart"]
         self.call(args + auth.split())
 
 class FirewallConfig(KickstartConfig):
     """A class to apply a kickstart firewall configuration to a system."""
     def apply(self, ksfirewall):
         # Check to see if firewalld is available in the install image
-        if not os.path.exists(os.path.join(self.instroot, self.path("/usr/bin/firewall-offline-cmd"))):
+        if not chroottypecheck('firewall-offline-cmd'):
             # Throw a warning indicating firewall configuration is ignored and return
             logging.warning("firewalld is not installed, ignoring firewall configuration settings!")
             return
-        args = ["/usr/bin/firewall-offline-cmd"]
+        args = ["firewall-offline-cmd"]
         # enabled is None if neither --enable or --disable is passed
         # default to enabled if nothing has been set.
         if ksfirewall.enabled == False:
@@ -218,20 +218,20 @@ class FirewallConfig(KickstartConfig):
 class RootPasswordConfig(KickstartConfig):
     """A class to apply a kickstart root password configuration to a system."""
     def lock(self):
-        self.call(["/usr/bin/passwd", "-l", "root"])
+        self.call(["passwd", "-l", "root"])
 
     def set_encrypted(self, password):
-        self.call(["/usr/sbin/usermod", "-p", password, "root"])
+        self.call(["usermod", "-p", password, "root"])
 
     def set_unencrypted(self, password):
-        for p in ("/bin/echo", "/usr/bin/passwd"):
-            if not os.path.exists("%s/%s" %(self.instroot, p)):
+        for p in ("echo", "passwd"):
+            if not chroottypecheck(p):
                 raise errors.KickstartError("Unable to set unencrypted password due to lack of %s" % p)
 
-        p1 = subprocess.Popen(["/bin/echo", password],
+        p1 = subprocess.Popen(["echo", password],
                               stdout = subprocess.PIPE,
                               preexec_fn = self.chroot)
-        p2 = subprocess.Popen(["/usr/bin/passwd", "--stdin", "root"],
+        p2 = subprocess.Popen(["passwd", "--stdin", "root"],
                               stdin = p1.stdout,
                               stdout = subprocess.PIPE,
                               preexec_fn = self.chroot)
@@ -249,12 +249,12 @@ class RootPasswordConfig(KickstartConfig):
 class ServicesConfig(KickstartConfig):
     """A class to apply a kickstart services configuration to a system."""
     def apply(self, ksservices):
-        if not os.path.exists(self.path("/sbin/chkconfig")):
+        if not chroottypecheck('chkconfig'):
             return
         for s in ksservices.enabled:
-            self.call(["/sbin/chkconfig", s, "on"])
+            self.call(["chkconfig", s, "on"])
         for s in ksservices.disabled:
-            self.call(["/sbin/chkconfig", s, "off"])
+            self.call(["chkconfig", s, "off"])
 
 class XConfig(KickstartConfig):
     """A class to apply a kickstart X configuration to a system."""
@@ -461,10 +461,11 @@ class SelinuxConfig(KickstartConfig):
         if ksselinux.selinux == ksconstants.SELINUX_DISABLED:
             return
 
-        if not os.path.exists(self.path("/sbin/setfiles")):
+        if not chroottypecheck('setfiles'):
             return
 
-        rc = self.call(["/sbin/setfiles", "-p", "-e", "/proc", "-e", "/sys", "-e", "/dev", selinux.selinux_file_context_path(), "/"])
+        rc = self.call(["setfiles", "-p", "-e", "/proc", "-e", "/sys", "-e", "/dev",
+                        selinux.selinux_file_context_path(), "/"])
         if rc:
             if ksselinux.selinux == ksconstants.SELINUX_ENFORCING:
                 raise errors.KickstartError("SELinux relabel failed.")

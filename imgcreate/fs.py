@@ -35,6 +35,13 @@ from imgcreate.util import call
 
 from imgcreate.errors import *
 
+def chroottypecheck(self, command):
+    """Check how a command would be interpreted in a change root environment.
+    """
+    with open(os.devnull, 'w') as DEVNULL:
+        return subprocess.call(['type', command], stdout=DEVNULL,
+                      stderr=subprocess.STDOUT, preexec_fn=self.chroot)
+
 def makedirs(dirname):
     """A version of os.makedirs() that doesn't throw an
     exception if the leaf directory already exists.
@@ -52,7 +59,7 @@ def squashfs_compression_type(sqfs_img):
 
     env = os.environ.copy()
     env['LC_ALL'] = 'C'
-    args = ['/usr/sbin/unsquashfs', '-s', sqfs_img]
+    args = ['unsquashfs', '-s', sqfs_img]
     try:
         p = subprocess.Popen(args, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE, env=env)
@@ -77,9 +84,9 @@ def squashfs_compression_type(sqfs_img):
 def mksquashfs(in_img, out_img, compress_type):
 # Allow gzip to work for older versions of mksquashfs
     if not compress_type or compress_type == "gzip":
-        args = ["/sbin/mksquashfs", in_img, out_img]
+        args = ['mksquashfs', in_img, out_img]
     else:
-        args = ["/sbin/mksquashfs", in_img, out_img, "-comp", compress_type]
+        args = ['mksquashfs', in_img, out_img, '-comp', compress_type]
 
     if not sys.stdout.isatty():
         args.append("-no-progress")
@@ -98,7 +105,7 @@ def resize2fs(fs, size=None, minimal=False):
     e2fsck(fs)
 
     logging.info("resizing %s" % (fs,))
-    args = ["/sbin/resize2fs", fs]
+    args = ['resize2fs', fs]
     if minimal:
         args.append("-M")
     else:
@@ -115,7 +122,7 @@ def resize2fs(fs, size=None, minimal=False):
 
 def e2fsck(fs):
     logging.info("Checking filesystem %s" % fs)
-    return call(["/sbin/e2fsck", "-f", "-y", fs])
+    return call(['e2fsck', '-f', '-y', fs])
 
 class BindChrootMount:
     """Represents a bind mount of a directory into a chroot."""
@@ -134,7 +141,7 @@ class BindChrootMount:
             return
 
         makedirs(self.dest)
-        rc = call(["/bin/mount", "--bind", self.src, self.dest])
+        rc = call(['mount', '--bind', self.src, self.dest])
         if rc != 0:
             raise MountError("Bind-mounting '%s' to '%s' failed" %
                              (self.src, self.dest))
@@ -144,10 +151,10 @@ class BindChrootMount:
         if not self.mounted:
             return
 
-        rc = call(["/bin/umount", self.dest])
+        rc = call(['umount', self.dest])
         if rc != 0:
             logging.info("Unable to unmount %s normally, using lazy unmount" % self.dest)
-            rc = call(["/bin/umount", "-l", self.dest])
+            rc = call(['umount', '-l', self.dest])
             if rc != 0:
                 raise MountError("Unable to unmount fs at %s" % self.dest)
             else:
@@ -170,7 +177,7 @@ class LoopbackMount:
 
     def lounsetup(self):
         if self.losetup:
-            rc = call(["/sbin/losetup", "-d", self.loopdev])
+            rc = call(['losetup', '-d', self.loopdev])
             self.losetup = False
             self.loopdev = None
 
@@ -178,7 +185,7 @@ class LoopbackMount:
         if self.losetup:
             return
 
-        losetupProc = subprocess.Popen(["/sbin/losetup", "-f"],
+        losetupProc = subprocess.Popen(['losetup', '-f'],
                                        stdout=subprocess.PIPE)
         losetupOutput = losetupProc.communicate()[0]
 
@@ -188,7 +195,7 @@ class LoopbackMount:
 
         self.loopdev = losetupOutput.split()[0]
 
-        rc = call(["/sbin/losetup", self.loopdev, self.lofile])
+        rc = call(['losetup', self.loopdev, self.lofile])
         if rc != 0:
             raise MountError("Failed to allocate loop device for '%s'" %
                              self.lofile)
@@ -301,7 +308,7 @@ class LoopbackDisk(Disk):
         if self.device is not None:
             return
 
-        losetupProc = subprocess.Popen(["/sbin/losetup", "-f"],
+        losetupProc = subprocess.Popen(['losetup', '-f'],
                                        stdout=subprocess.PIPE)
         losetupOutput = losetupProc.communicate()[0]
 
@@ -312,7 +319,7 @@ class LoopbackDisk(Disk):
         device = losetupOutput.split()[0].decode("utf-8")
 
         logging.info("Losetup add %s mapping to %s"  % (device, self.lofile))
-        rc = call(["/sbin/losetup", device, self.lofile])
+        rc = call(['losetup', device, self.lofile])
         if rc != 0:
             raise MountError("Failed to allocate loop device for '%s'" %
                              self.lofile)
@@ -322,7 +329,7 @@ class LoopbackDisk(Disk):
         if self.device is None:
             return
         logging.info("Losetup remove %s" % self.device)
-        rc = call(["/sbin/losetup", "-d", self.device])
+        rc = call(['losetup', '-d', self.device])
         self.device = None
 
 
@@ -396,13 +403,13 @@ class DiskMount(Mount):
     def unmount(self):
         if self.mounted:
             logging.info("Unmounting directory %s" % self.mountdir)
-            rc = call(["/bin/umount", self.mountdir])
+            rc = call(['umount', self.mountdir])
             if rc == 0:
                 self.mounted = False
             else:
                 logging.warning("Unmounting directory %s failed, using lazy umount" % self.mountdir)
                 print("Unmounting directory %s failed, using lazy umount" %self.mountdir, file=sys.stdout)
-                rc = call(["/bin/umount", "-l", self.mountdir])
+                rc = call(['umount', '-l', self.mountdir])
                 if rc != 0:
                     raise MountError("Unable to unmount filesystem at %s" % self.mountdir)
                 else:
@@ -434,7 +441,7 @@ class DiskMount(Mount):
         self.__create()
 
         logging.info("Mounting %s at %s" % (self.disk.device, self.mountdir))
-        args = [ "/bin/mount", self.disk.device, self.mountdir ]
+        args = [ 'mount', self.disk.device, self.mountdir ]
         if self.fstype:
             args.extend(["-t", self.fstype])
         if self.fstype == "squashfs":
@@ -456,7 +463,7 @@ class ExtDiskMount(DiskMount):
 
     def __format_filesystem(self):
         logging.info("Formating %s filesystem on %s" % (self.fstype, self.disk.device))
-        args = [ "/sbin/mkfs." + self.fstype ]
+        args = [ 'mkfs.' + self.fstype ]
         if self.fstype.startswith("ext"):
             args = args + [ "-F", "-L", self.fslabel, "-m", "1", "-b", str(self.blocksize) ]
         elif self.fstype == "xfs":
@@ -470,7 +477,7 @@ class ExtDiskMount(DiskMount):
         if rc != 0:
             raise MountError("Error creating %s filesystem" % (self.fstype,))
         logging.info("Tuning filesystem on %s" % self.disk.device)
-        call(["/sbin/tune2fs", "-c0", "-i0", "-Odir_index",
+        call(['tune2fs', "-c0", "-i0", "-Odir_index",
               "-ouser_xattr,acl", self.disk.device])
 
     def __resize_filesystem(self, size = None):
@@ -518,7 +525,7 @@ class ExtDiskMount(DiskMount):
 
         dev_null = os.open("/dev/null", os.O_WRONLY)
         try:
-            out = subprocess.Popen(['/sbin/dumpe2fs', '-h', self.disk.lofile],
+            out = subprocess.Popen(['dumpe2fs', '-h', self.disk.lofile],
                                    stdout = subprocess.PIPE,
                                    stderr = dev_null).communicate()[0]
         finally:
@@ -567,8 +574,8 @@ class DeviceMapperSnapshot(object):
                                              self.imgloop.device,
                                              self.cowloop.device)
 
-        args = ["/sbin/dmsetup", "create", self.__name, "-vv", "--verifyudev",
-                "--uuid", "LIVECD-%s" % self.__name, "--table", table]
+        args = ['dmsetup', 'create', self.__name, '-vv', '--verifyudev',
+                '--uuid', 'LIVECD-%s' % self.__name, '--table', table]
         if call(args) != 0:
             self.cowloop.cleanup()
             self.imgloop.cleanup()
@@ -583,7 +590,7 @@ class DeviceMapperSnapshot(object):
 
         # sleep to try to avoid any dm shenanigans
         time.sleep(2)
-        rc = call(["/sbin/dmsetup", "remove", self.__name])
+        rc = call(['dmsetup', 'remove', self.__name])
         if not ignore_errors and rc != 0:
             raise SnapshotError("Could not remove snapshot device")
 
@@ -599,7 +606,7 @@ class DeviceMapperSnapshot(object):
 
         dev_null = os.open("/dev/null", os.O_WRONLY)
         try:
-            out = subprocess.Popen(["/sbin/dmsetup", "status", self.__name],
+            out = subprocess.Popen(['dmsetup', 'status', self.__name],
                                    stdout = subprocess.PIPE,
                                    stderr = dev_null).communicate()[0]
         finally:

@@ -149,7 +149,7 @@ class LiveImageEditor(LiveImageCreator):
     def _get_fslabel(self):
         dev_null = os.open("/dev/null", os.O_WRONLY)
         try:
-            out = subprocess.Popen(["/sbin/e2label", self._image],
+            out = subprocess.Popen(["e2label", self._image],
                                    stdout = subprocess.PIPE,
                                    stderr = dev_null).communicate()[0]
 
@@ -425,7 +425,7 @@ class LiveImageEditor(LiveImageCreator):
             if os.path.exists(src):
                 os.rename(src, cfgf)
 
-        args = ['/bin/sed', '-i']
+        args = ['sed', '-i']
         if self._releasefile:
             args.append('-e')
             args.append('s/Welcome to .*/Welcome to ' + self._releasefile + '!/')
@@ -639,7 +639,7 @@ def parse_options(args):
 
 def get_fsvalue(filesystem, tag):
     dev_null = os.open('/dev/null', os.O_WRONLY)
-    args = ['/sbin/blkid', '-s', tag, '-o', 'value', filesystem]
+    args = ['blkid', '-s', tag, '-o', 'value', filesystem]
     try:
         fs_type = subprocess.Popen(args,
                                stdout=subprocess.PIPE,
