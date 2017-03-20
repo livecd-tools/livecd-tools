@@ -25,9 +25,9 @@ def main():
             if not os.path.exists(dst):
                 os.makedir(dst)
             if options is None:
-                args = ("/bin/mount", src, dst)
+                args = ("mount", src, dst)
             else:
-                args = ("/bin/mount", options, src, dst)
+                args = ("mount", options, src, dst)
             rc = subprocess.call(args)
             return rc
         return
@@ -35,7 +35,7 @@ def main():
 
     def umount(src):
         if os.path.exists(src):
-                args = ("/bin/umount", src)
+                args = ("umount", src)
                 rc = subprocess.call(args)
                 return rc
         return
@@ -58,7 +58,7 @@ def main():
             tmp = tempfile.mkdtemp()
             return tmp
         else:
-            args = ("/bin/mkdir", "-p", dir)
+            args = ("mkdir", "-p", dir)
             rc = subprocess.call(args)
 
 
@@ -66,14 +66,14 @@ def main():
         if os.path.exists(src):
             if os.path.exists(dst):
                 if offset is None:
-                    args = ("/sbin/losetup", src, dst)
+                    args = ("losetup", src, dst)
                 else:
-                    args = ("/sbin/losetup", "-o", str(offset), src, dst)
+                    args = ("losetup", "-o", str(offset), src, dst)
                 rc = subprocess.call(args)
         return rc
 
     def lounset(device):
-        args = ("/sbin/losetup", "-d", device)
+        args = ("losetup", "-d", device)
         rc = subprocess.call(args) 
 
     def null():
@@ -81,16 +81,16 @@ def main():
         return fd
 
     def dd(file, target):
-        args = ("/bin/dd", "if=%s"%file, "of=%s"%target)
+        args = ("dd", "if=%s"%file, "of=%s"%target)
         rc = subprocess.call(args)
 
     def lo():
-        args = ("/sbin/losetup", "--find")
+        args = ("losetup", "--find")
         rc = subprocess.Popen(args, stdout=subprocess.PIPE).communicate()[0].rstrip()
         return rc
 
     def lodev(file):
-        args = ("/sbin/losetup", "-j", file)
+        args = ("losetup", "-j", file)
         rc = subprocess.Popen(args, stdout=subprocess.PIPE).communicate()[0].split(":")
         return rc[0]
 
@@ -98,7 +98,7 @@ def main():
     def mkimage(bs, count):
         tmp = tempfile.mkstemp()
         image = tmp[1]
-        args = ("/bin/dd", "if=/dev/zero",
+        args = ("dd", "if=/dev/zero",
                  "of=%s"%image, "bs=%s"%bs,
                  "count=%s"%count)
         rc = subprocess.call(args)
@@ -134,7 +134,7 @@ def main():
         disk.commit()
 
     def format(partition):
-        args = ("/sbin/mke2fs", "-j", partition)
+        args = ("mke2fs", "-j", partition)
         rc = subprocess.call(args)
 
     def mbr(target):
@@ -142,12 +142,12 @@ def main():
         dd(mbr, target)
 
     def getuuid(device):
-        args = ("/sbin/blkid", "-s", "UUID", "-o", "value", device)
+        args = ("blkid", "-s", "UUID", "-o", "value", device)
         rc = subprocess.Popen(args, stdout=subprocess.PIPE).communicate()[0].rstrip()
         return rc
 
     def syslinux(multitmp, config, **args):
-        arg = ("/sbin/extlinux", "--install", multitmp + "/extlinux/")
+        arg = ("extlinux", "--install", multitmp + "/extlinux/")
         rc = subprocess.call(arg)
 
         content = """
