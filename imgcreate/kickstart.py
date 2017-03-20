@@ -121,9 +121,11 @@ class KickstartConfig(object):
         os.chdir("/")
 
     def call(self, args):
-        if not os.path.exists("%s/%s" %(self.instroot, args[0])):
-            raise errors.KickstartError("Unable to run %s!" %(args))
-        return subprocess.call(args, preexec_fn = self.chroot)
+        try:
+            return subprocess.call(args, preexec_fn=self.chroot)
+        except OSError as e:
+            if e.errno == errno.ENOENT:
+                raise errors.KickstartError("Unable to run %s!" %(args))
 
     def apply(self):
         pass
@@ -181,22 +183,21 @@ class TimezoneConfig(KickstartConfig):
 class AuthConfig(KickstartConfig):
     """A class to apply a kickstart authconfig configuration to a system."""
     def apply(self, ksauthconfig):
-        if not os.path.exists(self.path("/usr/sbin/authconfig")):
-            return
 
         auth = ksauthconfig.authconfig or "--useshadow --enablemd5"
-        args = ["/usr/sbin/authconfig", "--update", "--nostart"]
-        self.call(args + auth.split())
+        args = ["authconfig", "--update", "--nostart"]
+        try:
+            subprocess.call(args + auth.split(), preexec_fn=self.chroot)
+        except OSError as e:
+            if e.errno == errno.ENOENT:
+                logging.info('The authconfig command is not available.')
+                return
 
 class FirewallConfig(KickstartConfig):
     """A class to apply a kickstart firewall configuration to a system."""
     def apply(self, ksfirewall):
-        # Check to see if firewalld is available in the install image
-        if not os.path.exists(os.path.join(self.instroot, self.path("/usr/bin/firewall-offline-cmd"))):
-            # Throw a warning indicating firewall configuration is ignored and return
-            logging.warning("firewalld is not installed, ignoring firewall configuration settings!")
-            return
-        args = ["/usr/bin/firewall-offline-cmd"]
+
+        args = ["firewall-offline-cmd"]
         # enabled is None if neither --enable or --disable is passed
         # default to enabled if nothing has been set.
         if ksfirewall.enabled == False:
@@ -213,28 +214,44 @@ class FirewallConfig(KickstartConfig):
         for service in ksfirewall.services:
             args += [ "--service=%s" % (service,) ]
 
-        self.call(args)
+        try:
+            subprocess.call(args, preexec_fn=self.chroot)
+        except OSError as e:
+            # Check to see if firewalld is available in the install image.
+            if e.errno == errno.ENOENT:
+                logging.warning('firewalld is not installed, '
+                                'ignoring firewall configuration settings!')
+                return
 
 class RootPasswordConfig(KickstartConfig):
     """A class to apply a kickstart root password configuration to a system."""
     def lock(self):
-        self.call(["/usr/bin/passwd", "-l", "root"])
+        self.call(["passwd", "-l", "root"])
 
     def set_encrypted(self, password):
-        self.call(["/usr/sbin/usermod", "-p", password, "root"])
+        self.call(["usermod", "-p", password, "root"])
 
     def set_unencrypted(self, password):
-        for p in ("/bin/echo", "/usr/bin/passwd"):
-            if not os.path.exists("%s/%s" %(self.instroot, p)):
-                raise errors.KickstartError("Unable to set unencrypted password due to lack of %s" % p)
 
-        p1 = subprocess.Popen(["/bin/echo", password],
-                              stdout = subprocess.PIPE,
-                              preexec_fn = self.chroot)
-        p2 = subprocess.Popen(["/usr/bin/passwd", "--stdin", "root"],
-                              stdin = p1.stdout,
-                              stdout = subprocess.PIPE,
-                              preexec_fn = self.chroot)
+        try:
+            p1 = subprocess.Popen(["echo", password],
+                                  stdout=subprocess.PIPE,
+                                  preexec_fn=self.chroot)
+        except OSError as e:
+            if e.errno == errno.ENOENT:
+                raise errors.KickstartError("Unable to set unencrypted "
+                                            "password due to lack of 'echo'.")
+
+        try:
+            p2 = subprocess.Popen(["passwd", "--stdin", "root"],
+                                  stdin=p1.stdout,
+                                  stdout=subprocess.PIPE,
+                                  preexec_fn=self.chroot)
+        except OSError as e:
+            if e.errno == errno.ENOENT:
+                raise errors.KickstartError("Unable to set unencrypted "
+                                           "password due to lack of 'passwd'.")
+
         p2.communicate()
 
     def apply(self, ksrootpw):
@@ -249,12 +266,12 @@ class RootPasswordConfig(KickstartConfig):
 class ServicesConfig(KickstartConfig):
     """A class to apply a kickstart services configuration to a system."""
     def apply(self, ksservices):
-        if not os.path.exists(self.path("/sbin/chkconfig")):
-            return
-        for s in ksservices.enabled:
-            self.call(["/sbin/chkconfig", s, "on"])
-        for s in ksservices.disabled:
-            self.call(["/sbin/chkconfig", s, "off"])
+
+        if fs.chrootentitycheck('chkconfig', self.instroot):
+            for s in ksservices.enabled:
+                subprocess.call(['chkconfig', s, 'on'], preexec_fn=self.chroot)
+            for s in ksservices.disabled:
+                subprocess.call(['chkconfig', s, 'off'], preexec_fn=self.chroot)
 
 class XConfig(KickstartConfig):
     """A class to apply a kickstart X configuration to a system."""
@@ -461,10 +478,14 @@ class SelinuxConfig(KickstartConfig):
         if ksselinux.selinux == ksconstants.SELINUX_DISABLED:
             return
 
-        if not os.path.exists(self.path("/sbin/restorecon")):
-            return
-
-        rc = self.call(["/sbin/restorecon", "-p", "-e", "/proc", "-e", "/sys", "-e", "/dev", "-F", "-R", "/"])
+        try:
+            rc = subprocess.call(['restorecon', '-p', '-e', '/proc', '-e',
+                                  '/sys', '-e', '/dev', '-F', '-R', '/'],
+                                 preexec_fn=self.chroot)
+        except OSError as e:
+            if e.errno == errno.ENOENT:
+                logging.info('The restorecon command is not available.')
+                return
         if rc:
             if ksselinux.selinux == ksconstants.SELINUX_ENFORCING:
                 raise errors.KickstartError("SELinux relabel failed.")
