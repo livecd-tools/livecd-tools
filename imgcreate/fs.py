@@ -55,12 +55,14 @@ def chrootentitycheck(entity, chrootdir):
         else:
             return True
 
-def makedirs(dirname):
+def makedirs(dirname, dirmode=None):
     """A version of os.makedirs() that doesn't throw an
     exception if the leaf directory already exists.
     """
+
+    dirmode = dirmode or 0o777
     try:
-        os.makedirs(dirname)
+        os.makedirs(dirname, dirmode)
     except OSError as e:
         if e.errno != errno.EEXIST:
             raise
@@ -94,7 +96,7 @@ def squashfs_compression_type(sqfs_img):
                     break
     return compress_type
 
-def mksquashfs(in_img, out_img, compress_type):
+def mksquashfs(in_img, out_img, compress_type, ops=None):
 # Allow gzip to work for older versions of mksquashfs
     if not compress_type or compress_type == "gzip":
         args = ['mksquashfs', in_img, out_img]
@@ -104,32 +106,41 @@ def mksquashfs(in_img, out_img, compress_type):
     if not sys.stdout.isatty():
         args.append("-no-progress")
 
-    ret = call(args)
+    if ops == 'show-squashing':
+        p = subprocess.Popen(args, stdout=None, stderr=subprocess.STDOUT)
+        p.wait()
+        ret = p.returncode
+    else:
+        ret = call(args)
+
     if ret != 0:
         raise SquashfsError("'%s' exited with error (%d)" %
                             (" ".join(args), ret))
 
-def resize2fs(fs, size=None, minimal=False):
+def resize2fs(fs, size=None, minimal=False, ops=''):
     if minimal and size is not None:
         raise ResizeError("Can't specify both minimal and a size for resize!")
-    if not minimal and size is None:
-        raise ResizeError("Must specify either a size or minimal for resize!")
 
-    e2fsck(fs)
+    args = ['resize2fs', '-p', fs]
+    if ops == 'nocheck':
+        args.append('-f')
+    else:
+        e2fsck(fs)
 
     logging.info("resizing %s" % (fs,))
-    args = ['resize2fs', fs]
     if minimal:
-        args.append("-M")
-    else:
-        args.append("%sK" %(size // 1024,))
+        args.append('-M')
+    elif size:
+        args.append('%sK' %(size // 1024,))
     ret = call(args)
     if ret != 0:
         raise ResizeError("resize2fs returned an error (%d)!" % (ret,))
 
-    ret = e2fsck(fs)
-    if ret != 0:
-        raise ResizeError("fsck after resize returned an error (%d)!" % (ret,))
+    if ops != 'nocheck':
+        ret = e2fsck(fs)
+        if ret != 0:
+            raise ResizeError("fsck after resize returned an error (%d)!" %
+                              (ret,))
 
     return 0
 
@@ -137,50 +148,17 @@ def e2fsck(fs):
     logging.info("Checking filesystem %s" % fs)
     return call(['e2fsck', '-f', '-y', fs])
 
-class BindChrootMount:
-    """Represents a bind mount of a directory into a chroot."""
-    def __init__(self, src, chroot, dest = None):
-        self.src = src
-        self.root = chroot
-
-        if not dest:
-            dest = src
-        self.dest = self.root + "/" + dest
-
-        self.mounted = False
-
-    def mount(self):
-        if self.mounted:
-            return
-
-        makedirs(self.dest)
-        rc = call(['mount', '--bind', self.src, self.dest])
-        if rc != 0:
-            raise MountError("Bind-mounting '%s' to '%s' failed" %
-                             (self.src, self.dest))
-        self.mounted = True
-
-    def unmount(self):
-        if not self.mounted:
-            return
-
-        rc = call(['umount', self.dest])
-        if rc != 0:
-            logging.info("Unable to unmount %s normally, using lazy unmount" % self.dest)
-            rc = call(['umount', '-l', self.dest])
-            if rc != 0:
-                raise MountError("Unable to unmount fs at %s" % self.dest)
-            else:
-                logging.info("lazy umount succeeded on %s" % self.dest)
-                print("lazy umount succeeded on %s" % self.dest, file=sys.stdout)
- 
-        self.mounted = False
 
 class LoopbackMount:
     """LoopbackMount  compatibility layer for old API"""
-    def __init__(self, lofile, mountdir, fstype = None):
-        self.diskmount = DiskMount(LoopbackDisk(lofile,size = 0),mountdir,fstype,rmmountdir = True)
+    def __init__(self, lofile, mountdir, fstype=None, ops=[], dirmode=None):
+        self.diskmount = DiskMount(LoopbackDisk(lofile, size=0, ops=ops,
+                                                dirmode=dirmode),
+                                   mountdir, fstype, rmmountdir=True, ops=ops,
+                                   dirmode=dirmode)
         self.losetup = False
+        self.ops = ops
+        self.dirmode = dirmode
         
     def cleanup(self):
         self.diskmount.cleanup()
@@ -194,7 +172,7 @@ class LoopbackMount:
             self.losetup = False
             self.loopdev = None
 
-    def loopsetup(self):
+    def loopsetup(self, ops=[]):
         if self.losetup:
             return
 
@@ -208,37 +186,50 @@ class LoopbackMount:
 
         self.loopdev = losetupOutput.split()[0]
 
-        rc = call(['losetup', self.loopdev, self.lofile])
+        args = ['losetup', self.loopdev, self.lofile]
+        if not ops:
+            ops = self.ops
+        if '-r' in ops or 'ro' in ops:
+            args += ['-r']
+        if '--direct-io' in ops:
+            args.insert(1, '--direct-io')
+        rc = call(args)
         if rc != 0:
             raise MountError("Failed to allocate loop device for '%s'" %
                              self.lofile)
 
         self.losetup = True
 
-    def mount(self):
-        self.diskmount.mount()
+    def mount(self, ops=[], dirmode=None):
+        self.diskmount.mount(ops, dirmode)
+
 
 class SparseLoopbackMount(LoopbackMount):
     """SparseLoopbackMount  compatibility layer for old API"""
-    def __init__(self, lofile, mountdir, size, fstype = None):
-        self.diskmount = DiskMount(SparseLoopbackDisk(lofile,size),mountdir,fstype,rmmountdir = True)
+    def __init__(self, lofile, mountdir, size, fstype=None, ops=[],
+                 dirmode=None):
+        self.diskmount = DiskMount(SparseLoopbackDisk(lofile, size), mountdir,
+                                   fstype, rmmountdir=True, ops=ops,
+                                   dirmode=dirmode)
 
-    def expand(self, create = False, size = None):
+    def expand(self, create=False, size=None):
         self.diskmount.disk.expand(create, size)
 
-    def truncate(self, size = None):
+    def truncate(self, size=None):
         self.diskmount.disk.truncate(size)
 
     def create(self):
         self.diskmount.disk.create()
 
+
 class SparseExtLoopbackMount(SparseLoopbackMount):
     """SparseExtLoopbackMount  compatibility layer for old API"""
-    def __init__(self, lofile, mountdir, size, fstype, blocksize, fslabel):
+    def __init__(self, lofile, mountdir, size, fstype, blocksize, fslabel,
+                 ops=[], dirmode=None):
         self.diskmount = ExtDiskMount(SparseLoopbackDisk(lofile,size),
                                       mountdir, fstype, blocksize, fslabel,
-                                      rmmountdir=True)
-
+                                      rmmountdir=True, ops=ops,
+                                      dirmode=dirmode)
 
     def __format_filesystem(self):
         self.diskmount.__format_filesystem()
@@ -246,24 +237,25 @@ class SparseExtLoopbackMount(SparseLoopbackMount):
     def create(self):
         self.diskmount.disk.create()
 
-    def resize(self, size = None):
+    def resize(self, size=None):
         return self.diskmount.__resize_filesystem(size)
 
-    def mount(self):
-        self.diskmount.mount()
-        
+    def mount(self, ops='', dirmode=None):
+        self.diskmount.mount(ops, dirmode)
+
     def __fsck(self):
         self.extdiskmount.__fsck()
 
     def __get_size_from_filesystem(self):
         return self.diskmount.__get_size_from_filesystem()
-        
-    def __resize_to_minimal(self):
-        return self.diskmount.__resize_to_minimal()
-        
-    def resparse(self, size = None):
-        return self.diskmount.resparse(size)
-        
+
+    def __resize_to_minimal(self, ops=None):
+        return self.diskmount.__resize_to_minimal(ops=ops)
+
+    def resparse(self, size=None, ops=None):
+        return self.diskmount.resparse(size, ops=ops)
+
+
 class Disk:
     """Generic base object for a disk
 
@@ -271,11 +263,11 @@ class Disk:
     by calling losetup. For RawDisk, this is obviously a no-op. The 'cleanup'
     method must undo the 'create' operation.
     """
-    def __init__(self, size, device = None):
+    def __init__(self, size, device=None):
         self._device = device
         self._size = size
 
-    def create(self):
+    def create(self, ops=[]):
         pass
 
     def cleanup(self):
@@ -283,19 +275,22 @@ class Disk:
 
     def get_device(self):
         return self._device
+
     def set_device(self, path):
         self._device = path
+
     device = property(get_device, set_device)
 
     def get_size(self):
         return self._size
+
     size = property(get_size)
 
 
 class RawDisk(Disk):
     """A Disk backed by a block device.
     Note that create() is a no-op.
-    """  
+    """
     def __init__(self, size, device):
         Disk.__init__(self, size, device)
 
@@ -305,11 +300,14 @@ class RawDisk(Disk):
     def exists(self):
         return True
 
+
 class LoopbackDisk(Disk):
     """A Disk backed by a file via the loop module."""
-    def __init__(self, lofile, size):
+    def __init__(self, lofile, size, ops=[], dirmode=None):
         Disk.__init__(self, size)
         self.lofile = lofile
+        self.ops = ops
+        self.dirmode = dirmode
 
     def fixed(self):
         return False
@@ -317,7 +315,7 @@ class LoopbackDisk(Disk):
     def exists(self):
         return os.path.exists(self.lofile)
 
-    def create(self):
+    def create(self, ops=[]):
         if self.device is not None:
             return
 
@@ -329,10 +327,17 @@ class LoopbackDisk(Disk):
             raise MountError("Failed to allocate loop device for '%s'" %
                              self.lofile)
 
-        device = losetupOutput.split()[0].decode("utf-8")
+        device = losetupOutput.split()[0].decode('utf_8')
+        args = ['losetup', device, self.lofile]
+        if not ops:
+            ops = self.ops
+        if '--direct-io' in ops:
+            args.insert(1, '--direct-io')
+        if '-r' in ops or 'ro' in ops:
+            args += ['-r']
 
         logging.info("Losetup add %s mapping to %s"  % (device, self.lofile))
-        rc = call(['losetup', device, self.lofile])
+        rc = call(args)
         if rc != 0:
             raise MountError("Failed to allocate loop device for '%s'" %
                              self.lofile)
@@ -346,17 +351,18 @@ class LoopbackDisk(Disk):
         self.device = None
 
 
-
 class SparseLoopbackDisk(LoopbackDisk):
     """A Disk backed by a sparse file via the loop module."""
-    def __init__(self, lofile, size):
-        LoopbackDisk.__init__(self, lofile, size)
+    def __init__(self, lofile, size, ops=[], dirmode=None):
+        LoopbackDisk.__init__(self, lofile, size, ops=ops, dirmode=dirmode)
 
-    def expand(self, create = False, size = None):
+    def expand(self, create=False, size=None, dirmode=None):
         flags = os.O_WRONLY
         if create:
             flags |= os.O_CREAT
-            makedirs(os.path.dirname(self.lofile))
+            if dirmode is None:
+                dirmode = self.dirmode
+            makedirs(os.path.dirname(self.lofile), dirmode)
 
         if size is None:
             size = self.size
@@ -370,7 +376,7 @@ class SparseLoopbackDisk(LoopbackDisk):
         os.write(fd, b'\x00')
         os.close(fd)
 
-    def truncate(self, size = None):
+    def truncate(self, size=None):
         if size is None:
             size = self.size
 
@@ -379,9 +385,21 @@ class SparseLoopbackDisk(LoopbackDisk):
         os.ftruncate(fd, size)
         os.close(fd)
 
-    def create(self):
-        self.expand(create = True)
-        LoopbackDisk.create(self)
+    def create(self, ops=[], dirmode=None):
+        self.expand(create=True, dirmode=dirmode)
+        LoopbackDisk.create(self, ops=ops)
+
+
+class ExistingSparseLoopbackDisk(SparseLoopbackDisk):
+    """Don't expand the disk on creation."""
+
+    def __init__(self, lofile, size, ops=[], dirmode=None):
+        SparseLoopbackDisk.__init__(self, lofile, size, ops=ops,
+                                    dirmode=dirmode)
+
+    def create(self, ops=[], dirmode=None):
+        LoopbackDisk.create(self, ops=ops)
+
 
 class Mount:
     """A generic base class to deal with mounting things."""
@@ -397,21 +415,28 @@ class Mount:
     def unmount(self):
         pass
 
+
 class DiskMount(Mount):
     """A Mount object that handles mounting of a Disk."""
-    def __init__(self, disk, mountdir, fstype = None, rmmountdir = True):
+    def __init__(self, disk, mountdir, fstype=None, rmmountdir=True, ops='',
+                 dirmode=None):
         Mount.__init__(self, mountdir)
 
         self.disk = disk
         self.fstype = fstype
+        self.ops = ops
+        self.dirmode = dirmode
         self.rmmountdir = rmmountdir
 
         self.mounted = False
         self.rmdir   = False
+        self.created = False
 
     def cleanup(self):
         Mount.cleanup(self)
+        self.mounted = False
         self.disk.cleanup()
+        self.created = False
 
     def unmount(self):
         if self.mounted:
@@ -420,14 +445,18 @@ class DiskMount(Mount):
             if rc == 0:
                 self.mounted = False
             else:
-                logging.warning("Unmounting directory %s failed, using lazy umount" % self.mountdir)
-                print("Unmounting directory %s failed, using lazy umount" %self.mountdir, file=sys.stdout)
+                logging.warn("Unmounting directory %s failed, using lazy "
+                             "umount" % self.mountdir)
+                print("Unmounting directory %s failed, using lazy umount" %
+                      self.mountdir, file=sys.stdout)
                 rc = call(['umount', '-l', self.mountdir])
                 if rc != 0:
-                    raise MountError("Unable to unmount filesystem at %s" % self.mountdir)
+                    raise MountError("Unable to unmount filesystem at %s" %
+                                     self.mountdir)
                 else:
                     logging.info("lazy umount succeeded on %s" % self.mountdir)
-                    print("lazy umount succeeded on %s" % self.mountdir, file=sys.stdout)
+                    print("lazy umount succeeded on %s" % self.mountdir,
+                          file=sys.stdout)
                     self.mounted = False
 
         if self.rmdir and not self.mounted:
@@ -437,28 +466,38 @@ class DiskMount(Mount):
                 pass
             self.rmdir = False
 
+    def __create(self, ops=''):
+        if not self.created:
+            self.disk.create(ops=ops)
+            self.created = True
 
-    def __create(self):
-        self.disk.create()
-
-
-    def mount(self):
+    def mount(self, ops='', dirmode=None):
         if self.mounted:
             return
 
         if not os.path.isdir(self.mountdir):
+            if dirmode is None:
+                dirmode = self.dirmode
+            dirmode = dirmode or 0o777
             logging.info("Creating mount point %s" % self.mountdir)
-            os.makedirs(self.mountdir)
+            os.makedirs(self.mountdir, dirmode)
             self.rmdir = self.rmmountdir
 
-        self.__create()
+        self.__create(ops=ops)
 
         logging.info("Mounting %s at %s" % (self.disk.device, self.mountdir))
-        args = [ 'mount', self.disk.device, self.mountdir ]
+        args = ['mount', self.disk.device, self.mountdir]
         if self.fstype:
-            args.extend(["-t", self.fstype])
-        if self.fstype == "squashfs":
-            args.extend(["-o", "ro"])
+            args.extend(['-t', self.fstype])
+        if self.fstype == 'squashfs' and 'ro' not in ops:
+            ops += ',ro'
+        if not ops:
+            ops = self.ops
+        if isinstance(ops, list) and ('-r' in ops or 'ro' in ops):
+            args.extend(['-o', 'ro'])
+        else: 
+            args.extend(['-o', ops])
+
         rc = call(args)
         if rc != 0:
             raise MountError("Failed to mount '%s' to '%s'" %
@@ -466,34 +505,120 @@ class DiskMount(Mount):
 
         self.mounted = True
 
+    def remount(self, ops):
+        if not self.mounted:
+            return
+
+        remount_ops = ''.join(('remount,', ops))
+        args = ['mount', '-o', remount_ops, self.mountdir]
+        rc = call(args)
+        if rc != 0:
+            raise MountError("%s of '%s' to '%s' failed." %
+                             (remount_ops, self.disk.device, self.mountdir))
+
+
+class BindChrootMount():
+    """Represents a bind mount of a directory into a chroot."""
+    def __init__(self, src, chroot, dest=None, ops='', dirmode=None):
+        self.src = src
+        self.root = chroot
+        self.ops = ops
+        self.dirmode = dirmode
+
+        if not dest:
+            dest = src
+        self.dest = self.root + '/' + dest
+        self.mountdir = self.dest
+
+        self.mounted = False
+
+    def mount(self, ops='', dirmode=None):
+        if self.mounted:
+            return
+
+        if dirmode is None:
+            dirmode = self.dirmode
+        makedirs(self.dest, dirmode)
+        args = ['mount', '--bind', self.src, self.dest]
+        rc = call(args)
+        if rc != 0:
+            raise MountError("Bind-mounting '%s' to '%s' failed" %
+                             (self.src, self.dest))
+        if not ops:
+            ops = self.ops
+        if '-r' in ops or 'ro' in ops:
+            self.remount('ro')
+
+        self.mounted = True
+
+    def remount(self, ops):
+        if not self.mounted:
+            return
+
+        remount_ops = ''.join(('remount,', ops))
+        args = ['mount', '-o', remount_ops, self.dest]
+        rc = call(args)
+        if rc != 0:
+            raise MountError("%s of '%s' to '%s' failed." %
+                             (remount_ops, self.src, self.dest))
+
+    def unmount(self):
+        if not self.mounted:
+            return
+
+        rc = call(['umount', self.dest])
+        if rc != 0:
+            logging.info("Unable to unmount %s normally, using lazy unmount" %
+                         self.dest)
+            rc = call(['umount', '-l', self.dest])
+            if rc != 0:
+                raise MountError("Unable to unmount fs at %s" % self.dest)
+            else:
+                logging.info("lazy umount succeeded on %s" % self.dest)
+                print("lazy umount succeeded on %s" % self.dest,
+                      file=sys.stdout)
+ 
+        self.mounted = False
+
+    def cleanup(self):
+        self.unmount()
+
+
 class ExtDiskMount(DiskMount):
-    """A DiskMount object that is able to format/resize ext[23] filesystems."""
+    """A DiskMount object that can format/resize ext[234] filesystems."""
     def __init__(self, disk, mountdir, fstype, blocksize, fslabel,
-                 rmmountdir=True):
-        DiskMount.__init__(self, disk, mountdir, fstype, rmmountdir)
+                 rmmountdir=True, ops='', dirmode=None):
+        DiskMount.__init__(self, disk, mountdir, fstype, rmmountdir, ops=ops,
+                           dirmode=dirmode)
         self.blocksize = blocksize
-        self.fslabel = "_" + fslabel
+        self.fslabel = '_' + fslabel
+        self.created = False
 
     def __format_filesystem(self):
-        logging.info("Formating %s filesystem on %s" % (self.fstype, self.disk.device))
-        args = [ 'mkfs.' + self.fstype ]
-        if self.fstype.startswith("ext"):
-            args = args + [ "-F", "-L", self.fslabel, "-m", "1", "-b", str(self.blocksize) ]
-        elif self.fstype == "xfs":
-            args = args + [ "-L", self.fslabel[0:10], "-b", "size=%s" % str(self.blocksize) ]
-        elif self.fstype == "btrfs":
-            args = args + [ "-L", self.fslabel ]
+        logging.info("Formating %s filesystem on %s" % (self.fstype,
+                                                        self.disk.device))
+        call(['wipefs', '-a', self.disk.device])
+        args = ['mkfs.' + self.fstype]
+        if self.fstype.startswith('ext'):
+            args = args + ['-F', '-L', self.fslabel, '-m', '1', '-b',
+                           str(self.blocksize)]
+        elif self.fstype == 'xfs':
+            args = args + ['-L', self.fslabel[0:10], '-b', 'size=%s' %
+                           str(self.blocksize)]
+        elif self.fstype == 'btrfs':
+            args = args + ['-L', self.fslabel]
         args = args + [self.disk.device]
-        print(args)
+        logging.info("Formating args: %s" % args)
         rc = call(args)
 
         if rc != 0:
             raise MountError("Error creating %s filesystem" % (self.fstype,))
-        logging.info("Tuning filesystem on %s" % self.disk.device)
-        call(['tune2fs', "-c0", "-i0", "-Odir_index",
-              "-ouser_xattr,acl", self.disk.device])
+        if self.fstype.startswith('ext'):
+            logging.info('Tuning filesystem on %s' % self.disk.device)
+            call(['tune2fs', '-c0', '-i0', '-Odir_index',
+                  '-ouser_xattr,acl', self.disk.device])
 
-    def __resize_filesystem(self, size = None):
+    def __resize_filesystem(self, size=None, ops=''):
         current_size = os.stat(self.disk.lofile)[stat.ST_SIZE]
 
         if size is None:
@@ -503,26 +628,33 @@ class ExtDiskMount(DiskMount):
             return
 
         if size > current_size:
-            self.disk.expand(size)
+            self.disk.expand(size=size)
 
-        resize2fs(self.disk.lofile, size)
+        if self.fstype.startswith('ext'):
+            resize2fs(self.disk.lofile, size, ops=ops)
+        elif size < current_size:
+            self.disk.truncate(size=size)
         return size
 
-    def __create(self):
+    def __create(self, ops=''):
+        if self.created:
+            return
         resize = False
         if not self.disk.fixed() and self.disk.exists():
             resize = True
 
-        self.disk.create()
+        self.disk.create(ops=ops)
 
         if resize:
-            self.__resize_filesystem()
-        else:
+            self.__resize_filesystem(ops=ops)
+        elif ops != 'raw':
             self.__format_filesystem()
 
-    def mount(self):
-        self.__create()
-        DiskMount.mount(self)
+        self.created = True
+
+    def mount(self, ops='', dirmode=None):
+        self.__create(ops)
+        DiskMount.mount(self, ops, dirmode)
 
     def __fsck(self):
         return e2fsck(self.disk.lofile)
@@ -530,37 +662,39 @@ class ExtDiskMount(DiskMount):
 
     def __get_size_from_filesystem(self):
         def parse_field(output, field):
-            for line in output.split(b"\n"):
-                if line.startswith(field.encode("utf-8") + b":"):
+            for line in output.split(b'\n'):
+                if line.startswith(field.encode('utf_8') + b':'):
                     return line[len(field) + 1:].strip()
 
             raise KeyError("Failed to find field '%s' in output" % field)
 
-        dev_null = os.open("/dev/null", os.O_WRONLY)
+        dev_null = os.open('/dev/null', os.O_WRONLY)
         try:
             out = subprocess.Popen(['dumpe2fs', '-h', self.disk.lofile],
-                                   stdout = subprocess.PIPE,
-                                   stderr = dev_null).communicate()[0]
+                                   stdout=subprocess.PIPE,
+                                   stderr=dev_null).communicate()[0]
         finally:
             os.close(dev_null)
 
         return int(parse_field(out, "Block count")) * self.blocksize
 
-    def __resize_to_minimal(self):
-        resize2fs(self.disk.lofile, minimal=True)
+    def __resize_to_minimal(self, ops=''):
+        resize2fs(self.disk.lofile, minimal=True, ops=ops)
         return self.__get_size_from_filesystem()
 
-    def resparse(self, size = None):
+    def resparse(self, size=None, ops=None):
         self.cleanup()
-        minsize = self.__resize_to_minimal()
+        minsize = self.__resize_to_minimal(ops=ops)
         self.disk.truncate(minsize)
-        self.__resize_filesystem(size)
+        self.__resize_filesystem(size, ops=ops)
         return minsize
 
+
 class DeviceMapperSnapshot(object):
-    def __init__(self, imgloop, cowloop):
+    def __init__(self, imgloop, cowloop, ops=[]):
         self.imgloop = imgloop
         self.cowloop = cowloop
+        self.persistent = 'PO'
 
         self.__created = False
         self.__name = None
@@ -568,36 +702,52 @@ class DeviceMapperSnapshot(object):
     def get_path(self):
         if self.__name is None:
             return None
-        return os.path.join("/dev/mapper", self.__name)
+        return os.path.join('/dev/mapper', self.__name)
     path = property(get_path)
 
-    def create(self):
+    def create(self, ops=[]):
         if self.__created:
             return
 
-        self.imgloop.create()
-        self.cowloop.create()
+        self.imgloop.create(ops=ops)
+        self.cowloop.create(ops=ops)
 
-        self.__name = "imgcreate-%d-%d" % (os.getpid(),
-                                           random.randint(0, 2**16))
+        self.DeviceMapperTarget__name = self.__name = 'imgcreate-%d-%d' % (
+            os.getpid(), random.randint(0, 2**16))
 
         size = os.stat(self.imgloop.lofile)[stat.ST_SIZE]
 
-        table = "0 %d snapshot %s %s p 8" % (size // 512,
-                                             self.imgloop.device,
-                                             self.cowloop.device)
+        if '--readonly' in ops or '-r' in ops or 'ro' in ops:
+            self.persistent = 'P'
+        if 'tmpfs' == rcall(['df', '--output=fstype',
+                             self.cowloop.lofile])[0].split()[1] or 'N' in ops:
+            self.persistent = 'N'
+        if 'P' in ops:
+            self.persistent = 'P'
+        if 'PO' in ops:
+            self.persistent = 'PO'
+
+        table = '0 %d snapshot %s %s %s 8' % (size // 512,
+                                              self.imgloop.device,
+                                              self.cowloop.device,
+                                              self.persistent)
 
         args = ['dmsetup', 'create', self.__name, '-vv', '--verifyudev',
                 '--uuid', 'LIVECD-%s' % self.__name, '--table', table]
+
+        if '--readonly' in ops or '-r' in ops or 'ro' in ops:
+            args += ['--readonly']
         if call(args) != 0:
+            time.sleep(1)
             self.cowloop.cleanup()
             self.imgloop.cleanup()
-            raise SnapshotError("Could not create snapshot device using: " +
-                                " ".join(args))
+            raise SnapshotError('Could not create snapshot device using: ' +
+                                ' '.join(args))
 
         self.__created = True
+        self.device = os.path.join('/dev/mapper', self.__name)
 
-    def remove(self, ignore_errors = False):
+    def remove(self, ignore_errors=False):
         if not self.__created:
             return
 
@@ -605,37 +755,43 @@ class DeviceMapperSnapshot(object):
         time.sleep(2)
         rc = call(['dmsetup', 'remove', self.__name])
         if not ignore_errors and rc != 0:
-            raise SnapshotError("Could not remove snapshot device")
+            raise SnapshotError('Could not remove snapshot device.')
 
-        self.__name = None
+        self.DeviceMapperTarget__name = self.__name = None
         self.__created = False
 
         self.cowloop.cleanup()
         self.imgloop.cleanup()
 
+    def cleanup(self):
+        self.remove()
+
     def get_cow_used(self):
         if not self.__created:
             return 0
 
-        dev_null = os.open("/dev/null", os.O_WRONLY)
+        dev_null = os.open('/dev/null', os.O_WRONLY)
         try:
             out = subprocess.Popen(['dmsetup', 'status', self.__name],
-                                   stdout = subprocess.PIPE,
-                                   stderr = dev_null).communicate()[0]
+                                   stdout=subprocess.PIPE,
+                                   stderr=dev_null).communicate()[0]
         finally:
             os.close(dev_null)
 
-        #
-        # dmsetup status on a snapshot returns e.g.
-        #   "0 8388608 snapshot 416/1048576"
-        # or, more generally:
-        #   "A B snapshot C/D"
-        # where C is the number of 512 byte sectors in use
-        #
+        # dmsetup status on a snapshot returns, e.g.,
+        #   "0 8388608 snapshot 416/1048576 260"
+        # following the pattern:
+        #   "A B snapshot C/D E"
+        # where C is the number of 512 byte sectors allocated
+        #  from D          "        "   "     "     in the overlay
+        #   and E          "        "   "     "     of metadata
+        #       A is the start sector of the filesystem
+        #       B        size of the filesystem in 512 byte sectors.
         try:
             return int((out.split()[3]).split(b'/')[0]) * 512
         except ValueError:
             raise SnapshotError("Failed to parse dmsetup status: " + out)
+
 
 def create_image_minimizer(path, image, compress_type, target_size=None):
     """
