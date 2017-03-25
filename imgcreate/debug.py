@@ -1,7 +1,7 @@
 #
 # debug.py: Helper routines for debugging
 #
-# Copyright 2008, Red Hat  Inc.
+# Copyright 2008, 2017, Red Hat, Inc.
 # Copyright 2016, Neal Gompa
 #
 # This program is free software; you can redistribute it and/or modify
@@ -21,7 +21,42 @@
 import logging
 import logging.handlers
 import optparse
+import argparse
 import sys
+
+
+class LoggingConfig(argparse.Action):
+    """Class for handling logging setup."""
+
+    def __init__(self, option_strings, dest, logger, **kwargs):
+        super(LoggingConfig, self).__init__(option_strings, dest, **kwargs)
+        self.logger = logger
+
+    def __call__(self, parser, namespace, values, option_string=None):
+
+        if self.dest == 'debug':
+            if logging.DEBUG < self.logger.level:
+                self.logger.setLevel(logging.DEBUG)
+                values = True
+
+        elif self.dest == 'verbose':
+            if logging.INFO < self.logger.level:
+                self.logger.setLevel(logging.INFO)
+                values = True
+
+        elif self.dest == 'quiet':
+            self.logger.removeHandler(stream)
+            values = True
+
+        elif self.dest == 'logfile':
+            try:
+                logfile = logging.FileHandler(values, 'a')
+            except IOError as e:
+                raise argparse.ArgumentError("Cannot open file '%s' : %s" %
+                                             (values, e.strerror))
+            self.logger.addHandler(logfile)
+
+        setattr(namespace, self.dest, values)
 
 
 def handle_logging(option, opt, val, parser, logger, level):
@@ -53,7 +88,9 @@ def setup_logging(parser = None):
     Note, to avoid possible namespace clashes, setup_logging() will only ever
     add these three options. No new options will be added in the future.
 
-    parser -- an optparse.OptionParser instance, or None
+    parser -- an optparse.OptionParser instance,
+              an argparse.ArgumentParser, or
+              None
 
     """
     logger = logging.getLogger()
@@ -66,28 +103,50 @@ def setup_logging(parser = None):
 
     if parser is None:
         return
+    elif isinstance(parser, argparse.ArgumentParser):
+        group = parser.add_argument_group('Debugging options',
+                                 'These options control the output of logging '
+                                 'information during image creation.')
 
-    group = optparse.OptionGroup(parser, "Debugging options",
-                                 "These options control the output of logging information during image creation")
+        group.add_argument('-d', '--debug', metavar='', nargs=0,
+                           action=LoggingConfig, logger=logger,
+                           help='Output debugging information.\n ')
 
-    group.add_option("-d", "--debug",
-                     action = "callback", callback = handle_logging,
-                     callback_args = (logger, logging.DEBUG),
-                     help = "Output debugging information")
+        group.add_argument('-v', '--verbose', metavar='', nargs=0,
+                           action=LoggingConfig, logger=logger,
+                           help='Output verbose progress information.\n ')
 
-    group.add_option("-v", "--verbose",
-                     action = "callback", callback = handle_logging,
-                     callback_args = (logger, logging.INFO),
-                     help = "Output verbose progress information")
+        group.add_argument('-q', '--quiet', metavar='', nargs=0,
+                           action=LoggingConfig, logger=logger,
+                           help='Suppress stdout.\n ')
 
-    group.add_option("-q", "--quiet",
-                     action = "callback", callback = handle_quiet,
-                     callback_args = (logger, stream),
-                     help = "Supress stdout")
+        group.add_argument('--logfile', metavar='PATH',
+                           action=LoggingConfig, logger=logger,
+                           help='Save debug information to PATH.\n ')
 
-    group.add_option("", "--logfile", type="string",
-                     action = "callback", callback = handle_logfile,
-                     callback_args = (logger,),
-                     help = "Save debug information to FILE", metavar = "FILE")
+    elif isinstance(parser, optparse.OptionParser):
+        group = optparse.OptionGroup(parser, "Debugging options",
+                                 "These options control the output of logging "
+                                 "information during image creation.")
 
-    parser.add_option_group(group)
+        group.add_option("-d", "--debug",
+                         action = "callback", callback = handle_logging,
+                         callback_args = (logger, logging.DEBUG),
+                         help = "Output debugging information")
+
+        group.add_option("-v", "--verbose",
+                         action = "callback", callback = handle_logging,
+                         callback_args = (logger, logging.INFO),
+                         help = "Output verbose progress information")
+
+        group.add_option("-q", "--quiet",
+                         action = "callback", callback = handle_quiet,
+                         callback_args = (logger, stream),
+                         help = "Suppress stdout")
+
+        group.add_option("", "--logfile", type="string",
+                         action = "callback", callback = handle_logfile,
+                         callback_args = (logger,),
+                         help="Save debug information to FILE", metavar="FILE")
+
+        parser.add_option_group(group)
