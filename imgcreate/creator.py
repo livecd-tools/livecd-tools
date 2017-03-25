@@ -1,9 +1,10 @@
 #
 # creator.py : ImageCreator and LoopImageCreator base classes
 #
-# Copyright 2007, Red Hat  Inc.
+# Copyright 2007, Red Hat, Inc.
 # Copyright 2016, Kevin Kofler
 # Copyright 2016, Neal Gompa
+# Copyright 2017, Fedora Project
 #
 # Portions from Anaconda dnfpayload.py
 # DNF/rpm software payload management.
@@ -43,6 +44,7 @@ from imgcreate import kickstart
 
 FSLABEL_MAXLEN = 32
 """The maximum string length supported for LoopImageCreator.fslabel."""
+
 
 class ImageCreator(object):
     """Installs a system to a chroot directory.
@@ -481,7 +483,7 @@ class ImageCreator(object):
                 os.symlink(src, self._instroot + dest)
         os.umask(origumask)
 
-    def __create_selinuxfs(self):
+    def __create_selinuxfs(self, force=False):
         if not os.path.exists(self.__selinux_mountpoint):
             return
 
@@ -489,7 +491,7 @@ class ImageCreator(object):
                    self._instroot + self.__selinux_mountpoint + "/load"]
         subprocess.call(arglist, close_fds = True)
 
-        if kickstart.selinux_enabled(self.ks):
+        if force or kickstart.selinux_enabled(self.ks):
             # label the fs like it is a root before the bind mounting
             arglist = ["setfiles", "-F", "-r", self._instroot,
                        selinux.selinux_file_context_path(), self._instroot]
@@ -810,7 +812,7 @@ class ImageCreator(object):
         """
         subprocess.call("bash", preexec_fn=self._chroot)
 
-    def package(self, destdir = "."):
+    def package(self, destdir='.', ops=None):
         """Prepares the created image for final delivery.
 
         In its simplest form, this method merely copies the install root to the
@@ -821,8 +823,11 @@ class ImageCreator(object):
         destdir -- the directory into which the final image should be moved;
                    this defaults to the current directory.
 
+        ops     -- options, e.g., 'show-squashing', passed to subsequent
+                   procedures.
+
         """
-        self._stage_final_image()
+        self._stage_final_image(ops)
 
         for f in os.listdir(self._outdir):
             shutil.move(os.path.join(self._outdir, f),
