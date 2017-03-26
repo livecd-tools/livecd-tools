@@ -1,8 +1,9 @@
 #
 # debug.py: Helper routines for debugging
 #
-# Copyright 2008, 2017, Red Hat, Inc.
+# Copyright 2008, Red Hat, Inc.
 # Copyright 2016, Neal Gompa
+# Copyright 2017, Fedora Project
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
