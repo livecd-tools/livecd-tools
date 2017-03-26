@@ -1,7 +1,8 @@
 #
 # errors.py : exception definitions
 #
-# Copyright 2007, Red Hat  Inc.
+# Copyright 2007, Red Hat, Inc.
+# Copyright 2017, Fedora Project
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,6 +27,8 @@ class KickstartError(CreatorError):
 class MountError(CreatorError):
     pass
 class SnapshotError(CreatorError):
+    pass
+class CryptoLUKSError(CreatorError):
     pass
 class SquashfsError(CreatorError):
     pass
