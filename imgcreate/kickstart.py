@@ -466,10 +466,7 @@ class SelinuxConfig(KickstartConfig):
 
         rc = self.call(["/sbin/setfiles", "-p", "-e", "/proc", "-e", "/sys", "-e", "/dev", selinux.selinux_file_context_path(), "/"])
         if rc:
-            if ksselinux.selinux == ksconstants.SELINUX_ENFORCING:
-                raise errors.KickstartError("SELinux relabel failed.")
-            else:
-                logging.error("SELinux relabel failed.")
+            logging.error("SELinux relabel failed.")
 
     def apply(self, ksselinux):
         selinux_config = "/etc/selinux/config"
