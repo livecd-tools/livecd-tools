@@ -31,7 +31,8 @@ shortusage() {
     livecd-iso-to-disk [--help] [--noverify] [--format] [--msdos] [--reset-mbr]
                        [--efi] [--skipcopy] [--force] [--xo] [--xo-no-home]
                        [--timeout <duration>] [--totaltimeout <duration>]
-                       [--extra-kernel-args <args>] [--multi] [--livedir <dir>]
+                       [--nobootmsg] [--nomenu] [--extra-kernel-args <args>]
+                       [--multi] [--livedir <dir>] [--compress]
                        [--compress] [--skipcompress] [--no-overlay]
                        [--overlay-size-mb <size>] [--reset-overlay]
                        [--home-size-mb <size>] [--delete-home] [--crypted-home]
@@ -207,6 +208,13 @@ usage() {
         boot.  This timeout cannot be canceled by the user.  Units are 1/10 s.
         A totaltimeout of zero will disable the timeout completely.
         (This setting is not available in EFI GRUB.)
+
+    --nobootmsg
+        Do not display boot.msg, usually, \"Press the <ENTER> key to begin the
+        installation process.\"
+
+    --nomenu
+        Skip the boot menu, and automatically boot the 'linux' label item.
 
     --extra-kernel-args <args>
         Specifies additional kernel arguments, <args>, that will be inserted
@@ -855,6 +863,12 @@ while true ; do
             checkint $2 totaltimeout
             totaltimeout=$2
             shift
+            ;;
+        --nobootmsg)
+            nobootmsg=1
+            ;;
+        --nomenu)
+            nomenu=1
             ;;
         --extra-kernel-args)
             kernelargs=$2
@@ -1601,6 +1615,15 @@ if [[ $overlay == none ]]; then
            ' $BOOTCONFIG $BOOTCONFIG_EFI
 fi
 
+# Don't display boot.msg.
+if [[ $nobootmsg == 1 ]]; then
+    sed -i '/display boot.msg/d' $BOOTCONFIG $BOOTCONFIG_EFI
+fi
+# Skip the menu, and boot 'linux'.
+if [[ $nomenu == 1 ]]; then
+    sed -i 's/default vesamenu.c32/default linux/' $BOOTCONFIG $BOOTCONFIG_EFI
+fi
+
 if ((overlaysizemb > 0)); then
     echo "Initializing persistent overlay file"
     if [[ -z $skipcopy ]]; then
@@ -1851,3 +1874,4 @@ fi
 
 [[ -n $multi ]] && multi=Multi\ 
 echo "Target device is now set up with a ${multi}Live image!"
+

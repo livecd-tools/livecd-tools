@@ -6,7 +6,7 @@ livecd-iso-to-disk - Installs bootable Live images onto USB/SD storage devices.
 
 =head1 SYNOPSIS
 
-B<livecd-iso-to-disk>  [--help] [--noverify] [--format] [--msdos] [--reset-mbr] [--efi] [--skipcopy] [--force] [--xo] [--xo-no-home] [--timeout <duration>] [--totaltimeout <duration>] [--extra-kernel-args <args>] [--multi] [--livedir <dir>] [--compress] [--skipcompress] [--no-overlay] [--overlay-size-mb <size>] [--reset-overlay] [--home-size-mb <size>] [--delete-home] [--crypted-home] [--unencrypted-home] [--swap-size-mb <size>] [--updates <updates.img>] [--ks <kickstart>] [--label <label>] <source> <target device>
+B<livecd-iso-to-disk>  [--help] [--noverify] [--format] [--msdos] [--reset-mbr] [--efi] [--skipcopy] [--force] [--xo] [--xo-no-home] [--timeout <duration>] [--totaltimeout <duration>] [--nobootmsg] [--nomenu] [--extra-kernel-args <args>] [--multi] [--livedir <dir>] [--compress] [--skipcompress] [--no-overlay] [--overlay-size-mb <size>] [--reset-overlay] [--home-size-mb <size>] [--delete-home] [--crypted-home] [--unencrypted-home] [--swap-size-mb <size>] [--updates <updates.img>] [--ks <kickstart>] [--label <label>] <source> <target device>
 
 Simplest
 
@@ -103,6 +103,14 @@ Enter a desired timeout value in 1/10 second units (or '-1') and the appropriate
 =item --totaltimeout <duration>
 
 Adds a SYSLINUX bootloader totaltimeout, which indicates how long to wait before booting automatically.  This is used to force an automatic boot.  This timeout cannot be canceled by the user.  Units are 1/10 s.  A totaltimeout of zero will disable the timeout completely.  (This setting is not available in EFI GRUB.)
+
+=item --nobootmsg
+
+Do not display boot.msg, usually, \"Press the <ENTER> key to begin the installation process.\"
+
+=item --nomenu
+
+Skip the boot menu, and automatically boot the 'linux' label item.
 
 =item --extra-kernel-args <args>
 
