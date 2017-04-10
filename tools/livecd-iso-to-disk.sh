@@ -417,8 +417,8 @@ getdisk() {
     elif [[ -e /sys/$p/device ]]; then
         device=${p##*/}
     else
-        p=$(readlink -f /sys/$p/../)
-        device=${p##*/}
+        q=$(readlink -f /sys/$p/../)
+        device=${q##*/}
     fi
     if [[ -z $device || ! -e /sys/block/$device || ! -e /dev/$device ]]; then
         echo "Error finding block device of $DEV.  Aborting!"
@@ -980,12 +980,6 @@ fi
 checkSyslinuxVersion
 checkMounted $TGTDEV
 checkFilesystem $TGTDEV
-if [[ -n $efi ]]; then
-    checkGPT $TGTDEV
-else
-  # Because we can't set boot flag for EFI Protective on msdos partition tables
-    checkPartActive $TGTDEV
-fi
 
 if [[ $LIVEOS =~ [[:space:]] ]]; then
     printf "\n    ALERT:
@@ -1086,7 +1080,15 @@ if [[ -n $format && -z $skipcopy ]]; then
     fi
 fi
 
+if [[ -n $efi ]]; then
+    checkGPT $TGTDEV
+else
+  # Because we can't set boot flag for EFI Protective on msdos partition tables
+    checkPartActive $TGTDEV
+fi
+
 [[ -n $resetmbr ]] && resetMBR $TGTDEV
+
 checkMBR $TGTDEV
 
 fs_label_msg() {
