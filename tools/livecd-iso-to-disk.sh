@@ -406,10 +406,6 @@ getdisk() {
     fi
 
     p=$(udevadm info -q path -n $DEV)
-    if [[ $? -gt 0 ]]; then
-        echo "Error getting udev path to $DEV"
-        exitclean
-    fi
     if [[ -n $loop ]]; then
         node=${DEV#/dev/loop}
         p=${DEV##*/}
@@ -426,7 +422,6 @@ getdisk() {
     fi
 
     device="/dev/$device"
-    # FIXME: weird dev names could mess this up I guess
     p=/dev/${p##*/}
     p=${p##$device}
     # Strip off leading p from partnum, e.g., with /dev/mmcblk0p1
@@ -434,8 +429,8 @@ getdisk() {
 }
 
 get_partition1() {
-    # Get the name of partition one. Devices that end with a digit need to have
-    # a 'p' appended before the partition number.
+    # Return an appropriate name for partition one. Devices that end with a
+    # digit need to have a 'p' appended before the partition number.
     local dev=$1
 
     if [[ $dev =~ .*[0-9]+$ ]]; then
@@ -529,7 +524,10 @@ createGPTLayout() {
     sleep 5
     TGTDEV=$(get_partition1 ${device})
     umount $TGTDEV &> /dev/null || :
-    mkdosfs -n "$label" $TGTDEV
+    mkfs.fat -n "$label" $TGTDEV
+    udevadm settle
+    # mkfs.fat silently truncates label to 11 bytes.
+    label=$(lsblk -ndo LABEL $TGTDEV)
 }
 
 createMSDOSLayout() {
@@ -552,7 +550,10 @@ createMSDOSLayout() {
     sleep 5
     TGTDEV=$(get_partition1 ${device})
     umount $TGTDEV &> /dev/null || :
-    mkdosfs -n "$label" $TGTDEV
+    mkfs.fat -n "$label" $TGTDEV
+    udevadm settle
+    # mkfs.fat silently truncates label to 11 bytes.
+    label=$(lsblk -ndo LABEL $TGTDEV)
 }
 
 createEXTFSLayout() {
@@ -583,6 +584,9 @@ createEXTFSLayout() {
         mkfs=mkfs.ext4
     fi
     $mkfs -O ^64bit -L "$label" $TGTDEV
+    udevadm settle
+    # mkfs.ext[34] truncate labels to 16 bytes.
+    label=$(lsblk -ndo LABEL $TGTDEV)
 }
 
 checkGPT() {
@@ -1005,8 +1009,10 @@ if ((overlaysizemb > 0)); then
         exitclean
     fi
     [[ -z $label ]] && label=$(lsblk -no LABEL $TGTDEV)
-    # Remove newline, if present such as for a loop device, from parent device.
-    label="${label#$'\n'}"
+    # Remove newline, if parent device is passed, such as for a loop device.
+    label=${label#$'\n'}
+    # If more than one partition is present, use label from first.
+    label=${label%$'\n'*}
     if [[ $label =~ [[:space:]] ]]; then
         printf '\n        ALERT:
         The LABEL (%s) on %s has spaces, newlines, or tabs in it.
@@ -1109,32 +1115,19 @@ labelTargetDevice() {
     local dev=$1
 
     TGTLABEL=$(lsblk -no LABEL $dev)
-    # Remove newline, if present such as for a loop device, of parent device.
-    TGTLABEL="${TGTLABEL#$'\n'}"
+    # Remove newline, if parent device is passed, such as for a loop device.
+    TGTLABEL=${TGTLABEL#$'\n'}
+    # If more than one partition is present, use label from first.
+    TGTLABEL=${TGTLABEL%$'\n'*}
     TGTLABEL=${TGTLABEL//[[:space:]]/_}
     [[ -z $TGTLABEL && -z $label ]] && label=LIVE
     if [[ -n $label && $TGTLABEL != "$label" ]]; then
         if [[ $TGTFS == @(vfat|msdos) ]]; then
             fatlabel $dev "$label"
-            if (($? > 0)); then
-                echo "
-                ERROR:   fatlabel failed on $dev, device not setup."
-                fs_label_msg
-            fi
         elif [[ $TGTFS == ext[234] ]]; then
             e2label $dev "$label"
-            if (($? > 0)); then
-                echo "
-                ERROR:   e2label failed on $dev, device not setup."
-                fs_label_msg
-            fi
         elif [[ $TGTFS == btrfs ]]; then
             btrfs filesystem label $dev "$label"
-            if (($? > 0)); then
-                echo "
-                ERROR:   btrfs filesystem label failed. '$dev' not setup."
-                fs_label_msg
-            fi
         else
             printf "
             ALERT:  Unknown filesystem type.
