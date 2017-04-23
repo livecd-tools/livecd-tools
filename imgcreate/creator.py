@@ -95,7 +95,7 @@ class ImageCreator(object):
 
         self.__builddir = None
         self.__bindmounts = []
-        self.__fstype = kickstart.get_image_fstype(self.ks, "ext3")
+        self.__fstype = kickstart.get_image_fstype(self.ks, "ext4")
 
         self.__sanity_check()
 
