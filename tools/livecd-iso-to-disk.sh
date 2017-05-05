@@ -1319,9 +1319,6 @@ checklivespace() {
     duTable=($(du -c -B 1M "$0" $sources 2> /dev/null || :))
     livesize=$((livesize + ${duTable[*]: -2:1} + 1))
 
-    freespace=($(df -B 1M $TGTDEV))
-    freespace=${freespace[*]: -3:1}
-
     tba=$((overlaysizemb + homesizemb + livesize + swapsizemb))
     if ((tba > freespace + tbd)); then
         needed=$((tba - freespace - tbd))
@@ -1344,6 +1341,9 @@ checklivespace() {
         exitclean
     fi
 }
+freespace=($(df -B 1M $TGTDEV))
+freespace=${freespace[*]: -3:1}
+
 [[ -z $skipcopy && live == $srctype ]] && checklivespace
 
 # Verify available space for DVD installer
