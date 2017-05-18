@@ -647,6 +647,9 @@ checkFilesystem() {
     fi
     if [[ $TGTFS == @(vfat|msdos) ]]; then
         tgtmountopts='-o shortname=winnt,umask=0077'
+        CONFIG_FILE=syslinux.cfg
+    else
+        CONFIG_FILE=extlinux.conf
     fi
 }
 
@@ -1522,27 +1525,39 @@ if [[ $srctype == live ]]; then
     # When the source is an installed Live USB/SD image, restore the boot
     # config file to a base state before updating.
     if [[ -d $SRCMNT/syslinux/ ]]; then
-        echo "Preparing boot config file."
+        echo "Preparing boot config files."
         title=$(sed -n -r '/^\s*label\s+linux/{n
-                           s/^\s*menu\s+label\s+\^Start\s+(.*)/\1/;s/;/:/gp}
+                           s/^\s*menu\s+label\s+\^Start\s+(.*)/\1/p}
                           ' $BOOTCONFIG)
+        # Delete all labels before the 'linux' menu label.
         sed -i -r '/^\s*label .*/I,/^\s*label linux\>/I{
                    /^\s*label linux\>/I ! {N;N;N;N
-                   /\<kernel\s+vesamenu.c32\>/d};}' $BOOTCONFIG
+                   /\<kernel\s+[^ ]*menu.c32\>/d};}' $BOOTCONFIG
+        sed -i -r '/^\s*menu\s+end/I,$ {
+                   /^\s*menu\s+end/I ! d}' $BOOTCONFIG
+        # Keep only the menu entries up through the first submenu.
+        sed -i -r "/\s+}$/ { N
+                   /\n}$/ { n;Q}}" $BOOTCONFIG_EFI
+        # Restore configuration entries to a base state.
+        # And, if --multi, distinguish the new menuentry with $LIVEOS.
+        [[ -f $TGTMNT/EFI_previous ]] && livedir=$LIVEOS\ 
         sed -i -r "s/^\s*timeout\s+.*/timeout 600/I
 /^\s*totaltimeout\s+.*/Iz
-s;(^\s*menu\s+title\s+Welcome\s+to)\s+.*;\1 $title;I
-s/\<(initrd=initrd.?.img)\>\s+[^\n.]*\<(root=live:[^\s+]*)/\1 \2/
-s/\<(root=live:[^ ]*)\s+[^\n.]*\<(r*d*.*live.*ima*ge*)/\1 \2/
-/^\s*label\s+linux\>/I,/^\s*label\s+check\>/Is/(r*d*.*live.*ima*ge*).*/\1 quiet/
-/^\s*label\s+check\>/I,/^\s*label\s+vesa\>/Is/(r*d*.*live.*ima*ge*).*/\1 rd.live.check quiet/
-/^\s*label\s+vesa\>/I,/^\s*label\s+memtest\>/Is/(r*d*.*live.*ima*ge*).*/\1 nomodeset quiet/
+s/(^\s*menu\s+title\s+Welcome\s+to)\s+.*/\1 $title/I
+s/\<(kernel)\>\s+[^\n.]*(vmlinuz.?)/\1 \2/
+s/\<(initrd=).*(initrd.?\.img)\>/\1\2/
+s/\<(root=live:[^ ]*)\s+[^\n.]*\<(rd\.live\.image|liveimg)/\1 \2/
+/^\s*label\s+linux\>/I,/^\s*label\s+check\>/Is/(rd\.live\.image|liveimg).*/\1 quiet/
+/^\s*label\s+check\>/I,/^\s*label\s+vesa\>/Is/(rd\.live\.image|liveimg).*/\1 rd.live.check quiet/
+/^\s*label\s+vesa\>/I,/^\s*label\s+memtest\>/Is/(rd\.live\.image|liveimg).*/\1 nomodeset quiet/
 s/^\s*set\s+timeout=.*/set timeout=60/
-/^\s*menuentry\s+'Start\s+/,/\s+}/s/(r*d*.*live.*ima*ge*).*/\1 quiet/
-/^\s*menuentry\s+'Test\s+/,/\s+}/s/(r*d*.*live.*ima*ge*).*/\1 rd.live.check quiet/
-/^\s*submenu\s+'Trouble/,/\s+}/s/(r*d*.*live.*ima*ge*).*/\1 nomodeset quiet/
+/^\s*menuentry\s+'Start\s+/,/\s+}/{s/\s+'Start\s+/&$livedir/
+s/(rd\.live\.image|liveimg).*/\1 quiet/}
+/^\s*menuentry\s+'Test\s+/,/\s+}/{s/\s+&\s+start\s+/&$livedir/
+s/(rd\.live\.image|liveimg).*/\1 rd.live.check quiet/}
+/^\s*submenu\s+'Trouble/,/\s+}/s/(rd\.live\.image|liveimg).*/\1 nomodeset quiet/
 s/(linuxefi\s+[^ ]+vmlinuz.?)\s+.*\s+(root=live:[^\s+]*)/\1 \2/
-s;(linuxefi|initrdefi)\s+[^ ]+(initrd.?.img|vmlinuz.?);\1 /images/pxeboot/\2;
+s_(linuxefi|initrdefi)\s+[^ ]+(initrd.?\.img|vmlinuz.?)_\1 /images/pxeboot/\2_
                   " $BOOTCONFIG $BOOTCONFIG_EFI
     fi
 fi
@@ -1568,8 +1583,8 @@ if [[ -n $kernelargs ]]; then
                s;\<vmlinuz.\?\>;& ${kernelargs} ;" $BOOTCONFIG $BOOTCONFIG_EFI
 fi
 if [[ $LIVEOS != LiveOS ]]; then
-    sed -i "s;r*d*.*live.*ima*ge*;& rd.live.dir=$LIVEOS;
-           " $BOOTCONFIG $BOOTCONFIG_EFI
+    sed -i -r "s;rd\.live\.image|liveimg;& rd.live.dir=$LIVEOS;
+              " $BOOTCONFIG $BOOTCONFIG_EFI
 fi
 
 if [[ -n $BOOTCONFIG_EFI ]]; then
@@ -1606,17 +1621,17 @@ if [[ -n $totaltimeout ]]; then
 fi
 
 if [[ $overlay == none ]]; then
-    sed -i 's/r*d*.*live.*ima*ge*/& rd.live.overlay=none /
-           ' $BOOTCONFIG $BOOTCONFIG_EFI
+    sed -i -r 's/rd\.live\.image|liveimg/& rd.live.overlay=none/
+              ' $BOOTCONFIG $BOOTCONFIG_EFI
 fi
 
 # Don't display boot.msg.
 if [[ $nobootmsg == 1 ]]; then
-    sed -i '/display boot.msg/d' $BOOTCONFIG $BOOTCONFIG_EFI
+    sed -i '/display boot.msg/d' $BOOTCONFIG
 fi
 # Skip the menu, and boot 'linux'.
 if [[ $nomenu == 1 ]]; then
-    sed -i 's/default vesamenu.c32/default linux/' $BOOTCONFIG $BOOTCONFIG_EFI
+    sed -i 's/default .*/default linux/' $BOOTCONFIG
 fi
 
 if ((overlaysizemb > 0)); then
@@ -1631,15 +1646,15 @@ if ((overlaysizemb > 0)); then
                 count=1 bs=1M seek=$overlaysizemb
         fi
     fi
-    sed -i "s/r*d*.*live.*ima*ge*/& rd.live.overlay=${TGTLABEL}/
-           " $BOOTCONFIG $BOOTCONFIG_EFI
+    sed -i -r "s/rd\.live\.image|liveimg/& rd.live.overlay=${TGTLABEL}/
+              " $BOOTCONFIG $BOOTCONFIG_EFI
 fi
 
 if [[ -n $resetoverlay ]]; then
     printf 'Resetting the overlay.\n'
     dd if=/dev/zero of=$TGTMNT/$LIVEOS/$OVERNAME bs=64k count=1 conv=notrunc
-    sed -i "s/r*d*.*live.*ima*ge*/& rd.live.overlay=${TGTLABEL} /
-           " $BOOTCONFIG $BOOTCONFIG_EFI
+    sed -i -r "s/rd\.live\.image|liveimg/& rd.live.overlay=${TGTLABEL}$ovl/
+              " $BOOTCONFIG $BOOTCONFIG_EFI
 fi
 
 if ((swapsizemb > 0)); then
@@ -1685,7 +1700,7 @@ fi
 
 if [[ live = $srctype ]]; then
     sed -i -r 's/\s+ro\s+|\s+ro$/ /g
-               s/r*d*.*live.*ima*ge*/& rw /' $BOOTCONFIG $BOOTCONFIG_EFI
+               s/rd\.live\.image|liveimg/& rw/' $BOOTCONFIG $BOOTCONFIG_EFI
 fi
 
 # create the forth files for booting on the XO if requested
@@ -1757,29 +1772,32 @@ if [[ -n $multi && ! -d $TGTMNT/syslinux ]]; then
     }
     [[ -e $TGTMNT/EFI_previous ]] && rm $TGTMNT/EFI_previous
 fi
+
+# This is a bit of a kludge, but syslinux doesn't guarantee the API
+# for its com32 modules, :/, so we use the version on the installation host,
+# selecting the UI present on the source. (This means that for multi boot
+# installations, the most recent host and source may alter the version and UI.)
+# See https://bugzilla.redhat.com/show_bug.cgi?id=492370
+for f in vesamenu.c32 menu.c32; do
+    if [[ -f $TGTMNT/$SYSLINUXPATH/$f ]]; then
+        UI=$f
+        for d in /usr/share/syslinux /usr/lib/syslinux; do
+            if [[ -f $d/$f ]]; then
+                cp $d/$f $TGTMNT/$SYSLINUXPATH/$f
+                break 2
+            fi
+        done
+    fi
+done
+sed -i -r "s/\s+[^ ]*menu\.c32\>/ $UI/g" $TGTMNT/syslinux/$CONFIG_FILE
+
 if [[ -z $multi ]] || [[ $multi == move ]]; then
-    echo "Installing boot loader"
+    echo "Installing boot loader..."
     if [[ -n $efi ]]; then
         # replace the ia32 hack
         if [[ -f $TGTMNT$EFI_BOOT/BOOT.conf ]]; then
             cp -f $TGTMNT$EFI_BOOT/BOOTia32.conf $TGTMNT$EFI_BOOT/BOOT.conf
         fi
-    fi
-
-    # this is a bit of a kludge, but syslinux doesn't guarantee the API
-    # for its com32 modules :/
-    if [[ -f $TGTMNT/$SYSLINUXPATH/vesamenu.c32 &&
-          -f /usr/share/syslinux/vesamenu.c32 ]]; then
-        cp /usr/share/syslinux/vesamenu.c32 $TGTMNT/$SYSLINUXPATH/vesamenu.c32
-    elif [[ -f $TGTMNT/$SYSLINUXPATH/vesamenu.c32 &&
-            -f /usr/lib/syslinux/vesamenu.c32 ]]; then
-        cp /usr/lib/syslinux/vesamenu.c32 $TGTMNT/$SYSLINUXPATH/vesamenu.c32
-    elif [[ -f $TGTMNT/$SYSLINUXPATH/menu.c32 &&
-            -f /usr/share/syslinux/menu.c32 ]]; then
-        cp /usr/share/syslinux/menu.c32 $TGTMNT/$SYSLINUXPATH/menu.c32
-    elif [[ -f $TGTMNT/$SYSLINUXPATH/menu.c32 &&
-            -f /usr/lib/syslinux/menu.c32 ]]; then
-        cp /usr/lib/syslinux/menu.c32 $TGTMNT/$SYSLINUXPATH/menu.c32
     fi
 
     # syslinux >= 6.02 also requires ldlinux.c32, libcom32.c32, libutil.c32
@@ -1830,13 +1848,9 @@ if [[ -z $multi ]] || [[ $multi == move ]]; then
     fi
 fi
 if [[ $multi == 1 ]]; then
-    # we need to do some more config file tweaks for multi-image mode
-    if [[ $TGTFS == @(vfat|msdos) ]]; then
-        CONFIG_FILE=syslinux.cfg
-    elif [[ $TGTFS == @(ext[234]|btrfs) ]]; then
-        CONFIG_FILE=extlinux.conf
-    fi
-    sed -i -r "s;kernel\s+vm;kernel /$LIVEOS/syslinux/vm;
+    # We need to do some more config file tweaks for multi-image mode.
+    sed -i -r "s;\s+[^ ]*menu\.c32\>; $UI;g
+               s;kernel\s+vm;kernel /$LIVEOS/syslinux/vm;
                s;initrd=i;initrd=/$LIVEOS/syslinux/i;
               " $TGTMNT/$SYSLINUXPATH/isolinux.cfg
     mv $TGTMNT/$SYSLINUXPATH/isolinux.cfg $TGTMNT/$SYSLINUXPATH/$CONFIG_FILE
@@ -1847,10 +1861,19 @@ if [[ $multi == 1 ]]; then
                i\
                label $LIVEOS\\
 \  menu label ^Go to $LIVEOS menu\\
-\  kernel vesamenu.c32\\
+\  kernel $UI\\
 \  APPEND /$LIVEOS/syslinux/$CONFIG_FILE\\
 
                };}" $TGTMNT/syslinux/$CONFIG_FILE
+
+    cat << EOF >> $TGTMNT/$SYSLINUXPATH/$CONFIG_FILE
+menu separator
+LABEL multimain
+  MENU LABEL Return to Multi Live Image Boot Menu
+  KERNEL $UI
+  APPEND ~
+EOF
+
     if [[ -f $TGTMNT/EFI_previous ]]; then
         sed -i -r "1 i\
 ...
