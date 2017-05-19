@@ -30,12 +30,12 @@ def main():
         
     def mkempty(bs, count):
         image = tempfile.mkstemp()
-        args = ("/bin/dd", "if=/dev/zero", "of=%s"%image, "bs=%s"%bs, "count=%s"%count)
+        args = ("dd", "if=/dev/zero", "of=%s"%image, "bs=%s"%bs, "count=%s"%count)
         execute(args)
         return image
 
     def dump(ent, file):
-        args = ("/sbin/dump", "-0", ent, "-f", file)
+        args = ("dump", "-0", ent, "-f", file)
         execute(args)
  
     def restore():
@@ -47,7 +47,7 @@ def main():
 
     def getrootents():
         ents = list()
-        args = ("/bin/df", "-lh")
+        args = ("df", "-lh")
         data = execute(args, needdata=True)
         lines = data.split('\n')
  

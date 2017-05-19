@@ -360,7 +360,7 @@ class ImageCreator(object):
         This method may be used by subclasses when executing programs inside
         the install root e.g.
 
-          subprocess.call(["/bin/ls"], preexec_fn = self.chroot)
+          subprocess.call(["ls"], preexec_fn = self.chroot)
 
         """
         os.chroot(self._instroot)
@@ -485,18 +485,20 @@ class ImageCreator(object):
         if not os.path.exists(self.__selinux_mountpoint):
             return
 
-        arglist = ["/bin/mount", "--bind", "/dev/null", self._instroot + self.__selinux_mountpoint + "/load"]
+        arglist = ["mount", "--bind", "/dev/null",
+                   self._instroot + self.__selinux_mountpoint + "/load"]
         subprocess.call(arglist, close_fds = True)
 
         if kickstart.selinux_enabled(self.ks):
             # label the fs like it is a root before the bind mounting
-            arglist = ["/sbin/setfiles", "-F", "-r", self._instroot, selinux.selinux_file_context_path(), self._instroot]
+            arglist = ["setfiles", "-F", "-r", self._instroot,
+                       selinux.selinux_file_context_path(), self._instroot]
             subprocess.call(arglist, close_fds = True)
             # these dumb things don't get magically fixed, so make the user generic
         # if selinux exists on the host we need to lie to the chroot
         if selinux.is_selinux_enabled():
             for f in ("/proc", "/sys"):
-                arglist = ["/usr/bin/chcon", "-u", "system_u", self._instroot + f]
+                arglist = ["chcon", "-u", "system_u", self._instroot + f]
                 subprocess.call(arglist, close_fds = True)
 
     def __destroy_selinuxfs(self):
@@ -506,7 +508,7 @@ class ImageCreator(object):
         # if the system was running selinux clean up our lies
         path = self._instroot + self.__selinux_mountpoint + "/load"
         if os.path.exists(path):
-            arglist = ["/bin/umount", path]
+            arglist = ["umount", path]
             subprocess.call(arglist, close_fds = True)
 
     def mount(self, base_on = None, cachedir = None):
@@ -806,7 +808,7 @@ class ImageCreator(object):
         this can be useful for debugging.
 
         """
-        subprocess.call(["/bin/bash"], preexec_fn = self._chroot)
+        subprocess.call(["bash"], preexec_fn = self._chroot)
 
     def package(self, destdir = "."):
         """Prepares the created image for final delivery.
