@@ -1579,8 +1579,8 @@ echo "Updating boot config file."
 sed -i -r "s/\<root=[^ ]*/root=live:$TGTLABEL/g
         s/\<rootfstype=[^ ]*\>/rootfstype=$TGTFS/" $BOOTCONFIG $BOOTCONFIG_EFI
 if [[ -n $kernelargs ]]; then
-    sed -i -r "s;\<initrd.\?\.img\>;& ${kernelargs} ;
-               s;\<vmlinuz.\?\>;& ${kernelargs} ;" $BOOTCONFIG $BOOTCONFIG_EFI
+    sed -i -r "s;=initrd.?\.img\>;& ${kernelargs} ;
+               s;/vmlinuz.?\>;& ${kernelargs} ;" $BOOTCONFIG $BOOTCONFIG_EFI
 fi
 if [[ $LIVEOS != LiveOS ]]; then
     sed -i -r "s;rd\.live\.image|liveimg;& rd.live.dir=$LIVEOS;
