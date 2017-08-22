@@ -6,7 +6,7 @@ livecd-iso-to-disk - Installs bootable Live images onto USB/SD storage devices.
 
 =head1 SYNOPSIS
 
-B<livecd-iso-to-disk>  [--help] [--noverify] [--format] [--msdos] [--reset-mbr] [--efi] [--skipcopy] [--force] [--xo] [--xo-no-home] [--timeout <duration>] [--totaltimeout <duration>] [--nobootmsg] [--nomenu] [--extra-kernel-args <args>] [--multi] [--livedir <dir>] [--compress] [--skipcompress] [--no-overlay] [--overlay-size-mb <size>] [--reset-overlay] [--home-size-mb <size>] [--delete-home] [--crypted-home] [--unencrypted-home] [--swap-size-mb <size>] [--updates <updates.img>] [--ks <kickstart>] [--label <label>] <source> <target device>
+B<livecd-iso-to-disk>  [--help] [--noverify] [--format] [--msdos] [--reset-mbr] [--efi] [--skipcopy] [--force] [--xo] [--xo-no-home] [--timeout <duration>] [--totaltimeout <duration>] [--nobootmsg] [--nomenu] [--extra-kernel-args <args>] [--multi] [--livedir <dir>] [--compress] [--skipcompress] [--no-overlay] [--overlayfs [temp]] [--overlay-size-mb <size>] [--reset-overlay] [--home-size-mb <size>] [--delete-home] [--crypted-home] [--unencrypted-home] [--swap-size-mb <size>] [--updates <updates.img>] [--ks <kickstart>] [--label <label>] <source> <target device>
 
 Simplest
 
@@ -135,6 +135,12 @@ Expands the source SquashFS.img on installation into the read-only /LiveOS/rootf
 =item --no-overlay    (effective only with --skipcompress or an uncompressed image)
 
 Installs a kernel option, rd.live.overlay=none, that signals the live boot process to create a writable, linear Device-mapper target for an uncompressed /LiveOS/rootfs.img filesystem image file.  Read-write by default (unless a kernel argument of rd.live.overlay.readonly is given) this configuration avoids the complications of using an overlay of fixed size for persistence when storage format and space allows.
+
+=item --overlayfs [temp]   (add --overlay-size-mb for persistence on vfat devices)
+
+Specifies the creation of an OverlayFS type overlay.  If the option is followed by 'temp', a temporary overlay will be used.  On vfat or msdos formatted devices, --overlay-size-mb <size> must also be provided for a persistent overlay.  OverlayFS overlays are directories of the files that have changed on the read-only root filesystem.  With non-vfat-formatted devices, the OverlayFS can extend the available root filesystem space up to the capacity of the Live USB device.
+
+The --overlayfs option requires an initial boot image based on dracut version 045 or greater to use the OverlayFS feature.  Lacking this, the device boots with a temporary Device-mapper overlay.
 
 =item --overlay-size-mb <size>
 
