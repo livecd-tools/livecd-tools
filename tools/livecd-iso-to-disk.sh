@@ -35,10 +35,10 @@ shortusage() {
                        [--multi] [--livedir <dir>] [--compress]
                        [--skipcompress] [--no-overlay] [--overlayfs [temp]]
                        [--overlay-size-mb <size>] [--reset-overlay]
-                       [--home-size-mb <size>] [--delete-home] [--crypted-home]
-                       [--unencrypted-home] [--swap-size-mb <size>]
-                       [--updates <updates.img>] [--ks <kickstart>]
-                       [--label <label>]
+                       [--home-size-mb <size>] [--copy-home] [--delete-home]
+                       [--crypted-home] [--unencrypted-home]
+                       [--swap-size-mb <size>] [--updates <updates.img>]
+                       [--ks <kickstart>] [--label <label>]
                        <source> <target device>
 
     (Enter livecd-iso-to-disk --help on the command line for more information.)"
@@ -157,11 +157,11 @@ usage() {
 
     --skipcopy
         Skips the copying of the live image to the target device, bypassing the
-        actions of the --format, --overlay-size-mb, --home-size-mb, &
-        --swap-size-mb options, if present on the command line. (The --skipcopy
-        option is useful while testing the script, in order to avoid repeated
-        and lengthy copy commands, or with --reset-mbr, to repair the boot
-        configuration files on a previously installed LiveOS device.)
+        action of the --format, --overlay-size-mb, --home-size-mb, --copy-home,
+        & --swap-size-mb options, if present on the command line. (The
+        --skipcopy option is useful while testing the script, in order to avoid
+        repeated and lengthy copy commands, or with --reset-mbr, to repair the
+        boot configuration files on a previously installed LiveOS device.)
 
     --force
         This option allows the installation script to bypass a delete
@@ -309,6 +309,14 @@ usage() {
         with a new, empty one.  A maximum <size> of 4095 MiB is permitted for
         vfat-formatted devices.  If there is not enough room on your device,
         you will be given information to help in adjusting your settings.
+
+    --copy-home
+        This option allows one to copy a persistent home.img filesystem from
+        the source LiveOS image to the target image.  Changes already made in
+        the source home directory will be propagated to the new image.
+            WARNING: User-sensitive information, such as password cookies and
+            user and application data, will be copied to the new image! Scrub
+            this information before using this option.
 
     --delete-home
         One must explicitly select this option in the case where there is an
@@ -898,6 +906,8 @@ shopt -s extglob
 cryptedhome=cryptedhome
 keephome=keephome
 homesizemb=0
+copyhome=''
+copyhomesize=0
 swapsizemb=0
 overlaysizemb=''
 resetoverlay=''
@@ -1002,6 +1012,10 @@ while true ; do
             checkint $2
             homesizemb=$2
             shift
+            ;;
+        --copy-home)
+            copyhome=copyhome
+            cryptedhome=''
             ;;
         --crypted-home)
             cryptedhome=cryptedhome
@@ -1312,6 +1326,56 @@ if [[ -z $skipcopy ]] && [[ -f $HOMEPATH ]] && [[ -n $keephome ]] &&
         Please adjust your home.img options.  Exiting...\n\n'
     exitclean
 fi
+if [[ -z $skipcopy && -f $HOMEPATH && -n $keephome &&
+      -n $copyhome && -s $SRCMNT/$srcdir/$HOMEFILE ]]; then
+    printf '\n        ERROR:
+        The target has an existing home.img, and you requested that one from
+        the source be copied to the target device.
+        To remove an existing home.img on the target, you must explicitly
+        specify the --delete-home option.\n
+        Please adjust your home options.  Exiting...\n'
+    exitclean
+fi
+if [[ ! -f $SRCMNT/$srcdir/$HOMEFILE && -n $copyhome ]]; then
+    printf '\n        ERROR:
+        There appears to be no persistent /home.img on the source.
+        Please check your inputs.  Exiting...\n'
+    exitclean
+fi
+if [[ $SRCFS == iso9660 && -f $SRCMNT/$srcdir/$HOMEFILE &&
+     -z $copyhome ]]; then
+    printf '\n        NOTICE:
+        The source has a persistent home.img intended for installation.
+        If there is an existing home.img on the target device,
+        you will be asked to approve its deletion.\n
+        Press Enter to continue, or Ctrl C to abort.\n'
+    read
+    copyhome=1
+fi
+if [[ -f $SRCMNT/$srcdir/$HOMEFILE && -n $copyhome && -n $cryptedhome ]]; then
+    printf '\n        ATTENTION:
+        The default --encrypted-home option is only available for newly-created
+        home.img filesystems.  If the home.img on the source is encrypted,
+        that feature will carry over to the new installation.\n
+        Press Enter to continue, or Ctrl C to abort.\n'
+    read
+fi
+if [[ -s $SRCMNT/$srcdir/$HOMEFILE && -n $copyhome &&
+     $homesizemb -gt 0 ]]; then
+    printf '\n        ERROR:
+        You requested a new home AND to copy one from the source.\n
+        Please request only one of these options.  Exiting...\n'
+    exitclean
+fi
+if [[ ! -s $SRCMNT/$srcdir/$HOMEFILE && -n $copyhome &&
+     $overlaysizemb -gt 0 ]]; then
+    printf '\n        NOTICE:
+        There appears to be no persistent home.img on this source.\n
+        Would you LIKE to continue with just the persistent overlay?\n
+        Press Enter to continue, or Ctrl C to abort.\n'
+    read
+    copyhome=''
+fi
 
 [[ -d $SRCMNT/EFI ]] && d=$(ls -d $SRCMNT/EFI/*/)
 # This test is case sensitive in Bash on vfat filesystems.
@@ -1471,8 +1535,10 @@ checklivespace() {
     sources+=" $SRCMNT/isolinux $SRCMNT/syslinux $SRCMNT$EFI_BOOT"
     duTable=($(du -c -B 1M "$0" $sources 2> /dev/null || :))
     livesize=$((livesize + ${duTable[*]: -2:1} + 1))
+    [[ -s $SRCMNT/$srcdir/$HOMEFILE  && -n $copyhome ]] &&
+        copyhomesize=($(du -s -B 1M $SRCMNT/$srcdir/$HOMEFILE))
 
-    tba=$((overlaysizemb + homesizemb + livesize + swapsizemb))
+    tba=$((overlaysizemb + homesizemb + copyhomesize + livesize + swapsizemb))
     if ((tba > freespace + tbd)); then
         needed=$((tba - freespace - tbd))
         printf "\n  The live image + overlay, home, & swap space, if requested,
@@ -1484,6 +1550,8 @@ checklivespace() {
             printf "  + Overlay size: %16s\n" $overlaysize
         ((homesizemb > 0)) &&
             printf "  + Home directory size: %9s\n" $homesizemb
+        ((copyhomesize > 0)) &&
+            printf '  + Copy home directory size: %4s\n' $copyhomesize
         ((swapsizemb > 0)) &&
             printf "  + Swap file size: %14s\n" $swapsizemb
         printf "  = Total requested space:  %6s  MiB\n" $tba
@@ -1575,6 +1643,9 @@ if [[ $srctype == live && -z $skipcopy ]]; then
     if [[ -f $SRCMNT/$srcdir/osmin.img ]]; then
         $copyFile "$SRCMNT/$srcdir/osmin.img" $TGTMNT/$LIVEOS/osmin.img ||
             exitclean
+    fi
+    if [[ -s $SRCMNT/$srcdir/$HOMEFILE && -n $copyhome ]]; then
+        $copyFile $SRCMNT/$srcdir/$HOMEFILE $HOMEPATH || exitclean
     fi
     printf '\nSyncing filesystem writes to disc.
     Please wait, this may take a while...\n'
