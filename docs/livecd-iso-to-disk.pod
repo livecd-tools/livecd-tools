@@ -20,11 +20,11 @@ To execute the script to completion, you will need to run it with root user perm
 
 =item <source>
 
-This may be the filesystem path to a LiveOS .iso image file, such as from a CD-ROM, DVD, or download.  It could also be the device node reference, the LiveOS-containing directory path, or the mount point for another LiveOS filesystem, including the currently booted LiveOS device, which is mounted at /run/initramfs/live.
+This may be the filesystem path to a LiveOS .iso image file, such as from a CD-ROM, DVD, or download.  It could also be the device node reference, the LiveOS-containing directory path, or the mount point for another LiveOS filesystem.  Entering 'live' for the <source> will source the currently booted LiveOS device.
 
 =item <target device>
 
-This should be the device partition name for the attached, target device, such as /dev/sdc1.  (Issue the df -Th command to get a listing of mounted partitions, so you can confirm the filesystem types, available space, and device names.)  Be careful to specify the correct device, or you may overwrite important data on another disk!
+This should be, or a link to, the device partition path for the attached, target device, such as /dev/sdc1.  (Issue the df -Th command to get a listing of mounted partitions, so you can confirm the filesystem types, available space, and device names.)  Be careful to specify the correct device, or you may overwrite important data on another disk!  For a multi boot installation to the currently booted device, enter 'live' as the target.
 
 =back
 
@@ -34,7 +34,7 @@ B<livecd-iso-to-disk> installs a Live CD/DVD/USB image (LiveOS) onto a USB/SD st
 
 Unless you request the --format option, installing an image does not destroy data outside of the LiveOS, syslinux, & EFI directories on your target device.  This allows one to maintain other files on the target disk outside of the LiveOS filesystem.
 
-LiveOS images employ embedded filesystems through the Device-mapper component of the Linux kernel.  The filesystems are embedded within files in the /LiveOS/ directory of the storage device.  The /LiveOS/squashfs.img file is the default, compressed filesystem containing one directory and the file /LiveOS/rootfs.img that contains the root filesystem for the distribution.  These are read-only filesystems that are usually fixed in size to within a few GiB of the size of the full root filesystem at build time.  At boot time, a Device-mapper snapshot with a default 0.5 GiB, in-memory, read-write overlay is created for the root filesystem.  Optionally, one may specify a fixed-size, persistent on disk overlay to hold changes to the root filesystem.  The build-time size of the root filesystem will limit the maximum size of the working root filesystem--even if supplied with an overlay file larger than the apparent free space on the root filesystem.  *Note well* that deletion of any original files in the read-only root filesystem does not recover any storage space on your LiveOS device.  Storage in the persistent /LiveOS/overlay-<device_id> file is allocated as needed.  If the overlay storage space is filled, the overlay will enter an 'Overflow' state where the root filesystem will continue to operate in a read-only mode.  There will not be an explicit warning or signal when this happens, but applications may begin to report errors due to this restriction.  If significant changes or updates to the root filesystem are to be made, carefully watch the fraction of space allocated in the overlay by issuing the 'dmsetup status' command at a command line of the running LiveOS image.  Some consumption of root filesystem and overlay space can be avoided by specifying a persistent home filesystem for user files, which will be saved in a fixed-size /LiveOS/home.img file.  This filesystem is encrypted by default.  (One may bypass encryption with the --unencrypted-home option.)  This filesystem is mounted on the /home directory of the root filesystem.  When its storage space is filled, out-of-space warnings will be issued by the operating system.
+LiveOS images employ embedded filesystems through the Device-mapper component of the Linux kernel.  The filesystems are embedded within files in the /LiveOS/ directory of the storage device.  The /LiveOS/squashfs.img file is the default, compressed filesystem containing one directory and the file /LiveOS/rootfs.img that contains the root filesystem for the distribution.  These are read-only filesystems that are usually fixed in size to within a few GiB of the size of the full root filesystem at build time.  At boot time, a Device-mapper snapshot with a sparse 32 GiB, in-memory, read-write overlay is created for the root filesystem.  Optionally, one may specify a fixed-size, persistent on disk overlay to hold changes to the root filesystem.  The build-time size of the root filesystem will limit the maximum size of the working root filesystem--even if supplied with an overlay file larger than the apparent free space on the root filesystem.  *Note well* that deletion of any original files in the read-only root filesystem does not recover any storage space on your LiveOS device.  Storage in the persistent /LiveOS/overlay-<device_id> file is allocated as needed.  If the overlay storage space is filled, the overlay will enter an 'Overflow' state where the root filesystem will continue to operate in a read-only mode.  There will not be an explicit warning or signal when this happens, but applications may begin to report errors due to this restriction.  If significant changes or updates to the root filesystem are to be made, carefully watch the fraction of space allocated in the overlay by issuing the 'dmsetup status' command at a command line of the running LiveOS image.  Some consumption of root filesystem and overlay space can be avoided by specifying a persistent home filesystem for user files, which will be saved in a fixed-size /LiveOS/home.img file.  This filesystem is encrypted by default.  (One may bypass encryption with the --unencrypted-home option.)  This filesystem is mounted on the /home directory of the root filesystem.  When its storage space is filled, out-of-space warnings will be issued by the operating system.
 
 =head1 OPTIONS
 
@@ -118,21 +118,21 @@ Specifies additional kernel arguments, <args>, that will be inserted into the sy
 
 =item --multi
 
-Used when installing multiple images, to signal configuration of boot files for the image in the --livedir <dir> parameter.
+Signals the boot configuration to accommodate multiple images on the target device.  Image and boot files will be installed under the --livedir <directory>.  SYSLINUX boot components from the installation host will always update those in the boot path of the target device.
 
 =item --livedir <dir>
 
-Used when multiple LiveOS images are installed on a device to designate the directory <dir> for the particular image.
+Designates the directory for installing the LiveOS image.  The default is /LiveOS.
 
-=item --compress   (default state for the original root filesystem)
+=item --compress    (default state for the original root filesystem)
 
 The default, compressed SquashFS filesystem image is copied on installation.  (This option has no effect if the source filesystem is already expanded.)
 
-=item --skipcompress   (default option when  --xo is specified)
+=item --skipcompress    (default option when  --xo is specified)
 
-Expands the source SquashFS.img on installation into the read-only /LiveOS/rootfs.img root filesystem image file.  This avoids the system overhead of decompression during use at the expense of storage space.
+Expands the source SquashFS.img on installation into the read-only /LiveOS/rootfs.img root filesystem image file.  This avoids the system overhead of decompression during use at the expense of storage space and bus I/O.
 
-=item --no-overlay   (effective only with skipcompress)
+=item --no-overlay    (effective only with --skipcompress or an uncompressed image)
 
 Installs a kernel option, rd.live.overlay=none, that signals the live boot process to create a writable, linear Device-mapper target for an uncompressed /LiveOS/rootfs.img filesystem image file.  Read-write by default (unless a kernel argument of rd.live.overlay.readonly is given) this configuration avoids the complications of using an overlay of fixed size for persistence when storage format and space allows.
 
@@ -152,7 +152,7 @@ Specifies creation of a home filesystem of <size> mebibytes (integer values only
 
 One must explicitly select this option in the case where there is an existing persistent home filesystem on the target device and the --home-size-mb <size> option is selected to create an empty, new home filesystem.  This prevents unwitting deletion of user files.
 
-=item --crypted-home   (default that only applies to new home-size-mb requests)
+=item --crypted-home    (default that only applies to new home-size-mb requests)
 
 Specifies the default option to encrypt a new persistent home filesystem when --home-size-mb <size> is specified.
 
