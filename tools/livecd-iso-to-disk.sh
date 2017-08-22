@@ -34,9 +34,9 @@ shortusage() {
                        [--nobootmsg] [--nomenu] [--extra-kernel-args <args>]
                        [--multi] [--livedir <dir>] [--compress]
                        [--skipcompress] [--no-overlay] [--overlayfs [temp]]
-                       [--overlay-size-mb <size>] [--reset-overlay]
-                       [--home-size-mb <size>] [--copy-home] [--delete-home]
-                       [--crypted-home] [--unencrypted-home]
+                       [--overlay-size-mb <size>] [--copy-overlay]
+                       [--reset-overlay] [--home-size-mb <size>] [--copy-home]
+                       [--delete-home] [--crypted-home] [--unencrypted-home]
                        [--swap-size-mb <size>] [--updates <updates.img>]
                        [--ks <kickstart>] [--label <label>]
                        <source> <target device>
@@ -157,11 +157,12 @@ usage() {
 
     --skipcopy
         Skips the copying of the live image to the target device, bypassing the
-        action of the --format, --overlay-size-mb, --home-size-mb, --copy-home,
-        & --swap-size-mb options, if present on the command line. (The
-        --skipcopy option is useful while testing the script, in order to avoid
-        repeated and lengthy copy commands, or with --reset-mbr, to repair the
-        boot configuration files on a previously installed LiveOS device.)
+        action of the --format, --overlay-size-mb, --copy-overlay,
+        --home-size-mb, --copy-home, & --swap-size-mb options, if present on
+        the command line. (The --skipcopy option is useful while testing the
+        script, in order to avoid repeated and lengthy copy commands, or with
+        --reset-mbr, to repair the boot configuration files on a previously
+        installed LiveOS device.)
 
     --force
         This option allows the installation script to bypass a delete
@@ -288,6 +289,14 @@ usage() {
         overlay.  A maximum <size> of 4095 MiB is permitted for vfat-formatted
         devices.  If there is not enough room on your device, you will be given
         information to help in adjusting your settings.
+
+    --copy-overlay
+        This option allows one to copy the persistent overlay from one live
+        image to the new image.  Changes already made in the source image will
+        be propagated to the new installation.
+            WARNING: User sensitive information such as password cookies and
+            application or user data will be copied to the new image!  Scrub
+            this information before using this option.
 
     --reset-overlay
         This option will reset the persistent overlay to an unallocated state.
@@ -905,14 +914,16 @@ shopt -s extglob
 
 cryptedhome=cryptedhome
 keephome=keephome
-homesizemb=0
+homesizemb=''
 copyhome=''
-copyhomesize=0
-swapsizemb=0
-overlaysizemb=''
-resetoverlay=''
+copyhomesize=''
+swapsizemb=''
 overlay=''
 overlayfs=''
+overlaysizemb=''
+copyoverlay=''
+copyoverlaysize=''
+resetoverlay=''
 srctype=
 srcdir=LiveOS
 squashimg=squashfs.img
@@ -1004,6 +1015,9 @@ while true ; do
             checkint $2
             overlaysizemb=$2
             shift
+            ;;
+        --copy-overlay)
+            copyoverlay=copyoverlay
             ;;
         --reset-overlay)
             resetoverlay=resetoverlay
@@ -1139,7 +1153,7 @@ if [[ -n $skipcompress && -n $overlayfs ]]; then
     exitclean
 fi
 
-if [[ $overlay == none ]] && ((overlaysizemb > 0)); then
+if [[ $overlay == none && -n $overlaysizemb ]]; then
     printf '\n        ERROR:
         You have specified --no-overlay AND --overlay-size-mb <size>.\n
         Only one of these options may be requested at a time.\n
@@ -1150,7 +1164,7 @@ fi
 [[ -n $overlaysizemb || -n $format ]] &&
     [[ -z $label ]] && label=$(get_label $TGTDEV)
 
-if ((overlaysizemb > 0)); then
+if [[ -n $overlaysizemb ]]; then
     if [[ $TGTFS == @(vfat|msdos) ]] && ((overlaysizemb > 4095)); then
         printf '\n        ALERT:
         An overlay size greater than 4095 MiB
@@ -1166,14 +1180,14 @@ if ((overlaysizemb > 0)); then
     fi
 fi
 
-if ((homesizemb > 0)) && [[ $TGTFS = vfat ]]; then
+if [[ -n $homesizemb ]] && [[ $TGTFS = vfat ]]; then
     if ((homesizemb > 4095)); then
         echo "Can't have a home filesystem greater than 4095 MB on VFAT"
         exitclean
     fi
 fi
 
-if ((swapsizemb > 0)) && [[ $TGTFS == vfat ]]; then
+if [[ -n $swapsizemb ]] && [[ $TGTFS == vfat ]]; then
     if ((swapsizemb > 4095)); then
         echo "Can't have a swap file greater than 4095 MB on VFAT"
         exitclean
@@ -1286,6 +1300,24 @@ OVLNAME="overlay-$label-$TGTUUID"
 TGTMNT=$(mktemp -d /run/tgttmp.XXXXXX)
 mount $tgtmountopts $TGTDEV $TGTMNT || exitclean
 
+if [[ -n $copyoverlay ]]; then
+    SRCOVL=($(find $SRCMNT/$srcdir/ -name overlay-* -print || :))
+    if [[ ! -s $SRCOVL ]]; then
+        printf '\n   NOTICE:
+        There appears to be no persistent overlay on this image.
+        Would you LIKE to continue with NO persistent overlay?\n\n
+        Press Enter to continue, or Ctrl-c to abort.\n\n'
+        read
+        copyoverlay=''
+    fi
+fi
+if [[ -n $copyoverlay && -n $overlaysizemb ]]; then
+    printf '\n        ERROR:
+        You requested a new overlay AND to copy one from the source.\n
+        Please request only one of these options.  Exiting...\n'
+    exitclean
+fi
+
 OVLPATH=$TGTMNT/$LIVEOS/$OVLNAME
 if [[ -n $resetoverlay ]]; then
     existing=($(find $TGTMNT/$LIVEOS/ -name overlay-* -print || :))
@@ -1298,27 +1330,25 @@ if [[ -n $resetoverlay ]]; then
     fi
 fi
 if [[ -n $resetoverlay ]]; then
-    if ((overlaysizemb > 0)) && [[ -z $skipcopy ]]; then
+    if [[ -n $overlaysizemb && -z $skipcopy ]]; then
         printf '\n        ERROR:
         You requested a new persistent overlay AND to reset the current one.\n
+        Please select only one of these options.  Exiting...\n\n'
+        exitclean
+    elif [[ -n $copyoverlay && -z $skipcopy ]]; then
+        printf '\n        ERROR:
+        You asked to reset the target overlay AND to copy the source one.\n
         Please select only one of these options.  Exiting...\n\n'
         exitclean
     elif [[ $existing != $OVLPATH ]]; then
         # Rename overlay in case of label change.
         mv $existing $OVLPATH
     fi
-    if [[ -d $OVLPATH ]]; then
-        overlayfs=$TGTFS
-    else
-        # Find if OVLPATH is a filesystem.
-        existing=$(blkid -s TYPE -o value $OVLPATH || :)
-        [[ -n $existing ]] && overlayfs=$existing
-    fi
 fi
 
 HOMEPATH=$TGTMNT/$LIVEOS/$HOMEFILE
-if [[ -z $skipcopy ]] && [[ -f $HOMEPATH ]] && [[ -n $keephome ]] &&
-     ((homesizemb > 0)); then
+SRCHOME=$SRCMNT/$srcdir/$HOMEFILE
+if [[ -z $skipcopy && -f $HOMEPATH && -n $keephome && -n $homesizemb ]]; then
     printf '\n        ERROR:
         The target has an existing home.img file and you requested that a new
         home.img be created.  To remove an existing home.img on the target,
@@ -1327,7 +1357,7 @@ if [[ -z $skipcopy ]] && [[ -f $HOMEPATH ]] && [[ -n $keephome ]] &&
     exitclean
 fi
 if [[ -z $skipcopy && -f $HOMEPATH && -n $keephome &&
-      -n $copyhome && -s $SRCMNT/$srcdir/$HOMEFILE ]]; then
+      -n $copyhome && -s $SRCHOME ]]; then
     printf '\n        ERROR:
         The target has an existing home.img, and you requested that one from
         the source be copied to the target device.
@@ -1336,14 +1366,13 @@ if [[ -z $skipcopy && -f $HOMEPATH && -n $keephome &&
         Please adjust your home options.  Exiting...\n'
     exitclean
 fi
-if [[ ! -f $SRCMNT/$srcdir/$HOMEFILE && -n $copyhome ]]; then
+if [[ ! -f $SRCHOME && -n $copyhome ]]; then
     printf '\n        ERROR:
         There appears to be no persistent /home.img on the source.
         Please check your inputs.  Exiting...\n'
     exitclean
 fi
-if [[ $SRCFS == iso9660 && -f $SRCMNT/$srcdir/$HOMEFILE &&
-     -z $copyhome ]]; then
+if [[ $SRCFS == iso9660 && -f $SRCHOME && -z $copyhome ]]; then
     printf '\n        NOTICE:
         The source has a persistent home.img intended for installation.
         If there is an existing home.img on the target device,
@@ -1352,7 +1381,7 @@ if [[ $SRCFS == iso9660 && -f $SRCMNT/$srcdir/$HOMEFILE &&
     read
     copyhome=1
 fi
-if [[ -f $SRCMNT/$srcdir/$HOMEFILE && -n $copyhome && -n $cryptedhome ]]; then
+if [[ -f $SRCHOME && -n $copyhome && -n $cryptedhome ]]; then
     printf '\n        ATTENTION:
         The default --encrypted-home option is only available for newly-created
         home.img filesystems.  If the home.img on the source is encrypted,
@@ -1360,15 +1389,14 @@ if [[ -f $SRCMNT/$srcdir/$HOMEFILE && -n $copyhome && -n $cryptedhome ]]; then
         Press Enter to continue, or Ctrl C to abort.\n'
     read
 fi
-if [[ -s $SRCMNT/$srcdir/$HOMEFILE && -n $copyhome &&
-     $homesizemb -gt 0 ]]; then
+if [[ -s $SRCHOME && -n $copyhome && -n $homesizemb ]]; then
     printf '\n        ERROR:
         You requested a new home AND to copy one from the source.\n
         Please request only one of these options.  Exiting...\n'
     exitclean
 fi
-if [[ ! -s $SRCMNT/$srcdir/$HOMEFILE && -n $copyhome &&
-     $overlaysizemb -gt 0 ]]; then
+if [[ ! -s $SRCHOME && -n $copyhome ]] &&
+    [[ -n $overlaysizemb || -n $resetoverlay || -n $copyoverlay ]]; then
     printf '\n        NOTICE:
         There appears to be no persistent home.img on this source.\n
         Would you LIKE to continue with just the persistent overlay?\n
@@ -1535,24 +1563,28 @@ checklivespace() {
     sources+=" $SRCMNT/isolinux $SRCMNT/syslinux $SRCMNT$EFI_BOOT"
     duTable=($(du -c -B 1M "$0" $sources 2> /dev/null || :))
     livesize=$((livesize + ${duTable[*]: -2:1} + 1))
-    [[ -s $SRCMNT/$srcdir/$HOMEFILE  && -n $copyhome ]] &&
-        copyhomesize=($(du -s -B 1M $SRCMNT/$srcdir/$HOMEFILE))
+    [[ -s $SRCHOME  && -n $copyhome ]] &&
+        copyhomesize=($(du -s -B 1M $SRCHOME))
+    [[ -s $SRCOVL && -n $copyoverlay ]] && {
+        copyoverlaysize=($(du -c -B 1M "$SRCOVL"))
+        copyoverlaysize=${copyoverlaysize[*]: -2:1}; }
 
-    tba=$((overlaysizemb + homesizemb + copyhomesize + livesize + swapsizemb))
+    tba=$((overlaysizemb + copyoverlaysize + homesizemb + copyhomesize +
+           livesize + swapsizemb))
     if ((tba > freespace + tbd)); then
         needed=$((tba - freespace - tbd))
         printf "\n  The live image + overlay, home, & swap space, if requested,
         \r  will NOT fit in the space available on the target device.\n
         \r  + Size of live image: %10s  MiB\n" $livesize
-        ((overlaysizemb > 0)) &&
-            printf "  + Overlay size: %16s\n" $overlaysizemb
         [[ -n $overlaysize ]] &&
             printf "  + Overlay size: %16s\n" $overlaysize
+        [[ -n $copyoverlaysize ]] &&
+            printf "  + Copy overlay size: %11s\n" $copyoverlaysize
         ((homesizemb > 0)) &&
             printf "  + Home directory size: %9s\n" $homesizemb
-        ((copyhomesize > 0)) &&
+        [[ -n $copyhomesize ]] &&
             printf '  + Copy home directory size: %4s\n' $copyhomesize
-        ((swapsizemb > 0)) &&
+        [[ -n $swapsizemb ]] &&
             printf "  + Swap file size: %14s\n" $swapsizemb
         printf "  = Total requested space:  %6s  MiB\n" $tba
         printf "  - Space available:  %12s\n" $((freespace + tbd))
@@ -1644,12 +1676,27 @@ if [[ $srctype == live && -z $skipcopy ]]; then
         $copyFile "$SRCMNT/$srcdir/osmin.img" $TGTMNT/$LIVEOS/osmin.img ||
             exitclean
     fi
-    if [[ -s $SRCMNT/$srcdir/$HOMEFILE && -n $copyhome ]]; then
-        $copyFile $SRCMNT/$srcdir/$HOMEFILE $HOMEPATH || exitclean
+    if [[ -s $SRCHOME && -n $copyhome ]]; then
+        $copyFile $SRCHOME $HOMEPATH || exitclean
+    fi
+    if [[ -s $SRCOVL && -n $copyoverlay ]]; then
+        printf 'Copying overlay...'
+        cp -a "$SRCOVL" $OVLPATH || exitclean
+        [[ -d $SRCOVL ]] && {
+            cp -a "$SRCOVL/../ovlwork" $OVLPATH/../ovlwork || exitclean; }
     fi
     printf '\nSyncing filesystem writes to disc.
     Please wait, this may take a while...\n'
     sync -f $TGTMNT/$LIVEOS/
+fi
+if [[ -n $resetoverlay || -n $copyoverlay ]]; then
+    if [[ -d $OVLPATH ]]; then
+        overlayfs=$TGTFS
+    else
+        # Find if OVLPATH is a filesystem.
+        existing=$(blkid -s TYPE -o value $OVLPATH || :)
+        [[ -n $existing ]] && overlayfs=$existing
+    fi
 fi
 
 # Bootloader is always reconfigured, so keep this out of the -z skipcopy stuff.
@@ -1874,7 +1921,8 @@ if [[ -n $nomenu ]]; then
     sed -i 's/default .*/default linux/' $BOOTCONFIG
 fi
 
-if [[ -n $overlaysizemb || -n $overlayfs ]] && [[ -z $resetoverlay ]]; then
+if [[ -n $overlaysizemb || -n $overlayfs ]] &&
+    [[ -z $resetoverlay && -z $copyoverlay ]]; then
     if [[ -z $skipcopy ]]; then
         echo "Initializing persistent overlay..."
         if [[ $TGTFS == @(vfat|msdos) && $overlayfs != temp ]]; then
@@ -1926,6 +1974,8 @@ if [[ -n $resetoverlay ]]; then
     else
         dd if=/dev/zero of=$OVLPATH bs=64k count=1 conv=notrunc,fsync
     fi
+fi
+if [[ -n $resetoverlay || -n $copyoverlay ]]; then
     ovl=''
     [[ -n $overlayfs ]] && ovl=' rd.live.overlay.overlayfs'
     sed -i -r "s/rd\.live\.image|liveimg/& rd.live.overlay=${TGTLABEL}$ovl/

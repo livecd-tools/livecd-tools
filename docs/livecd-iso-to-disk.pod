@@ -6,7 +6,7 @@ livecd-iso-to-disk - Installs bootable Live images onto USB/SD storage devices.
 
 =head1 SYNOPSIS
 
-B<livecd-iso-to-disk>  [--help] [--noverify] [--format] [--msdos] [--reset-mbr] [--efi] [--skipcopy] [--force] [--xo] [--xo-no-home] [--timeout <duration>] [--totaltimeout <duration>] [--nobootmsg] [--nomenu] [--extra-kernel-args <args>] [--multi] [--livedir <dir>] [--compress] [--skipcompress] [--no-overlay] [--overlayfs [temp]] [--overlay-size-mb <size>] [--reset-overlay] [--home-size-mb <size>] [--copy-home] [--delete-home] [--crypted-home] [--unencrypted-home] [--swap-size-mb <size>] [--updates <updates.img>] [--ks <kickstart>] [--label <label>] <source> <target device>
+B<livecd-iso-to-disk>  [--help] [--noverify] [--format] [--msdos] [--reset-mbr] [--efi] [--skipcopy] [--force] [--xo] [--xo-no-home] [--timeout <duration>] [--totaltimeout <duration>] [--nobootmsg] [--nomenu] [--extra-kernel-args <args>] [--multi] [--livedir <dir>] [--compress] [--skipcompress] [--no-overlay] [--overlayfs [temp]] [--overlay-size-mb <size>] [--copy-overlay] [--reset-overlay] [--home-size-mb <size>] [--copy-home] [--delete-home] [--crypted-home] [--unencrypted-home] [--swap-size-mb <size>] [--updates <updates.img>] [--ks <kickstart>] [--label <label>] <source> <target device>
 
 Simplest
 
@@ -66,7 +66,7 @@ Creates a GUID partition table when --format is passed, and installs a hybrid Ex
 
 =item --skipcopy
 
-Skips the copying of the live image to the target device, bypassing the action of the --format, --overlay-size-mb, --home-size-mb, --copy-home, & --swap-size-mb options, if present on the command line. (The --skipcopy option may be used while testing the script, in order to avoid repeated and lengthy copy commands, or with --reset-mbr to repair the boot configuration files on a previously installed LiveOS device.)
+Skips the copying of the live image to the target device, bypassing the action of the --format, --overlay-size-mb, --copy-overlay, --home-size-mb, --copy-home, & --swap-size-mb options, if present on the command line. (The --skipcopy option may be used while testing the script, in order to avoid repeated and lengthy copy commands, or with --reset-mbr to repair the boot configuration files on a previously installed LiveOS device.)
 
 =item --force
 
@@ -146,6 +146,16 @@ The --overlayfs option requires an initial boot image based on dracut version 04
 
 Specifies creation of a filesystem overlay of <size> mebibytes (integer values only).  The overlay makes persistent storage available to the live operating system, if the operating system supports it.  The overlay holds a snapshot of changes to the root filesystem.  *Note well* that deletion of any original files in the read-only root filesystem does not recover any storage space on your LiveOS device.  Storage in the persistent /LiveOS/overlay-<device_id> file is allocated as needed.  If the overlay storage space is filled, the overlay will enter an 'Overflow' state where the root filesystem will continue to operate in a read-only mode.  There will not be an explicit warning or signal when this happens, but applications may begin to report errors due to the restriction.  If significant changes or updates to the root filesystem are to be made, carefully watch the fraction of space allocated in the overlay by issuing the 'dmsetup status' command at a command line of the running LiveOS image.  Some consumption of root filesystem and overlay space can be avoided by specifying a persistent home filesystem for user files, see --home-size-mb below.  The target storage device must have enough free space for the image and the overlay.  A maximum <size> of 4095 MiB is permitted for vfat-formatted devices.  If there is not enough room on your device, you will be given information to help in adjusting your settings.
 
+=item --copy-overlay
+
+This option allows one to copy the persistent overlay from one live image to the new image.  Changes already made in the source image will be propagated to the new installation.
+
+=over 4
+
+B<WARNING:> User sensitive information such as password cookies and application or user data will be copied to the new image!  Scrub this information before using this option.
+
+=back
+
 =item --reset-overlay
 
 This option will reset the persistent overlay to an unallocated state.  This might be used if installing a new or refreshed image onto a device with an existing overlay, and avoids the writing of a large file on a vfat-formatted device.  This option also renames the overlay to match the current device filesystem label and UUID.
@@ -211,4 +221,3 @@ Copyright 2008-2010, 2017, Fedora Project and various contributors.  This is fre
 C<livecd-creator(1)>, project website C<http://fedoraproject.org/wiki/FedoraLiveCD>
 
 =cut
-
