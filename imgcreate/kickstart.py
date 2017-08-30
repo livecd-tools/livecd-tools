@@ -461,10 +461,10 @@ class SelinuxConfig(KickstartConfig):
         if ksselinux.selinux == ksconstants.SELINUX_DISABLED:
             return
 
-        if not os.path.exists(self.path("/sbin/setfiles")):
+        if not os.path.exists(self.path("/sbin/restorecon")):
             return
 
-        rc = self.call(["/sbin/setfiles", "-p", "-e", "/proc", "-e", "/sys", "-e", "/dev", selinux.selinux_file_context_path(), "/"])
+        rc = self.call(["/sbin/restorecon", "-p", "-e", "/proc", "-e", "/sys", "-e", "/dev", "-F", "-R", "/"])
         if rc:
             if ksselinux.selinux == ksconstants.SELINUX_ENFORCING:
                 raise errors.KickstartError("SELinux relabel failed.")
