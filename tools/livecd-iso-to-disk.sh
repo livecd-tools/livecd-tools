@@ -1514,7 +1514,8 @@ checklivespace() {
         tbd=0
     fi
 
-    targets="$TGTMNT/$SYSLINUXPATH $TGTMNT$T_EFI_BOOT "
+    targets="$TGTMNT/$SYSLINUXPATH"
+    [[ -n $T_EFI_BOOT ]] && targets+=" $TGTMNT$T_EFI_BOOT "
     [[ -n $xo ]] && targets+=$TGTMNT/boot/olpc.fth
     duTable=($(du -c -B 1M $targets 2> /dev/null || :))
     tbd=$((tbd + ${duTable[*]: -2:1}))
@@ -1560,7 +1561,8 @@ checklivespace() {
         fi
     fi
     sources="$SRCMNT/$srcdir/osmin.img"\ "$SRCMNT/$srcdir/syslinux"
-    sources+=" $SRCMNT/isolinux $SRCMNT/syslinux $SRCMNT$EFI_BOOT"
+    sources+=" $SRCMNT/isolinux $SRCMNT/syslinux"
+    [[ -n $EFI_BOOT ]] && sources+=" $SRCMNT$EFI_BOOT"
     duTable=($(du -c -B 1M "$0" $sources 2> /dev/null || :))
     livesize=$((livesize + ${duTable[*]: -2:1} + 1))
     [[ -s $SRCHOME  && -n $copyhome ]] &&
