@@ -1822,8 +1822,10 @@ if [[ $srctype == live ]]; then
         sed -i -r '/^\s*menu\s+end/I,$ {
                    /^\s*menu\s+end/I ! d}' $BOOTCONFIG
         # Keep only the menu entries up through the first submenu.
-        sed -i -r "/\s+}$/ { N
-                   /\n}$/ { n;Q}}" $BOOTCONFIG_EFI
+        if [[ -n $BOOTCONFIG_EFI ]]; then
+            sed -i -r "/\s+}$/ { N
+                       /\n}$/ { n;Q}}" $BOOTCONFIG_EFI
+        fi
         # Restore configuration entries to a base state.
         sed -i -r "s/^\s*timeout\s+.*/timeout 600/I
 /^\s*totaltimeout\s+.*/Iz
@@ -1837,8 +1839,9 @@ s/\<(root=live:[^ ]*)\s+[^\n.]*\<(rd\.live\.image|liveimg)/\1 \2/
                   " $BOOTCONFIG
     fi
     # And, if --multi, distinguish the new menuentry with $LIVEOS.
-    [[ -f $TGTMNT/EFI_previous ]] && livedir=$LIVEOS\ ~
-    sed -i -r "s/^\s*set\s+timeout=.*/set timeout=60/
+    if [[ -n $BOOTCONFIG_EFI ]]; then
+        [[ -f $TGTMNT/EFI_previous ]] && livedir=$LIVEOS\ ~
+        sed -i -r "s/^\s*set\s+timeout=.*/set timeout=60/
 /^\s*menuentry\s+'Start\s+/,/\s+}/{s/(\s+'Start\s+)[^ ]*\s+~/\1/
 s/\s+'Start\s+/&$livedir/
 s/(rd\.live\.image|liveimg).*/\1 quiet/}
@@ -1849,6 +1852,7 @@ s/(rd\.live\.image|liveimg).*/\1 rd.live.check quiet/}
 s/(linuxefi\s+[^ ]+vmlinuz.?)\s+.*\s+(root=live:[^\s+]*)/\1 \2/
 s_(linuxefi|initrdefi)\s+[^ ]+(initrd.?\.img|vmlinuz.?)_\1 /images/pxeboot/\2_
               " $BOOTCONFIG_EFI
+    fi
 fi
 
 # Setup the updates.img
@@ -1898,12 +1902,14 @@ if [[ -n $timeout ]]; then
     [[ $timeout == "-0" ]] && { timeout=1; totaltimeout=1; }
     sed -i -r "s/^\s*timeout.*$/timeout $((timeout==-1 ? 0 : timeout))/I
               " $BOOTCONFIG
-    if [[ $timeout != @(0|-1) ]]; then
-        set +e
-        ((timeout = (timeout%10) > 4 ? (timeout/10)+1 : (timeout/10) ))
-        set -e
+    if [[ -n $BOOTCONFIG_EFI ]]; then
+        if [[ $timeout != @(0|-1) ]]; then
+            set +e
+            ((timeout = (timeout%10) > 4 ? (timeout/10)+1 : (timeout/10) ))
+            set -e
+        fi
+        sed -i -r "s/^\s*(set\s+timeout=).*$/\1$timeout/" $BOOTCONFIG_EFI
     fi
-    sed -i -r "s/^\s*(set\s+timeout=).*$/\1$timeout/" $BOOTCONFIG_EFI
 fi
 if [[ -n $totaltimeout ]]; then
     sed -i -r "/\s*timeout\s+.*/ a\totaltimeout\ $totaltimeout" $BOOTCONFIG
