@@ -494,7 +494,7 @@ class x86LiveImageCreator(LiveImageCreatorBase):
         if kernel == self._default_kernel:
             return True
 
-        if kernel.startswith("kernel-") and kernel[7:] == self._default_kernel:
+        if kernel.startswith(b"kernel-") and kernel[7:] == self._default_kernel:
             return True
 
         return False
@@ -578,7 +578,7 @@ menu separator
 
             if default:
                 long = self.product
-            elif kernel.startswith("kernel-"):
+            elif kernel.startswith(b"kernel-"):
                 long = "%s (%s)" % (self.product, kernel[7:])
             else:
                 long = "%s (%s)" % (self.product, kernel)
