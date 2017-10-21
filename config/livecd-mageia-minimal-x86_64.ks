@@ -4,7 +4,7 @@ timezone US/Eastern
 auth --useshadow --passalgo=sha512
 selinux --disabled
 firewall --disabled
-part / --size 1024
+part / --size 1536
 
 repo --name=cauldron-x86_64 --mirrorlist=https://www.mageia.org/mirrorlist/?release=cauldron&arch=x86_64&section=core&repo=release
 
