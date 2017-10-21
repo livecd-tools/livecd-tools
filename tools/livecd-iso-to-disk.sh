@@ -1442,13 +1442,16 @@ if [[ $srctype == live ]] &&
     To abort the installation, press Ctrl C.
     ' multi
     if [[ $multi != " " ]]; then
-        multi=1
+        multi=multi
+        LIVEOS=$(mktemp -d $TGTMNT/XXXX)
+        rmdir $LIVEOS
+        LIVEOS=${LIVEOS##*/}
     else
         unset -v multi
         # Backup previous config_file.
         [[ -f $TGTMNT/syslinux/$CONFIG_FILE ]] &&
             cp $TGTMNT/syslinux/$CONFIG_FILE $TGTMNT/syslinux/previous_config
-        [[ -f $TGTMNT$T_EFI_BOOT/grub.cfg ]]
+        [[ -f $TGTMNT$T_EFI_BOOT/grub.cfg ]] &&
             cp $TGTMNT$T_EFI_BOOT/grub.cfg $TGTMNT/EFI/grub.cfg.previous
     fi
 fi
@@ -1715,6 +1718,9 @@ if ! [[ -f $BOOTCONFIG ]]; then
         [[ -f $f ]] && mv $f $BOOTCONFIG && break
     done
 fi
+TITLE=$(sed -n -r '/^\s*label\s+linux/{n
+                   s/^\s*menu\s+label\s+\^Start\s+(.*)/\1/p}
+                  ' $BOOTCONFIG)
 
 # Always install EFI components, when available, so that they are available to
 # propagate, if desired from the installed system.
@@ -1812,9 +1818,6 @@ if [[ $srctype == live ]]; then
     # config file to a base state before updating.
     if [[ -d $SRCMNT/syslinux/ ]]; then
         echo "Preparing boot config files."
-        title=$(sed -n -r '/^\s*label\s+linux/{n
-                           s/^\s*menu\s+label\s+\^Start\s+(.*)/\1/p}
-                          ' $BOOTCONFIG)
         # Delete all labels before the 'linux' menu label.
         sed -i -r '/^\s*label .*/I,/^\s*label linux\>/I{
                    /^\s*label linux\>/I ! {N;N;N;N
@@ -1829,7 +1832,7 @@ if [[ $srctype == live ]]; then
         # Restore configuration entries to a base state.
         sed -i -r "s/^\s*timeout\s+.*/timeout 600/I
 /^\s*totaltimeout\s+.*/Iz
-s/(^\s*menu\s+title\s+Welcome\s+to)\s+.*/\1 $title/I
+s/(^\s*menu\s+title\s+Welcome\s+to)\s+.*/\1 $TITLE/I
 s/\<(kernel)\>\s+[^\n.]*(vmlinuz.?)/\1 \2/
 s/\<(initrd=).*(initrd.?\.img)\>/\1\2/
 s/\<(root=live:[^ ]*)\s+[^\n.]*\<(rd\.live\.image|liveimg)/\1 \2/
@@ -1838,7 +1841,7 @@ s/\<(root=live:[^ ]*)\s+[^\n.]*\<(rd\.live\.image|liveimg)/\1 \2/
 /^\s*label\s+vesa\>/I,/^\s*label\s+memtest\>/Is/(rd\.live\.image|liveimg).*/\1 nomodeset quiet/
                   " $BOOTCONFIG
     fi
-    # And, if --multi, distinguish the new menuentry with $LIVEOS.
+    # And, if --multi, distinguish the new grub menuentry with $LIVEOS ~.
     if [[ -n $BOOTCONFIG_EFI ]]; then
         [[ -f $TGTMNT/EFI_previous ]] && livedir=$LIVEOS\ ~
         sed -i -r "s/^\s*set\s+timeout=.*/set timeout=60/
@@ -2136,7 +2139,7 @@ if [[ $multi == multi ]]; then
                /^\s*label\s+.*/I {
                i\
                label $LIVEOS\\
-\  menu label ^Go to $LIVEOS menu\\
+\  menu label ^Go to $LIVEOS ~$TITLE menu\\
 \  kernel $UI\\
 \  APPEND /$LIVEOS/syslinux/$CONFIG_FILE\\
 
