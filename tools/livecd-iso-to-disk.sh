@@ -1750,13 +1750,15 @@ if [[ -n $EFI_BOOT ]]; then
     fi
 
     # On some images (RHEL) the BOOT*.efi file isn't in $EFI_BOOT, but is in
-    # the eltorito image, so try to extract it if it is missing
+    # the eltorito image, so try to extract it, if it is missing.
 
-    # test for presence of *.efi grub binary
-    if [[ ! -f $(nocase_path "$TGTMNT$T_EFI_BOOT/boot*efi") ]]; then
+    # Test for presence of *.efi grub binary.
+    bootefi=($(nocase_path "$TGTMNT$T_EFI_BOOT/boot*efi"))
+    #^ Use compound array assignment to accommodate presence of multiple files.
+    if [[ ! -f $bootefi ]]; then
         if ! type dumpet >/dev/null 2>&1 && [[ -n $efi ]]; then
             echo "No /usr/bin/dumpet tool found. EFI image will not boot."
-            echo "Source media is missing grub binary in /EFI/BOOT/*EFI"
+            echo "Source media is missing grub binary in /EFI/BOOT/*EFI."
             exitclean
         else
             # dump the eltorito image with dumpet, output is $SRC.1
@@ -1764,10 +1766,11 @@ if [[ -n $EFI_BOOT ]]; then
             EFIMNT=$(mktemp -d /run/srctmp.XXXXXX)
             mount -o loop "$SRC".1 $EFIMNT
 
-            if [[ -f $(nocase_path "$EFIMNT$EFI_BOOT/boot*efi") ]]; then
-                cp $(nocase_path "$EFIMNT$EFI_BOOT/boot*efi") $TGTMNT$T_EFI_BOOT
+            bootefi=($(nocase_path "$EFIMNT$EFI_BOOT/boot*efi"))
+            if [[ -f $bootefi ]]; then
+                cp -t $TGTMNT$T_EFI_BOOT ${bootefi[*]}
             elif [[ -n $efi ]]; then
-                echo "No BOOT*.EFI found in eltorito image. EFI will not boot"
+                echo "No BOOT*.EFI found in eltorito image. EFI will not boot."
                 umount $EFIMNT
                 rm "$SRC".1
                 exitclean
