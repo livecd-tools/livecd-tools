@@ -1581,6 +1581,8 @@ checklivespace() {
         printf "\n  The live image + overlay, home, & swap space, if requested,
         \r  will NOT fit in the space available on the target device.\n
         \r  + Size of live image: %10s  MiB\n" $livesize
+        [[ -n $overlaysizemb ]] &&
+            printf "  + Overlay size: %16s\n" $overlaysizemb
         [[ -n $overlaysize ]] &&
             printf "  + Overlay size: %16s\n" $overlaysize
         [[ -n $copyoverlaysize ]] &&
@@ -1700,7 +1702,8 @@ if [[ -n $resetoverlay || -n $copyoverlay ]]; then
     else
         # Find if OVLPATH is a filesystem.
         existing=$(blkid -s TYPE -o value $OVLPATH || :)
-        [[ -n $existing ]] && overlayfs=$existing
+        [[ -n $existing && $existing != DM_snapshot_cow ]] &&
+            overlayfs=$existing
     fi
 fi
 
