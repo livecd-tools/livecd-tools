@@ -209,10 +209,12 @@ parser.add_argument('--home-size-mb', metavar='[+|-]SIZE[,FSTYPE[,BLKSZ]]',
                     'a home.img filesystem of size NN MiB, or changing\nthe'
                     ' size of an existing home.img filesystem to NN MiB\n'
                     '(or by a difference of +NN or -NN MiB, if a sign is\n'
-                    'prefixed).  If NN = 0 (or nets to <= 0), the home.img\n'
-                    'filesystem contents will be shifted to the the /home\n'
-                    'folder, which is normally compressed; however,\n'
-                    'subsequently, it will not have access to the\n'
+                    'prefixed.  If a minus -NN value is specified along with\n'
+                    'a ,FSTYPE, use an equal sign like this,\n'
+                    '--home-size-mb=-NN,FSTYPE.)  If NN = 0 (or nets to\n'
+                    '<= 0), the home.img filesystem contents will be shifted\n'
+                    'to the /home folder, which is normally compressed;\n'
+                    'however, subsequently, it will not have access to the\n'
                     '--encrypted-home option of livecd-iso-to-disk.\nIf '
                     'the selected or calculated size is insufficient\nfor the '
                     'current home contents, the edit will be\nadjusted to a '
@@ -240,14 +242,16 @@ parser.add_argument('--unencrypted-home', dest='EncHomeReq',
 parser.add_argument('--overlay-size-mb', metavar='[+|-]SIZE[,FSTYPE[,BLKSZ]]',
                     help='Specifies a new size of NN MiB for the overlay file'
                     '\n(or changing the size by a difference of +NN or'
-                    '\n-NN MiB, if a size is prefixed. Do not append an\n'
-                    ',FSTYPE if a minus -NN value is specified.) If NN = 0\n'
+                    '\n-NN MiB, if a size is prefixed. If a minus -NN value is'
+                    '\nspecified along with a ,FSTYPE, use an equal sign like'
+                    '\nthis, --overlay-size-mb=-NN,FSTYPE.)  If NN = 0\n'
                     '(or nets to <= 0), no change will be made.\n\n'
                     'Optionally, for OverlayFS overlays on vfat-formatted\n'
                     'devices, one may specify the overlay fileystem type\n'
                     'and block size by appending ,FSTYPE,BLKSZ to this\n'
-                    'argument.  ext234, xfs, & btrfs are supported, although\n'
-                    'a btrfs OverlayFS fails to boot.\n ')
+                    'argument.  Block size defaults to 4096 bytes if it is\n'
+                    'not given.  ext234, xfs, & btrfs are supported,\n'
+                    'although a btrfs OverlayFS fails to boot.\n ')
 
 parser.add_argument('--refresh-only', action='store_true', default=False,
                     help='Specify replacing the squashfs.img or rootfs_img\n'
