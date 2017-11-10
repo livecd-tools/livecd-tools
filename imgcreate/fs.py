@@ -1505,14 +1505,14 @@ class LiveImageMount(object):
                                              dirmode=dirmode)
         self.__created = True
 
-    def make_overlay(self, size=512*1024**2, existing_size=0, ovltype='',
+    def make_overlay(self, size=512*1024**2, existing_size=0, ovl_fstype='',
                      ovl_blksz=None, ops=[], dirmode=None):
         """Register a new or modified LiveOS overlay."""
 
         device = findmnt('-no UUID,LABEL -T', self.srcdir)
         device = device.partition(' ')
         label = device[2].strip()
-        if ovltype != 'dir' and any(n in ' \t\n\r\f\v' for n in label):
+        if ovl_fstype != 'dir' and any(n in ' \t\n\r\f\v' for n in label):
             source = findmnt('-no SOURCE,FSTYPE -T', self.srcdir).split()
             print("\nALERT:\n      The filesystem label on '", source[0],
             "' contains spaces, tabs, newlines,\n      or other whitespace ",
@@ -1532,20 +1532,27 @@ class LiveImageMount(object):
 
         overfile = os.path.join(self.liveosdir,
                                 '-'.join(('overlay', label, device[0])))
-        if ovltype == 'dir':
+
+        def _wipe_overlay(otype):
+            self.unmount()
+            if otype in ('', 'temp', 'DM_snapshot_cow'):
+                call(['wipefs', '-a', self.livemount.disk.cowloop.device])
+            elif otype == 'dir':
+                shutil.rmtree(os.path.join(overfile, '..', 'ovlwork'))
+                shutil.rmtree(overfile)
+            else:
+                call(['wipefs', '-a', self.livemount.cowloop.device])
+            self.cleanup()
+            
+        if ovl_fstype == 'dir':
             call(['rm', '-rf', overfile])
             makedirs(overfile, 0o755)
             makedirs(os.path.join(overfile, '..', 'ovlwork'), 0o755)
         else:
-            if os.path.isdir(overfile):
-                shutil.rmtree(os.path.join(overfile, '..', 'ovlwork'))
-                shutil.rmtree(overfile)
             resize = True
-            if ovltype in ('', 'temp', 'DM_snapshot_cow'):
+            if ovl_fstype in ('', 'temp', 'DM_snapshot_cow'):
                 if os.path.exists(overfile):
-                    self.unmount()
-                    call(['wipefs', '-a', self.livemount.cowloop.device])
-                    self.cleanup()
+                    _wipe_overlay(self.ovltype)
                     self.overlay = ExistingSparseLoopbackDisk(overfile, size)
                 else:
                     self.overlay = SparseLoopbackDisk(overfile, size)
@@ -1554,21 +1561,19 @@ class LiveImageMount(object):
                 self.livemount = None
                 self.overlay.create(ops=ops, dirmode=dirmode)
             else:
-                self.unmount()
-                call(['wipefs', '-a', self.livemount.disk.cowloop.device])
-                self.cleanup()
+                _wipe_overlay(self.ovltype)
                 self.livemount = OverlayFSMount('overlayfs', self.imgloop,
                                                 overfile, None,
                                                 self.mountdir, size=size,
                                                 ops=ops, dirmode=dirmode)
-            self.ovltype = ovltype
+            self.ovltype = ovl_fstype
             if resize:
-                self.resize_overlay(size, existing_size, ovltype, ovl_blksz)
+                self.resize_overlay(size, existing_size, ovl_fstype, ovl_blksz)
             return self.overlay
 
-    def resize_overlay(self, overlay_size_mb, existing_size, ovltype,
+    def resize_overlay(self, overlay_size_mb, existing_size, ovl_fstype,
                        ovl_blksz):
-        if ovltype in ('', 'temp', 'DM_snapshot_cow'):
+        if ovl_fstype in ('', 'temp', 'DM_snapshot_cow'):
             overlay = self.overlay
         else:
             overlay = self.livemount.cowloop
@@ -1578,10 +1583,10 @@ class LiveImageMount(object):
         else:
             overlay.truncate(size=overlay_size_mb)
 
-        if ovltype in ('', 'temp', 'DM_snapshot_cow'):
+        if ovl_fstype in ('', 'temp', 'DM_snapshot_cow'):
             self.reset_overlay()
         else:
-            self.livemount.recreate_overlay(ovltype, ovl_blksz, 'overlayfs',
+            self.livemount.recreate_overlay(ovl_fstype, ovl_blksz, 'overlayfs',
                                             dirmode=0o755)
 
     def reset_overlay(self):
