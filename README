@@ -160,6 +160,6 @@ livecd-iso-to-disk script.
    /usr/bin/livecd-iso-to-disk /path/to/live.iso /dev/sdb1
 
 Replace /dev/sdb1 with the (unmounted) partition where you wish to put
-the live image.  This is not a destructive process; any data you 
-currently have on your USB stick will be preserved.
+the live image.  This is a destructive process; any data you 
+currently have on your USB stick will be destroyed.
 
