@@ -2189,7 +2189,8 @@ fi
 echo "Installing boot loader..."
 if [[ -n $efi ]]; then
     # replace the ia32 hack
-    if [[ -f $TGTMNT$T_EFI_BOOT/BOOT.conf ]]; then
+    if [[ -f $TGTMNT$T_EFI_BOOT/BOOT.conf ]] &&
+        [[ -f $TGTMNT$T_EFI_BOOT/BOOTia32.conf ]]; then
         cp -f $TGTMNT$T_EFI_BOOT/BOOTia32.conf $TGTMNT$T_EFI_BOOT/BOOT.conf
     fi
 fi
