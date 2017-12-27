@@ -497,6 +497,8 @@ resetMBR() {
             echo 'Could not find gptmbr.bin (SYSLINUX).'
             exitclean
         fi
+        # Make the partition bootable from BIOS
+        run_parted --script $device set $partnum legacy_boot on
     else
         if [[ -f /usr/lib/syslinux/mbr.bin ]]; then
             cat /usr/lib/syslinux/mbr.bin > $device
