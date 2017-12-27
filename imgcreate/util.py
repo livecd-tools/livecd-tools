@@ -19,6 +19,7 @@
 
 import subprocess
 import logging
+import io
 
 def call(*popenargs, **kwargs):
     """
@@ -30,13 +31,14 @@ def call(*popenargs, **kwargs):
                          stderr=subprocess.STDOUT, **kwargs)
     rc = p.wait()
 
+    stdout = io.TextIOWrapper(p.stdout, encoding='utf-8')
+
     # Log output using logging module
     while True:
-        # FIXME choose a more appropriate buffer size
-        buf = p.stdout.read(4096)
+        buf = stdout.readline()
         if not buf:
             break
-        logging.debug("%s", buf)
+        logging.debug("%s", buf.rstrip())
 
     return rc
 
