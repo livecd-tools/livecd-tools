@@ -40,6 +40,18 @@ Add packages to an existing live CD iso9660 image.
 
 Defines the file system label. The default is based on the configuration name.
 
+=item --title=TITLE
+
+Title used by syslinux.cfg file
+
+=item --product=PRODUCT
+
+Product name used in syslinux.cfg boot stanzas and countdown
+
+=item  -p, --plugins
+
+Use DNF plugins during image creation
+
 =item --compression-type=COMPRESSOR
 
 Specify a compressor recognized by mksquashfs.
@@ -69,6 +81,38 @@ defines the temporary directory to use. The default directory is /var/tmp.
 =item --cache=CACHEDIR
 
 Defines the cache directory to use (default: private cache).
+
+=item --cacheonly
+
+Work offline from cache, use together with --cache (default: False)
+
+=item --nocleanup
+
+Skip cleanup of temporary files
+
+=back
+
+=head1 DEBUGGING OPTIONS
+
+These options control the output of logging information during image creation
+
+=over 4
+
+=item -d, --debug
+
+Output debugging information
+
+=item -v, --verbose
+
+Output verbose progress information
+
+=item -q, --quiet
+
+Supress stdout
+
+=item --logfile=FILE
+
+Save debug information to FILE
 
 =back
 
