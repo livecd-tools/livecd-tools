@@ -23,7 +23,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import division
 doc1 = '''
-              editliveos.py: [options] <LiveOS_source>
+              editliveos [options] <LiveOS_source>
 
               Edit a LiveOS image to merge a persistent overlay, insert files,
               clone a customized instance, adjust the root or home filesystem
@@ -31,7 +31,7 @@ doc1 = '''
               the image into a new, .iso image distribution file, and refresh
               the source's persistent filesystem overlay.'''
 doc2 = '''
- USAGE HELP   editliveos.py -h, -?, --help
+ USAGE HELP   editliveos -h, -?, --help
 
               LiveOS_source may be entered as "live" to edit or clone the
               currently running LiveOS image.  An attached LiveOS loaded
@@ -1491,7 +1491,6 @@ s/\s+rw\s+|\s+rw$/ /g'''
                           ('var', 'log', 'dmesg'),
                           ('var', 'log', 'dmesg.old'),
                           ('var', 'log', 'audit', 'audit.log'),
-                          ('var', 'lib', 'dbus', 'machine-id'),
                           ('var', 'lib', 'random-seed'),
                           ('var', 'lib', 'alsa', 'asound.state'),
                           ('var', 'lib', 'colord', 'mapping.db'),

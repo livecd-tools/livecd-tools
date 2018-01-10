@@ -320,7 +320,8 @@ def config_mirror_targets(src_fs, tmpdir='/tmp', legs=2, ops=None):
         loopobj.create()
         imgdev = loopobj.device
 
-    fslabel, fstype = lsblk('-ndo LABEL,FSTYPE', imgdev).split()
+    fslabel = lsblk('-ndo LABEL', imgdev)
+    fstype = lsblk('-ndo FSTYPE', imgdev)
     blocksize = os.stat(imgdev).st_blksize
 
     def _create_target_object(i):
@@ -369,10 +370,6 @@ def mirror_fs(fs_dev, dm_node, imgsize, mirloops, mirname):
 
     # Loading mirror configuration.
     logging.info('loading mirror %s to %s' % (device, repr(tgtloops)))
-
-    call(['sync'])
-    with open('/proc/sys/vm/drop_caches', 'w') as f:
-        f.write('3')
 
     call(dmsetup_cmd + ['create', mirname, '--readonly', '--table', mirror])
     time.sleep(2)
