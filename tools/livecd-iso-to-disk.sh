@@ -1320,6 +1320,63 @@ if [[ -n $copyoverlay && -n $overlaysizemb ]]; then
     exitclean
 fi
 
+[[ -d $SRCMNT/EFI ]] && d=$(ls -d $SRCMNT/EFI/*/)
+# This test is case sensitive in Bash on vfat filesystems.
+if [[ $d =~ EFI/BOOT/ ]]; then
+    EFI_BOOT=/EFI/BOOT
+elif [[ $d =~ EFI/boot/ ]]; then
+    EFI_BOOT=/EFI/boot
+fi
+if [[ -n $efi && -z $EFI_BOOT ]]; then
+    printf '\n        ATTENTION:
+    You requested EFI booting, but this source image lacks support
+    for EFI booting.  Exiting...\n'
+    exitclean
+fi
+[[ -d $TGTMNT/EFI ]] && d=$(ls -d $TGTMNT/EFI/*/)
+if [[ $d =~ EFI/boot/ ]]; then
+    T_EFI_BOOT=/EFI/boot
+else
+    T_EFI_BOOT=/EFI/BOOT
+fi
+BOOTCONFIG_EFI=($(nocase_path "$TGTMNT$T_EFI_BOOT/boot*.conf"))
+#^ Use compound array assignment in case there are multiple files.
+
+if [[ $srctype == live ]] &&
+   [[ -z $multi && -z $force && -e $TGTMNT/syslinux ]]; then
+    IFS=: read -n 1 -p '
+    ATTENTION:
+
+        >> There may be other LiveOS images on this device. <<
+
+    Do you want a Multi Live Image installation?
+
+        If so, press Enter to continue.
+
+        If not, press the [space bar], and any image in the "'$LIVEOS'"
+                directory will be overwritten, and any others ignored.
+
+    To abort the installation, press Ctrl C.
+    ' multi
+    if [[ $multi != " " ]]; then
+        multi=multi
+        if [[ $LIVEOS == LiveOS ]]; then
+            LIVEOS=$(mktemp -d $TGTMNT/XXXX)
+            rmdir $LIVEOS
+            LIVEOS=${LIVEOS##*/}
+        fi
+    else
+        unset -v multi
+        # Backup previous config_file.
+        [[ -f $TGTMNT/syslinux/$CONFIG_FILE ]] &&
+            cp $TGTMNT/syslinux/$CONFIG_FILE $TGTMNT/syslinux/$CONFIG_FILE.prev
+        [[ -f $TGTMNT$T_EFI_BOOT/grub.cfg ]] &&
+            cp $TGTMNT$T_EFI_BOOT/grub.cfg $TGTMNT$T_EFI_BOOT/grub.cfg.prev
+        [[ -f $BOOTCONFIG_EFI ]] &&
+            cp $BOOTCONFIG_EFI $BOOTCONFIG_EFI.prev
+    fi
+fi
+
 OVLPATH=$TGTMNT/$LIVEOS/$OVLNAME
 if [[ -n $resetoverlay ]]; then
     existing=($(find $TGTMNT/$LIVEOS/ -name overlay-* -print || :))
@@ -1405,57 +1462,6 @@ if [[ ! -s $SRCHOME && -n $copyhome ]] &&
         Press Enter to continue, or Ctrl C to abort.\n'
     read
     copyhome=''
-fi
-
-[[ -d $SRCMNT/EFI ]] && d=$(ls -d $SRCMNT/EFI/*/)
-# This test is case sensitive in Bash on vfat filesystems.
-if [[ $d =~ EFI/BOOT/ ]]; then
-    EFI_BOOT=/EFI/BOOT
-elif [[ $d =~ EFI/boot/ ]]; then
-    EFI_BOOT=/EFI/boot
-fi
-if [[ -n $efi && -z $EFI_BOOT ]]; then
-    printf '\n        ATTENTION:
-    You requested EFI booting, but this source image lacks support
-    for EFI booting.  Exiting...\n'
-    exitclean
-fi
-[[ -d $TGTMNT/EFI ]] && d=$(ls -d $TGTMNT/EFI/*/)
-if [[ $d =~ EFI/boot/ ]]; then
-    T_EFI_BOOT=/EFI/boot
-else
-    T_EFI_BOOT=/EFI/BOOT
-fi
-
-if [[ $srctype == live ]] &&
-   [[ -z $multi && -z $force && -e $TGTMNT/syslinux ]]; then
-    IFS=: read -n 1 -p '
-    ATTENTION:
-
-        >> There may be other LiveOS images on this device. <<
-
-    Do you want a Multi Live Image installation?
-
-        If so, press Enter to continue.
-
-        If not, press the [space bar], and other images
-                will be ignored.
-
-    To abort the installation, press Ctrl C.
-    ' multi
-    if [[ $multi != " " ]]; then
-        multi=multi
-        LIVEOS=$(mktemp -d $TGTMNT/XXXX)
-        rmdir $LIVEOS
-        LIVEOS=${LIVEOS##*/}
-    else
-        unset -v multi
-        # Backup previous config_file.
-        [[ -f $TGTMNT/syslinux/$CONFIG_FILE ]] &&
-            cp $TGTMNT/syslinux/$CONFIG_FILE $TGTMNT/syslinux/previous_config
-        [[ -f $TGTMNT$T_EFI_BOOT/grub.cfg ]] &&
-            cp $TGTMNT$T_EFI_BOOT/grub.cfg $TGTMNT/EFI/grub.cfg.previous
-    fi
 fi
 
 if [[ $(syslinux --version 2>&1) != syslinux\ * ]]; then
@@ -1731,27 +1737,37 @@ TITLE=$(sed -n -r '/^\s*label\s+linux/{n
 # propagate, if desired from the installed system.
 if [[ -n $EFI_BOOT ]]; then
     echo "Setting up $T_EFI_BOOT"
+    [[ ! -d $TGTMNT$T_EFI_BOOT ]] && mkdir -p $TGTMNT$T_EFI_BOOT
 
     # The GRUB EFI config file can be one of:
     #   boot?*.conf
     #   BOOT?*.conf
     #   grub.cfg
-    BOOTCONFIG_EFI=$(nocase_path "$TGTMNT$T_EFI_BOOT/boot*.conf")
-    if ! [[ -f $BOOTCONFIG_EFI ]]; then
+
+    # Test for EFI config file on target device from previous installation.
+    if [[ -f $TGTMNT$T_EFI_BOOT/grub.cfg ]]; then
+        # (Prefer grub.cfg over boot*.conf set above.)
         BOOTCONFIG_EFI=$TGTMNT$T_EFI_BOOT/grub.cfg
     fi
-    [[ -e $TGTMNT/EFI_previous ]] && rm $TGTMNT/EFI_previous
     if [[ -n $multi && -f $BOOTCONFIG_EFI ]]; then
-        mv -T $BOOTCONFIG_EFI $TGTMNT/EFI_previous
+        mv -Tf $BOOTCONFIG_EFI $BOOTCONFIG_EFI.multi
     fi
     if [[ $TGTMNT/EFI -ef $SRCMNT/EFI ]]; then
-        cp $TGTMNT/EFI_previous $BOOTCONFIG_EFI
+        cp $BOOTCONFIG_EFI.multi $BOOTCONFIG_EFI
     else
-        [[ -d $TGTMNT$T_EFI_BOOT ]] && rm -r -- $TGTMNT$T_EFI_BOOT
-        mkdir -p $TGTMNT$T_EFI_BOOT
-        cp -r $SRCMNT$EFI_BOOT/* $TGTMNT$T_EFI_BOOT
+        cp -Tr $SRCMNT$EFI_BOOT $TGTMNT$T_EFI_BOOT
 
         rm -f $TGTMNT$T_EFI_BOOT/grub.conf
+    fi
+
+    # Select config file for initial installations.
+    BOOTCONFIG_EFI=$TGTMNT$T_EFI_BOOT/grub.cfg
+    if [[ ! -f $BOOTCONFIG_EFI ]]; then
+        BOOTCONFIG_EFI=($(nocase_path "$TGTMNT$T_EFI_BOOT/boot*.conf"))
+    fi
+    if [[ -n $efi && ! -f $BOOTCONFIG_EFI ]]; then
+        echo "Unable to find an EFI configuration file."
+        exitclean
     fi
 
     # On some images (RHEL) the BOOT*.efi file isn't in $EFI_BOOT, but is in
@@ -1851,7 +1867,7 @@ s/\<(root=live:[^ ]*)\s+[^\n.]*\<(rd\.live\.image|liveimg)/\1 \2/
     fi
     # And, if --multi, distinguish the new grub menuentry with $LIVEOS ~.
     if [[ -n $BOOTCONFIG_EFI ]]; then
-        [[ -f $TGTMNT/EFI_previous ]] && livedir=$LIVEOS\ ~
+        [[ -f $BOOTCONFIG_EFI.multi ]] && livedir=$LIVEOS\ ~
         sed -i -r "s/^\s*set\s+timeout=.*/set timeout=60/
 /^\s*menuentry\s+'Start\s+/,/\s+}/{s/(\s+'Start\s+)[^ ]*\s+~/\1/
 s/\s+'Start\s+/&$livedir/
@@ -2112,7 +2128,7 @@ if [[ -n $multi && ! -d $TGTMNT/syslinux ]]; then
         mv $TGTMNT/$SYSLINUXPATH $TGTMNT/syslinux
         SYSLINUXPATH=syslinux
     }
-    [[ -e $TGTMNT/EFI_previous ]] && rm $TGTMNT/EFI_previous
+    [[ -e $BOOTCONFIG_EFI.multi ]] && rm $BOOTCONFIG_EFI.multi
 fi
 
 BOOTPATH=$SYSLINUXPATH
@@ -2168,7 +2184,7 @@ sed -i -r "s/\s+[^ ]*menu\.c32\>/ $UI/g" $TGTMNT/syslinux/$CONFIG_FILE
 
 [[ $multi == move ]] && move_syslinux_dir
 
-if [[ -f $TGTMNT/EFI_previous ]]; then
+if [[ -f $BOOTCONFIG_EFI.multi ]]; then
     # (Implies --multi and the presence of EFI components.)
     # Insert marker and delete any conflicting menu entries
     # after escaping special characters.
@@ -2179,21 +2195,25 @@ if [[ -f $TGTMNT/EFI_previous ]]; then
                /\s+rd\.live\.dir=$d\s+/ d }
                /\s*submenu\s+/ { N;N;N;N;N
                /\s+rd\.live\.dir=$d\s+/ d }
-              " $TGTMNT/EFI_previous
-    cat $TGTMNT/EFI_previous >> $BOOTCONFIG_EFI
-    # Clear header from EFI_previous.
+              " $BOOTCONFIG_EFI.multi
+    cat $BOOTCONFIG_EFI.multi >> $BOOTCONFIG_EFI
+    # Clear header from $BOOTCONFIG_EFI.multi.
     sed -i -r '/^\.\.\.$/,/^\s*menuentry\s+/ {
                /^\s*menuentry\s+/ ! d}' $BOOTCONFIG_EFI
-    rm $TGTMNT/EFI_previous
+    rm $BOOTCONFIG_EFI.multi
 fi
 
 # Always make the following adjustments.
 echo "Installing boot loader..."
-if [[ -n $efi ]]; then
-    # replace the ia32 hack
-    if [[ -f $TGTMNT$T_EFI_BOOT/BOOT.conf ]] &&
-        [[ -f $TGTMNT$T_EFI_BOOT/BOOTia32.conf ]]; then
+if [[ -f $TGTMNT$T_EFI_BOOT/BOOT.conf ]]; then
+    if [[ -f $TGTMNT$T_EFI_BOOT/BOOTia32.conf ]]; then
+        # replace the ia32 hack. BOOTia32.conf was in Fedora 11-14.
         cp -f $TGTMNT$T_EFI_BOOT/BOOTia32.conf $TGTMNT$T_EFI_BOOT/BOOT.conf
+    elif [[ $BOOTCONFIG_EFI -ef $TGTMNT$T_EFI_BOOT/BOOT.conf ]]; then
+        cp -f $BOOTCONFIG_EFI $TGTMNT$T_EFI_BOOT/grub.cfg
+    else
+        # Fedora 27 duplicates /EFI/BOOT/grub.cfg at /EFI/BOOT/BOOT.conf
+        cp -f $BOOTCONFIG_EFI $TGTMNT$T_EFI_BOOT/BOOT.conf
     fi
 fi
 
