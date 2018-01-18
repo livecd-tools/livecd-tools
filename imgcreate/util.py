@@ -30,12 +30,12 @@ def call(*popenargs, **kwargs):
     p = subprocess.Popen(*popenargs, stdout=subprocess.PIPE,
                          stderr=subprocess.STDOUT, **kwargs)
     rc = p.wait()
-
-    stdout = io.TextIOWrapper(p.stdout, encoding='utf-8')
+    fp = io.open(p.stdout.fileno(), mode="r", encoding="utf-8", closefd=False)
+    stdout = fp.read().split()
+    fp.close()
 
     # Log output using logging module
-    while True:
-        buf = stdout.readline()
+    for buf in stdout:
         if not buf:
             break
         logging.debug("%s", buf.rstrip())
