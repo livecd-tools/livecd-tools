@@ -533,21 +533,6 @@ def get_image_fstype(ks, default = None):
             return p.fstype
     return default
 
-def get_modules(ks):
-    devices = []
-    if not hasattr(ks.handler.device, "deviceList"):
-        devices.append(ks.handler.device)
-    else:
-        devices.extend(ks.handler.device.deviceList)
-
-    modules = []
-    for device in devices:
-        if not device.moduleName:
-            continue
-        modules.extend(device.moduleName.split(":"))
-
-    return modules
-
 def get_timeout(ks, default = None):
     if not hasattr(ks.handler.bootloader, "timeout"):
         return default
