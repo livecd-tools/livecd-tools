@@ -90,7 +90,6 @@ class LiveImageCreatorBase(LoopImageCreator):
                           "=mmc", "=pcmcia", "mptsas", "udf", "virtio_blk",
                           "virtio_pci", "virtio_scsi", "virtio_net", "virtio_mmio",
                           "virtio_balloon", "virtio-rng"]
-        self.__modules.extend(kickstart.get_modules(self.ks))
 
         self._isofstype = "iso9660"
         self.base_on = False
