@@ -2,7 +2,7 @@
 # live.py : LiveImageCreator class for creating Live CD images
 #
 # Copyright 2007-2012, Red Hat, Inc.
-# Copyright 2016, Kevin Kofler
+# Copyright 2016-2018, Kevin Kofler
 # Copyright 2016, Neal Gompa
 # Copyright 2017, Fedora Project
 #
@@ -725,16 +725,18 @@ menu end
         """
         fail = False
         missing = []
-        files = [("/boot/efi/EFI/*/shim.efi", "/EFI/BOOT/BOOT%s.EFI" % (self.efiarch,)),
-                 ("/boot/efi/EFI/*/gcdx64.efi", "/EFI/BOOT/grubx64.efi"),
-                 ("/boot/efi/EFI/*/fonts/unicode.pf2", "/EFI/BOOT/fonts/"),
+        files = [("/boot/efi/EFI/*/shim.efi", "/EFI/BOOT/BOOT%s.EFI" % (self.efiarch,), True),
+                 ("/boot/efi/EFI/*/gcdx64.efi", "/EFI/BOOT/grubx64.efi", True),
+                 ("/boot/efi/EFI/*/gcdia32.efi", "/EFI/BOOT/grubia32.efi", False),
+                 ("/boot/efi/EFI/*/fonts/unicode.pf2", "/EFI/BOOT/fonts/", True),
                 ]
         makedirs(isodir+"/EFI/BOOT/fonts/")
-        for src, dest in files:
+        for src, dest, required in files:
             src_glob = glob.glob(self._instroot+src)
             if not src_glob:
-                missing.append("Missing EFI file (%s)" % (src,))
-                fail = True
+                if required:
+                    missing.append("Missing EFI file (%s)" % (src,))
+                    fail = True
             else:
                 shutil.copy(src_glob[0], isodir+dest)
         map(logging.error, missing)
