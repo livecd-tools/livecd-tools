@@ -87,7 +87,7 @@ class LiveImageCreatorBase(LoopImageCreator):
         self.__isodir = None
 
         self.__modules = ["=ata", "sym53c8xx", "aic7xxx", "=usb", "=firewire",
-                          "=mmc", "=pcmcia", "mptsas", "udf", "virtio_blk",
+                          "=mmc", "=pcmcia", "mptsas", "virtio_blk",
                           "virtio_pci", "virtio_scsi", "virtio_net", "virtio_mmio",
                           "virtio_balloon", "virtio-rng"]
 
@@ -326,8 +326,6 @@ class LiveImageCreatorBase(LoopImageCreator):
                 "-o", iso]
 
         args.extend(self._get_genisoimage_options(isodir))
-        if self._isofstype == "udf":
-            args.append("-allow-limited-size")
 
         args.append(isodir)
 
@@ -375,9 +373,6 @@ class LiveImageCreatorBase(LoopImageCreator):
             if self.skip_compression:
                 os_image = os.path.join(self.__isodir, os_image)
                 shutil.move(self._image, os_image)
-                if os.stat(os_image).st_size >= 4*1024*1024*1024:
-                    self._isofstype = "udf"
-                    logging.warning("Switching to UDF due to size of rootfs_img.")
             else:
                 if 'flatten-squashfs' in ops:
                     ops.remove('flatten-squashfs')
@@ -394,9 +389,6 @@ class LiveImageCreatorBase(LoopImageCreator):
                            self.__isodir + "/LiveOS/squashfs.img",
                            self.compress_type, ops)
                 self._LoopImageCreator__instloop.cleanup()
-                if os.stat(self.__isodir + "/LiveOS/squashfs.img").st_size >= 4*1024*1024*1024:
-                    self._isofstype = "udf"
-                    logging.warning("Switching to UDF due to size of LiveOS/squashfs.img")
 
             self.__create_iso(self.__isodir)
         finally:
