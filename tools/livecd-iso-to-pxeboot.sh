@@ -96,7 +96,7 @@ mkdir tftpboot
 # aggregating both cpio archives (initrd + ISO) into a single
 # filesystem.
 NEWISO=$STRIPPEDISO/`basename "$ISO"`
-genisoimage --quiet -J -joliet-long -r -T -o $NEWISO --root LiveOS $CDMNT/LiveOS/squashfs.img
+xorrisofs -quiet -joliet -joliet-long -rational-rock -output $NEWISO -root LiveOS $CDMNT/LiveOS/squashfs.img
 ISOBASENAME=`basename "$NEWISO"`
 ISODIRNAME=`dirname "$NEWISO"`
 ( cd "$STRIPPEDISO" && echo "$ISOBASENAME" | cpio -H newc --quiet -L -o ) |

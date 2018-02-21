@@ -127,11 +127,11 @@ class LiveImageCreatorBase(LoopImageCreator):
             r += " rhgb"
         return r
 
-    def _get_genisoimage_options(self, isodir):
-        """Return the architecture specific genisoimage options.
+    def _get_xorrisofs_options(self, isodir):
+        """Return the architecture specific xorrisofs options.
 
         This is the hook where subclasses may specify additional arguments to
-        genisoimage, e.g. to enable a bootable ISO to be built.
+        xorrisofs, e.g. to enable a bootable ISO to be built.
 
         By default, an empty list is returned.
 
@@ -319,13 +319,13 @@ class LiveImageCreatorBase(LoopImageCreator):
     def __create_iso(self, isodir):
         iso = self._outdir + "/" + self.name + ".iso"
 
-        args = ["genisoimage",
-                "-J", "-r",
-                "-hide-rr-moved", "-hide-joliet-trans-tbl",
-                "-V", self.fslabel,
-                "-o", iso]
+        args = ["xorrisofs",
+                "-joliet", "-rational-rock",
+                "-hide-rr-moved",
+                "-volid", self.fslabel,
+                "-output", iso]
 
-        args.extend(self._get_genisoimage_options(isodir))
+        args.extend(self._get_xorrisofs_options(isodir))
 
         args.append(isodir)
 
@@ -402,17 +402,17 @@ class x86LiveImageCreator(LiveImageCreatorBase):
         LiveImageCreatorBase.__init__(self, *args, **kwargs)
         self._efiarch = None
 
-    def _get_genisoimage_options(self, isodir):
-        options = [ "-b", "isolinux/isolinux.bin",
-                    "-c", "isolinux/boot.cat",
+    def _get_xorrisofs_options(self, isodir):
+        options = [ "-eltorito-boot", "isolinux/isolinux.bin",
+                    "-eltorito-catalog", "isolinux/boot.cat",
                     "-no-emul-boot", "-boot-info-table",
                     "-boot-load-size", "4" ]
         if os.path.exists(isodir + "/isolinux/efiboot.img"):
             options.extend([ "-eltorito-alt-boot",
-                             "-e", "isolinux/efiboot.img",
+                             "-efi-boot", "isolinux/efiboot.img",
                              "-no-emul-boot",
                              "-eltorito-alt-boot",
-                             "-e", "isolinux/macboot.img",
+                             "-efi-boot", "isolinux/macboot.img",
                              "-no-emul-boot"])
         return options
 
@@ -845,11 +845,9 @@ submenu 'Troubleshooting -->' {
         self._configure_efi_bootloader(isodir)
 
 class ppcLiveImageCreator(LiveImageCreatorBase):
-    def _get_genisoimage_options(self, isodir):
-        return [ "-hfs", "-no-desktop", "-part",
-                 "-map", isodir + "/ppc/mapping",
-                 "-hfs-bless", isodir + "/ppc/mac",
-                 "-hfs-volid", self.fslabel ]
+    def _get_xorrisofs_options(self, isodir):
+        return [ "-hfsplus",
+                 "-hfs-bless", isodir + "/ppc/mac"]
 
     def _get_required_packages(self):
         return ["yaboot"] + \
