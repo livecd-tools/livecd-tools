@@ -479,12 +479,12 @@ class SelinuxConfig(KickstartConfig):
             return
 
         try:
-            rc = subprocess.call(['restorecon', '-p', '-e', '/proc', '-e',
-                                  '/sys', '-e', '/dev', '-F', '-R', '/'],
-                                 preexec_fn=self.chroot)
+            rc = subprocess.call(['setfiles', '-p', '-e', '/proc',
+                                  '-e', '/dev',
+                                  selinux.selinux_file_context_path(), '/'])
         except OSError as e:
             if e.errno == errno.ENOENT:
-                logging.info('The restorecon command is not available.')
+                logging.info('The setfiles command is not available.')
                 return
         if rc:
             if ksselinux.selinux == ksconstants.SELINUX_ENFORCING:
