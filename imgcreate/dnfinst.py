@@ -179,7 +179,10 @@ class DnfLiveCD(dnf.Base):
             # dnf 1
             repo = dnf.repo.Repo(name, cachedir = self.conf.cachedir)
         if url:
-            repo.baseurl.append(_varSubstitute(url))
+            # some overly clever trickery in dnf 3 prevents us just
+            # using repo.baseurl.append here:
+            # https://bugzilla.redhat.com/show_bug.cgi?id=1595917
+            repo.baseurl = repo.baseurl + [_varSubstitute(url)]
         if mirrorlist:
             repo.mirrorlist = _varSubstitute(mirrorlist)
         repo.enable()
