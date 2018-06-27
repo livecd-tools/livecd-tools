@@ -724,7 +724,6 @@ menu end
               fonts/unicode.pf2
         """
         fail = False
-        missing = []
         files = [("/boot/efi/EFI/*/shim.efi", "/EFI/BOOT/BOOT%s.EFI" % (self.efiarch,), True),
                  ("/boot/efi/EFI/*/gcdx64.efi", "/EFI/BOOT/grubx64.efi", True),
                  ("/boot/efi/EFI/*/gcdia32.efi", "/EFI/BOOT/grubia32.efi", False),
@@ -735,11 +734,10 @@ menu end
             src_glob = glob.glob(self._instroot+src)
             if not src_glob:
                 if required:
-                    missing.append("Missing EFI file (%s)" % (src,))
+                    logging.error("Missing EFI file (%s)" % (src,))
                     fail = True
             else:
                 shutil.copy(src_glob[0], isodir+dest)
-        map(logging.error, missing)
         return fail
 
     def __get_basic_efi_config(self, **args):
