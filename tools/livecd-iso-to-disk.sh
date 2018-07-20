@@ -1342,8 +1342,8 @@ fi
 BOOTCONFIG_EFI=($(nocase_path "$TGTMNT$T_EFI_BOOT/boot*.conf"))
 #^ Use compound array assignment in case there are multiple files.
 
-if [[ $srctype == live ]] &&
-   [[ -z $multi && -z $force && -e $TGTMNT/syslinux ]]; then
+if [[ -e $TGTMNT/syslinux && $srctype == live && -z $skipcopy ]] &&
+   [[ -z $multi && -z $force ]]; then
     IFS=: read -n 1 -p '
     ATTENTION:
 
