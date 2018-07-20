@@ -1976,6 +1976,7 @@ if [[ -n $overlaysizemb || -n $overlayfs ]] &&
             fi
         elif [[ -z $overlayfs ]]; then
             dd if=/dev/null of=$OVLPATH count=1 bs=1M seek=$overlaysizemb
+            chmod 0600 $OVLPATH &> /dev/null || :
         elif [[ $overlayfs != temp ]]; then
             mkdir $OVLPATH
             chcon --reference=/. $OVLPATH
@@ -2005,7 +2006,7 @@ if [[ -n $resetoverlay ]]; then
         rm -r -- $OVLPATH
         mkdir $OVLPATH
         mkdir $OVLPATH/../ovlwork
-        chcon --reference=/ $OVLPATH
+        chcon --reference=/. $OVLPATH
     else
         dd if=/dev/zero of=$OVLPATH bs=64k count=1 conv=notrunc,fsync
     fi
@@ -2021,6 +2022,7 @@ if ((swapsizemb > 0)); then
     echo "Initializing swap file."
     if [[ -z $skipcopy ]]; then
         dd if=/dev/zero of=$TGTMNT/$LIVEOS/swap.img count=$swapsizemb bs=1M
+        chmod 0600 $TGTMNT/$LIVEOS/swap.img &> /dev/null || :
     fi
     mkswap -f $TGTMNT/$LIVEOS/swap.img
 fi
@@ -2035,6 +2037,7 @@ if ((homesizemb > 0)) && [[ -z $skipcopy ]]; then
     else
         dd if=/dev/null of=$HOMEPATH count=1 bs=1M seek=$homesizemb
     fi
+    chmod 0600 $HOMEPATH &> /dev/null || :
     if [[ -n $cryptedhome ]]; then
         loop=$(losetup -f --show $HOMEPATH)
 
