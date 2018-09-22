@@ -1,6 +1,7 @@
 #!/bin/bash
 # Transfer a Live image so that it's bootable off of a USB/SD device.
-# Copyright 2007-2012, 2017,  Red Hat, Inc.
+# Copyright 2007-2012, 2017, Red Hat, Inc.
+# Copyright 2008-2010, 2017-2018, Fedora Project
 #
 # Jeremy Katz <katzj@redhat.com>
 # Brian C. Lane <bcl@redhat.com>
@@ -375,7 +376,7 @@ usage() {
 
     COPYRIGHT
 
-    Copyright 2008-2010, 2017, Fedora Project and various contributors.
+    Copyright 2008-2010, 2017-2018, Fedora Project and various contributors.
     This is free software. You may redistribute copies of it under the terms of
     the GNU General Public License http://www.gnu.org/licenses/gpl.html.
     There is NO WARRANTY, to the extent permitted by law.
@@ -902,7 +903,7 @@ cp_p() {
 if type rsync >/dev/null 2>&1; then
     copyFile='rsync --inplace --8-bit-output --progress'
 elif type gvfs-copy >/dev/null 2>&1; then
-    copyFile='gvfs-copy -p'
+    copyFile='gio copy -p'
 elif type strace >/dev/null 2>&1 && type awk >/dev/null 2>&1; then
     copyFile='cp_p'
 else
@@ -1123,7 +1124,7 @@ checkFilesystem $TGTDEV
 
 if [[ $LIVEOS =~ [[:space:]]|/ ]]; then
     printf "\n    ALERT:
-    The LiveOS directory name, '%s', contains spaces, newlines,tabs, or '/'.\n
+    The LiveOS directory name, '%s', contains spaces, newlines, tabs, or '/'.\n
     Whitespace and '/' do not work with the SYSLINUX boot loader.
     Replacing the whitespace by underscores, any '/' by '-'...\n\n" "$LIVEOS"
     LIVEOS=${LIVEOS//[[:space:]]/_}
@@ -1897,6 +1898,7 @@ fi
 echo "Updating boot config files."
 # adjust label and fstype
 sed -i -r "s/\<root=[^ ]*/root=live:$TGTLABEL/g
+        s/inst.stage2=hd:LABEL=[^ ]*/inst.stage2=hd:$TGTLABEL/g
         s/\<rootfstype=[^ ]*\>/rootfstype=$TGTFS/" $BOOTCONFIG $BOOTCONFIG_EFI
 if [[ -n $kernelargs ]]; then
     sed -i -r "s;=initrd.?\.img\>;& ${kernelargs} ;
