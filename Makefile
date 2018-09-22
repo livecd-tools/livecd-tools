@@ -29,7 +29,6 @@ install: man
 	$(INSTALL_PROGRAM) -D tools/liveimage-mount $(DESTDIR)/usr/bin/liveimage-mount
 	$(INSTALL_PROGRAM) -D tools/livecd-iso-to-disk.sh $(DESTDIR)/usr/bin/livecd-iso-to-disk
 	$(INSTALL_PROGRAM) -D tools/livecd-iso-to-pxeboot.sh $(DESTDIR)/usr/bin/livecd-iso-to-pxeboot
-	$(INSTALL_PROGRAM) -D tools/edit-livecd $(DESTDIR)/usr/bin/edit-livecd
 	$(INSTALL_PROGRAM) -D tools/editliveos $(DESTDIR)/usr/bin/editliveos
 	$(INSTALL_PROGRAM) -D tools/mkbiarch $(DESTDIR)/usr/bin/mkbiarch
 	$(INSTALL_DATA) -D AUTHORS $(DESTDIR)/usr/share/doc/livecd-tools/AUTHORS
@@ -44,7 +43,6 @@ install: man
 	$(INSTALL_DATA) -D docs/*.8 $(DESTDIR)/usr/share/man/man8
 	$(SED_PROGRAM) -i "s:#!/usr/bin/python:#!$(PYTHON_PROGRAM):g" $(DESTDIR)/usr/bin/livecd-creator
 	$(SED_PROGRAM) -i "s:#!/usr/bin/python:#!$(PYTHON_PROGRAM):g" $(DESTDIR)/usr/bin/liveimage-mount
-	$(SED_PROGRAM) -i "s:#!/usr/bin/python:#!$(PYTHON_PROGRAM):g" $(DESTDIR)/usr/bin/edit-livecd
 	$(SED_PROGRAM) -i "s:#!/usr/bin/python:#!$(PYTHON_PROGRAM):g" $(DESTDIR)/usr/bin/editliveos
 	$(SED_PROGRAM) -i "s:#!/usr/bin/python:#!$(PYTHON_PROGRAM):g" $(DESTDIR)/usr/bin/mkbiarch
 
