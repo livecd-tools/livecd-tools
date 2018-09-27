@@ -182,7 +182,10 @@ class DnfLiveCD(dnf.Base):
             # some overly clever trickery in dnf 3 prevents us just
             # using repo.baseurl.append here:
             # https://bugzilla.redhat.com/show_bug.cgi?id=1595917
-            repo.baseurl = repo.baseurl + [_varSubstitute(url)]
+            # with the change to representing it as a tuple in DNF 3.6
+            # this '+= (tuple)' approach seems to work for DNF 2,
+            # 3.0-3.5 *and* 3.6
+            repo.baseurl += (_varSubstitute(url),)
         if mirrorlist:
             repo.mirrorlist = _varSubstitute(mirrorlist)
         repo.enable()
