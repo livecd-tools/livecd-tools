@@ -853,6 +853,10 @@ detectsrctype() {
             break
         fi
     done
+    IMGMNT=$(mktemp -d /run/imgtmp.XXXXXX)
+    mount $srcmountopts "$SRCIMG" $IMGMNT || exitclean
+    [[ -d $IMGMNT/proc ]] && flat_squashfs=flat_squashfs
+    umount $IMGMNT
     [[ -n $srctype ]] && return
 
     if [[ -e $SRCMNT/images/install.img ]] ||
@@ -1147,15 +1151,6 @@ if [[ $overlayfs == temp && -n $overlaysizemb ]]; then
     exitclean
 fi
 
-if [[ -n $skipcompress && -n $overlayfs ]]; then
-    printf '\n        ALERT:
-        You have specified both --skipcompress AND --overlayfs.\n
-        The boot manager is not currently coded to support this
-        combination of options.\n
-        Please request only one of these options.  Exiting...\n'
-    exitclean
-fi
-
 if [[ $overlay == none && -n $overlaysizemb ]]; then
     printf '\n        ERROR:
         You have specified --no-overlay AND --overlay-size-mb <size>.\n
@@ -1224,6 +1219,23 @@ trap exitclean SIGINT SIGTERM
 
 # Figure out what needs to be done based on the source image.
 detectsrctype
+
+if [[ -n $flat_squashfs ]] && [[ -z $overlayfs ]]; then
+    if [[ $TGTFS == @(vfat|msdos) ]] && [[ -z $overlaysizemb ]]; then
+        printf  "\n        ALERT:
+        The source has a flat SquashFS structure that requires an OverlayFS
+        overlay specified by the --overlayfs option.\n
+        Because the target device filesystem is '"$TGTFS"', you must
+        specify an --overlay-size-mb <size> value for an embedded overlayfs.\n
+        Exiting...\n\n"
+        exitclean
+    elif [[ -n $overlaysizemb ]]; then
+        overlayfs=$TGTFS
+    else
+        overlayfs=temp
+    fi
+fi
+
 
 # Format the device
 if [[ -n $format && -z $skipcopy ]]; then
@@ -1491,7 +1503,7 @@ fi
 
 if [[ -n $overlayfs && -z $(lsinitrd $CONFIG_SRC/initrd*.img\
     -f usr/lib/dracut/hooks/cmdline/30-parse-dmsquash-live.sh | \
-    sed -n /rootfsbase/p) ]]; then
+    sed -n '/dev\/root/p') ]]; then
     printf '\n    NOTICE:
     The --overlayfs option requires an initial boot image based on
     dracut version 045 or greater to use the OverlayFS feature.\n
@@ -1511,7 +1523,7 @@ checklivespace() {
     if [[ -d $TGTMNT/$LIVEOS ]]; then
         # du -c reports a grand total in the first column of the last row,
         # i.e., at ${array[*]: -2:1}, the penultimate index position.
-        tbd=($(du -c -B 1M $TGTMNT/$LIVEOS))
+        tbd=($(du -c -B 1M $TGTMNT/$LIVEOS $TGTMNT/images))
         tbd=${tbd[*]: -2:1}
         if [[ -s $HOMEPATH ]] && [[ -n $keephome ]]; then
             homesize=($(du -B 1M $HOMEPATH))
@@ -1573,7 +1585,7 @@ checklivespace() {
         fi
     fi
     sources="$SRCMNT/$srcdir/osmin.img"\ "$SRCMNT/$srcdir/syslinux"
-    sources+=" $SRCMNT/isolinux $SRCMNT/syslinux"
+    sources+=" $SRCMNT/images $SRCMNT/isolinux $SRCMNT/syslinux"
     [[ -n $EFI_BOOT ]] && sources+=" $SRCMNT$EFI_BOOT"
     duTable=($(du -c -B 1M "$0" $sources 2> /dev/null || :))
     livesize=$((livesize + ${duTable[*]: -2:1} + 1))
@@ -1733,6 +1745,19 @@ fi
 TITLE=$(sed -n -r '/^\s*label\s+linux/{n
                    s/^\s*menu\s+label\s+\^Start\s+(.*)/\1/p}
                   ' $BOOTCONFIG)
+
+# Copy LICENSE and README.
+if [[ -z $skipcopy ]]; then
+    for f in $SRCMNT/LICENSE $SRCMNT/Fedora-Legal-README.txt; do
+        [[ -f $f ]] && cp $f $TGTMNT
+    done
+fi
+
+# Always install /images directory, when available, so that they may be used
+# to propagate a new installation from the installed system.
+if [[ -d $SRCMNT/images ]] && [[ $srctype == live && -z $skipcopy ]]; then
+    cp -r $SRCMNT/images $TGTMNT
+fi
 
 # Always install EFI components, when available, so that they are available to
 # propagate, if desired from the installed system.
