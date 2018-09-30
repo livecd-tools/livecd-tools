@@ -4,7 +4,7 @@
 # Copyright 2007-2012, Red Hat, Inc.
 # Copyright 2016-2018, Kevin Kofler
 # Copyright 2016, Neal Gompa
-# Copyright 2017, Fedora Project
+# Copyright 2017-2018, Fedora Project
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -200,15 +200,20 @@ class LiveImageCreatorBase(LoopImageCreator):
                 raise CreatorError("Failed to loopback mount squashfs.img "
                                    "from '%s' : %s" % (base_on, e))
 
-            for f in ('rootfs.img', 'ext3fs.img'):
-                os_image = os.path.join(squashloop.mountdir, 'LiveOS', f)
-                if os.path.exists(os_image):
-                    break
+            # Test for flattened squashfs.
+            os_image = os.path.join(squashloop.mountdir, 'proc')
+            if os.path.isdir(os_image):
+                os_image = squashimg
+            else:
+                for f in ('rootfs.img', 'ext3fs.img'):
+                    os_image = os.path.join(squashloop.mountdir, 'LiveOS', f)
+                    if os.path.exists(os_image):
+                        break
 
             if not os.path.exists(os_image):
                 raise CreatorError("'%s' is not a valid live CD ISO : neither "
-                                   "LiveOS/rootfs.img nor ext3fs.img exist" %
-                                   base_on)
+                "LiveOS/rootfs.img, ext3fs.img, nor squashfs.img exist" %
+                base_on)
 
             try:
                 shutil.copyfile(os_image, self._image)
@@ -356,7 +361,7 @@ class LiveImageCreatorBase(LoopImageCreator):
                             'not setting up mediacheck')
         return
 
-    def _stage_final_image(self, ops=None):
+    def _stage_final_image(self, ops=[]):
         try:
             makedirs(self.__ensure_isodir() + "/LiveOS")
 
@@ -366,7 +371,7 @@ class LiveImageCreatorBase(LoopImageCreator):
                 create_image_minimizer(self.__isodir + "/LiveOS/osmin.img",
                                        self._image, self.compress_type)
 
-            os_image = os.path.join('LiveOS', os.path.basename(self._image))
+            os_image = os.path.join('LiveOS', 'rootfs.img')
             if self.skip_compression:
                 os_image = os.path.join(self.__isodir, os_image)
                 shutil.move(self._image, os_image)
@@ -374,12 +379,21 @@ class LiveImageCreatorBase(LoopImageCreator):
                     self._isofstype = "udf"
                     logging.warning("Switching to UDF due to size of rootfs_img.")
             else:
-                makedirs(os.path.join(os.path.dirname(self._image), "LiveOS"))
-                os_image = os.path.join(os.path.dirname(self._image), os_image)
-                shutil.move(self._image, os_image)
-                mksquashfs(os.path.dirname(self._image),
+                if 'flatten-squashfs' in ops:
+                    ops.remove('flatten-squashfs')
+                    self._LoopImageCreator__instloop.mount('ro')
+                    os_image = self._instroot
+                else:
+                    makedirs(os.path.join(
+                                     os.path.dirname(self._image), "LiveOS"))
+                    os_image = os.path.join(
+                                       os.path.dirname(self._image), os_image)
+                    shutil.move(self._image, os_image)
+                    os_image = os.path.dirname(self._image)
+                mksquashfs(os_image,
                            self.__isodir + "/LiveOS/squashfs.img",
                            self.compress_type, ops)
+                self._LoopImageCreator__instloop.cleanup()
                 if os.stat(self.__isodir + "/LiveOS/squashfs.img").st_size >= 4*1024*1024*1024:
                     self._isofstype = "udf"
                     logging.warning("Switching to UDF due to size of LiveOS/squashfs.img")

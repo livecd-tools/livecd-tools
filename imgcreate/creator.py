@@ -812,7 +812,7 @@ class ImageCreator(object):
         """
         subprocess.call("bash", preexec_fn=self._chroot)
 
-    def package(self, destdir='.', ops=None):
+    def package(self, destdir='.', ops=[]):
         """Prepares the created image for final delivery.
 
         In its simplest form, this method merely copies the install root to the
@@ -823,8 +823,9 @@ class ImageCreator(object):
         destdir -- the directory into which the final image should be moved;
                    this defaults to the current directory.
 
-        ops     -- options, e.g., 'show-squashing', passed to subsequent
-                   procedures.
+        ops     -- options list, e.g., ['show-squashing'], passed to subsequent
+                   procedures, such as, mksquashfs(), or ['flatten-squashfs']
+                   passed to _stage_final_image().
 
         """
         self._stage_final_image(ops)

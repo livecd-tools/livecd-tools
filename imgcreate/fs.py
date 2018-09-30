@@ -4,7 +4,7 @@
 #
 # Copyright 2007, Red Hat, Inc.
 # Copyright 2016, Neal Gompa
-# Copyright 2017, Sugar Labs®
+# Copyright 2017-2018, Sugar Labs®
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -30,7 +30,6 @@ import stat
 import shutil
 import subprocess
 import random
-import string
 import logging
 import tempfile
 import time
@@ -99,17 +98,19 @@ def squashfs_compression_type(sqfs_img):
                     break
     return compress_type
 
-def mksquashfs(in_img, out_img, compress_type, ops=None):
+def mksquashfs(in_dir, out_img, compress_type, ops=[]):
 # Allow gzip to work for older versions of mksquashfs
     if not compress_type or compress_type == "gzip":
-        args = ['mksquashfs', in_img, out_img]
+        args = ['mksquashfs', in_dir, out_img]
     else:
-        args = ['mksquashfs', in_img, out_img, '-comp', compress_type]
+        args = ['mksquashfs', in_dir, out_img, '-comp', compress_type]
 
     if not sys.stdout.isatty():
         args.append('-no-progress')
 
-    if ops == 'show-squashing':
+    if ops:
+        ops.remove('show-squashing')
+        args += ops
         p = subprocess.Popen(args, stdout=None, stderr=subprocess.STDOUT)
         p.wait()
         ret = p.returncode
@@ -399,7 +400,7 @@ def mirror_fs(fs_dev, dm_node, imgsize, mirloops, mirname):
 
 class LoopbackMount:
     """LoopbackMount  compatibility layer for old API"""
-    def __init__(self, lofile, mountdir, fstype=None, ops=[], dirmode=None):
+    def __init__(self, lofile, mountdir, fstype=None, ops='', dirmode=None):
         self.diskmount = DiskMount(LoopbackDisk(lofile, size=0, ops=ops,
                                                 dirmode=dirmode),
                                    mountdir, fstype, rmmountdir=True, ops=ops,
@@ -420,7 +421,7 @@ class LoopbackMount:
             self.losetup = False
             self.loopdev = None
 
-    def loopsetup(self, ops=[]):
+    def loopsetup(self, ops=''):
         if self.losetup:
             return
 
@@ -454,7 +455,7 @@ class LoopbackMount:
 
 class SparseLoopbackMount(LoopbackMount):
     """SparseLoopbackMount  compatibility layer for old API"""
-    def __init__(self, lofile, mountdir, size, fstype=None, ops=[],
+    def __init__(self, lofile, mountdir, size, fstype=None, ops='',
                  dirmode=None):
         self.diskmount = DiskMount(SparseLoopbackDisk(lofile, size), mountdir,
                                    fstype, rmmountdir=True, ops=ops,
@@ -473,7 +474,7 @@ class SparseLoopbackMount(LoopbackMount):
 class SparseExtLoopbackMount(SparseLoopbackMount):
     """SparseExtLoopbackMount  compatibility layer for old API"""
     def __init__(self, lofile, mountdir, size, fstype, blocksize, fslabel,
-                 ops=[], dirmode=None):
+                 ops='', dirmode=None):
         self.diskmount = ExtDiskMount(SparseLoopbackDisk(lofile,size),
                                       mountdir, fstype, blocksize, fslabel,
                                       rmmountdir=True, ops=ops,
@@ -515,7 +516,7 @@ class Disk:
         self._device = device
         self._size = size
 
-    def create(self, ops=[]):
+    def create(self, ops=''):
         pass
 
     def cleanup(self):
@@ -551,7 +552,7 @@ class RawDisk(Disk):
 
 class LoopbackDisk(Disk):
     """A Disk backed by a file via the loop module."""
-    def __init__(self, lofile, size, ops=[], dirmode=None):
+    def __init__(self, lofile, size, ops='', dirmode=None):
         Disk.__init__(self, size)
         self.lofile = lofile
         self.ops = ops
@@ -563,7 +564,7 @@ class LoopbackDisk(Disk):
     def exists(self):
         return os.path.exists(self.lofile)
 
-    def create(self, ops=[]):
+    def create(self, ops=''):
         if self.device is not None:
             return
 
@@ -601,7 +602,7 @@ class LoopbackDisk(Disk):
 
 class SparseLoopbackDisk(LoopbackDisk):
     """A Disk backed by a sparse file via the loop module."""
-    def __init__(self, lofile, size, ops=[], dirmode=None):
+    def __init__(self, lofile, size, ops='', dirmode=None):
         LoopbackDisk.__init__(self, lofile, size, ops=ops, dirmode=dirmode)
 
     def expand(self, create=False, size=None, dirmode=None):
@@ -633,7 +634,7 @@ class SparseLoopbackDisk(LoopbackDisk):
         os.ftruncate(fd, size)
         os.close(fd)
 
-    def create(self, ops=[], dirmode=None):
+    def create(self, ops='', dirmode=None):
         self.expand(create=True, dirmode=dirmode)
         LoopbackDisk.create(self, ops=ops)
 
@@ -641,11 +642,11 @@ class SparseLoopbackDisk(LoopbackDisk):
 class ExistingSparseLoopbackDisk(SparseLoopbackDisk):
     """Don't expand the disk on creation."""
 
-    def __init__(self, lofile, size, ops=[], dirmode=None):
+    def __init__(self, lofile, size, ops='', dirmode=None):
         SparseLoopbackDisk.__init__(self, lofile, size, ops=ops,
                                     dirmode=dirmode)
 
-    def create(self, ops=[], dirmode=None):
+    def create(self, ops='', dirmode=None):
         LoopbackDisk.create(self, ops=ops)
 
 
@@ -774,6 +775,7 @@ class OverlayFSMount(Mount):
         self.upper = upper  # A       "        "    or a path to the overlay
         self.work = work
         self.cowmnt = None
+        self.size = size
         self.ops = ops
         self.dirmode = dirmode
         self.mountdir = dest
@@ -782,6 +784,8 @@ class OverlayFSMount(Mount):
 
         if isinstance(self.upper, str):
             if os.path.isdir(self.upper):
+                if not self.work:
+                    self.work = os.path.join(self.upper, '..', 'ovlwork')
                 self.upper = ''.join((',upperdir=', self.upper))
                 self.work = ''.join((',workdir=', self.work))
             else:
@@ -797,11 +801,15 @@ class OverlayFSMount(Mount):
             self.work = ''.join((',workdir=',
                                  os.path.join(mntdir, 'ovlwork')))
 
-        mntdir = tempfile.mkdtemp('', 'img-', '/run')
-        self.imgmnt = DiskMount(self.lower, mntdir, ops=ops, dirmode=dirmode)
+        if isinstance(self.lower, DiskMount):
+            mntdir = self.lower.mountdir
+            self.imgmnt = self.lower
+        else:
+            mntdir = tempfile.mkdtemp('', 'img-', '/run')
+            self.imgmnt = DiskMount(self.lower, mntdir, ops=ops, dirmode=dirmode)
         self.lower = ''.join(('lowerdir=', mntdir))
 
-    def recreate_overlay(self, fstype, blksz, label, ops=None, dirmode=None):
+    def create_ovlfs(self, fstype, blksz, label, ops=None, dirmode=None):
         if self.cowmnt.disk.device:
             self.cowmnt.cleanup()
         self.cowmnt = ExtDiskMount(self.cowloop, self.cowmnt.mountdir, fstype,
@@ -809,15 +817,16 @@ class OverlayFSMount(Mount):
         self.cowmnt._ExtDiskMount__create()
         self.cowmnt._ExtDiskMount__format_filesystem()
         self.cowmnt.mount()
+        self.size = self.cowloop.size
         d = os.path.join(self.cowmnt.mountdir, 'overlayfs')
         makedirs(d)
         makedirs(os.path.join(self.cowmnt.mountdir, 'ovlwork'))
         args = ['chcon', '--reference=/', d]
         rc = call(args)
         if rc != 0:
-            raise MountError("OverlayFS mount:  '%s' failed" % args)
-        
-        self.cowmnt.cleanup()
+            raise MountError("OverlayFS create:  '%s' failed" % args)
+
+        self.cowmnt.unmount()
 
     def mount(self, name=None, ops='', dirmode=None):
         if self.mounted:
@@ -826,6 +835,7 @@ class OverlayFSMount(Mount):
         if not ops:
             ops = self.ops
         if '-r' in ops or 'ro' in ops:
+            ops = 'ro'
             lower = ''.join((self.upper.replace('upperdir', 'lowerdir'),
                                   ':', self.lower.replace('lowerdir=', '')))
             upper = ''
@@ -842,8 +852,8 @@ class OverlayFSMount(Mount):
         self.imgmnt.mount(ops='ro', dirmode=dirmode)
         if self.cowmnt:
             self.cowmnt.mount(ops=ops, dirmode=dirmode)
-        args = ['mount', '-t', 'overlay', name, ''.join(('-o', ops, ',',
-                lower, upper, work)), self.mountdir]
+        args = ['mount', '-t', 'overlay', name,
+                '-o', ''.join((ops, ',', lower, upper, work)), self.mountdir]
         rc = call(args)
         if rc != 0:
             raise MountError("OverlayFS mount:  '%s' failed" % args)
@@ -1056,7 +1066,7 @@ class ExtDiskMount(DiskMount):
 
 
 class DeviceMapperLinear(object):
-    def __init__(self, imgloop, ops=[]):
+    def __init__(self, imgloop, ops=''):
         self.imgloop = imgloop    # A LoopbackDisk object
         self.ops = ops
 
@@ -1070,11 +1080,10 @@ class DeviceMapperLinear(object):
         return os.path.join('/dev/mapper', self.__name)
     path = property(get_path)
 
-    def create(self, ops=[]):
+    def create(self, ops=''):
         if self.__created:
             return
-        ops += ['--direct-io']
-        self.imgloop.create(ops)
+        self.imgloop.create(ops+',--direct-io')
 
         self.DeviceMapperTarget__name = self.__name = 'imgcreate-%d-%d' % (
             os.getpid(), random.randint(0, 2**16))
@@ -1119,7 +1128,7 @@ class DeviceMapperLinear(object):
 
 
 class DeviceMapperSnapshot(object):
-    def __init__(self, imgloop, cowloop, ops=[]):
+    def __init__(self, imgloop, cowloop, ops=''):
         self.imgloop = imgloop
         self.cowloop = cowloop
         self.persistent = 'PO'
@@ -1133,7 +1142,7 @@ class DeviceMapperSnapshot(object):
         return os.path.join('/dev/mapper', self.__name)
     path = property(get_path)
 
-    def create(self, ops=[]):
+    def create(self, ops=''):
         if self.__created:
             return
 
@@ -1404,13 +1413,16 @@ class LiveImageMount(object):
     block device, or simply a directory path for a folder holding the files of
     a LiveOS image.
     """
-    def __init__(self, srcdir, mountdir, ovloop=None, ops='', dirmode=None):
+    def __init__(self, srcdir, mountdir, rootfsimg=None, overlay=None, ops='',
+                 dirmode=None):
         self.srcdir = srcdir
         self.liveosdir = None
         self.mountdir = mountdir
         self.mounted = False
+        self.rootfsimg = rootfsimg  # filepath relative to mountdir
         self.imgloop = None
-        self.overlay = ovloop     # file, directory, or loop_object
+        self.overlay = overlay  # [device:]filepath, directory, or loop_object
+        self.ovlmnt = None
         self.ovltype = None
         self.cowloop = None
         self.ops = ops
@@ -1422,7 +1434,7 @@ class LiveImageMount(object):
         self.homemnt = None
         self.EncHome = None
 
-    def __create(self, ops=[], dirmode=None):
+    def __create(self, ops='', dirmode=None):
         if self.__created:
             return
         if not ops:
@@ -1430,52 +1442,86 @@ class LiveImageMount(object):
         self.liveosdir = os.path.join(self.srcdir, 'LiveOS')
         if not os.path.isdir(self.liveosdir):
             self.liveosdir = self.srcdir
-        sqfs_img = os.path.join(self.liveosdir, 'squashfs.img')
+        if self.rootfsimg:
+            sqfs_img = os.path.join(self.liveosdir, self.rootfsimg)
+        else:
+            sqfs_img = os.path.join(self.liveosdir, 'squashfs.img')
         if os.path.exists(sqfs_img):
-            self.squashloop = LoopbackDisk(sqfs_img, None, ['-r'])
+            self.squashloop = LoopbackDisk(sqfs_img, None, '-r')
 
             self.squashmnt = DiskMount(self.squashloop, ''.join((self.mountdir,
                                        'sqmt')), ops='ro', dirmode=dirmode)
             self.squashmnt.mount('ro')
-            rootfs_img = os.path.join(self.squashmnt.mountdir,
-                                      'LiveOS', 'rootfs.img')
-            if not os.path.exists(rootfs_img):
+            # Test for flattened squashfs.
+            rootfs_img = os.path.join(self.squashmnt.mountdir, 'proc')
+            if os.path.isdir(rootfs_img):
+                lower = self.squashmnt
+                self.imgloop = self.squashloop
+            else:
                 rootfs_img = os.path.join(self.squashmnt.mountdir,
-                                          'LiveOS', 'ext3fs.img')
-            self.imgloop = LoopbackDisk(rootfs_img, None, ['-r'])
+                                          'LiveOS', 'rootfs.img')
+                if not os.path.exists(rootfs_img):
+                    rootfs_img = os.path.join(self.squashmnt.mountdir,
+                                              'LiveOS', 'ext3fs.img')
+                self.imgloop = LoopbackDisk(rootfs_img, None, '-r')
+                lower = self.imgloop
         else:
             rootfs_img = os.path.join(self.liveosdir, 'rootfs.img')
             if not os.path.exists(rootfs_img):
                 rootfs_img = os.path.join(self.liveosdir, 'ext3fs.img')
             if not os.path.exists(rootfs_img):
                 raise SnapshotError('Failed to find a LiveOS root image.')
-            self.imgloop = LoopbackDisk(rootfs_img, None)
+            lower = self.imgloop = LoopbackDisk(rootfs_img, None)
+            self.squashloop = None
+
+        if self.overlay and ':' in self.overlay:
+            overlay = self.overlay.split(':')
+            ovldev = overlay[0]
+            self.ovlmntdir = findmnt('-nfro TARGET', ovldev)
+            if not self.ovlmntdir:
+                self.ovlmntdir = tempfile.mkdtemp('', 'ovl-','/run')
+            self.overlay = os.path.join(self.ovlmntdir, overlay[1])
+            self.ovlmnt = DiskMount(RawDisk(None, ovldev), self.ovlmntdir,
+                                    dirmode=dirmode)
+            if os.path.ismount(self.ovlmntdir):
+                self.ovlmnt.mounted = True
+        elif self.overlay and self.overlay != 'DM_linear':
+            self.overlay = os.path.join(self.liveosdir, self.overlay)
         if self.overlay is None:
             self.overlay = find_overlay(self.liveosdir)
-            if self.overlay:
-                if os.path.isdir(self.overlay):
-                    self.ovltype = 'dir'
-                    cow = self.overlay
-                    work = os.path.join(self.liveosdir, 'ovlwork')
+        if self.overlay and self.overlay != 'DM_linear':
+            if self.ovlmnt:
+                self.ovlmnt.mount('ro')
+            if os.path.isdir(self.overlay):
+                self.ovltype = 'dir'
+                cow = self.overlay
+                if self.ovlmnt:
+                    work = os.path.join(self.overlay, '..', 'ovlwork')
                 else:
-                    cow = self.cowloop = LoopbackDisk(self.overlay, None,
-                                                      ops=ops)
-                    work = None
-                    self.cowloop.create(['ro'])
-                    call(['udevadm', 'settle'])
-                    self.ovltype = lsblk('-ndo FSTYPE', self.cowloop.device)
-                    self.cowloop.cleanup()
-                if self.ovltype not in ('', 'DM_snapshot_cow', 'temp'):
-                    self.livemount = OverlayFSMount(
-                                     'overlayfs', self.imgloop, cow, work,
-                                     self.mountdir, ops=ops, dirmode=dirmode)
+                    work = os.path.join(self.liveosdir, 'ovlwork')
+                size = None
+            else:
+                cow = self.cowloop = LoopbackDisk(self.overlay, None,
+                                                  ops=ops)
+                work = None
+                self.cowloop.create('ro')
+                size = cow._size = os.stat(self.overlay)[stat.ST_SIZE]
+                call(['udevadm', 'settle'])
+                self.ovltype = lsblk('-ndo FSTYPE', self.cowloop.device)
+                self.cowloop.cleanup()
         else:
-            self.cowloop = self.overlay
-        if not self.overlay:
             if self.squashmnt is None:
                 # Uncompressed live rootfs
                 self.dm_target = DeviceMapperLinear(self.imgloop, ops)
-                self.ovltype = ''
+                self.ovltype = 'DM_linear'
+                self.overlay = None
+            elif self.imgloop == self.squashloop:
+                self.overlay = tempfile.mkdtemp('', 'cow-','/run')
+                work = os.path.join(self.overlay, '..', 'ovlwork')
+                makedirs(work, 0o755)
+                cow = self.overlay
+                size = None
+                self.ovltype = 'dir'
             else:
                 self.overlay = tempfile.NamedTemporaryFile(dir=self.mountdir,
                                                            delete=False).name
@@ -1486,6 +1532,10 @@ class LiveImageMount(object):
                                                    'temp'):
             self.dm_target = DeviceMapperSnapshot(self.imgloop,
                                                   self.cowloop, ops=ops)
+            self.ovltype = 'DM_snapshot_cow'
+        if self.ovltype not in ('DM_linear', 'DM_snapshot_cow', 'temp'):
+            self.livemount = OverlayFSMount('overlayfs', lower, cow, work,
+                             self.mountdir, size, ops=ops, dirmode=dirmode)
         if not self.livemount:
             self.livemount = DiskMount(self.dm_target, self.mountdir,
                                        ops=ops, dirmode=dirmode)
@@ -1501,72 +1551,83 @@ class LiveImageMount(object):
                 self.homemnt = LoopbackMount(home_img, homedir, ops=ops,
                                              dirmode=dirmode)
         self.__created = True
+        if self.ovlmnt:
+            self.ovlmnt.unmount()
 
     def make_overlay(self, size=512*1024**2, existing_size=0, ovl_fstype='',
-                     ovl_blksz=None, ops=[], dirmode=None):
+                     ovl_blksz=None, ops='', dirmode=None):
         """Register a new or modified LiveOS overlay."""
 
-        device = findmnt('-no UUID,LABEL -T', self.srcdir)
-        device = device.partition(' ')
-        label = device[2].strip()
-        if ovl_fstype != 'dir' and any(n in ' \t\n\r\f\v' for n in label):
-            source = findmnt('-no SOURCE,FSTYPE -T', self.srcdir).split()
-            print("\nALERT:\n      The filesystem label on '", source[0],
-            "' contains spaces, tabs, newlines,\n      or other whitespace ",
-            'that is incompatible with a LiveOS overlay.\n\nAttempting to ',
-            'rename it with whitespace replaced by underscores...', sep='')
-            label = label.translate(string.maketrans(' \t\n\r\f\v', '______'))
-            self.unmount()
-            if source[1] == 'vfat':
-                args = ['fatlabel']
-            elif source[1].startswith('ext'):
-                args = ['e2label']
-            elif source[1] == 'btrfs':
-                args = ['btrfs', 'filesystem', 'label']
-            args += [source[0], label]
-            if call(args) != 0:
-                print('ERROR:\nRelabel of', source[0], 'has failed.\n')
+        if self.ovlmnt:
+            self.ovlmnt.mount()
+        if not self.overlay:
+            device = findmnt('-no UUID,LABEL -T', self.srcdir)
+            device = device.partition(' ')
+            label = device[2].strip()
+            if ovl_fstype != 'dir' and any(n in ' \t\n\r\f\v' for n in label):
+                source = findmnt('-no SOURCE,FSTYPE -T', self.srcdir).split()
+                print("\nALERT:\tThe filesystem label on '", source[0],
+                "' contains spaces, tabs, newlines,\n\tor other whitespace ",
+                'incompatible with a LiveOS overlay.\n\n\t', label, '\n\n\t'
+                'Attempting to rename it with whitespace replaced by '
+                'underscores...\n\n\t', sep='')
+                label = label.translate(str.maketrans(' \t\n\r\f\v', '______'))
+                print(label)
+                self.unmount()
+                if source[1] == 'vfat':
+                    args = ['fatlabel']
+                elif source[1].startswith('ext'):
+                    args = ['e2label']
+                elif source[1] == 'btrfs':
+                    args = ['btrfs', 'filesystem', 'label']
+                args += [source[0], label]
+                if call(args) != 0:
+                    print('ERROR:\nRelabel of', source[0], 'has failed.\n')
 
-        overfile = os.path.join(self.liveosdir,
-                                '-'.join(('overlay', label, device[0])))
+            overfile = os.path.join(self.liveosdir,
+                                    '-'.join(('overlay', label, device[0])))
+        else:
+            overfile = self.overlay
 
         def _wipe_overlay(otype):
             self.unmount()
-            if otype in ('', 'temp', 'DM_snapshot_cow'):
-                call(['wipefs', '-a', self.livemount.disk.cowloop.device])
-            elif otype == 'dir':
+            if otype == 'dir':
                 shutil.rmtree(os.path.join(overfile, '..', 'ovlwork'))
                 shutil.rmtree(overfile)
             else:
-                call(['wipefs', '-a', self.livemount.cowloop.device])
+                os.remove(overfile)
             self.cleanup()
-            
+
+        if os.path.exists(overfile):
+            _wipe_overlay(self.ovltype)
+            existing_size = 0
+        if self.ovlmnt:
+            self.ovlmnt.mount()
         if ovl_fstype == 'dir':
-            call(['rm', '-rf', overfile])
             makedirs(overfile, 0o755)
             makedirs(os.path.join(overfile, '..', 'ovlwork'), 0o755)
-        else:
-            resize = True
-            if ovl_fstype in ('', 'temp', 'DM_snapshot_cow'):
-                if os.path.exists(overfile):
-                    _wipe_overlay(self.ovltype)
-                    self.overlay = ExistingSparseLoopbackDisk(overfile, size)
-                else:
-                    self.overlay = SparseLoopbackDisk(overfile, size)
-                    resize = False
-                self._LiveImageMount__created = False
-                self.livemount = None
-                self.overlay.create(ops=ops, dirmode=dirmode)
+            call(['chcon', '--reference=/.', overfile])
+        elif ovl_fstype in ('', 'temp', 'DM_snapshot_cow'):
+            self.overlay = SparseLoopbackDisk(overfile, size)
+            self.overlay.create(ops=ops, dirmode=dirmode)
+            self.overlay.cleanup()
+        if ovl_fstype not in ('', 'temp', 'DM_snapshot_cow'):
+            if self.imgloop == self.squashloop:
+                lower = self.squashmnt
             else:
-                _wipe_overlay(self.ovltype)
-                self.livemount = OverlayFSMount('overlayfs', self.imgloop,
-                                                overfile, None,
-                                                self.mountdir, size=size,
-                                                ops=ops, dirmode=dirmode)
-            self.ovltype = ovl_fstype
-            if resize:
+                lower = self.imgloop
+            self.livemount = OverlayFSMount('overlayfs', lower, overfile, None,
+                                            self.mountdir, size=size,
+                                            ops=ops, dirmode=dirmode)
+            if ovl_fstype != 'dir':
                 self.resize_overlay(size, existing_size, ovl_fstype, ovl_blksz)
-            return self.overlay
+
+        self.ovltype = ovl_fstype
+        if self.ovlmnt:
+            ovldev = self.ovlmnt.disk.device + ':'
+            overfile = overfile.replace(self.ovlmnt.mountdir + os.sep, ovldev)
+        self.overlay = overfile
+        return self.overlay
 
     def resize_overlay(self, overlay_size_mb, existing_size, ovl_fstype,
                        ovl_blksz):
@@ -1583,10 +1644,12 @@ class LiveImageMount(object):
         if ovl_fstype in ('', 'temp', 'DM_snapshot_cow'):
             self.reset_overlay()
         else:
-            self.livemount.recreate_overlay(ovl_fstype, ovl_blksz, 'overlayfs',
-                                            dirmode=0o755)
+            self.livemount.create_ovlfs(ovl_fstype, ovl_blksz, 'overlayfs',
+                                        dirmode=0o755)
 
     def reset_overlay(self):
+        if self.ovlmnt:
+            self.ovlmnt.mount()
         if self.ovltype in ('', 'temp', 'DM_snapshot_cow'):
             reset_overlay_args = ['dd', 'if=/dev/zero', 'of=%s' %
                                   self.overlay, 'bs=64k', 'count=1',
@@ -1594,6 +1657,8 @@ class LiveImageMount(object):
             call(reset_overlay_args)
         else:
             self.unmount()
+            if self.ovlmnt:
+                self.ovlmnt.mount()
             if self.ovltype == 'dir':
                 ovl = self.livemount.upper[10:]
             else:
@@ -1604,6 +1669,8 @@ class LiveImageMount(object):
             call(['chcon', '--reference=/', ovl])
             if self.ovltype != 'dir':
                 self.livemount.cowmnt.cleanup()
+            if self.ovlmnt:
+                self.ovlmnt.unmount()
 
     def mount(self, ops='', dirmode=None):
         if self.mounted:
@@ -1612,6 +1679,8 @@ class LiveImageMount(object):
             ops = self.ops
         try:
             self.__create(ops=ops, dirmode=dirmode)
+            if self.ovlmnt:
+                self.ovlmnt.mount(ops=ops, dirmode=dirmode)
             self.livemount.mount(ops=ops, dirmode=dirmode)
             if self.homemnt:
                 self.homemnt.mount(ops=ops)
@@ -1629,6 +1698,8 @@ class LiveImageMount(object):
             time.sleep(2)
         if self.livemount:
             self.livemount.unmount()
+        if self.ovlmnt:
+            self.ovlmnt.unmount()
         self.mounted = False
 
     def cleanup(self):
@@ -1640,10 +1711,16 @@ class LiveImageMount(object):
             self.dm_target = None
         if self.livemount:
             self.livemount.cleanup()
+            self.livemount = None
         if self.imgloop:
             self.imgloop.cleanup()
         if isinstance(self.cowloop, LoopbackDisk):
             self.cowloop.cleanup()
+            self.cowloop = None
+        if self.ovlmnt:
+            self.ovlmnt.cleanup()
+        if self.overlay:
+            self.overlay = None
         if self.squashmnt:
             self.squashmnt.cleanup()
         self.__created = False

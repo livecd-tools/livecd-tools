@@ -58,6 +58,12 @@ def parse_options(args):
                       default=False)
     imgopt.add_option("", "--image-type", type="string", dest="image_type",
                       help=optparse.SUPPRESS_HELP)
+    imgopt.add_option("", "--flat-squashfs", action="store_true",
+                      dest="flat_squashfs",
+                      help="Specify squashing the root filesystem directly. "
+                           "This eliminates the intermediate LiveOS directory "
+                           "and is suitable only for OverlayFS overlays.",
+                      default=False)
     imgopt.add_option("", "--compression-type", type="string", dest="compress_type",
                       help="Compression type recognized by mksquashfs "
                            "(default xz needs a 2.6.38+ kernel, gzip works "
@@ -220,13 +226,19 @@ def main():
     try:
         creator.mount(options.base_on, options.cachedir)
         creator.install()
+        if (options.flat_squashfs and
+          'rd.live.overlay.overlayfs' not in ks.handler.bootloader.appendLine):
+            ks.handler.bootloader.appendLine += 'rd.live.overlay.overlayfs'
         creator.configure()
         if options.give_shell:
             print("Launching shell. Exit to continue.")
             print("----------------------------------")
             creator.launch_shell()
         creator.unmount()
-        creator.package()
+        ops = []
+        if 'rd.live.overlay.overlayfs' in ks.handler.bootloader.appendLine:
+            ops += ['flatten-squashfs']
+        creator.package(ops=ops)
     except (imgcreate.CreatorError, DnfBaseError) as e:
         logging.error(u"Error creating Live CD : %s" % e)
         return 1
