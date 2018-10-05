@@ -4,7 +4,7 @@ timezone US/Eastern
 auth --useshadow --passalgo=sha512
 selinux --enforcing
 firewall --disabled
-part / --size 1024
+part / --size 2048
 
 repo --name=development --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=rawhide&arch=$basearch
 
