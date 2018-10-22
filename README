@@ -3,13 +3,13 @@
                     David Zeuthen <davidz@redhat.com>
                     Jeremy Katz <katzj@redhat.com>
 
-                    Last Updated: November 29, 2016
+                    Last Updated: October 2018
 
 This project concerns tools to generate live CDs on Fedora based
-systems including derived distributions such as RHEL, CentOS and
+systems including derived distributions such as RHEL, CentOS, and
 others. See the project Wiki at 
 
- http://fedoraproject.org/wiki/FedoraLiveCD
+ https://fedoraproject.org/wiki/FedoraLiveCD
 
 for more details. Discussion of this project takes place at the
 livecd@lists.fedoraproject.org mailing list
@@ -23,24 +23,24 @@ license. See the file COPYING for details.
 
 The live CD is designed in such a way that the when running from a
 live CD, the system should appear as much as possible as a standard
-system with all that entails; e.g. read-write rootfs (achieved using
-dm-snapshot), standard ext3 file system (for extended attributes) and
+system with all that entails; e.g., read-write rootfs (achieved using
+dm-snapshot), standard ext4 file system (for extended attributes) and
 so on. 
 
 Another design goal is that the live CD should be ''installable'',
-ie. an user should be able to install the bits from the live CD onto
+i.e., an user should be able to install the bits from the live CD onto
 his hard disk without this process requiring network access or
 additional media.
 
 Finally, another design goal is that the tool set itself should be
 separate from configuration; the same unmodified tool should be usable
 for building various live CD flavors with vastly different
-configurations, e.g. a GNOME live CD, a KDE live CD, a live cd with
-music programs and so on.
+configurations, e.g., a GNOME live CD, a KDE live CD, a live CD with
+music programs, and so on.
 
 2. CREATING A LIVE CD
 
-To create a live cd, the livecd-creator tool is used. Super user
+To create a live CD, the livecd-creator tool is used. Super user
 privileges are needed. The tool is more or less self-documenting, use
 the --help option to see options.
 
@@ -48,10 +48,10 @@ the --help option to see options.
 
 In a nutshell, the livecd-creator program
 
- o Sets up a file for the ext3 file system that will contain all the
+ o Sets up a file for the ext4 file system that will contain all the
    data comprising the live CD
 
- o Loopback mounts that file into the file system so there is an
+ o Loop mounts that file into the file system so there is an
    installation root
 
  o Bind mounts certain kernel file systems (/dev, /dev/pts, /proc,
@@ -74,14 +74,14 @@ In a nutshell, the livecd-creator program
 
  o Unmounts the installation root
 
- o Runs resize2fs to minimize and unminimize the ext3 file to remove data
+ o Runs resize2fs to minimize and unminimize the ext4 file to remove data
    from deleted files
 
- o Runs resize2fs to minimize on a devicemapper snapshot, to generate a
+ o Runs resize2fs to minimize on a device-mapper snapshot, to generate a
    small minimized delta image file which can be used by anaconda to
    reduce installation time by not copying unused data to disk
 
- o Creates a squashfs file system containing only the ext3 file (compression)
+ o Creates a squashfs file system containing only the ext4 file (compression)
 
  o Configures the boot loader
 
@@ -97,7 +97,7 @@ The command
 
 will create a live CD that will boot to a login prompt. Note that since
 no configuration is done the user will not be able to login to the
-system as the root password is not set / cleared.
+system as the root password is not set or cleared.
 
 2.3 LIVE CD CONFIGURATION FILES
 
@@ -109,22 +109,22 @@ script to be run at the end of the build process.
 For the Fedora project, there are currently a variety of different live CD
 configuration files.  The spin-kickstarts package includes all of the
 kickstarts used to create the various spins. These include a minimal live image
-(livecd-fedora-minimal.ks), a complete desktop image (livecd-fedora-desktop.ks)
-and others.
+(fedora-minimal-common.ks), a complete workstation image
+(fedora-live-workstation.ks) and others.
 
-2.4 EXAMPLE: SPINNING THE FEDORA DESKTOP LIVE CD
+2.4 EXAMPLE: SPINNING THE FEDORA WORKSTATION LIVE CD
 
-Assuming that you use the livecd-fedora-desktop.ks configuration file,
+Assuming that you use the fedora-live-workstation.ks configuration file,
 then the following command
 
 # livecd-creator \
   --config=/usr/share/spin-kickstarts/fedora-live-workstation.ks \
-  --fslabel=Fedora-24-WS-Live-foo
+  --fslabel=Fedora-29-WS-Live-foo
 
-will create a live CD called "Fedora-24-WS-Live-foo". The name
+will create a live CD called "Fedora-29-WS-Live-foo". The name
 given by --fslabel is used.
 
- o as a file system label on the ext3 and iso9660 file systems
+ o as a file system label on the ext4 and iso9660 file systems
    (as such it's visible on the desktop as the CD name)
 
  o in the isolinux boot loader
@@ -151,15 +151,45 @@ This then gets verified before mounting the real root filesystem.
 
 These utilities used to be part of the anaconda-runtime package.
 
-5. USING LIVE IMAGES FROM USB MEDIA 
+5. LOADING LIVE IMAGES ONTO USB MEDIA 
 
 USB sticks are becoming increasingly prevalent and are a nice way to
 use live images.  You can take a live CD iso image and transform it so
 that it can be used on a USB stick.  To do so, use the
-livecd-iso-to-disk script.
-   /usr/bin/livecd-iso-to-disk /path/to/live.iso /dev/sdb1
+livecd-iso-to-disk script, like the following:
 
-Replace /dev/sdb1 with the (unmounted) partition where you wish to put
-the live image.  This is not a destructive process; any data you 
+   livecd-iso-to-disk /path/to/live.iso /dev/sdb1
+
+Replace the '/dev/sdb1' argument above with the (unmounted) partition where you
+wish to load the live image.  This is not a destructive process; any data you 
 currently have on your USB stick will be preserved.
+
+Multiple images may be loaded onto a single USB stick.
+
+See livecd-iso-to-disk --help for more options and instructions.
+
+6. MOUNTING LIVE IMAGES 
+
+A live CD .iso file or an installed live USB device may be mounted with the
+liveimage-mount script to peer into the live OS filesystem, or even edit it on
+a device loaded with a persistent storage overlay.
+
+   liveimage-mount /path/to/live[.iso|device|directory] <mountpoint>
+
+See liveimage-mount --help for more options.
+
+7. EDITING LIVE IMAGES
+
+Live OS images may be edited using the editliveos script:
+
+   editliveos [options] <LiveOS_source>
+
+This script may be used to to merge a persistent overlay, insert files, clone a
+customized instance, adjust the root or home filesystem or overlay sizes and
+filesystem or overlay types, seclude private or user-specific files, rebuild
+the image into a new, .iso image distribution file, and refresh the source's
+persistent filesystem overlay.
+
+See editliveos --help for more options and instructions.
+
 
