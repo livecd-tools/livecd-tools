@@ -1503,7 +1503,7 @@ fi
 
 if [[ -n $overlayfs && -z $(lsinitrd $CONFIG_SRC/initrd*.img\
     -f usr/lib/dracut/hooks/cmdline/30-parse-dmsquash-live.sh | \
-    sed -n '/dev\/root/p') ]]; then
+    sed -n -r '/(dev\/root|rootfsbase)/p') ]]; then
     printf '\n    NOTICE:
     The --overlayfs option requires an initial boot image based on
     dracut version 045 or greater to use the OverlayFS feature.\n
