@@ -24,13 +24,13 @@ license. See the file COPYING for details.
 The live CD is designed in such a way that the when running from a
 live CD, the system should appear as much as possible as a standard
 system with all that entails; e.g., read-write rootfs (achieved using
-dm-snapshot), standard ext4 file system (for extended attributes) and
-so on. 
+dm-snapshot or OverlayFS with the --flat-squashfs option), standard ext4 file
+system (for extended attributes) or a direct SquashFS, and so on. 
 
 Another design goal is that the live CD should be ''installable'',
-i.e., an user should be able to install the bits from the live CD onto
-his hard disk without this process requiring network access or
-additional media.
+i.e., a user should be able to install the bits from the live CD onto
+a hard disk without this process requiring network access or additional
+media.
 
 Finally, another design goal is that the tool set itself should be
 separate from configuration; the same unmodified tool should be usable
@@ -78,10 +78,11 @@ In a nutshell, the livecd-creator program
    from deleted files
 
  o Runs resize2fs to minimize on a device-mapper snapshot, to generate a
-   small minimized delta image file which can be used by anaconda to
+   small minimized delta image file which was historically used by anaconda to
    reduce installation time by not copying unused data to disk
 
- o Creates a squashfs file system containing only the ext4 file (compression)
+ o Creates a SquashFS file system containing only the ext4 file (compression)
+   or directly from the installation root (for OverlayFS overlays)
 
  o Configures the boot loader
 
@@ -95,9 +96,9 @@ The command
 # livecd-creator \
   --config=/usr/share/doc/livecd-tools/livecd-fedora-minimal.ks
 
-will create a live CD that will boot to a login prompt. Note that since
-no configuration is done the user will not be able to login to the
-system as the root password is not set or cleared.
+will create a live CD that will boot to a login prompt. Note that in this
+minimal example, since no configuration is done, the user will not be able to
+login to the system as the root password is not set or cleared.
 
 2.3 LIVE CD CONFIGURATION FILES
 
@@ -184,7 +185,7 @@ Live OS images may be edited using the editliveos script:
 
    editliveos [options] <LiveOS_source>
 
-This script may be used to to merge a persistent overlay, insert files, clone a
+This script may be used to merge a persistent overlay, insert files, clone a
 customized instance, adjust the root or home filesystem or overlay sizes and
 filesystem or overlay types, seclude private or user-specific files, rebuild
 the image into a new, .iso image distribution file, and refresh the source's
