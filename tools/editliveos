@@ -588,7 +588,7 @@ class LiveImageEditor(LiveImageCreator):
             base_on = findmnt('-no TARGET -T', self.tmpdir)
         if self.src_type in ('blk', 'dir'):
             # In case the overlay is uninitialized or filesystems need recovery.
-            self.liveosmnt._LiveImageMount__create(ops=['rw'], dirmode=0o700)
+            self.liveosmnt._LiveImageMount__create(ops='rw', dirmode=0o700)
             if isinstance(self.liveosmnt.livemount, OverlayFSMount):
                 self.src_type = 'embedded-OFS'
             if self.liveosmnt.ovltype in ('', 'temp'):
