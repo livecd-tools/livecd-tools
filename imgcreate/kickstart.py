@@ -614,7 +614,10 @@ def exclude_docs(ks):
     return ks.handler.packages.excludeDocs
 
 def exclude_weakdeps(ks):
-    return ks.handler.packages.excludeWeakdeps
+    if hasattr(ks.handler.packages, "excludeWeakdeps"):
+        if ks.handler.packages.excludeWeakdeps:
+            return ks.handler.packages.excludeWeakdeps
+    return None
 
 def nocore(ks):
     return ks.handler.packages.nocore
