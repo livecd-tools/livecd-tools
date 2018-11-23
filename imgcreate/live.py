@@ -332,17 +332,6 @@ class LiveImageCreatorBase(LoopImageCreator):
         if subprocess.call(args) != 0:
             raise CreatorError("ISO creation failed!")
 
-        if os.path.exists(isodir + '/isolinux/efiboot.img'):
-            c = ['isohybrid', '-u', '-m', iso]
-        else:
-            c = ['isohybrid', iso]
-
-        try:
-            subprocess.call(c)
-        except OSError as e:
-            if e.errno == errno.ENOENT:
-                logging.info('The isohybrid command is not available.')
-
         self.__implant_md5sum(iso)
 
     def __implant_md5sum(self, iso):
@@ -403,17 +392,20 @@ class x86LiveImageCreator(LiveImageCreatorBase):
         self._efiarch = None
 
     def _get_xorrisofs_options(self, isodir):
-        options = [ "-eltorito-boot", "isolinux/isolinux.bin",
+        options = [ "-isohybrid-mbr", "/usr/share/syslinux/isohdpfx.bin",
+                    "-eltorito-boot", "isolinux/isolinux.bin",
                     "-eltorito-catalog", "isolinux/boot.cat",
                     "-no-emul-boot", "-boot-info-table",
                     "-boot-load-size", "4" ]
         if os.path.exists(isodir + "/isolinux/efiboot.img"):
             options.extend([ "-eltorito-alt-boot",
-                             "-efi-boot", "isolinux/efiboot.img",
+                             "-e", "isolinux/efiboot.img",
                              "-no-emul-boot",
+                             "-isohybrid-gpt-basdat", "-isohybrid-apm-hfsplus",
                              "-eltorito-alt-boot",
-                             "-efi-boot", "isolinux/macboot.img",
-                             "-no-emul-boot"])
+                             "-e", "isolinux/macboot.img",
+                             "-no-emul-boot",
+                             "-isohybrid-gpt-basdat", "-isohybrid-apm-hfsplus"])
         return options
 
     def _get_required_packages(self):
