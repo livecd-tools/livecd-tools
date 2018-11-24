@@ -480,7 +480,7 @@ class SelinuxConfig(KickstartConfig):
 
         try:
             rc = subprocess.call(['setfiles', '-p', '-e', '/proc',
-                                  '-e', '/dev',
+                                  '-e', '/sys', '-e', '/dev',
                                   selinux.selinux_file_context_path(), '/'])
         except OSError as e:
             if e.errno == errno.ENOENT:
