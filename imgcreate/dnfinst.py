@@ -73,9 +73,11 @@ class DnfLiveCD(dnf.Base):
             conf += "plugins=1\n"
         else:
             conf += "plugins=0\n"
-        conf += "reposdir=\n"
+        conf += "reposdir=/dev/null\n"
         conf += "failovermethod=priority\n"
         conf += "keepcache=1\n"
+        conf += "obsoletes=1\n"
+        conf += "best=1\n"
         conf += "tsflags=nocontexts\n"
 
         f = open(confpath, "w+")
