@@ -481,7 +481,8 @@ class SelinuxConfig(KickstartConfig):
         try:
             rc = subprocess.call(['setfiles', '-p', '-e', '/proc',
                                   '-e', '/sys', '-e', '/dev',
-                                  selinux.selinux_file_context_path(), '/'])
+                                  selinux.selinux_file_context_path(), '/'],
+                                 preexec_fn=self.chroot)
         except OSError as e:
             if e.errno == errno.ENOENT:
                 logging.info('The setfiles command is not available.')
