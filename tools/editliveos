@@ -394,7 +394,8 @@ class LiveImageEditor(LiveImageCreator):
         file but maintain (restore to) in the refreshed filesystems."""
 
         self.releasefile = []
-        """A string of file or directory paths to include in _brand()."""
+        """A string of file or directory paths to include in _brand().  This
+        variable is later reused to hold the modified release name."""
 
         self.builder = os.getenv('LOGNAME')
         """The name of the Remix builder for _branding.
@@ -440,6 +441,9 @@ class LiveImageEditor(LiveImageCreator):
 
         self.is_squashed = None
         """Flag indicating presence of a source LiveOS SquashFS."""
+
+        self.liveossrc = None
+        """Mount object for the source device."""
 
         self.liveosmnt = None
         """Mount object for the source LiveOS image."""
@@ -554,8 +558,6 @@ class LiveImageEditor(LiveImageCreator):
                         self.srcdir = os.path.join(self.srcmntdir,
                                       os.path.dirname(losetup('-nO BACK-FILE',
                                       self.overlayloop)).lstrip(os.sep))
-                    else:
-                        self.srcdir = base_on
                     self.imgloop = findmnt('-no SOURCE', base_mp)
             else:
                 self.liveosdir = base_on
@@ -734,7 +736,7 @@ class LiveImageEditor(LiveImageCreator):
 
 
     def new_liveos_mount(self, base_on, rootfsimg=None, overlay=None,
-                         mntdir=None, ops=[], dirmode=None):
+                         mntdir=None, ops='', dirmode=None):
         """
         Initialize a new mount object for the LiveOS image of an .iso,
         attached, or refreshed device.  Optionally, pass a rootfsimg or
@@ -743,20 +745,21 @@ class LiveImageEditor(LiveImageCreator):
         if os.path.isfile(base_on):
             self.liveossrc = DiskMount(LoopbackDisk(base_on, None, '-r'),
                              tempfile.mkdtemp(dir=mntdir, prefix='iso-'))
+            self.srcdir = self.liveossrc.mountdir
             ops = 'ro'
         elif os.path.isdir(base_on):
             self.liveossrc = None
             self.srcdir = os.path.join(base_on, 'LiveOS')
             if not os.path.exists(self.srcdir):
                 self.srcdir = base_on
-        else:
+        elif self.src_type == 'blk' and not self.liveossrc:
             self.liveossrc = DiskMount(RawDisk(None, base_on),
                              tempfile.mkdtemp(dir=mntdir, prefix='dev-'),
                              dirmode=dirmode)
         if self.liveossrc:
             self.liveossrc.mount(dirmode=0o400)
             self.liveossrc.rmdir = True
-            self.srcdir = self.liveossrc.mountdir
+            self.srcdir = os.path.join(self.liveossrc.mountdir, 'LiveOS')
 
         liveosmnt = LiveImageMount(self.srcdir, tempfile.mkdtemp('-', 'LIM-',
                          mntdir), rootfsimg, overlay, ops=ops, dirmode=dirmode)
@@ -1076,7 +1079,8 @@ class LiveImageEditor(LiveImageCreator):
 
         src, dst = srcmntdir, isodir
         if self.exclude_all:
-            src = self.srcdir
+#            src = self.srcdir
+            src = self.liveosdir
         if srcmntdir != self.srcdir:
             dst = os.path.join(isodir, 'LiveOS')
 
@@ -1086,9 +1090,9 @@ class LiveImageEditor(LiveImageCreator):
         if self.exclude_all:
             copypaths([self.bootfolder], isodir)
 
-        for src in ('images', 'EFI'):
+        for src in ('images', 'EFI', 'LICENSE', 'Fedora-Legal-README.txt'):
             src = os.path.join(self.srcmntdir, src)
-            if os.path.isdir(src):
+            if os.path.exists(src):
                 copypaths([src], isodir)
 
         copypaths(self.includes, isodir, ignore_list, message='Additional '
@@ -1356,14 +1360,17 @@ class LiveImageEditor(LiveImageCreator):
             self.cfgf = os.path.join(isodir, 'isolinux', f)
             if os.path.exists(self.cfgf): break
         # Get release name from boot configuration file.
-        args = ['sed', '-n', '-r']
+        cmd = ['sed', '-n', '-r']
         sedscript = r'''/^\s*label\s+linux/{n
-                        s/^\s*menu\s+label\s+\^Start\s+(.*)/\1/p}'''
-        args.extend([sedscript, self.cfgf])
-        release, err, rc = rcall(args)
+                        s/^\s*menu\s+label\s+\^(Start|Install)\s+(.*)/\2/p}'''
+        cmd.extend([sedscript, self.cfgf])
+        release, err, rc = rcall(cmd)
         if not release:
             return
-        release = release.strip()
+        self.release = release = release.strip()
+        f = release.find('Remix-')
+        if f > -1:
+            release = release[f+6:]
 
         kernel = os.path.join(isodir, 'isolinux', 'vmlinuz')
         if not os.path.exists(kernel):
@@ -1418,66 +1425,78 @@ class LiveImageEditor(LiveImageCreator):
         isocfgf = os.path.join(isodir, 'isolinux', 'isolinux.cfg')
         os.rename(self.cfgf, isocfgf)
 
-        args = ['sed', '-i', '-r']
+        cmd = ['sed', '-i', '-r']
 
         for dn in ('BOOT', 'boot'):
             EFI_config = os.path.join(isodir, 'EFI', dn, 'grub.cfg')
             if os.path.exists(EFI_config):
-                # Keep only the menu entries up through the first submenu.
-                sedscript = r'''/\s+}$/ { N
-                                /\n}$/ { n;Q}}'''
-                args.extend([sedscript, EFI_config])
-                call(args)
                 break
             else:
                 EFI_config = None
+        self.EFI_config = EFI_config
+
+        # Keep only the menu entries up through the first submenu.
+        sedscript = r'''/\s+}$/ { N
+                        /\n}$/ { n;Q}}'''
+        cmd.extend([sedscript, EFI_config])
+        call(cmd)
+        # Remove a netinst Rescue submenu.
+        sedscript = r'''/^\s*menuentry 'Rescue .*/I {N;N;N;d}'''
+        cmd[3:] = [sedscript, EFI_config]
+        call(cmd)
 
         # Remove labels from any multi boot configurations.
         sedscript = r'''/^\s*label .*/I,/^\s*label linux\>/I{
                         /^\s*label linux\>/I ! {N;N;N;N
                         /\<kernel\s+[^ ]*menu.c32\>/d};}'''
-        args[3:] = [sedscript, isocfgf]
-        call(args)
+        cmd[3:] = [sedscript, isocfgf]
+        call(cmd)
         sedscript = r'''/^\s*menu\s+end/I,$ {
                         /^\s*menu\s+end/I ! d}'''
-        args[3:] = [sedscript, isocfgf]
-        call(args)
+        cmd[3:] = [sedscript, isocfgf]
+        call(cmd)
 
-        sedscript = r'''s/root=[^ ]*/root=live:CDLABEL=%s/
-                     ''' % self.fslabel
-        args[3:] = [sedscript, isocfgf]
+        sedscript = r'''s/(root=[^ ]*|inst.stage2=[^ ]*)/root=live:CDLABEL={0}/
+                     '''.format(self.fslabel)
+        cmd[3:] = [sedscript, isocfgf]
         if EFI_config:
-            args.append(EFI_config)
-        call(args)
+            cmd.append(EFI_config)
+        call(cmd)
         sedscript = r'''s/^\s*timeout\s+.*/timeout 600/I
-/^\s*totaltimeout\s+.*/Iz'''
+/^\s*totaltimeout\s+.*/Iz
+s/{0}/{1}/'''.format(self.release, self.releasefile)
+        cmd[3:] = [sedscript, isocfgf]
+        call(cmd)
+
         if self.releasefile:
-            sedscript += r'''s/(^\s*menu\s+title\s+Welcome\s+to)\s+.*/\1 %s/I
-''' % self.releasefile
+            sedscript = r'''1,20 s/^(\s*menu\s+title\s+)(Welcome\s+to|.+)/\1{}/I
+'''.format(self.releasefile)
         sedscript += r'''s/\<(kernel)\>\s+[^\n.]*(vmlinuz.?)/\1 \2/
 s/\<(initrd=).*(initrd.?\.img)\>/\1\2/
 s/\<(root=live:[^ ]*)\s+[^\n.]*\<(rd\.live\.image|liveimg)/\1 \2/
 /^\s*label\s+linux\>/I,/^\s*label\s+check\>/Is/(rd\.live\.image|liveimg).*/\1 quiet/
 /^\s*label\s+check\>/I,/^\s*label\s+vesa\>/Is/(rd\.live\.image|liveimg).*/\1 rd.live.check quiet/
 /^\s*label\s+vesa\>/I,/^\s*label\s+memtest\>/Is/(rd\.live\.image|liveimg).*/\1 nomodeset quiet/'''
-        args[3:] = [sedscript, isocfgf]
-        call(args)
+        cmd[3:] = [sedscript, isocfgf]
+        call(cmd)
 
         if EFI_config:
-            iso_boot = os.path.join(os.sep, 'images', 'pxeboot')
+            iso_boot = os.path.join('images', 'pxeboot')
             if not os.path.exists(os.path.join(isodir, iso_boot)):
-                iso_boot = '/isolinux'
+                iso_boot = 'isolinux'
             sedscript = r'''s/^\s*set\s+timeout=.*/set timeout=60/
-/^\s*menuentry\s+'Start\s+/,/\s+}/{s/(\s+'Start\s+)[^ ]*\s+~/\1/
-s/(rd\.live\.image|liveimg).*/\1 quiet/}
-/^\s*menuentry\s+'Test\s+/,/\s+}/{s/(\s+&\s+start\s+)[^ ]*\s+~/\1/
-s/(rd\.live\.image|liveimg).*/\1 rd.live.check quiet/}
-/^\s*submenu\s+'Trouble/,/\s+}/s/(rd\.live\.image|liveimg).*/\1 nomodeset quiet/
+s/(--set=root -l ').+'/\1{0}'/
+/^\s*menuentry\s+'(Start|Install)\s+/,/\s*\}}/ {{s/\s+'(Start|Install)\s+.+'/ 'Start {1}'/
+s/(rd\.live\.image|liveimg).*/\1 quiet/}}
+/^\s*menuentry\s+'Test\s+/,/\s*}}/ {{s/\s+&\s+(start|install)\s+.+'/ \& start {1}'/
+s/(rd\.live\.image|liveimg).*/\1 rd.live.check quiet/}}
+/^\s*submenu\s+'Trouble/,/\s*}}/ {{s/(menuentry\s+').+'/\1Start {1} in basic graphics mode'/
+s/(rd\.live\.image|liveimg).*/\1 nomodeset quiet/}}
 s/(linuxefi\s+[^ ]+vmlinuz.?)\s+.*\s+(root=live:[^\s+]*)/\1 \2/
-s_(linuxefi|initrdefi)\s+[^ ]+(initrd.?\.img|vmlinuz.?)_\1 %s/\2_
-s/\s+rw\s+|\s+rw$/ /g''' % iso_boot
-            args[3:] = [sedscript, EFI_config]
-            call(args)
+s_(linuxefi|initrdefi)\s+[^ ]+(initrd.?\.img|vmlinuz.?)_\1 /{2}/\2_
+s/\s+rw\s+|\s+rw$/ /g'''.format(self.fslabel, self.releasefile, iso_boot)
+            cmd[3:] = [sedscript, EFI_config]
+            call(cmd)
 
         sedscript = ''
         if self.flatten_squashfs:
@@ -1497,22 +1516,28 @@ s/\s+rw\s+|\s+rw$/ /g''' % iso_boot
                     # append parameter
                     sedscript += r'\n/^  append/s/$/ %s/' % param
         if sedscript:
-            args[3:] = [sedscript, isocfgf]
+            cmd[3:] = [sedscript, isocfgf]
             if EFI_config:
-                args.append(EFI_config)
+                cmd.append(EFI_config)
 
             try:
-                call(args)
+                call(cmd)
             except IOError as e:
                 raise CreatorError("Failed to configure bootloader file: %s" % e)
 
         # Clear remnants of a multi boot install.
-        EFI_config = os.path.join(isodir, 'EFI', 'grub.cfg.prev')
+        EFI_config = os.path.join(isodir, 'EFI', 'BOOT', 'grub.cfg.prev')
         if os.path.exists(EFI_config):
             os.remove(EFI_config)
         isocfgf = self.cfgf + '.prev'
         if os.path.exists(isocfgf):
             os.remove(isocfgf)
+        # Synchronize redundant configuration files.
+        EFI_config = os.path.join(os.path.dirname(EFI_config), 'BOOT.conf')
+        shutil.copy2(self.EFI_config, EFI_config)
+        EFI_config = EFI_config + '.prev'
+        if os.path.exists(EFI_config):
+            os.remove(EFI_config)
 
 
     def tar_cmd(self, operation, opfile, destdir=None, ops=None):
@@ -1809,178 +1834,198 @@ s/\s+rw\s+|\s+rw$/ /g''' % iso_boot
         if self.skip_refresh or not os.access(self.srcdir, os.W_OK):
             return
 
-        # Try to protect mounted device contents from deletion on error.
-        try:
-            if self.liveossrc:
-                try:
-                    self.liveossrc.mount(dirmode=0o700)
-                except MountError as e:
-                    raise CreatorError("Failed to mount '%s' : '%s'" %
-                                       (self.liveossrc.mountdir, e))
-            isodir = self._LiveImageCreatorBase__isodir
-            isoliveosdir = os.path.join(isodir, 'LiveOS')
+        if self.liveossrc:
+            try:
+                self.liveossrc.mount(dirmode=0o700)
+            except MountError as e:
+                raise CreatorError("Failed to mount '%s' : '%s'" %
+                                   (self.liveossrc.mountdir, e))
+        isodir = self._LiveImageCreatorBase__isodir
+        isoliveosdir = os.path.join(isodir, 'LiveOS')
 
-            def restore_from_tar(liveosmntdir):
-                """Restore the secluded files to a filesystem."""
+        def restore_from_tar(liveosmntdir):
+            """Restore the secluded files to a filesystem."""
 
-                def extract_tar(f):
-                    """Extract files from archive."""
+            def extract_tar(f):
+                """Extract files from archive."""
 
-                    tar_args = self.tar_cmd('--extract', f, ops=['--overwrite'])
-                    out, err, rc = rcall(tar_args, raise_err=False,
-                                         cwd=liveosmntdir)
-                    print('%s%s' % (out, err))
+                tar_args = self.tar_cmd('--extract', f, ops=['--overwrite'])
+                out, err, rc = rcall(tar_args, raise_err=False,
+                                     cwd=liveosmntdir)
+                print('%s%s' % (out, err))
 
-                [extract_tar(f) for f in self.seclude_tar]
+            [extract_tar(f) for f in self.seclude_tar]
 
-            call(['sync'])
-            if not self._space_for_refresh(isodir, isoliveosdir):
-                print('There is insufficient space to perform the requested '
-                       'refresh.   Skipping...\n')
-                return
+        call(['sync'])
+        if not self._space_for_refresh(isodir, isoliveosdir):
+            print('There is insufficient space to perform the requested '
+                   'refresh.   Skipping...\n')
+            return
 
-            print('''\nRefreshing the source device with the new image.
-                       Please wait...''')
+        print('''\nRefreshing the source device with the new image.
+                   Please wait...''')
 
-            src_dst, dellist = [], []
-            def _proclists(delfile, src=None, dst=None):
-                """Setup file refresh lists."""
-                if delfile:
-                    fpath = os.path.join(self.liveosdir, delfile)
-                    if os.path.exists(fpath):
-                        dellist.append(fpath)
-                if src:
-                    src_dst.append([os.path.join(isoliveosdir, src),
-                                    os.path.join(self.liveosdir, dst)])
-                    if os.path.exists(src_dst[-1][1]):
-                        dellist.append(src_dst[-1][1])
+        src_dst, dellist = [], []
+        def _proclists(delfile, src=None, dst=None):
+            """Setup file refresh lists."""
+            if delfile:
+                fpath = os.path.join(self.liveosdir, delfile)
+                if os.path.exists(fpath):
+                    dellist.append(fpath)
+            if src:
+                src_dst.append([os.path.join(isoliveosdir, src),
+                                os.path.join(self.liveosdir, dst)])
+                if os.path.exists(src_dst[-1][1]):
+                    dellist.append(src_dst[-1][1])
 
-            if self.rootfs_img == 'squashfs.img':
-                self.rootfs_img = None
-            rootfsimg = 'squashfs.img'
-            if not self.compress:
-                rootfsimg = self.rootfs_img
-            if args.rootfsimg:
-                rootfsimg = args.rootfsimg
+        if self.rootfs_img == 'squashfs.img':
+            self.rootfs_img = None
+        rootfsimg = 'squashfs.img'
+        if not self.compress:
+            rootfsimg = self.rootfs_img
+        if args.rootfsimg:
+            rootfsimg = args.rootfsimg
 
-            if self.osmin_img:
-                _proclists(None, 'osmin.img', 'osmin.img')
-            else:
-                _proclists('osmin.img')
-            if self.compress:
-                _proclists(self.rootfs_img, 'squashfs.img', rootfsimg)
-            else:
-                _proclists('squashfs.img', self.rootfs_img, rootfsimg)
+        if self.osmin_img:
+            _proclists(None, 'osmin.img', 'osmin.img')
+        else:
+            _proclists('osmin.img')
+        if self.compress:
+            _proclists(self.rootfs_img, 'squashfs.img', rootfsimg)
+        else:
+            _proclists('squashfs.img', self.rootfs_img, rootfsimg)
 
-            syslinuxdir = os.path.join(self.liveosdir, 'syslinux')
-            if not os.path.isdir(syslinuxdir):
-                syslinuxdir = os.path.join(self.srcmntdir, 'syslinux')
-            for f in ('syslinux.cfg', 'extlinux.conf'):
-                cfgf = os.path.join(syslinuxdir, f)
-                if os.path.exists(cfgf): break
-            cfgf_sed = (['sed', '-i',
-                         's/^menu title .*/menu title Welcome to %s!/' %
-                         self.releasefile, cfgf])
-            call(cfgf_sed)
+        syslinuxdir = os.path.join(self.liveosdir, 'syslinux')
+        if not os.path.isdir(syslinuxdir):
+            syslinuxdir = os.path.join(self.srcmntdir, 'syslinux')
+        for f in ('syslinux.cfg', 'extlinux.conf'):
+            cfgf = os.path.join(syslinuxdir, f)
+            if os.path.exists(cfgf): break
+        shutil.copy2(cfgf, cfgf + '.prev')
+        cmd = ['sed', '-i', '-r',]
+        cmd[3:] = [
+        r'''/^\s*label\s+linux\>/I,/^\s*label\s+memtest\>/I s/{0}/{1}/'''.format(
+                     self.release, self.releasefile), cfgf]
+        call(cmd)
 
-            # Copy or move new rootfs_img or squashfs.img and osmin.img.
-            [os.remove(f) for f in dellist]
-            transfer = shutil.copy2
-            if os.stat(self.liveosdir).st_dev == os.stat(self.tmpdir).st_dev:
-                transfer = shutil.move
-            [transfer(*sd) for sd in src_dst]
-            call(['sync'])
+        cmd = ['sed', '-n', '-r',
+                r'/^\s*menu\s+title\s+Multi Live Image Boot Menu/p', cfgf]
+        f, e, c = rcall(cmd)
+        if not f:
+            cmd = ['sed', '-i', '-r',
+            r'''1,20 s/^(\s*menu\s+title\s+)(Welcome\s+to|.+)/\1{}/I'''.format(
+                self.releasefile), cfgf]
+            call(cmd)
 
-            if os.path.dirname(syslinuxdir) == self.srcmntdir:
-                kernelpath = ' '
-            else:
-                kernelpath = os.path.basename(self.liveosdir)
-            kernelpath += '\/syslinux\/vmlinuz'
+        if os.path.dirname(syslinuxdir) != self.srcmntdir:
+            dn = e = os.path.basename(self.liveosdir.rstrip('/'))
+            for c in ('?', '+', '/', '|', '{', '}'):
+                if c in e:
+                    dn = e.replace(c, '\\' + c)
 
-            for dn in ('BOOT', 'boot'):
-                EFI_config = os.path.join(self.srcmntdir,
-                                          'EFI', dn, 'grub.cfg')
-                if os.path.exists(EFI_config):
-                    break
+            f = cfgf.replace(e + os.sep, '')
+            shutil.copy2(f, f + '.prev')
+            cmd[3:] = [r'''/\s*label\s+{0}/I {{N;
+            /{0}/ s/(Start\s+).+( menu)/\1{1}\2/}}'''.format(
+                       dn, self.releasefile), f]
+            call(cmd)
+        else:
+            dn = ' '
 
-            if self.ovltype == 'DM_linear' and not self.overlay_size_mb:
-                # This signals no overlay processing.
-                overlay = 'DM_linear'
-            else:
-                overlay = args.overlay
+        for c in ('BOOT', 'boot'):
+            EFI_config = os.path.join(self.srcmntdir,
+                                      'EFI', c, 'grub.cfg')
+            if os.path.exists(EFI_config):
+                break
+        shutil.copy2(EFI_config, EFI_config + '.prev')
+        c = os.path.join(os.path.dirname(EFI_config), 'BOOT.conf')
+        shutil.copy2(c, c + '.prev')
+        cmd[3:] = [r'''/menuentry/ {{N;
+        /{0}\/syslinux\/vmlinuz/ s/{1}/{2}/}}'''.format(
+                    dn, self.release, self.releasefile), EFI_config]
+        call(cmd)
 
-            if self.src_type == 'live' and not (self.flatten_squashfs or
-                                                self.overlay_size_mb or
-                                                self.ovltype == 'DM_linear'):
+        # Copy or move new rootfs_img or squashfs.img and osmin.img.
+        [os.remove(f) for f in dellist]
+        transfer = shutil.copy2
+        if os.stat(self.liveosdir).st_dev == os.stat(self.tmpdir).st_dev:
+            transfer = shutil.move
+        [transfer(*sd) for sd in src_dst]
+        call(['sync'])
+
+        if self.ovltype == 'DM_linear' and not self.overlay_size_mb:
+            # This signals no overlay processing.
+            overlay = 'DM_linear'
+        else:
+            overlay = args.overlay
+
+        if self.src_type == 'live' and not (self.flatten_squashfs or
+                                            self.overlay_size_mb or
+                                            self.ovltype == 'DM_linear'):
+            self.overlay_size_mb = self.ovl_size
+            self.ovl_fstype = self.ovltype
+            ovlmntdir = self.srcmntdir
+            if self.liveosmnt and self.liveosmnt.ovlmnt:
+                self.liveosmnt.ovlmnt.mount()
+                ovlmntdir = self.liveosmnt.ovlmntdir
+            self.ovl_blksz = 4096
+            if self.ovltype not in ('', 'temp','DM_snapshot_cow',
+                                    'DM_linear', 'dir'):
+                self.ovl_blksz = os.statvfs(
+                '/run/initramfs/overlayfs/overlayfs').f_bsize
+
+        if (self.flatten_squashfs and self.ovltype in ('', 'temp',
+            'DM_snapshot_cow')) or (self.overlay_size_mb and
+            self.ovltype in ('', 'DM_snapshot_cow', 'DM_linear') and
+            self.ovl_fstype not in ('', 'temp','DM_snapshot_cow')):
+            if not self.overlay_size_mb:
                 self.overlay_size_mb = self.ovl_size
-                self.ovl_fstype = self.ovltype
+                self.ovl_fstype = 'dir'
                 ovlmntdir = self.srcmntdir
                 if self.liveosmnt and self.liveosmnt.ovlmnt:
                     self.liveosmnt.ovlmnt.mount()
                     ovlmntdir = self.liveosmnt.ovlmntdir
+                if findmnt('-no FSTYPE -T', ovlmntdir) == 'vfat':
+                    self.ovl_fstype = 'ext4'
                 self.ovl_blksz = 4096
-                if self.ovltype not in ('', 'temp','DM_snapshot_cow',
-                                        'DM_linear', 'dir'):
-                    self.ovl_blksz = os.statvfs(
-                    '/run/initramfs/overlayfs/overlayfs').f_bsize
 
-            if (self.flatten_squashfs and self.ovltype in ('', 'temp',
-                'DM_snapshot_cow')) or (self.overlay_size_mb and
-                self.ovltype in ('', 'DM_snapshot_cow', 'DM_linear') and
-                self.ovl_fstype not in ('', 'temp','DM_snapshot_cow')):
-                if not self.overlay_size_mb:
-                    self.overlay_size_mb = self.ovl_size
-                    self.ovl_fstype = 'dir'
-                    ovlmntdir = self.srcmntdir
-                    if self.liveosmnt and self.liveosmnt.ovlmnt:
-                        self.liveosmnt.ovlmnt.mount()
-                        ovlmntdir = self.liveosmnt.ovlmntdir
-                    if findmnt('-no FSTYPE -T', ovlmntdir) == 'vfat':
-                        self.ovl_fstype = 'ext4'
-                    self.ovl_blksz = 4096
+            cmd[3:] = [
+            's/rd\.live\.image|liveimg/& rd.live.overlay.overlayfs/', cfgf]
+            call(cmd)
 
-                cfgf_sed = ['sed', '-i', '-r',
-                's/rd\.live\.image|liveimg/& rd.live.overlay.overlayfs/', cfgf]
-                call(cfgf_sed)
+            cmd[3:] = [
+            r's/{0}\/syslinux\/vmlinuz/& rd.live.overlay.overlayfs/'.format(dn)
+                        , EFI_config]
+            call(cmd)
 
-                cfgf_sed = ['sed', '-i', '-r',
-                's/%s/& rd.live.overlay.overlayfs/' % kernelpath, EFI_config]
-                call(cfgf_sed)
-                shutil.copy2(EFI_config,
-                       os.path.join(os.path.dirname(EFI_config), 'BOOT.conf'))
+        elif self.overlay_size_mb and self.ovl_fstype == 'DM_snapshot_cow':
+            cmd[3:] = ['s/ rd\.live\.overlay\.overlayfs//g', cfgf]
+            call(cmd)
 
-            elif self.overlay_size_mb and self.ovl_fstype == 'DM_snapshot_cow':
-                cfgf_sed = ['sed', '-i', '-r',
-                's/ rd\.live\.overlay\.overlayfs//g', cfgf]
-                call(cfgf_sed)
-                
-                cfgf_sed = ['sed', '-i', '-r',
-                            '/%s/s/ rd\.live\.overlay\.overlayfs//g' %
-                            kernelpath, EFI_config]
-                call(cfgf_sed)
-                shutil.copy2(EFI_config,
-                       os.path.join(os.path.dirname(EFI_config), 'BOOT.conf'))
+            cmd[3:] = [r'/{0}/ s/ rd\.live\.overlay\.overlayfs//g'.format(dn),
+                       EFI_config]
+            call(cmd)
+        shutil.copy2(EFI_config, c)
 
-            self.liveosmnt = self.new_liveos_mount(self.liveosdir,
-                                                   args.rootfsimg, overlay,
-                                                   self.mntdir)
-            self.liveosmnt._LiveImageMount__create(ops='rw', dirmode=0o700)
+        self.liveosmnt = self.new_liveos_mount(self.src, args.rootfsimg,
+                                               overlay, self.mntdir)
+        self.liveosmnt._LiveImageMount__create(ops='rw', dirmode=0o700)
 
-            if self.overlay_size_mb:
-                overlay = self.liveosmnt.make_overlay(self.overlay_size_mb,
-                                                      self.ovl_size,
-                                                      self.ovl_fstype,
-                                                      self.ovl_blksz)
-                self.liveosmnt.cleanup()
-                self.liveosmnt.overlay = overlay
-            elif self.ovltype != 'DM_linear':
-                self.liveosmnt.reset_overlay()
+        if self.overlay_size_mb:
+            overlay = self.liveosmnt.make_overlay(self.overlay_size_mb,
+                                                  self.ovl_size,
+                                                  self.ovl_fstype,
+                                                  self.ovl_blksz)
+            self.liveosmnt.cleanup()
+            self.liveosmnt.overlay = overlay
+        elif self.ovltype != 'DM_linear':
+            self.liveosmnt.reset_overlay()
 
-            if self.seclude_tar:
-                print('Restoring secluded files to the refresh...')
-                self.liveosmnt.mount('rw')
-                restore_from_tar(self.liveosmnt.mountdir)
-                [os.remove(f) for f in self.seclude_tar]
+        if self.seclude_tar:
+            print('Restoring secluded files to the refresh...')
+            self.liveosmnt.mount('rw')
+            restore_from_tar(self.liveosmnt.mountdir)
+            [os.remove(f) for f in self.seclude_tar]
 #           TODO Implement homefsck support, such as below.
 #            if self.src_type == 'live' and os.path.exists(self.home_img):
 #                # Tag to signal a home fsck, if implemented in startup script.
@@ -1988,15 +2033,14 @@ s/\s+rw\s+|\s+rw$/ /g''' % iso_boot
 #                                       'forcehomefsck'), 'w')
 #                fd.close()
 
-            if hasattr(self, 'newhome_img'):
-                self.newhomemnt.cleanup()
+        if hasattr(self, 'newhome_img'):
+            self.newhomemnt.cleanup()
 
-            call(self.dmsetup_cmd + ['mknodes'])
-        finally:
-            call(['sync'])
-            self.liveosmnt.cleanup()
-            if self.liveossrc:
-                self.liveossrc.cleanup()
+        call(self.dmsetup_cmd + ['mknodes'])
+        call(['sync'])
+        self.liveosmnt.cleanup()
+        if self.liveossrc:
+            self.liveossrc.cleanup()
 
 
     def _e2fsck_img(self, img):
@@ -2159,7 +2203,7 @@ def main():
             raise CreatorError('\nNotice: --rootfs-size-gb: %s is not a '
             'valid number.\n     Please correct this.\nError: %s' % (
                 args.rootfs_size, e))
-    name = ''.join((os.path.basename(args.liveos), '.edited'))
+    name = ''.join((os.path.basename(args.liveos.rstrip('/')), '.edited'))
     src_type = 'iso'
     if args.liveos == 'live' or args.liveos in (
                  '/mnt/live', '/run/initramfs/live', '/run/initramfs/livedev'):
@@ -2383,6 +2427,8 @@ def main():
                      partition to reclaim storage clusters that were unlinked
                      during the LiveOS and overlay refresh.
                   ''')
+        if editor.src_type == 'blk' and os.path.ismount(editor.srcmntdir):
+            os.system('umount ' + editor.srcmntdir)
         if success and editor.docleanup and editor.src_type != 'iso':
             shutil.rmtree(editor.mntdir)
 
