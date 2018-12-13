@@ -97,6 +97,9 @@ usage() {
     target device.  This allows one to maintain other files on the target disk
     outside of the LiveOS filesystem.
 
+    Multi image installations may be invoked interactively if the target device
+    already contains a LiveOS image.
+
     LiveOS images employ embedded filesystems through the Device-mapper
     component of the Linux kernel.  The filesystems are embedded within files
     in the /LiveOS/ directory of the storage device.  The /LiveOS/squashfs.img
@@ -350,11 +353,13 @@ usage() {
     --updates <updates.img>
         Setup a kernel command line argument, inst.updates, to point to an
         updates image on the device. Used by Anaconda for testing updates to an
-        iso without needing to make a new iso.
+        iso without needing to make a new iso. <updates.img> should be a path
+        accessible to this script, which will be copied to the target device.
 
     --ks <kickstart>
         Setup inst.ks to point to an kickstart file on the device. Use this for
-        automating package installs on boot.
+        automating package installs on boot. <kickstart> should be a path
+        accessible to this script, which will be copied to the target device.
 
     --label <label>
         Specifies a specific filesystem label instead of default LIVE. Useful
@@ -813,7 +818,7 @@ checkint() {
 detectsrctype() {
     if [[ -e $SRCMNT/Packages ]]; then
         echo "/Packages found, will copy source packages to target."
-        packages=1
+        packages=packages
     fi
     if [[ $SRC == @(/run/initramfs/live|/mnt/live) ]]; then
         local cmdline=$(< /proc/cmdline)
@@ -824,7 +829,7 @@ detectsrctype() {
         fi
         ret=${cmdline#* @(rd.live.ram|live_ram)}
         if [[ ${#ret} != $len ]]; then
-            liveram=1
+            liveram=liveram
         fi
         ret=${cmdline#* @(rd.writable.fsimg|writable_fsimg)}
         if [[ ${#ret} != $len ]]; then
@@ -853,10 +858,13 @@ detectsrctype() {
             break
         fi
     done
-    IMGMNT=$(mktemp -d /run/imgtmp.XXXXXX)
-    mount $srcmountopts "$SRCIMG" $IMGMNT || exitclean
-    [[ -d $IMGMNT/proc ]] && flat_squashfs=flat_squashfs
-    umount $IMGMNT
+    # netinstall iso has no SRCIMG.
+    if [[ -n "$SRCIMG" ]]; then
+        IMGMNT=$(mktemp -d /run/imgtmp.XXXXXX)
+        mount $srcmountopts "$SRCIMG" $IMGMNT || exitclean
+        [[ -d $IMGMNT/proc ]] && flat_squashfs=flat_squashfs
+        umount $IMGMNT
+    fi
     [[ -n $srctype ]] && return
 
     if [[ -e $SRCMNT/images/install.img ]] ||
@@ -931,15 +939,15 @@ overlaysizemb=''
 copyoverlay=''
 copyoverlaysize=''
 resetoverlay=''
-srctype=
+srctype=''
 srcdir=LiveOS
 squashimg=squashfs.img
-imgtype=
-packages=
+imgtype=''
+packages=''
 LIVEOS=LiveOS
 HOMEFILE=home.img
-updates=
-ks=
+updates=''
+ks=''
 label=''
 
 while true ; do
@@ -1130,9 +1138,10 @@ if [[ $LIVEOS =~ [[:space:]]|/ ]]; then
     printf "\n    ALERT:
     The LiveOS directory name, '%s', contains spaces, newlines, tabs, or '/'.\n
     Whitespace and '/' do not work with the SYSLINUX boot loader.
-    Replacing the whitespace by underscores, any '/' by '-'...\n\n" "$LIVEOS"
+    Replacing the whitespace by underscores, any '/' by '-':  " "$LIVEOS"
     LIVEOS=${LIVEOS//[[:space:]]/_}
     LIVEOS=${LIVEOS////-}
+    printf "'$LIVEOS'\n\n"
 fi
 
 if [[ $overlayfs == @(vfat|msdos) ]] && [[ -z $overlaysizemb ]]; then
@@ -1236,6 +1245,21 @@ if [[ -n $flat_squashfs ]] && [[ -z $overlayfs ]]; then
     fi
 fi
 
+if [[ $srctype != live ]]; then
+    if [[ -n $homesizemb ]]; then
+        printf '\n        ALERT:
+        The source is not for a live installation. A home.img filesystem is not
+        useful for netinst or installer installations.\n
+        Please adjust your home.img options.  Exiting...\n\n'
+        exitclean
+    elif [[ -n $overlaysizemb ]]; then
+        printf '\n        ALERT:
+        The source is not for a live installation. A overlay file is not
+        useful for netinst or installer installations.\n
+        Please adjust your script options.  Exiting...\n\n'
+        exitclean
+    fi
+fi
 
 # Format the device
 if [[ -n $format && -z $skipcopy ]]; then
@@ -1355,8 +1379,37 @@ fi
 BOOTCONFIG_EFI=($(nocase_path "$TGTMNT$T_EFI_BOOT/boot*.conf"))
 #^ Use compound array assignment in case there are multiple files.
 
-if [[ -e $TGTMNT/syslinux && $srctype == live && -z $skipcopy ]] &&
+if [[ -n $multi ]]; then
+    if ! [[ -e $TGTMNT/syslinux ]]; then
+        unset -v multi
+    elif [[ $LIVEOS == LiveOS ]]; then
+        IFS=: read -p '
+    Please designate a directory name
+      for this multi boot installation: ' LIVEOS
+        if [[ $LIVEOS =~ [[:space:]]|/ ]]; then
+            printf "\n    ALERT:
+    The LiveOS directory name, '%s', contains spaces, newlines,
+    tabs, or '/'.
+
+    Whitespace and '/' do not work with the SYSLINUX boot loader.\n
+    Replacing the whitespace by underscores, any '/' by '-':  " "$LIVEOS"
+            LIVEOS=${LIVEOS//[[:space:]]/_}
+            LIVEOS=${LIVEOS////-}
+            printf "'$LIVEOS'\n\n"
+        fi
+    fi
+    multi=/$LIVEOS
+fi
+
+if [[ -e $TGTMNT/syslinux && -z $skipcopy ]] &&
    [[ -z $multi && -z $force ]]; then
+    if [[ $srctype == @(netinst|installer) ]]; then
+        d='the /images & boot configuration
+                directories'
+    else
+        d='any image in the "'$LIVEOS'"
+                directory'
+    fi
     IFS=: read -n 1 -p '
     ATTENTION:
 
@@ -1366,29 +1419,30 @@ if [[ -e $TGTMNT/syslinux && $srctype == live && -z $skipcopy ]] &&
 
         If so, press Enter to continue.
 
-        If not, press the [space bar], and any image in the "'$LIVEOS'"
-                directory will be overwritten, and any others ignored.
+        If not, press the [space bar], and '"$d"' will be overwritten,
+                and any others ignored.
 
     To abort the installation, press Ctrl C.
     ' multi
     if [[ $multi != " " ]]; then
-        multi=multi
         if [[ $LIVEOS == LiveOS ]]; then
             LIVEOS=$(mktemp -d $TGTMNT/XXXX)
             rmdir $LIVEOS
             LIVEOS=${LIVEOS##*/}
         fi
+        multi=/$LIVEOS
     else
         unset -v multi
-        # Backup previous config_file.
-        [[ -f $TGTMNT/syslinux/$CONFIG_FILE ]] &&
-            cp $TGTMNT/syslinux/$CONFIG_FILE $TGTMNT/syslinux/$CONFIG_FILE.prev
-        [[ -f $TGTMNT$T_EFI_BOOT/grub.cfg ]] &&
-            cp $TGTMNT$T_EFI_BOOT/grub.cfg $TGTMNT$T_EFI_BOOT/grub.cfg.prev
-        [[ -f $BOOTCONFIG_EFI ]] &&
-            cp $BOOTCONFIG_EFI $BOOTCONFIG_EFI.prev
     fi
 fi
+
+# Backup previous config_files.
+[[ -f $TGTMNT/syslinux/$CONFIG_FILE ]] &&
+    cp $TGTMNT/syslinux/$CONFIG_FILE $TGTMNT/syslinux/$CONFIG_FILE.prev
+[[ -f $TGTMNT$T_EFI_BOOT/grub.cfg ]] &&
+    cp $TGTMNT$T_EFI_BOOT/grub.cfg $TGTMNT$T_EFI_BOOT/grub.cfg.prev
+[[ -f $BOOTCONFIG_EFI ]] &&
+    cp $BOOTCONFIG_EFI $BOOTCONFIG_EFI.prev
 
 OVLPATH=$TGTMNT/$LIVEOS/$OVLNAME
 if [[ -n $resetoverlay ]]; then
@@ -1743,7 +1797,7 @@ if ! [[ -f $BOOTCONFIG ]]; then
     done
 fi
 TITLE=$(sed -n -r '/^\s*label\s+linux/{n
-                   s/^\s*menu\s+label\s+\^Start\s+(.*)/\1/p}
+                   s/^\s*menu\s+label\s+\^(Start|Install)\s+(.*)/\1 \2/p}
                   ' $BOOTCONFIG)
 
 # Copy LICENSE and README.
@@ -1753,11 +1807,7 @@ if [[ -z $skipcopy ]]; then
     done
 fi
 
-# Always install /images directory, when available, so that they may be used
-# to propagate a new installation from the installed system.
-if [[ -d $SRCMNT/images ]] && [[ $srctype == live && -z $skipcopy ]]; then
-    cp -r $SRCMNT/images $TGTMNT
-fi
+[[ -e $BOOTCONFIG_EFI.multi ]] && rm $BOOTCONFIG_EFI.multi
 
 # Always install EFI components, when available, so that they are available to
 # propagate, if desired from the installed system.
@@ -1832,16 +1882,17 @@ else
 fi
 
 # DVD installer copy
-if [[ -z $skipcopy ]] && [[ $srctype == @(installer|netinst) ]]; then
-    echo "Copying DVD image to target device."
-    mkdir -p $TGTMNT/images/
-    if [[ $imgtype == install ]]; then
-        for img in install.img updates.img product.img; do
-            if [[ -e $SRCMNT/images/$img ]]; then
-                $copyFile $SRCMNT/images/$img $TGTMNT/images/$img || exitclean
-            fi
-        done
-    fi
+# Always install /images directory, when available, so that they may be used
+# to propagate a new installation from the installed system.
+if [[ -z $skipcopy ]]; then
+    echo "Copying /images directory to the target device."
+    for f in $(find $SRCMNT/images); do
+        if [[ -d $f ]]; then
+            mkdir $TGTMNT$multi/${f#$SRCMNT} || exitclean
+        else
+            $copyFile $f $TGTMNT$multi/${f#$SRCMNT} || exitclean
+        fi
+    done
 fi
 
 # Copy packages over.
@@ -1854,7 +1905,7 @@ fi
 if [[ -n $packages && -z $skipcopy ]]; then
     echo "Copying package data from $SRC to device."
     rsync --inplace -rLDP --exclude EFI/ --exclude images/ --exclude isolinux/ \
-        --exclude TRANS.TBL --exclude LiveOS/ "$SRCMNT/" "$TGTMNT/"
+        --exclude TRANS.TBL --exclude LiveOS/ "$SRCMNT/" "$TGTMNT/"${multi#/}
     echo "Waiting for device to finish writing."
     sync -f "$TGTMNT/"
 fi
@@ -1910,20 +1961,20 @@ fi
 
 # Setup the updates.img
 if [[ -n $updates ]]; then
-    $copyFile "$updates" "$TGTMNT/updates.img"
-    kernelargs+=" inst.updates=hd:$TGTLABEL:/updates.img"
+    $copyFile "$updates" "$TGTMNT$multi/updates.img"
+    kernelargs+=" inst.updates=hd:$TGTLABEL:$multi/updates.img"
 fi
 
 # Setup the kickstart
 if [[ -n $ks ]]; then
-    $copyFile "$ks" "$TGTMNT/ks.cfg"
-    kernelargs+=" inst.ks=hd:$TGTLABEL:/ks.cfg"
+    $copyFile "$ks" "$TGTMNT$multi/ks.cfg"
+    kernelargs+=" inst.ks=hd:$TGTLABEL:$multi/ks.cfg"
 fi
 
 echo "Updating boot config files."
 # adjust label and fstype
 sed -i -r "s/\<root=[^ ]*/root=live:$TGTLABEL/g
-        s/inst.stage2=hd:LABEL=[^ ]*/inst.stage2=hd:$TGTLABEL/g
+        s;inst.stage2=hd:LABEL=[^ ]*;inst.stage2=hd:$TGTLABEL${multi/*/:$multi/images/install.img};g
         s/\<rootfstype=[^ ]*\>/rootfstype=$TGTFS/" $BOOTCONFIG $BOOTCONFIG_EFI
 if [[ -n $kernelargs ]]; then
     sed -i -r "s;=initrd.?\.img\>;& ${kernelargs} ;
@@ -2151,16 +2202,6 @@ EOF
 
 fi
 
-if [[ -n $multi && ! -d $TGTMNT/syslinux ]]; then
-    multi=move
-    # If this is the first image installed, move config directory to the root.
-    move_syslinux_dir() {
-        mv $TGTMNT/$SYSLINUXPATH $TGTMNT/syslinux
-        SYSLINUXPATH=syslinux
-    }
-    [[ -e $BOOTCONFIG_EFI.multi ]] && rm $BOOTCONFIG_EFI.multi
-fi
-
 BOOTPATH=$SYSLINUXPATH
 [[ -n $multi ]] && BOOTPATH=syslinux
 
@@ -2181,7 +2222,7 @@ for f in vesamenu.c32 menu.c32; do
     fi
 done
 
-if [[ $multi == multi ]]; then
+if [[ $multi == /$LIVEOS ]]; then
     # We need to do some more config file tweaks for multi-image mode.
     sed -i -r "s;\s+[^ ]*menu\.c32\>; $UI;g
                s;kernel\s+vm;kernel /$LIVEOS/syslinux/vm;
@@ -2212,8 +2253,6 @@ mv $TGTMNT/$SYSLINUXPATH/isolinux.cfg $TGTMNT/$SYSLINUXPATH/$CONFIG_FILE
 
 sed -i -r "s/\s+[^ ]*menu\.c32\>/ $UI/g" $TGTMNT/syslinux/$CONFIG_FILE
 
-[[ $multi == move ]] && move_syslinux_dir
-
 if [[ -f $BOOTCONFIG_EFI.multi ]]; then
     # (Implies --multi and the presence of EFI components.)
     # Insert marker and delete any conflicting menu entries
@@ -2242,7 +2281,7 @@ if [[ -f $TGTMNT$T_EFI_BOOT/BOOT.conf ]]; then
     elif [[ $BOOTCONFIG_EFI -ef $TGTMNT$T_EFI_BOOT/BOOT.conf ]]; then
         cp -f $BOOTCONFIG_EFI $TGTMNT$T_EFI_BOOT/grub.cfg
     else
-        # Fedora 27 duplicates /EFI/BOOT/grub.cfg at /EFI/BOOT/BOOT.conf
+        # Fedora 27+ duplicates /EFI/BOOT/grub.cfg at /EFI/BOOT/BOOT.conf
         cp -f $BOOTCONFIG_EFI $TGTMNT$T_EFI_BOOT/BOOT.conf
     fi
 fi
