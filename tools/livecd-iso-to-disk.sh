@@ -861,9 +861,10 @@ detectsrctype() {
     # netinstall iso has no SRCIMG.
     if [[ -n "$SRCIMG" ]]; then
         IMGMNT=$(mktemp -d /run/imgtmp.XXXXXX)
-        mount $srcmountopts "$SRCIMG" $IMGMNT || exitclean
+        mount -r "$SRCIMG" $IMGMNT || exitclean
         [[ -d $IMGMNT/proc ]] && flat_squashfs=flat_squashfs
         umount $IMGMNT
+        rmdir $IMGMNT
     fi
     [[ -n $srctype ]] && return
 
