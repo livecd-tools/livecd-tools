@@ -21,7 +21,7 @@ license. See the file COPYING for details.
 
 1. LIVE CD DESIGN GOALS
 
-The live CD is designed in such a way that the when running from a
+The live CD is designed in such a way that when running from a
 live CD, the system should appear as much as possible as a standard
 system with all that entails; e.g., read-write rootfs (achieved using
 dm-snapshot or OverlayFS with the --flat-squashfs option), standard ext4 file
