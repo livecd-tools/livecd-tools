@@ -267,11 +267,11 @@ class ServicesConfig(KickstartConfig):
     """A class to apply a kickstart services configuration to a system."""
     def apply(self, ksservices):
 
-        if fs.chrootentitycheck('chkconfig', self.instroot):
+        if fs.chrootentitycheck('systemctl', self.instroot):
             for s in ksservices.enabled:
-                subprocess.call(['chkconfig', s, 'on'], preexec_fn=self.chroot)
+                subprocess.call(['systemctl', 'enable', s], preexec_fn=self.chroot)
             for s in ksservices.disabled:
-                subprocess.call(['chkconfig', s, 'off'], preexec_fn=self.chroot)
+                subprocess.call(['systemctl', 'disable', s], preexec_fn=self.chroot)
 
 class XConfig(KickstartConfig):
     """A class to apply a kickstart X configuration to a system."""
