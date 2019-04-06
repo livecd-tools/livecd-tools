@@ -517,6 +517,7 @@ resetMBR() {
     fi
     # Wait for changes to show up/settle down.
     udevadm settle
+    sleep 5
 }
 
 checkMBR() {
@@ -579,6 +580,7 @@ createGPTLayout() {
     umount $TGTDEV &> /dev/null || :
     mkfs.fat -n "$label" $TGTDEV
     udevadm settle
+    sleep 5
     # mkfs.fat silently truncates label to 11 bytes.
     label=$(lsblk -ndo LABEL $TGTDEV)
 }
@@ -605,6 +607,7 @@ createMSDOSLayout() {
     umount $TGTDEV &> /dev/null || :
     mkfs.fat -n "$label" $TGTDEV
     udevadm settle
+    sleep 5
     # mkfs.fat silently truncates label to 11 bytes.
     label=$(lsblk -ndo LABEL $TGTDEV)
 }
@@ -638,6 +641,7 @@ createEXTFSLayout() {
     fi
     $mkfs -O ^64bit -L "$label" $TGTDEV
     udevadm settle
+    sleep 5
     # mkfs.ext[34] truncate labels to 16 bytes.
     label=$(lsblk -ndo LABEL $TGTDEV)
 }
