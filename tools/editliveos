@@ -357,6 +357,7 @@ args = parser.parse_args()
 
 print("\nSource image at '%s'" % args.liveos)
 
+arch = dnf.rpm.basearch(hawkey.detect_arch())
 
 class LiveImageEditor(LiveImageCreator):
     """
@@ -2179,15 +2180,21 @@ s/\s+rw\s+|\s+rw$/ /g'''.format(self.fslabel, self.releasefile, iso_boot)
         """Install packages into the install root.
 
         This function installs the packages listed in the supplied kickstart
-        into the install root. By default, the packages are installed from the
+        into the install root. The packages are installed from the
         repository URLs specified in the kickstart.
 
         """
         dnf_conf = self._mktemp(prefix = "dnf.conf-")
 
+        print("dbo creation")
         dbo = DnfLiveCD(releasever=self.releasever, useplugins=self.useplugins)
+        print("dbo setup start")
         dbo.setup(dnf_conf, self._instroot, cacheonly=self.cacheonly,
                    excludeWeakdeps=self.excludeWeakdeps)
+        dbo.conf.substitutions['basearch'] = arch
+        dbo.conf.substitutions['releasever'] = self.releasever
+        dbo.conf.releasever = self.releasever
+        print("dbo setup done")
 
         for repo in kickstart.get_repos(self.ks):
             (name, baseurl, mirrorlist, proxy, inc, exc, cost, sslverify) = repo
@@ -2210,13 +2217,18 @@ s/\s+rw\s+|\s+rw$/ /g'''.format(self.fslabel, self.releasefile, iso_boot)
         if kickstart.inst_langs(self.ks) != None:
             rpm.addMacro("_install_langs", kickstart.inst_langs(self.ks))
 
+        print("Start fill sack")
         dbo.fill_sack(load_system_repo = os.path.exists(self._instroot + "/var/lib/rpm/Packages"))
+        print("Done fill sack")
         dbo.read_comps()
+        print("Done read comp")
 
         try:
             self.__apply_selections(dbo)
+            print("Done apply selections")
 
             dbo.runInstall()
+            print("Done run install")
         except (dnf.exceptions.DownloadError, dnf.exceptions.RepoError) as e:
             raise CreatorError("Unable to download from repo : %s" % (e,))
         except dnf.exceptions.Error as e:
@@ -2465,7 +2477,7 @@ def main():
             editor._configure_bootloader(editor._LiveImageCreatorBase__isodir)
         if editor.ks:
             # Run_pre_scripts same code as ImageCreator_run_post_scripts
-            editor._run_post_scripts()
+            # editor._run_post_scripts()
             editor.install_rpms()
             editor._run_post_scripts()
         elif args.script:
@@ -2556,7 +2568,6 @@ def main():
 if __name__ == "__main__":
     sys.exit(main())
 
-arch = dnf.rpm.basearch(hawkey.detect_arch())
 if arch in ("i386", "x86_64"):
     LiveImageCreator = x86LiveImageCreator
 elif arch in ("ppc",):
