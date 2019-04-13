@@ -71,6 +71,8 @@ import tempfile
 import argparse
 import subprocess
 
+import dnf
+
 from imgcreate.fs import *
 from imgcreate.live import *
 from imgcreate.debug import *
@@ -79,6 +81,7 @@ from imgcreate.creator import *
 from imgcreate import kickstart
 
 t0 = time.time()
+# TODO(khoitd1997): update docs of newer options
 parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                                  add_help=False, usage=doc1 + '''
 
@@ -335,6 +338,18 @@ parser.add_argument('--extra-space-mb', type=int, default=2, metavar='SIZE',
 
 parser.add_argument('--nocleanup', action='store_true', default=False,
                     help='Skip cleanup of temporary files.')
+
+parser.add_argument("--releasever", type=str, dest="releasever", 
+                    default=None, 
+                    help="Value to substitute for $releasever in kickstart repo urls")
+
+parser.add_argument("-p", "--plugins", action="store_true", dest="plugins",
+                    default=False, 
+                    help="Use DNF plugins during image creation")
+
+parser.add_argument("--cacheonly", action="store_true", dest="cacheonly",
+                    default=False,
+                    help="Work offline from cache, use together with --cache (default: False)")
 
 setup_logging(parser)
 
@@ -2093,33 +2108,131 @@ s/\s+rw\s+|\s+rw$/ /g'''.format(self.fslabel, self.releasefile, iso_boot)
                 print("%s:  %.5s%% done\r" % (hdr["name"],
                                               (float(amount) / total) * 100),)
 
+    def __apply_selections(self, dbo):
+        excludedPkgs = kickstart.get_excluded(
+            self.ks, self._get_excluded_packages())
+
+        if kickstart.nocore(self.ks):
+            logging.info(
+                "skipping core group due to %%packages --nocore; system may not be complete")
+        else:
+            try:
+                dbo.selectGroup('core', excludedPkgs)
+                logging.info("selected group: core")
+            except dnf.exceptions.MarkingError as e:
+                if kickstart.ignore_missing(self.ks):
+                    logging.warning("Skipping missing group 'core'")
+                else:
+                    raise CreatorError("Failed to find group 'core' : %s" %
+                                       (e,))
+
+        env = kickstart.get_environment(self.ks)
+
+        excludedGroups = [
+            group.name for group in kickstart.get_excluded_groups(self.ks)]
+
+        if env:
+            try:
+                dbo.selectEnvironment(env, excludedGroups, excludedPkgs)
+                logging.info("selected env: %s", env)
+            except dnf.exceptions.MarkingError as e:
+                if kickstart.ignore_missing(self.ks):
+                    logging.warning(
+                        "Skipping missing environment '%s'" % (env,))
+                else:
+                    raise CreatorError("Failed to find environment '%s' : %s" %
+                                       (env, e))
+
+        for group in kickstart.get_groups(self.ks):
+            if group.name == 'core' or group.name in excludedGroups:
+                continue
+
+            try:
+                dbo.selectGroup(group.name, excludedPkgs, group.include)
+                logging.info("selected group: %s", group.name)
+            except dnf.exceptions.MarkingError as e:
+                if kickstart.ignore_missing(self.ks):
+                    logging.warning("Skipping missing group '%s'" %
+                                    (group.name,))
+                else:
+                    raise CreatorError("Failed to find group '%s' : %s" %
+                                       (group.name, e))
+
+        for pkg_name in set(excludedPkgs):
+            dbo.deselectPackage(pkg_name)
+            logging.info("excluding package: '%s'", pkg_name)
+
+        for pkg_name in set(kickstart.get_packages(self.ks,
+                                                   self._get_required_packages())) - set(excludedPkgs):
+            try:
+                dbo.selectPackage(pkg_name)
+                logging.info("selected package: '%s'", pkg_name)
+            except dnf.exceptions.MarkingError as e:
+                if kickstart.ignore_missing(self.ks):
+                    logging.warning(
+                        "Skipping missing package '%s'" % (pkg_name,))
+                else:
+                    raise CreatorError("Failed to find package '%s' : %s" %
+                                       (pkg_name, e))
 
     def install_rpms(self):
+        """Install packages into the install root.
+
+        This function installs the packages listed in the supplied kickstart
+        into the install root. By default, the packages are installed from the
+        repository URLs specified in the kickstart.
+
+        """
+        dnf_conf = self._mktemp(prefix = "dnf.conf-")
+
+        dbo = DnfLiveCD(releasever=self.releasever, useplugins=self.useplugins)
+        dbo.setup(dnf_conf, self._instroot, cacheonly=self.cacheonly,
+                   excludeWeakdeps=self.excludeWeakdeps)
+
+        for repo in kickstart.get_repos(self.ks):
+            (name, baseurl, mirrorlist, proxy, inc, exc, cost, sslverify) = repo
+
+            yr = dbo.addRepository(name, baseurl, mirrorlist)
+            if inc:
+                yr.includepkgs = inc
+            if exc:
+                yr.exclude = exc
+            if proxy:
+                yr.proxy = proxy
+            if cost is not None:
+                yr.cost = cost
+            yr.sslverify = sslverify
+
         if kickstart.exclude_docs(self.ks):
             rpm.addMacro("_excludedocs", "1")
         if not kickstart.selinux_enabled(self.ks):
             rpm.addMacro("__file_context_path", "%{nil}")
         if kickstart.inst_langs(self.ks) != None:
             rpm.addMacro("_install_langs", kickstart.inst_langs(self.ks))
-        # start RPM transaction
-        ts=rpm.TransactionSet(self._instroot)
-        for repo in kickstart.get_repos(self.ks):
-            (name, baseurl, mirrorlist, proxy, inc, exc, cost) = repo
-            if baseurl.startswith("file://"):
-                baseurl=baseurl[7:]
-            elif not baseurl.startswith("/"):
-                raise CreatorError("editliveos accepts only --baseurl pointing"
-                              " to a local folder with RPMs (not a Yum repo).")
-            if not baseurl.endswith("/"):
-                baseurl+="/"
-            for pkg_from_list in kickstart.get_packages(self.ks):
-                # TODO report if package listed in ks is missing
-                for pkg in glob.glob(baseurl+pkg_from_list+"-[0-9]*.rpm"):
-                    fdno = os.open(pkg, os.O_RDONLY)
-                    hdr = ts.hdrFromFdno(fdno)
-                    os.close(fdno)
-                    ts.addInstall(hdr,(hdr,pkg), "u")
-        ts.run(self.simpleCallback().callback,'')
+
+        dbo.fill_sack(load_system_repo = os.path.exists(self._instroot + "/var/lib/rpm/Packages"))
+        dbo.read_comps()
+
+        try:
+            self.__apply_selections(dbo)
+
+            dbo.runInstall()
+        except (dnf.exceptions.DownloadError, dnf.exceptions.RepoError) as e:
+            raise CreatorError("Unable to download from repo : %s" % (e,))
+        except dnf.exceptions.Error as e:
+            raise CreatorError("Unable to install: %s" % (e,))
+        finally:
+            dbo.close()
+            os.unlink(dnf_conf)
+
+        # do some clean up to avoid lvm info leakage.  this sucks.
+        for subdir in ("cache", "backup", "archive"):
+            lvmdir = self._instroot + "/etc/lvm/" + subdir
+            try:
+                for f in os.listdir(lvmdir):
+                    os.unlink(lvmdir + "/" + f)
+            except:
+                pass
 
 
 def copypaths(pathlist, dst_dir, ignore_list=[], parents=None, message=None):
@@ -2336,6 +2449,12 @@ def main():
     try:
         if args.kscfg:
             editor.ks = kickstart.read_kickstart(args.kscfg)
+
+            editor.excludeWeakdeps = kickstart.exclude_weakdeps(editor.ks)
+            editor.releasever = args.releasever
+            editor.useplugins = args.plugins
+            editor.cacheonly = args.cacheonly
+
             # part / --size <new rootfs size to be resized to>
             editor._LoopImageCreator__image_size = kickstart.get_image_size(
                                                    editor.ks)
