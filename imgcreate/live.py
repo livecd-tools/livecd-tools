@@ -227,11 +227,11 @@ class LiveImageCreatorBase(LoopImageCreator):
         self.base_on = True
         LoopImageCreator._mount_instroot(self, base_on)
         self.__write_initrd_conf(self._instroot + "/etc/sysconfig/mkinitrd")
-        self.__write_dracut_conf(self._instroot + "/etc/dracut.conf.d/02livecd.conf")
+        self.__write_dracut_conf(self._instroot + "/etc/dracut.conf.d/99-liveos.conf")
 
     def _unmount_instroot(self):
         self.__restore_file(self._instroot + "/etc/sysconfig/mkinitrd")
-        self.__restore_file(self._instroot + "/etc/dracut.conf.d/02livecd.conf")
+        self.__restore_file(self._instroot + "/etc/dracut.conf.d/99-liveos.conf")
         LoopImageCreator._unmount_instroot(self)
 
     def __ensure_isodir(self):
