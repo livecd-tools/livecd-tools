@@ -306,12 +306,11 @@ class ImageCreator(object):
         def get_version(header):
             version = None
             for f in header['filenames']:
-                if f.startswith(b'/boot/vmlinuz-'):
+                if not isinstance(f, str):
+                    f = f.decode("utf-8")
+                if f.startswith('/boot/vmlinuz-'):
                     version = f[14:]
-            if version is None:
                 return version
-            else:
-                return version.decode("utf-8")
 
         ts = rpm.TransactionSet(self._instroot)
 
