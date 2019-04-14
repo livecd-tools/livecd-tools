@@ -472,15 +472,18 @@ class x86LiveImageCreator(LiveImageCreatorBase):
                         isodir + "/isolinux/vmlinuz" + index)
 
         isDracut = False
+        if os.path.exists(self._instroot + "/usr/bin/dracut"):
+            isDracut = True
+
+        # FIXME: Implement a better check for how the initramfs is named...
         if os.path.exists(bootdir + "/initramfs-" + version + ".img"):
             shutil.copyfile(bootdir + "/initramfs-" + version + ".img",
                             isodir + "/isolinux/initrd" + index + ".img")
-            isDracut = True
         elif os.path.exists(bootdir + "/initrd-" + version + ".img"):
             shutil.copyfile(bootdir + "/initrd-" + version + ".img",
                             isodir + "/isolinux/initrd" + index + ".img")
         elif not self.base_on:
-            logging.error("No initrd or initramfs found for %s" % (version,))
+            logging.error("No initramfs or initrd found for %s" % (version,))
 
         is_xen = False
         if os.path.exists(bootdir + "/xen.gz-" + version[:-3]):
