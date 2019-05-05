@@ -81,7 +81,6 @@ from imgcreate.creator import *
 from imgcreate import kickstart
 
 t0 = time.time()
-# TODO(khoitd1997): update docs of newer options
 parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                                  add_help=False, usage=doc1 + '''
 
@@ -98,6 +97,7 @@ parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                         [-u, --seclude <seclude, s>]
                         [-r, --releasefile <releasefile, s>]
                         [-b, --builder <builder>]
+                        [-p, --plugins]
                         [--clone]
                         [--rootfsimg <file path>]
                         [--overlay [<devspec>:]<pathspec>]
@@ -106,6 +106,8 @@ parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                         [--skip-seclude]
                         [-c, --compress-type <compression type>]
                         [--compress]
+                        [--releasever <image fedora version>]
+                        [--arch <image arch>]
                         [--skip-compression]
                         [--refresh-uncompressed]
                         [--flatten-squashfs]
@@ -117,6 +119,7 @@ parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                         [--overlay-size-mb [+|-]<size>[,<fstype>[,<blksz>]]]
                         [-a, --extra-kernel-args <arg s>]
                         [--extra-space-mb <size>]
+                        [--cacheonly]
                         [--nocleanup]
                         ''' + doc2)
 
