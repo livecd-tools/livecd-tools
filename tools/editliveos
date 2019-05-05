@@ -346,6 +346,10 @@ parser.add_argument("--releasever", type=str, dest="releasever",
                     default=None, 
                     help="Value to substitute for $releasever in kickstart repo urls")
 
+parser.add_argument("--arch", type=str, dest="arch", 
+                    default=dnf.rpm.basearch(hawkey.detect_arch()), 
+                    help="Arch for the final image")
+
 parser.add_argument("-p", "--plugins", action="store_true", dest="plugins",
                     default=False, 
                     help="Use DNF plugins during image creation")
@@ -359,8 +363,6 @@ setup_logging(parser)
 args = parser.parse_args()
 
 print("\nSource image at '%s'" % args.liveos)
-
-arch = dnf.rpm.basearch(hawkey.detect_arch())
 
 class LiveImageEditor(LiveImageCreator):
     """
@@ -2194,7 +2196,7 @@ s/\s+rw\s+|\s+rw$/ /g'''.format(self.fslabel, self.releasefile, iso_boot)
         print("dbo setup start")
         dbo.setup(dnf_conf, self._instroot, cacheonly=self.cacheonly,
                    excludeWeakdeps=self.excludeWeakdeps)
-        dbo.conf.substitutions['basearch'] = arch
+        dbo.conf.substitutions['basearch'] = args.arch
         dbo.conf.substitutions['releasever'] = self.releasever
         dbo.conf.releasever = self.releasever
         print("dbo setup done")
@@ -2571,15 +2573,15 @@ def main():
 if __name__ == "__main__":
     sys.exit(main())
 
-if arch in ("i386", "x86_64"):
+if args.arch in ("i386", "x86_64"):
     LiveImageCreator = x86LiveImageCreator
-elif arch in ("ppc",):
+elif args.arch in ("ppc",):
     LiveImageCreator = ppcLiveImageCreator
-elif arch in ("ppc64",):
+elif args.arch in ("ppc64",):
     LiveImageCreator = ppc64LiveImageCreator
-elif arch.startswith(("arm", "aarch64")):
+elif args.arch.startswith(("arm", "aarch64")):
     LiveImageCreator = LiveImageCreatorBase
-elif arch in ("riscv64",):
+elif args.arch in ("riscv64",):
     LiveImageCreator = LiveImageCreatorBase
 else:
     raise CreatorError("Architecture not supported!")
