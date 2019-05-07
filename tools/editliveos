@@ -106,7 +106,7 @@ parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                         [--skip-seclude]
                         [-c, --compress-type <compression type>]
                         [--compress]
-                        [--releasever <image fedora version>]
+                        [--releasever <value to substitute for $releasever in repo urls>]
                         [--arch <image arch>]
                         [--skip-compression]
                         [--refresh-uncompressed]
@@ -2181,77 +2181,6 @@ s/\s+rw\s+|\s+rw$/ /g'''.format(self.fslabel, self.releasefile, iso_boot)
                     raise CreatorError("Failed to find package '%s' : %s" %
                                        (pkg_name, e))
 
-    def install_rpms(self):
-        """Install packages into the install root.
-
-        This function installs the packages listed in the supplied kickstart
-        into the install root. The packages are installed from the
-        repository URLs specified in the kickstart.
-
-        """
-        dnf_conf = self._mktemp(prefix = "dnf.conf-")
-
-        print("dbo creation")
-        dbo = DnfLiveCD(releasever=self.releasever, useplugins=self.useplugins)
-        print("dbo setup start")
-        dbo.setup(dnf_conf, self._instroot, cacheonly=self.cacheonly,
-                   excludeWeakdeps=self.excludeWeakdeps)
-        dbo.conf.substitutions['basearch'] = args.arch
-        dbo.conf.substitutions['releasever'] = self.releasever
-        dbo.conf.releasever = self.releasever
-        print("dbo setup done")
-
-        for repo in kickstart.get_repos(self.ks):
-            (name, baseurl, mirrorlist, proxy, inc, exc, cost, sslverify) = repo
-
-            yr = dbo.addRepository(name, baseurl, mirrorlist)
-            if inc:
-                yr.includepkgs = inc
-            if exc:
-                yr.exclude = exc
-            if proxy:
-                yr.proxy = proxy
-            if cost is not None:
-                yr.cost = cost
-            yr.sslverify = sslverify
-
-        if kickstart.exclude_docs(self.ks):
-            rpm.addMacro("_excludedocs", "1")
-        if not kickstart.selinux_enabled(self.ks):
-            rpm.addMacro("__file_context_path", "%{nil}")
-        if kickstart.inst_langs(self.ks) != None:
-            rpm.addMacro("_install_langs", kickstart.inst_langs(self.ks))
-
-        print("Start fill sack")
-        dbo.fill_sack(load_system_repo = os.path.exists(self._instroot + "/var/lib/rpm/Packages"))
-        print("Done fill sack")
-        dbo.read_comps()
-        print("Done read comp")
-
-        try:
-            self.__apply_selections(dbo)
-            print("Done apply selections")
-
-            dbo.runInstall()
-            print("Done run install")
-        except (dnf.exceptions.DownloadError, dnf.exceptions.RepoError) as e:
-            raise CreatorError("Unable to download from repo : %s" % (e,))
-        except dnf.exceptions.Error as e:
-            raise CreatorError("Unable to install: %s" % (e,))
-        finally:
-            dbo.close()
-            os.unlink(dnf_conf)
-
-        # do some clean up to avoid lvm info leakage.  this sucks.
-        for subdir in ("cache", "backup", "archive"):
-            lvmdir = self._instroot + "/etc/lvm/" + subdir
-            try:
-                for f in os.listdir(lvmdir):
-                    os.unlink(lvmdir + "/" + f)
-            except:
-                pass
-
-
 def copypaths(pathlist, dst_dir, ignore_list=[], parents=None, message=None):
     """
     Copy files in a list of filepaths to a destination directory including
@@ -2483,7 +2412,7 @@ def main():
         if editor.ks:
             # Run_pre_scripts same code as ImageCreator_run_post_scripts
             # editor._run_post_scripts()
-            editor.install_rpms()
+            editor.install()
             editor._run_post_scripts()
         elif args.script:
             print("Running edit script '%s'" % args.script)
