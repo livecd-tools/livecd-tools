@@ -71,8 +71,6 @@ import tempfile
 import argparse
 import subprocess
 
-import dnf
-
 from imgcreate.fs import *
 from imgcreate.live import *
 from imgcreate.debug import *
