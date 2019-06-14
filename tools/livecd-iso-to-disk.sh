@@ -516,8 +516,7 @@ resetMBR() {
         fi
     fi
     # Wait for changes to show up/settle down.
-    udevadm settle
-    sleep 5
+    udevadm settle -E $TGTDEV
 }
 
 checkMBR() {
@@ -574,14 +573,12 @@ createGPTLayout() {
     run_parted --script $device unit MiB mkpart '"EFI System Partition"' fat32\
         4 $((sizeinfo - 2)) set 1 boot on
     echo 'Waiting for devices to settle...'
-    udevadm settle
-    sleep 5
     TGTDEV=$(get_partition1 ${device})
+    udevadm settle -E $TGTDEV
     umount $TGTDEV &> /dev/null || :
     mkfs.fat -n "$label" $TGTDEV
-    udevadm settle
-    sleep 5
     # mkfs.fat silently truncates label to 11 bytes.
+    udevadm settle -E /dev/disk/by-label/"${label[*]::11}"
     label=$(lsblk -ndo LABEL $TGTDEV)
 }
 
@@ -601,14 +598,12 @@ createMSDOSLayout() {
     run_parted --script $device unit MiB mkpart primary fat32 \
         4 $((sizeinfo - 2)) set 1 boot on
     echo 'Waiting for devices to settle...'
-    udevadm settle
-    sleep 5
     TGTDEV=$(get_partition1 ${device})
+    udevadm settle -E $TGTDEV
     umount $TGTDEV &> /dev/null || :
     mkfs.fat -n "$label" $TGTDEV
-    udevadm settle
-    sleep 5
     # mkfs.fat silently truncates label to 11 bytes.
+    udevadm settle -E /dev/disk/by-label/"${label[*]::11}"
     label=$(lsblk -ndo LABEL $TGTDEV)
 }
 
@@ -628,9 +623,8 @@ createEXTFSLayout() {
     run_parted --script $device unit MiB mkpart primary ext2 \
         4 $((sizeinfo - 2)) set 1 boot on
     echo 'Waiting for devices to settle...'
-    udevadm settle
-    sleep 5
     TGTDEV=$(get_partition1 ${device})
+    udevadm settle -E $TGTDEV
     umount $TGTDEV &> /dev/null || :
 
     # Check extlinux version
@@ -640,9 +634,8 @@ createEXTFSLayout() {
         mkfs=mkfs.ext4
     fi
     $mkfs -O ^64bit -L "$label" $TGTDEV
-    udevadm settle
-    sleep 5
     # mkfs.ext[34] truncate labels to 16 bytes.
+    udevadm settle -E /dev/disk/by-label/"${label[*]::16}"
     label=$(lsblk -ndo LABEL $TGTDEV)
 }
 
