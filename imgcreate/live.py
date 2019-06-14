@@ -397,15 +397,19 @@ class x86LiveImageCreator(LiveImageCreatorBase):
                     "-eltorito-catalog", "isolinux/boot.cat",
                     "-no-emul-boot", "-boot-info-table",
                     "-boot-load-size", "4" ]
-        if os.path.exists(isodir + "/isolinux/efiboot.img"):
+        if os.path.exists(isodir + "/images/efiboot.img"):
             options.extend([ "-eltorito-alt-boot",
-                             "-e", "isolinux/efiboot.img",
+                             "-e", "images/efiboot.img",
                              "-no-emul-boot",
                              "-isohybrid-gpt-basdat", "-isohybrid-apm-hfsplus",
                              "-eltorito-alt-boot",
-                             "-e", "isolinux/macboot.img",
+                             "-e", "images/macboot.img",
                              "-no-emul-boot",
                              "-isohybrid-gpt-basdat", "-isohybrid-apm-hfsplus"])
+        isosize = int(rcall(['du', '-csxb', '--files0-from=-'], isodir,
+                            raise_err=False)[0].split()[-2])
+        if isosize > 4 * 1024**3 - 1:
+            options.extend(['-iso-level', '3'])
         return options
 
     def _get_required_packages(self):
