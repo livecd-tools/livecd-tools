@@ -95,6 +95,7 @@ parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                         [-u, --seclude <seclude, s>]
                         [-r, --releasefile <releasefile, s>]
                         [-b, --builder <builder>]
+                        [-p, --plugins]
                         [--clone]
                         [--rootfsimg <file path>]
                         [--overlay [<devspec>:]<pathspec>]
@@ -103,6 +104,8 @@ parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                         [--skip-seclude]
                         [-c, --compress-type <compression type>]
                         [--compress]
+                        [--releasever <value to substitute for $releasever in repo urls>]
+                        [--arch <image arch>]
                         [--skip-compression]
                         [--refresh-uncompressed]
                         [--flatten-squashfs]
@@ -114,6 +117,7 @@ parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                         [--overlay-size-mb [+|-]<size>[,<fstype>[,<blksz>]]]
                         [-a, --extra-kernel-args <arg s>]
                         [--extra-space-mb <size>]
+                        [--cacheonly]
                         [--nocleanup]
                         ''' + doc2)
 
@@ -336,12 +340,27 @@ parser.add_argument('--extra-space-mb', type=int, default=2, metavar='SIZE',
 parser.add_argument('--nocleanup', action='store_true', default=False,
                     help='Skip cleanup of temporary files.')
 
+parser.add_argument("--releasever", type=str, dest="releasever", 
+                    default=None, 
+                    help="Value to substitute for $releasever in kickstart repo urls")
+
+parser.add_argument("--arch", type=str, dest="arch", 
+                    default=dnf.rpm.basearch(hawkey.detect_arch()), 
+                    help="Arch for the final image")
+
+parser.add_argument("-p", "--plugins", action="store_true", dest="plugins",
+                    default=False, 
+                    help="Use DNF plugins during image creation")
+
+parser.add_argument("--cacheonly", action="store_true", dest="cacheonly",
+                    default=False,
+                    help="Work offline from cache, use together with --cache (default: False)")
+
 setup_logging(parser)
 
 args = parser.parse_args()
 
 print("\nSource image at '%s'" % args.liveos)
-
 
 class LiveImageEditor(LiveImageCreator):
     """
@@ -2093,35 +2112,6 @@ s/\s+rw\s+|\s+rw$/ /g'''.format(self.fslabel, self.releasefile, iso_boot)
                 print("%s:  %.5s%% done\r" % (hdr["name"],
                                               (float(amount) / total) * 100),)
 
-
-    def install_rpms(self):
-        if kickstart.exclude_docs(self.ks):
-            rpm.addMacro("_excludedocs", "1")
-        if not kickstart.selinux_enabled(self.ks):
-            rpm.addMacro("__file_context_path", "%{nil}")
-        if kickstart.inst_langs(self.ks) != None:
-            rpm.addMacro("_install_langs", kickstart.inst_langs(self.ks))
-        # start RPM transaction
-        ts=rpm.TransactionSet(self._instroot)
-        for repo in kickstart.get_repos(self.ks):
-            (name, baseurl, mirrorlist, proxy, inc, exc, cost) = repo
-            if baseurl.startswith("file://"):
-                baseurl=baseurl[7:]
-            elif not baseurl.startswith("/"):
-                raise CreatorError("editliveos accepts only --baseurl pointing"
-                              " to a local folder with RPMs (not a Yum repo).")
-            if not baseurl.endswith("/"):
-                baseurl+="/"
-            for pkg_from_list in kickstart.get_packages(self.ks):
-                # TODO report if package listed in ks is missing
-                for pkg in glob.glob(baseurl+pkg_from_list+"-[0-9]*.rpm"):
-                    fdno = os.open(pkg, os.O_RDONLY)
-                    hdr = ts.hdrFromFdno(fdno)
-                    os.close(fdno)
-                    ts.addInstall(hdr,(hdr,pkg), "u")
-        ts.run(self.simpleCallback().callback,'')
-
-
 def copypaths(pathlist, dst_dir, ignore_list=[], parents=None, message=None):
     """
     Copy files in a list of filepaths to a destination directory including
@@ -2336,6 +2326,12 @@ def main():
     try:
         if args.kscfg:
             editor.ks = kickstart.read_kickstart(args.kscfg)
+
+            editor.excludeWeakdeps = kickstart.exclude_weakdeps(editor.ks)
+            editor.releasever = args.releasever
+            editor.useplugins = args.plugins
+            editor.cacheonly = args.cacheonly
+
             # part / --size <new rootfs size to be resized to>
             editor._LoopImageCreator__image_size = kickstart.get_image_size(
                                                    editor.ks)
@@ -2346,8 +2342,8 @@ def main():
             editor._configure_bootloader(editor._LiveImageCreatorBase__isodir)
         if editor.ks:
             # Run_pre_scripts same code as ImageCreator_run_post_scripts
-            editor._run_post_scripts()
-            editor.install_rpms()
+            # editor._run_post_scripts()
+            editor.install()
             editor._run_post_scripts()
         elif args.script:
             print("Running edit script '%s'" % args.script)
@@ -2437,16 +2433,15 @@ def main():
 if __name__ == "__main__":
     sys.exit(main())
 
-arch = dnf.rpm.basearch(hawkey.detect_arch())
-if arch in ("i386", "x86_64"):
+if args.arch in ("i386", "x86_64"):
     LiveImageCreator = x86LiveImageCreator
-elif arch in ("ppc",):
+elif args.arch in ("ppc",):
     LiveImageCreator = ppcLiveImageCreator
-elif arch in ("ppc64",):
+elif args.arch in ("ppc64",):
     LiveImageCreator = ppc64LiveImageCreator
-elif arch.startswith(("arm", "aarch64")):
+elif args.arch.startswith(("arm", "aarch64")):
     LiveImageCreator = LiveImageCreatorBase
-elif arch in ("riscv64",):
+elif args.arch in ("riscv64",):
     LiveImageCreator = LiveImageCreatorBase
 else:
     raise CreatorError("Architecture not supported!")
