@@ -247,9 +247,9 @@ class LiveImageCreatorBase(LoopImageCreator):
 
         # XXX-BCL: does this need --label?
         subprocess.call(["mkefiboot", isodir + "/EFI/BOOT",
-                         isodir + "/isolinux/efiboot.img"])
+                         isodir + "/images/efiboot.img"])
         subprocess.call(["mkefiboot", "-a", isodir + "/EFI/BOOT",
-                         isodir + "/isolinux/macboot.img", "-l", self.product,
+                         isodir + "/images/macboot.img", "-l", self.product,
                          "-n", "/usr/share/pixmaps/bootloader/fedora-media.vol",
                          "-i", "/usr/share/pixmaps/bootloader/fedora.icns",
                          "-p", self.product])
