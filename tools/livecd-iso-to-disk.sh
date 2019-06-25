@@ -912,7 +912,7 @@ cp_p() {
 
 if type rsync >/dev/null 2>&1; then
     copyFile='rsync --inplace --8-bit-output --progress'
-elif type gvfs-copy >/dev/null 2>&1; then
+elif type gio >/dev/null 2>&1; then
     copyFile='gio copy -p'
 elif type strace >/dev/null 2>&1 && type awk >/dev/null 2>&1; then
     copyFile='cp_p'
