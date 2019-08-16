@@ -577,7 +577,7 @@ def get_repos(ks, repo_urls = {}):
 
         if repo.name in repos:
             logging.warning("Overriding already specified repo %s" %(repo.name,))
-        repos[repo.name] = (repo.name, baseurl, mirrorlist, proxy, inc, exc, repo.cost, sslverify)
+        repos[repo.name] = (repo.name, baseurl, mirrorlist, proxy, inc, exc, repo.priority, repo.cost, sslverify)
 
     return repos.values()
 
