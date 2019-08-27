@@ -7,7 +7,7 @@ INSTALL_DATA = $(INSTALL) -m 644
 INSTALL_SCRIPT = $(INSTALL_PROGRAM)
 PYTHON = python
 PYTHON_PROGRAM = $(shell which $(PYTHON))
-SED_PROGRAM = /usr/bin/sed
+SED_PROGRAM = $(shell which sed)
 
 INSTALL_PYTHON = $(INSTALL) -m 644
 define COMPILE_PYTHON

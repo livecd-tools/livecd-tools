@@ -497,6 +497,8 @@ resetMBR() {
     if [[ -n $efi ]]; then
         if [[ -f /usr/lib/syslinux/gptmbr.bin ]]; then
             cat /usr/lib/syslinux/gptmbr.bin > $device
+        elif [[ -f /usr/lib/SYSLINUX/gptmbr.bin ]]; then
+            cat /usr/lib/SYSLINUX/gptmbr.bin > $device
         elif [[ -f /usr/share/syslinux/gptmbr.bin ]]; then
             cat /usr/share/syslinux/gptmbr.bin > $device
         else
@@ -508,6 +510,8 @@ resetMBR() {
     else
         if [[ -f /usr/lib/syslinux/mbr.bin ]]; then
             cat /usr/lib/syslinux/mbr.bin > $device
+        elif [[ -f /usr/lib/SYSLINUX/mbr.bin ]]; then
+            cat /usr/lib/SYSLINUX/mbr.bin > $device
         elif [[ -f /usr/share/syslinux/mbr.bin ]]; then
             cat /usr/share/syslinux/mbr.bin > $device
         else
@@ -2290,6 +2294,8 @@ fi
 for f in ldlinux.c32 libcom32.c32 libutil.c32; do
     if [[ -f /usr/share/syslinux/$f ]]; then
         cp /usr/share/syslinux/$f $TGTMNT/$BOOTPATH/$f
+    elif [[ -f /usr/lib/syslinux/modules/bios/$f ]]; then
+        cp /usr/lib/syslinux/modules/bios/$f $TGTMNT/$BOOTPATH/$f
     else
         printf "\n        ATTENTION:
         Failed to find /usr/share/syslinux/$f.
