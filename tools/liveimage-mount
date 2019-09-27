@@ -6,7 +6,7 @@
 #
 # Copyright 2011, Red Hat, Inc.
 # Copyright 2016, Neal Gompa
-# Copyright 2017-2018, Sugar Labs®
+# Copyright 2017-2019, Sugar Labs®
 #   Code for Live mounting an attached LiveOS device added by Frederick Grose,
 #   <fgrose at sugarlabs.org>
 #   Ported to Python 3 by Neal Gompa <ngompa13 at gmail.com>
@@ -589,12 +589,26 @@ def main():
             mount([liveos, liveosmnt], ops)
             unmount = 'yes'
 
-        for d in ('LiveOS', ''):
-            liveosdir = os.path.join(liveosmnt, d)
-            if not os.path.exists(liveosdir):
-                continue
-            else:
-                break
+        cfgf = os.path.join(liveosmnt, 'syslinux', 'syslinux.cfg')
+        if not os.path.exists(cfgf):
+            cfgf = os.path.join(liveosmnt, 'syslinux', 'extlinux.conf')
+        cmd = ['sed', '-n', '-r']
+        sedscript = r'''/^\s*label\s+linux/{n;n;n
+                        s/^\s*append\s+.*rd\.live\.dir=([^ ]*) .*/\1/p}'''
+        cmd.extend([sedscript, cfgf])
+        liveosdir, err, rc = rcall(cmd)
+        liveosdir = liveosdir.rstrip()
+        if liveosdir == os.path.basename(liveosmnt):
+            liveosdir = liveosmnt
+        elif liveosdir:
+            liveosdir = os.path.join(liveosmnt, liveosdir)
+        else:
+            for d in ('LiveOS', ''):
+                liveosdir = os.path.join(liveosmnt, d)
+                if not os.path.exists(liveosdir):
+                    continue
+                else:
+                    break
         liveosmnt = findmnt('-no TARGET -T', liveosdir)
 
         if roflag and os.access(liveosmnt, os.W_OK):
@@ -633,7 +647,6 @@ def main():
             print("\n\tNo %s was found on '%s'\n"
                   "\r\t  Exiting...\n%s" % (d, liveos, linkn[0]),
                   file=sys.stderr)
-            [os.rmdir(mp) for mp in remove_mp]
             sys_exit(1)
 
         overlayfs = None
@@ -657,7 +670,7 @@ def main():
                     remove_dir.append(workdir)
             else:
                 overlayloop = loop_setup(overlay, roflag)
-                call(['udevadm', 'settle'])
+                call(['udevadm', 'settle', '-E', overlayloop])
                 if lsblk('-ndo FSTYPE', overlayloop) not in (
                                                     '', 'DM_snapshot_cow'):
                     ovl_mp = tempfile.mkdtemp(prefix=Y + '-ovl-')

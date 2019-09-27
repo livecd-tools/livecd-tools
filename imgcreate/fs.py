@@ -4,7 +4,7 @@
 #
 # Copyright 2007, Red Hat, Inc.
 # Copyright 2016, Neal Gompa
-# Copyright 2017-2018, Sugar Labs®
+# Copyright 2017-2019, Sugar Labs®
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -1439,7 +1439,21 @@ class LiveImageMount(object):
             return
         if not ops:
             ops = self.ops
-        self.liveosdir = os.path.join(self.srcdir, 'LiveOS')
+        cfgf = os.path.join(self.srcdir, 'syslinux', 'syslinux.cfg')
+        if not os.path.exists(cfgf):
+            cfgf = os.path.join(self.srcdir, 'syslinux', 'extlinux.conf')
+        cmd = ['sed', '-n', '-r']
+        sedscript = r'''/^\s*label\s+linux/{n;n;n
+                        s/^\s*append\s+.*rd\.live\.dir=([^ ]*) .*/\1/p}'''
+        cmd.extend([sedscript, cfgf])
+        self.liveosdir, err, rc = rcall(cmd)
+        self.liveosdir = self.liveosdir.rstrip()
+        if self.liveosdir == os.path.basename(self.srcdir):
+            self.liveosdir = self.srcdir
+        elif self.liveosdir:
+            self.liveosdir = os.path.join(self.srcdir, self.liveosdir)
+        else:
+            self.liveosdir = os.path.join(self.srcdir, 'LiveOS')
         if not os.path.isdir(self.liveosdir):
             self.liveosdir = self.srcdir
         if self.rootfsimg:
@@ -1506,7 +1520,7 @@ class LiveImageMount(object):
                 work = None
                 self.cowloop.create('ro')
                 size = cow._size = os.stat(self.overlay)[stat.ST_SIZE]
-                call(['udevadm', 'settle'])
+                call(['udevadm', 'settle', '-E', self.cowloop.device])
                 self.ovltype = lsblk('-ndo FSTYPE', self.cowloop.device)
                 self.cowloop.cleanup()
         else:

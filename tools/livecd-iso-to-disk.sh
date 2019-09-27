@@ -1,7 +1,7 @@
 #!/bin/bash
 # Transfer a Live image so that it's bootable off of a USB/SD device.
 # Copyright 2007-2012, 2017, Red Hat, Inc.
-# Copyright 2008-2010, 2017-2018, Fedora Project
+# Copyright 2008-2010, 2017-2019, Fedora Project
 #
 # Jeremy Katz <katzj@redhat.com>
 # Brian C. Lane <bcl@redhat.com>
@@ -169,9 +169,10 @@ usage() {
         installed LiveOS device.)
 
     --force
-        This option allows the installation script to bypass a delete
-        confirmation dialog in the event that a pre-existing LiveOS directory
-        is found on the target device.
+        This option forces an overwrite of the --livedir image, its syslinux
+        directory, and associated files like home.img.  This allows the script
+        to bypass a delete confirmation dialog in the event that a pre-existing
+        LiveOS directory is found on the target device.
 
     --xo
         Used to prepare an image for the OLPC XO-1 laptop with its compressed,
@@ -381,7 +382,7 @@ usage() {
 
     COPYRIGHT
 
-    Copyright 2008-2010, 2017-2018, Fedora Project and various contributors.
+    Copyright 2008-2010, 2017-2019, Fedora Project and various contributors.
     This is free software. You may redistribute copies of it under the terms of
     the GNU General Public License http://www.gnu.org/licenses/gpl.html.
     There is NO WARRANTY, to the extent permitted by law.
@@ -973,6 +974,7 @@ while true ; do
             ;;
         --force)
             force=force
+            keephome=''
             ;;
         --xo)
             xo=xo
@@ -1325,7 +1327,8 @@ TGTUUID=$(blkid -s UUID -o value $TGTDEV)
 if [[ -n $TGTUUID ]]; then
     TGTLABEL=UUID=$TGTUUID
 elif [[ -n $TGTLABEL ]]; then
-        TGTLABEL="LABEL=$TGTLABEL"
+    # Escape any special characters \/;& for sed replacement strings.
+    TGTLABEL="LABEL=$(sed 's/[\/;&]/\\&/g' <<< $TGTLABEL)"
 else
     printf '\n    ALERT:
     You need to have a filesystem label or
@@ -1380,7 +1383,7 @@ BOOTCONFIG_EFI=($(nocase_path "$TGTMNT$T_EFI_BOOT/boot*.conf"))
 if [[ -n $multi ]]; then
     if ! [[ -e $TGTMNT/syslinux ]]; then
         unset -v multi
-    elif [[ $LIVEOS == LiveOS ]]; then
+    elif [[ $LIVEOS == LiveOS ]] && [[ -z $force ]]; then
         IFS=: read -p '
     Please designate a directory name
       for this multi boot installation: ' LIVEOS
@@ -1538,10 +1541,12 @@ if [[ $(syslinux --version 2>&1) != syslinux\ * ]]; then
         Please upgrade.  Exiting...\n\n'
         exitclean
     fi
-elif [[ -n $multi ]]; then
-    SYSLINUXPATH=$LIVEOS/syslinux
-else
+elif [[ ! -d $TGTMNT/syslinux ]]; then
     SYSLINUXPATH=syslinux
+elif [[ -d $TGTMNT/$LIVEOS && ! -d $TGTMNT/$LIVEOS/syslinux ]]; then
+    SYSLINUXPATH=syslinux
+else
+    SYSLINUXPATH=$LIVEOS/syslinux
 fi
 
 if [[ -d $SRCMNT/isolinux/ ]]; then
@@ -1575,7 +1580,7 @@ checklivespace() {
     if [[ -d $TGTMNT/$LIVEOS ]]; then
         # du -c reports a grand total in the first column of the last row,
         # i.e., at ${array[*]: -2:1}, the penultimate index position.
-        tbd=($(du -c -B 1M $TGTMNT/$LIVEOS $TGTMNT/images))
+        tbd=($(du -c -B 1M $TGTMNT/$LIVEOS $TGTMNT/images 2> /dev/null || :))
         tbd=${tbd[*]: -2:1}
         if [[ -s $HOMEPATH ]] && [[ -n $keephome ]]; then
             homesize=($(du -B 1M $HOMEPATH))
@@ -1709,28 +1714,41 @@ if [[ $srctype == installer ]]; then
     fi
 fi
 
-if [[ -z $skipcopy ]] && [[ $srctype == live ]]; then
-    if [[ -d $TGTMNT/$LIVEOS ]] && [[ -z $force ]]; then
-        printf "\nThe '%s' directory is already set up with a LiveOS image.\n
-               " $LIVEOS
-        if [[ -z $keephome && -e $HOMEPATH ]]; then
-            printf '\n        WARNING:
-            \r        The old persistent home.img will be deleted!!!\n
-            \r        Press Enter to continue, or Ctrl C to abort.'
-            read
-        else
-            printf '    Press Ctrl C if you wish to abort.
-                Deleting the old OS in     seconds.\b\b\b\b\b\b\b\b\b\b'
-            for (( i=14; i>=0; i=i-1 )); do
+if [[ $srctype == live && -d $TGTMNT/$LIVEOS ]]; then
+    if [[ ! -d $TGTMNT/$LIVEOS/syslinux ]]; then
+        # Save multi menus for configuration.
+        MENUS=$(sed -n -r '/^\s*label .*/I {
+               /^\s*label\s+linux\>/I ! {N;N;N;N
+               /\<kernel\s+[^ ]*menu.c32\>/p};}' $TGTMNT/syslinux/$CONFIG_FILE)
+        MENUS=$(sed 's/.*/&\\/'  <<< "$MENUS")$'\n'
+    fi
+    if [[ -z $skipcopy ]]; then
+        case $force in
+        '')
+          printf "\nThe '%s' directory is already set up with a LiveOS image.\n
+                 " $LIVEOS
+          if [[ -z $keephome && -e $HOMEPATH ]]; then
+              printf '\n        WARNING:
+              \r        The old persistent home.img will be deleted!!!\n
+              \r        Press Enter to continue, or Ctrl C to abort.'
+              read
+          else
+              printf '    Press Ctrl C if you wish to abort.
+                  Deleting the old OS in     seconds.\b\b\b\b\b\b\b\b\b\b'
+              for (( i=14; i>=0; i=i-1 )); do
                 printf '\b\b%02d' $i
                 sleep 1
-            done
-            [[ -e $HOMEPATH && -n $keephome ]] &&
+              done
+              [[ -e $HOMEPATH && -n $keephome ]] &&
                 mv $HOMEPATH $TGTMNT/$HOMEFILE
-            [[ -e $OVLPATH && -n $resetoverlay ]] &&
+              [[ -e $OVLPATH && -n $resetoverlay ]] &&
                 mv $OVLPATH $TGTMNT/$OVLNAME
-        fi
-        rm -rf -- $TGTMNT/$LIVEOS
+          fi ;&
+             # The ;& terminator causes case to also execute the next block
+             # without testing its pattern.
+        force)
+          rm -rf -- $TGTMNT/$LIVEOS
+        esac
     fi
 fi
 
@@ -1797,6 +1815,8 @@ fi
 TITLE=$(sed -n -r '/^\s*label\s+linux/{n
                    s/^\s*menu\s+label\s+\^(Start|Install)\s+(.*)/\1 \2/p}
                   ' $BOOTCONFIG)
+# Escape any special characters \/;& for sed replacement strings.
+_TITLE=$(sed 's/[\/;&]/\\&/g' <<< $TITLE)
 
 # Copy LICENSE and README.
 if [[ -z $skipcopy ]]; then
@@ -1823,7 +1843,8 @@ if [[ -n $EFI_BOOT ]]; then
         # (Prefer grub.cfg over boot*.conf set above.)
         BOOTCONFIG_EFI=$TGTMNT$T_EFI_BOOT/grub.cfg
     fi
-    if [[ -n $multi && -f $BOOTCONFIG_EFI ]]; then
+    if [[ -n $multi && -f $BOOTCONFIG_EFI ]] ||
+       [[ -d $TGTMNT/$LIVEOS && -f $BOOTCONFIG_EFI ]]; then
         mv -Tf $BOOTCONFIG_EFI $BOOTCONFIG_EFI.multi
     fi
     if [[ $TGTMNT/EFI -ef $SRCMNT/EFI ]]; then
@@ -1885,7 +1906,7 @@ fi
 if [[ -z $skipcopy ]]; then
     echo "Copying /images directory to the target device."
     for f in $(find $SRCMNT/images); do
-        if [[ -d $f ]]; then
+        if [[ -d $f && ! -d $TGTMNT$multi/${f#$SRCMNT} ]]; then
             mkdir $TGTMNT$multi/${f#$SRCMNT} || exitclean
         else
             $copyFile $f $TGTMNT$multi/${f#$SRCMNT} || exitclean
@@ -1918,12 +1939,12 @@ if [[ $srctype == live ]]; then
     if [[ -d $SRCMNT/syslinux/ ]]; then
         echo "Preparing boot config files."
         # Delete all labels before the 'linux' menu label.
-        sed -i -r '/^\s*label .*/I,/^\s*label linux\>/I{
-                   /^\s*label linux\>/I ! {N;N;N;N
+        sed -i -r '/^\s*label .*/I {
+                   /^\s*label\s+linux\>/I ! {N;N;N;N
                    /\<kernel\s+[^ ]*menu.c32\>/d};}' $BOOTCONFIG
         sed -i -r '/^\s*menu\s+end/I,$ {
                    /^\s*menu\s+end/I ! d}' $BOOTCONFIG
-        # Keep only the menu entries up through the first submenu.
+        # Keep only the menu entries up through the first submenu as template.
         if [[ -n $BOOTCONFIG_EFI ]]; then
             sed -i -r "/\s+}$/ { N
                        /\n}$/ { n;Q}}" $BOOTCONFIG_EFI
@@ -1931,7 +1952,7 @@ if [[ $srctype == live ]]; then
         # Restore configuration entries to a base state.
         sed -i -r "s/^\s*timeout\s+.*/timeout 600/I
 /^\s*totaltimeout\s+.*/Iz
-s/(^\s*menu\s+title\s+Welcome\s+to)\s+.*/\1 $TITLE/I
+s/(^\s*menu\s+title\s+Welcome\s+to)\s+.*/\1 $_TITLE/I
 s/\<(kernel)\>\s+[^\n.]*(vmlinuz.?)/\1 \2/
 s/\<(initrd=).*(initrd.?\.img)\>/\1\2/
 s/\<(root=live:[^ ]*)\s+[^\n.]*\<(rd\.live\.image|liveimg)/\1 \2/
@@ -1941,8 +1962,10 @@ s/\<(root=live:[^ ]*)\s+[^\n.]*\<(rd\.live\.image|liveimg)/\1 \2/
                   " $BOOTCONFIG
     fi
     # And, if --multi, distinguish the new grub menuentry with $LIVEOS ~.
+    # First, escape special characters for sed regex and replacement strings.
+    _LIVEOS=$(sed 's/[]\/;$*.^?+|{}&[]/\\&/g' <<< $LIVEOS)
     if [[ -n $BOOTCONFIG_EFI ]]; then
-        [[ -f $BOOTCONFIG_EFI.multi ]] && livedir=$LIVEOS\ ~
+        [[ -f $BOOTCONFIG_EFI.multi ]] && livedir=$_LIVEOS\ ~
         sed -i -r "s/^\s*set\s+timeout=.*/set timeout=60/
 /^\s*menuentry\s+'Start\s+/,/\s+}/{s/(\s+'Start\s+)[^ ]*\s+~/\1/
 s/\s+'Start\s+/&$livedir/
@@ -1957,29 +1980,32 @@ s_(linuxefi|initrdefi)\s+[^ ]+(initrd.?\.img|vmlinuz.?)_\1 /images/pxeboot/\2_
     fi
 fi
 
+# Escape any special characters \/;& for sed replacement strings.
+_multi=$(sed 's/[\/;&]/\\&/g' <<< "$multi")
+
 # Setup the updates.img
 if [[ -n $updates ]]; then
     $copyFile "$updates" "$TGTMNT$multi/updates.img"
-    kernelargs+=" inst.updates=hd:$TGTLABEL:$multi/updates.img"
+    kernelargs+=" inst.updates=hd:$TGTLABEL:$_multi/updates.img"
 fi
 
 # Setup the kickstart
 if [[ -n $ks ]]; then
     $copyFile "$ks" "$TGTMNT$multi/ks.cfg"
-    kernelargs+=" inst.ks=hd:$TGTLABEL:$multi/ks.cfg"
+    kernelargs+=" inst.ks=hd:$TGTLABEL:$_multi/ks.cfg"
 fi
 
 echo "Updating boot config files."
 # adjust label and fstype
 sed -i -r "s/\<root=[^ ]*/root=live:$TGTLABEL/g
-        s;inst.stage2=hd:LABEL=[^ ]*;inst.stage2=hd:$TGTLABEL${multi/*/:$multi/images/install.img};g
+        s;inst.stage2=hd:LABEL=[^ ]*;inst.stage2=hd:$TGTLABEL:$_multi/images/install.img;g
         s/\<rootfstype=[^ ]*\>/rootfstype=$TGTFS/" $BOOTCONFIG $BOOTCONFIG_EFI
 if [[ -n $kernelargs ]]; then
     sed -i -r "s;=initrd.?\.img\>;& ${kernelargs} ;
                s;/vmlinuz.?\>;& ${kernelargs} ;" $BOOTCONFIG $BOOTCONFIG_EFI
 fi
 if [[ $LIVEOS != LiveOS ]]; then
-    sed -i -r "s;rd\.live\.image|liveimg;& rd.live.dir=$LIVEOS;
+    sed -i -r "s;rd\.live\.image|liveimg;& rd.live.dir=$_LIVEOS;
               " $BOOTCONFIG $BOOTCONFIG_EFI
 fi
 
@@ -2223,20 +2249,19 @@ done
 if [[ $multi == /$LIVEOS ]]; then
     # We need to do some more config file tweaks for multi-image mode.
     sed -i -r "s;\s+[^ ]*menu\.c32\>; $UI;g
-               s;kernel\s+vm;kernel /$LIVEOS/syslinux/vm;
-               s;initrd=i;initrd=/$LIVEOS/syslinux/i;
+               s;kernel\s+vm;kernel /$_LIVEOS/syslinux/vm;
+               s;initrd=i;initrd=/$_LIVEOS/syslinux/i;
               " $TGTMNT/$SYSLINUXPATH/isolinux.cfg
     sed -i -r "1,20 s/^\s*(menu\s+title)\s+.*/\1 Multi Live Image Boot Menu/I
-               /^\s*label\s+$LIVEOS\>/I { N;N;N;N; d }
+               /^\s*label\s+$_LIVEOS\>/I { N;N;N;N; d }
                0,/^\s*label\s+.*/I {
-               /^\s*label\s+.*/I {
-               i\
+               /^\s*label\s+.*/I i\
                label $LIVEOS\\
 \  menu label ^Go to $LIVEOS ~$TITLE menu\\
 \  kernel $UI\\
 \  APPEND /$LIVEOS/syslinux/$CONFIG_FILE\\
 
-               };}" $TGTMNT/syslinux/$CONFIG_FILE
+               }" $TGTMNT/syslinux/$CONFIG_FILE
 
     cat << EOF >> $TGTMNT/$SYSLINUXPATH/isolinux.cfg
 menu separator
@@ -2249,22 +2274,30 @@ fi
 
 mv $TGTMNT/$SYSLINUXPATH/isolinux.cfg $TGTMNT/$SYSLINUXPATH/$CONFIG_FILE
 
+if [[ -n $MENUS ]]; then
+    sed -i -r "/^\s*label\s+linux/I i\
+    $MENUS
+    " $TGTMNT/syslinux/$CONFIG_FILE
+    [[ -n $skipcopy ]] &&
+      sed -i -r "1,20 s/^\s*(menu\s+title)\s+.*/\1 Multi Live Image Boot Menu/I
+                " $TGTMNT/syslinux/$CONFIG_FILE
+fi
+
 sed -i -r "s/\s+[^ ]*menu\.c32\>/ $UI/g" $TGTMNT/syslinux/$CONFIG_FILE
 
 if [[ -f $BOOTCONFIG_EFI.multi ]]; then
     # (Implies --multi and the presence of EFI components.)
-    # Insert marker and delete any conflicting menu entries
-    # after escaping special characters.
-    d=$(sed 's/?/\\?/g;s/+/\\+/g;s/|/\\|/g;s/{/\\{/g;s/}/\\}/g' <<< $LIVEOS)
+    # Insert marker and delete any conflicting menu entries.
     sed -i -r "1 i\
 ...
                /^\s*menuentry\s+/ { N;N;N
-               /\s+rd\.live\.dir=$d\s+/ d }
+               /\s+rd\.live\.dir=$_LIVEOS\s+/ d }
                /\s*submenu\s+/ { N;N;N;N;N
-               /\s+rd\.live\.dir=$d\s+/ d }
+               /\s+rd\.live\.dir=$_LIVEOS\s+/ d }
               " $BOOTCONFIG_EFI.multi
+    # Append other pre-existing menus.
     cat $BOOTCONFIG_EFI.multi >> $BOOTCONFIG_EFI
-    # Clear header from $BOOTCONFIG_EFI.multi.
+    # Clear header that came from $BOOTCONFIG_EFI.multi.
     sed -i -r '/^\.\.\.$/,/^\s*menuentry\s+/ {
                /^\s*menuentry\s+/ ! d}' $BOOTCONFIG_EFI
     rm $BOOTCONFIG_EFI.multi
