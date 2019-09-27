@@ -773,9 +773,7 @@ class LiveImageEditor(LiveImageCreator):
             ops = 'ro'
         elif os.path.isdir(base_on):
             self.liveossrc = None
-            self.srcdir = os.path.join(base_on, 'LiveOS')
-            if not os.path.exists(self.srcdir):
-                self.srcdir = base_on
+            self.srcdir = base_on
         elif self.src_type == 'blk' and not self.liveossrc:
             self.liveossrc = DiskMount(RawDisk(None, base_on),
                              tempfile.mkdtemp(dir=mntdir, prefix='dev-'),
@@ -783,7 +781,7 @@ class LiveImageEditor(LiveImageCreator):
         if self.liveossrc:
             self.liveossrc.mount(dirmode=0o400)
             self.liveossrc.rmdir = True
-            self.srcdir = os.path.join(self.liveossrc.mountdir, 'LiveOS')
+            self.srcdir = self.liveossrc.mountdir
 
         liveosmnt = LiveImageMount(self.srcdir, tempfile.mkdtemp('-', 'LIM-',
                          mntdir), rootfsimg, overlay, ops=ops, dirmode=dirmode)
