@@ -2,7 +2,7 @@
 # coding: utf-8
 #
 # Copyright 2009, Red Hat, Inc.
-# Copyright 2012-2018, Sugar Labs®
+# Copyright 2012-2019, Sugar Labs®
 # Forked from edit-livecd, written by Perry Myers <pmyers at redhat.com>
 #                                   & David Huff <dhuff at redhat.com>
 # Cloning code, OverlayFS, and filesystem editing added by Frederick Grose,
@@ -57,7 +57,7 @@ doc2 = '''
 
               Storage space requirements for stageing the build files are
               estimated by the script and compared to the space available in
-              the -t <TMPDIR> option (default=/var/tmp).
+              the -t <TMPDIR> option (default = /var/tmp).
 
               Invoke the --help option to learn about other optional features.
               '''
@@ -134,7 +134,7 @@ parser.add_argument('-n', '--name', help="Name for the new LiveOS image (don't"
                     ' the .iso will be named as NAME-arch-Ymd.HM\n'
                     "If the name contains the os separator '" + os.sep + "', "
                     'that\ncharacter will be replaced by the underscore_\n'
-                    'in the .iso file name and filesystem label.')
+                    'in the .iso file name and filesystem label.\n ')
 
 parser.add_argument('-o', '--output', metavar='PATH',
                     help='Specify a directory location for the new .iso file.'
@@ -197,9 +197,9 @@ parser.add_argument('-r', '--releasefile', metavar='PATH',
                     help='Specify release file/s for branding the build.\n'
                          'Denote multiple files as "path1, path2, ..."\n ')
 
-parser.add_argument('-b', '--builder', default=os.getenv('LOGNAME'),
+parser.add_argument('-b', '--builder', default=os.getenv('USERNAME'),
                     help='Specify the builder of a Remix.\n'
-                         'default = "' + os.getenv('LOGNAME') + '" (the '
+                         'default = "' + os.getenv('USERNAME') + '" (the '
                          'current system user)\n ')
 
 parser.add_argument('--clone', action='store_true', default=False,
@@ -335,26 +335,30 @@ parser.add_argument('-a', '--extra-kernel-args', dest='kernelargs',
 
 parser.add_argument('--extra-space-mb', type=int, default=2, metavar='SIZE',
                     help='Specify extra space in MiB to reserve for\n'
-                         'unexpected staging area needs.  Default = 2 MiB.\n ')
+                         'unexpected staging area needs.  default = 2 MiB\n ')
 
 parser.add_argument('--nocleanup', action='store_true', default=False,
-                    help='Skip cleanup of temporary files.')
+                    help='Skip cleanup of temporary files.\n ')
 
-parser.add_argument("--releasever", type=str, dest="releasever", 
+parser.add_argument('--releasever', type=str, dest='releasever', 
                     default=None, 
-                    help="Value to substitute for $releasever in kickstart repo urls")
+                    help='Value to substitute for $releasever in kickstart '
+                         'repo urls.\n ')
 
-parser.add_argument("--arch", type=str, dest="arch", 
+parser.add_argument('--arch', type=str, dest='arch', 
                     default=dnf.rpm.basearch(hawkey.detect_arch()), 
-                    help="Arch for the final image")
+                    help='Computer instruction set architecture for the '
+                         'final image.\n'
+                         'default = dnf.rpm.basearch(hawkey.detect_arch())\n ')
 
-parser.add_argument("-p", "--plugins", action="store_true", dest="plugins",
+parser.add_argument('-p', '--plugins', action='store_true', dest='plugins',
                     default=False, 
-                    help="Use DNF plugins during image creation")
+                    help='Use DNF plugins during image creation.\n ')
 
-parser.add_argument("--cacheonly", action="store_true", dest="cacheonly",
+parser.add_argument('--cacheonly', action='store_true', dest='cacheonly',
                     default=False,
-                    help="Work offline from cache, use together with --cache (default: False)")
+                    help='Work offline from cache, use together with --cache\n'
+                         'default = False')
 
 setup_logging(parser)
 
@@ -416,9 +420,9 @@ class LiveImageEditor(LiveImageCreator):
         """A string of file or directory paths to include in _brand().  This
         variable is later reused to hold the modified release name."""
 
-        self.builder = os.getenv('LOGNAME')
+        self.builder = os.getenv('USERNAME')
         """The name of the Remix builder for _branding.
-        Default = os.getenv('LOGNAME')"""
+        Default = os.getenv('USERNAME')"""
 
         self.compress_type = None
         """mksquashfs compressor to use. Use 'None' to force reading of the
@@ -612,6 +616,7 @@ class LiveImageEditor(LiveImageCreator):
             self.liveosmnt._LiveImageMount__create(ops='rw', dirmode=0o700)
             if isinstance(self.liveosmnt.livemount, OverlayFSMount):
                 self.src_type = 'embedded-OFS'
+                # src_type dir with no overlay also passes here.
             if self.liveosmnt.ovltype in ('', 'temp'):
                 self._overlay = self.liveosmnt.cowloop.lofile
 
@@ -1098,7 +1103,6 @@ class LiveImageEditor(LiveImageCreator):
 
         src, dst = srcmntdir, isodir
         if self.exclude_all:
-#            src = self.srcdir
             src = self.liveosdir
         if srcmntdir != self.srcdir:
             dst = os.path.join(isodir, 'LiveOS')
@@ -2409,7 +2413,7 @@ def main():
         if editor.liveosmnt:
             editor.liveosmnt.cleanup()
         editor.cleanup()
-        print('\nLiveOS edit has completed.')
+        print('\nLiveOS edit has ended.')
 
         h, m = divmod(time.time() - t0, 3600)
         m, s = divmod(m, 60)
