@@ -26,9 +26,8 @@ import subprocess
 import time
 import logging
 
-from six.moves import urllib
-
 import selinux
+import urlgrabber
 
 import pykickstart.commands as kscommands
 import pykickstart.constants as ksconstants
@@ -52,10 +51,8 @@ def read_kickstart(path):
     version = ksversion.makeVersion()
     ks = ksparser.KickstartParser(version)
     try:
-        if "://" not in path:
-            path = "file://%s" % (urllib.request.pathname2url(os.path.abspath(path)))
-        ksdata = urllib.request.urlopen(path).read().decode("utf-8")
-        ks.readKickstartFromString(ksdata, reset=False)
+        ksfile = urlgrabber.urlgrab(path)
+        ks.readKickstart(ksfile)
 # Fallback to e.args[0] is a workaround for bugs in urlgragger and pykickstart.
     except IOError as e:
         raise errors.KickstartError("Failed to read kickstart file "
