@@ -319,11 +319,25 @@ class LiveImageCreatorBase(LoopImageCreator):
     def __create_iso(self, isodir):
         iso = self._outdir + "/" + self.name + ".iso"
 
-        args = ["xorrisofs",
-                "-joliet", "-rational-rock",
-                "-hide-rr-moved",
-                "-volid", self.fslabel,
-                "-output", iso]
+        def iterate_files_recursively(directory="."):
+            for entry in os.scandir(directory):
+                if entry.is_dir():
+                    for file in iterate_files_recursively(entry.path):
+                        yield file
+                else:
+                    yield entry.stat().st_size
+
+        args = ["xorrisofs"]
+
+        if max(iterate_files_recursively(isodir)) >= 4 * 1024**3:
+            args += ["-iso-level", "3"]
+
+        args += ["-output", iso,
+                 "-isohybrid-mbr", "/usr/share/syslinux/isohdpfx.bin",
+                 "-eltorito-boot", "isolinux/isolinux.bin",
+                 "-eltorito-catalog", "isolinux/boot.cat",
+                 "-boot-load-size", "4",
+                 "-boot-info-table", "-no-emul-boot"]
 
         args.extend(self._get_xorrisofs_options(isodir))
 
@@ -392,24 +406,14 @@ class x86LiveImageCreator(LiveImageCreatorBase):
         self._efiarch = None
 
     def _get_xorrisofs_options(self, isodir):
-        options = [ "-isohybrid-mbr", "/usr/share/syslinux/isohdpfx.bin",
-                    "-eltorito-boot", "isolinux/isolinux.bin",
-                    "-eltorito-catalog", "isolinux/boot.cat",
-                    "-no-emul-boot", "-boot-info-table",
-                    "-boot-load-size", "4" ]
-        if os.path.exists(isodir + "/images/efiboot.img"):
-            options.extend([ "-eltorito-alt-boot",
-                             "-e", "images/efiboot.img",
-                             "-no-emul-boot",
-                             "-isohybrid-gpt-basdat", "-isohybrid-apm-hfsplus",
-                             "-eltorito-alt-boot",
-                             "-e", "images/macboot.img",
-                             "-no-emul-boot",
-                             "-isohybrid-gpt-basdat", "-isohybrid-apm-hfsplus"])
-        isosize = int(rcall(['du', '-csxb', '--files0-from=-'], isodir,
-                            raise_err=False)[0].split()[-2])
-        if isosize > 4 * 1024**3 - 1:
-            options.extend(['-iso-level', '3'])
+        options = []
+        if os.path.exists(os.path.join(isodir, "images/efiboot.img")):
+            options += ["-eltorito-alt-boot", "-e", "images/efiboot.img",
+                        "-no-emul-boot", "-isohybrid-gpt-basdat"]
+        if os.path.exists(os.path.join(isodir, "images/macboot.img")):
+            options += ["-eltorito-alt-boot", "-e", "images/macboot.img",
+                        "-no-emul-boot", "-isohybrid-gpt-hfsplus"]
+        options += ["-rational-rock", "-joliet", "-volid", self.fslabel]
         return options
 
     def _get_required_packages(self):
