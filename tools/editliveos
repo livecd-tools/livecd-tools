@@ -109,7 +109,6 @@ parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                         [--skip-compression]
                         [--refresh-uncompressed]
                         [--flatten-squashfs]
-                        [--osmin_img]
                         [--rootfs-size-gb [+|-]<size>]
                         [--home-size-mb [+|-]<size>[,<fstype>[,<blksz>]]]
                         [--encrypted-home]
@@ -321,10 +320,6 @@ parser.add_argument('--flatten-squashfs', action="store_true",
                          'system, unless another filesystem type is specified\n'
                          'by the --overlay-size-mb [+|-]SIZE[,FSTYPE[,BLKSZ]]'
                          '\noption.\n ')
-
-parser.add_argument('--osmin_img', action='store_true', default=False,
-                    help='Specify creation of an osmin.img minimal snapshot.'
-                         '\n ')
 
 parser.add_argument('-a', '--extra-kernel-args', dest='kernelargs',
                     metavar='ARGS', default='',
@@ -801,9 +796,7 @@ class LiveImageEditor(LiveImageCreator):
             squash_img = losetup('-nO BACK-FILE', self.squashloop)
             img = squash_img
         else:
-            img = os.path.join(self.liveosdir, 'osmin.img')
-            if not os.path.exists(img):
-                self.compress_type = 'gzip'
+            self.compress_type = 'gzip'
         # 'self.compress_type = None' will force reading it from base_on.
         if self.compress_type is None:
             self.compress_type = squashfs_compression_type(img)
@@ -813,7 +806,7 @@ class LiveImageEditor(LiveImageCreator):
 
         du_args = ['du', '-csxb', '--files0-from=-']
 
-        ignore_list = [self.rootfs_img, 'squashfs.img', 'osmin.img',
+        ignore_list = [self.rootfs_img, 'squashfs.img',
                        'home.img', 'swap.img', 'overlay-*']
         if self.clone and not int(self.home_size_mb) >= 0:
             ignore_list.remove('home.img')
@@ -913,8 +906,6 @@ class LiveImageEditor(LiveImageCreator):
             # assuming a 2:1 compression ratio, at most
             required += rootfs_used // 2
 
-        if self.osmin_img:
-            required += 8192
         if self.src_type == 'iso':
             required += 64 * 1024 ** 2
 
@@ -1102,6 +1093,7 @@ class LiveImageEditor(LiveImageCreator):
         src, dst = srcmntdir, isodir
         if self.exclude_all:
             src = self.liveosdir
+            dst = os.path.join(isodir, 'LiveOS')
         if srcmntdir != self.srcdir:
             dst = os.path.join(isodir, 'LiveOS')
 
@@ -1907,10 +1899,7 @@ s/\s+rw\s+|\s+rw$/ /g'''.format(self.fslabel, self.releasefile, iso_boot)
         if args.rootfsimg:
             rootfsimg = args.rootfsimg
 
-        if self.osmin_img:
-            _proclists(None, 'osmin.img', 'osmin.img')
-        else:
-            _proclists('osmin.img')
+        _proclists('osmin.img')
         if self.compress:
             _proclists(self.rootfs_img, 'squashfs.img', rootfsimg)
         else:
@@ -1966,7 +1955,7 @@ s/\s+rw\s+|\s+rw$/ /g'''.format(self.fslabel, self.releasefile, iso_boot)
                     dn, self.release, self.releasefile), EFI_config]
         call(cmd)
 
-        # Copy or move new rootfs_img or squashfs.img and osmin.img.
+        # Copy or move new rootfs_img or squashfs.img.
         [os.remove(f) for f in dellist]
         transfer = shutil.copy2
         if os.stat(self.liveosdir).st_dev == os.stat(self.tmpdir).st_dev:
@@ -2319,9 +2308,6 @@ def main():
         print("\nNOTICE:\tA flattened squashfs is incompatible with a Device-"
               "mapper type overlay.\n", file=sys.stderr)
         return 1
-    editor.osmin_img = args.osmin_img
-    if not args.osmin_img:
-        editor.skip_minimize = True
     editor.kernelargs = args.kernelargs
     editor.extra_space = int(args.extra_space_mb) * 1024 ** 2
 
