@@ -68,16 +68,6 @@ class LiveImageCreatorBase(LoopImageCreator):
         self.skip_compression = False
         """Controls whether to use squashfs to compress the image."""
 
-        self.skip_minimize = False
-        """Controls whether an image minimizing snapshot should be created.
-
-        This snapshot can be used when copying the system image from the ISO in
-        order to minimize the amount of data that needs to be copied; simply,
-        it makes it possible to create a version of the image's filesystem with
-        no spare space.
-
-        """
-
         self._timeout = kickstart.get_timeout(self.ks, 10)
         """The bootloader timeout from kickstart."""
 
@@ -367,10 +357,6 @@ class LiveImageCreatorBase(LoopImageCreator):
             makedirs(self.__ensure_isodir() + "/LiveOS")
 
             self._resparse()
-
-            if not self.skip_minimize:
-                create_image_minimizer(self.__isodir + "/LiveOS/osmin.img",
-                                       self._image, self.compress_type)
 
             os_image = os.path.join('LiveOS', 'rootfs.img')
             if self.skip_compression:

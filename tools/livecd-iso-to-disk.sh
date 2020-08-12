@@ -1641,7 +1641,7 @@ checklivespace() {
             exitclean
         fi
     fi
-    sources="$SRCMNT/$srcdir/osmin.img"\ "$SRCMNT/$srcdir/syslinux"
+    sources="$SRCMNT/$srcdir/syslinux"
     sources+=" $SRCMNT/images $SRCMNT/isolinux $SRCMNT/syslinux"
     [[ -n $EFI_BOOT ]] && sources+=" $SRCMNT$EFI_BOOT"
     duTable=($(du -c -B 1M "$0" $sources 2> /dev/null || :))
@@ -1769,10 +1769,6 @@ if [[ $srctype == live && -z $skipcopy ]]; then
         $copyFile "$SRCIMG" $TGTMNT/$LIVEOS/${SRCIMG##/*/} || exitclean
         [[ ${SRCIMG##/*/} == squashed.img ]] &&
             mv $TGTMNT/$LIVEOS/${SRCIMG##/*/} $TGTMNT/$LIVEOS/squashfs.img
-    fi
-    if [[ -f $SRCMNT/$srcdir/osmin.img ]]; then
-        $copyFile "$SRCMNT/$srcdir/osmin.img" $TGTMNT/$LIVEOS/osmin.img ||
-            exitclean
     fi
     if [[ -s $SRCHOME && -n $copyhome ]]; then
         $copyFile $SRCHOME $HOMEPATH || exitclean

@@ -230,7 +230,7 @@ def main():
                                           # copy to here first then back
                                           # to multitmp + dir which is looback also
 
-        imgs = ("squashfs.img", "osmin.img")
+        imgs = ("squashfs.img")
         for img in imgs:
             copy(x86tmp + "/LiveOS/" + img, intermediate)
             copy(intermediate + "/" + img, multitmp + "/x86/LiveOS/")
