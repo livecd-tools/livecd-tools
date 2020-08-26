@@ -69,6 +69,7 @@ def parse_options(args):
                            "(default xz needs a 2.6.38+ kernel, gzip works "
                            "with all kernels, lzo needs a 2.6.36+ kernel, lz4 "
                            "needs a 3.19+ kernel, lzma needs custom kernel.) "
+                           "Use xz1m for xz compression with 1M block size.",
                            "Set to 'None' to force read from base_on.",
                       default="xz")
     imgopt.add_option("", "--releasever", type="string", dest="releasever",

@@ -102,6 +102,8 @@ def mksquashfs(in_dir, out_img, compress_type, ops=[]):
 # Allow gzip to work for older versions of mksquashfs
     if not compress_type or compress_type == "gzip":
         args = ['mksquashfs', in_dir, out_img]
+    elif compress_type == "xz1m":
+        args = ['mksquashfs', in_dir, out_img, '-comp', 'xz', '-b', '1M', '-Xdict-size', '1M', '-no-recovery']
     else:
         args = ['mksquashfs', in_dir, out_img, '-comp', compress_type]
 
@@ -408,7 +410,7 @@ class LoopbackMount:
         self.losetup = False
         self.ops = ops
         self.dirmode = dirmode
-        
+
     def cleanup(self):
         self.diskmount.cleanup()
 
@@ -744,7 +746,7 @@ class DiskMount(Mount):
             ops = self.ops
         if isinstance(ops, list) and ('-r' in ops or 'ro' in ops):
             args.extend(['-o', 'ro'])
-        elif ops: 
+        elif ops:
             args.extend(['-o', ops])
 
         rc = call(args)
@@ -878,7 +880,7 @@ class OverlayFSMount(Mount):
         if self.cowmnt:
             self.cowmnt.unmount()
         self.imgmnt.unmount()
- 
+
         self.mounted = False
 
     def cleanup(self):
@@ -952,7 +954,7 @@ class BindChrootMount():
                 logging.info("lazy umount succeeded on %s" % self.dest)
                 print("lazy umount succeeded on %s" % self.dest,
                       file=sys.stdout)
- 
+
         self.mounted = False
 
     def cleanup(self):
