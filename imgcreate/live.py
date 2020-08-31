@@ -62,8 +62,8 @@ class LiveImageCreatorBase(LoopImageCreator):
                                   cacheonly=cacheonly,
                                   docleanup=docleanup)
 
-        self.compress_type = "xz"
-        """mksquashfs compressor to use."""
+        self.compress_args = "xz"
+        """mksquashfs compressor arguments to use."""
 
         self.skip_compression = False
         """Controls whether to use squashfs to compress the image."""
@@ -173,12 +173,12 @@ class LiveImageCreatorBase(LoopImageCreator):
 
         squashloop = DiskMount(LoopbackDisk(squashimg, 0), self._mkdtemp(), "squashfs")
 
-        # 'self.compress_type = None' will force reading it from base_on.
-        if self.compress_type is None:
-            self.compress_type = squashfs_compression_type(squashimg)
-            if self.compress_type == 'undetermined':
+        # 'self.compress_args is None' will force reading it from base_on.
+        if self.compress_args is None:
+            self.compress_args = squashfs_compression_type(squashimg)
+            if self.compress_args == 'undetermined':
                 # Default to 'gzip' for compatibility with older versions.
-                self.compress_type = 'gzip'
+                self.compress_args = 'gzip'
         try:
             if not squashloop.disk.exists():
                 raise CreatorError("'%s' is not a valid live CD ISO : "
@@ -376,7 +376,7 @@ class LiveImageCreatorBase(LoopImageCreator):
                     os_image = os.path.dirname(self._image)
                 mksquashfs(os_image,
                            self.__isodir + "/LiveOS/squashfs.img",
-                           self.compress_type, ops)
+                           self.compress_args, ops)
                 self._LoopImageCreator__instloop.cleanup()
 
             self.__create_iso(self.__isodir)

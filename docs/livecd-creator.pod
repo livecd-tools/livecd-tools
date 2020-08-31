@@ -10,7 +10,7 @@ B<livecd-creator> [OPTIONS]
 
 =head1 DESCRIPTION
 
-B<livecd-creator> creates live CD or DVD images(ISO images) from kickstart files. Kickstart files contain information about packages and configuration settings which are used to build the image.
+B<livecd-creator> creates live CD or DVD images (ISO images) from kickstart files. Kickstart files contain information about packages and configuration settings which are used to build the image.
 
 =head1 OPTIONS
 
@@ -42,29 +42,31 @@ Defines the file system label. The default is based on the configuration name.
 
 =item --title=TITLE
 
-Title used by syslinux.cfg file
+Title used by F<syslinux.cfg> file.
 
 =item --product=PRODUCT
 
-Product name used in syslinux.cfg boot stanzas and countdown
+Product name used in F<syslinux.cfg> boot stanzas and countdown.
 
 =item  -p, --plugins
 
-Use DNF plugins during image creation
+Use DNF plugins during image creation.
 
-=item --compression-type=COMPRESSOR
+=item --compression-type=COMPRESS_ARGS
 
 Specify a compressor recognized by mksquashfs.
-xz is the default and works with 2.6.38 and later kernels.
-gzip works with all kernels.
-lzo works with 2.6.36 and later kernels.
-lzma will only work with custom kernels.
-Set to 'None' to force reading the compressor used in BASE_ON.
-If gzip is used, the -comp option is not passed to mksquashfs to allow the use of older versions of mksquashfs.
+C<xz> is the default and works with 2.6.38 and later kernels.
+C<gzip> works with all kernels.
+C<lzo> works with 2.6.36 and later kernels.
+C<lzma> will only work with custom kernels.
+C<xz1m> is interpreted as C<"xz -b 1M -Xdict-size 1M -norecovery">.
+Set to C<None> to force reading the compressor used in BASE_ON.
+If C<gzip> is used, the -comp option is not passed to mksquashfs to allow the use of older versions of mksquashfs.
+Multiple arguments should be specified in one string, i.e., C<--compression-type "type arg1 arg2 ...">.
 
 =item --releasever=VER
 
-Set the value to substitute for $releasever in kickstart repo urls
+Set the value to substitute for $releasever in kickstart repo urls.
 
 =back
 
@@ -76,7 +78,7 @@ These options define directories used on your system for creating the live image
 
 =item -t TMPDIR, --tmpdir=TMPDIR
 
-defines the temporary directory to use. The default directory is /var/tmp.
+defines the temporary directory to use. The default directory is F</var/tmp>.
 
 =item --cache=CACHEDIR
 
@@ -84,35 +86,35 @@ Defines the cache directory to use (default: private cache).
 
 =item --cacheonly
 
-Work offline from cache, use together with --cache (default: False)
+Work offline from cache, use together with --cache (default: False).
 
 =item --nocleanup
 
-Skip cleanup of temporary files
+Skip cleanup of temporary files.
 
 =back
 
 =head1 DEBUGGING OPTIONS
 
-These options control the output of logging information during image creation
+These options control the output of logging information during image creation.
 
 =over 4
 
 =item -d, --debug
 
-Output debugging information
+Output debugging information.
 
 =item -v, --verbose
 
-Output verbose progress information
+Output verbose progress information.
 
 =item -q, --quiet
 
-Supress stdout
+Supress stdout.
 
 =item --logfile=FILE
 
-Save debug information to FILE
+Save debug information to FILE.
 
 =back
 
@@ -135,12 +137,12 @@ livecd-creator provides for some extensions to the repo commands similar
 to what DNF supports. The strings $arch, $basearch and $releasever
 are replaced with the system arch, basearch and release version respectively.
 When no --releasever is passed it defaults to the current system's version.
-The allows the use of repo commands such as the following:
+This allows the use of repo commands such as the following:
 
 repo --name=fedora --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=fedora-$releasever&arch=$basearch
 
 Note that in a chroot environment (like koji) the rpmdb is not available,
-so either don't use $releasever in that case, or pass --releasever=VER
+so either don't use $releasever in that case, or pass --releasever=VER.
 
 =head1 CONTRIBUTORS
 
@@ -148,14 +150,14 @@ David Zeuthen, Jeremy Katz, Douglas McClendon and a team of many other contribut
 
 =head1 BUGS
 
-Report bugs to the mailing list C<http://www.redhat.com/mailman/listinfo/fedora-livecd-list> or directly to Bugzilla C<http://bugzilla.redhat.com/bugzilla/> against the C<Fedora> product, and the C<livecd-tools> component.
+Report bugs to the mailing list L<http://www.redhat.com/mailman/listinfo/fedora-livecd-list> or directly to Bugzilla L<http://bugzilla.redhat.com/bugzilla/> against the C<Fedora> product, and the C<livecd-tools> component.
 
 =head1 COPYRIGHT
 
-Copyright (C) Fedora Project 2008,2009, and various contributors. This is free software. You may redistribute copies of it under the terms of the GNU General Public License C<http://www.gnu.org/licenses/gpl.html>. There is NO WARRANTY, to the extent permitted by law.
+Copyright (C) Fedora Project 2008,2009,2020, and various contributors. This is free software. You may redistribute copies of it under the terms of the GNU General Public License L<http://www.gnu.org/licenses/gpl.html>. There is NO WARRANTY, to the extent permitted by law.
 
 =head1 SEE ALSO
 
-C<livecd-iso-to-disk(1)>, project website C<http://fedoraproject.org/wiki/FedoraLiveCD>
+C<livecd-iso-to-disk(8)>, project website L<http://fedoraproject.org/wiki/FedoraLiveCD>
 
 =cut

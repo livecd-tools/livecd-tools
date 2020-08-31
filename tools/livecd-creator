@@ -64,12 +64,16 @@ def parse_options(args):
                            "This eliminates the intermediate LiveOS directory "
                            "and is suitable only for OverlayFS overlays.",
                       default=False)
-    imgopt.add_option("", "--compression-type", type="string", dest="compress_type",
-                      help="Compression type recognized by mksquashfs "
-                           "(default xz needs a 2.6.38+ kernel, gzip works "
-                           "with all kernels, lzo needs a 2.6.36+ kernel, lz4 "
-                           "needs a 3.19+ kernel, lzma needs custom kernel.) "
-                           "Set to 'None' to force read from base_on.",
+    imgopt.add_option("", "--compression-type", type="string", dest="compress_args",
+                      help="Compression type recognized by mksquashfs. "
+                           "(The default, xz, needs a 2.6.38+ kernel; gzip works "
+                           "with all kernels; lzo needs a 2.6.36+ kernel; lz4 "
+                           "needs a 3.19+ kernel; lzma needs custom kernel.) "
+                           'xz1m is interpreted as "xz -b 1M -Xdict-size 1M -norecovery". '
+                           "Set to 'None' to cause the program to read the compression "
+                           "type from the base_on image. "
+                           "Multiple arguments should be specified in "
+                           'one string, i.e., --compression-type "type arg1 arg2 ...".',
                       default="xz")
     imgopt.add_option("", "--releasever", type="string", dest="releasever",
                       default=None,
@@ -217,7 +221,7 @@ def main():
         logging.error(u"%s creation failed: %s", options.image_type, e)
         return 1
 
-    creator.compress_type = options.compress_type
+    creator.compress_args = options.compress_args
     creator.skip_compression = options.skip_compression
     creator.skip_minimize = options.skip_minimize
     if options.cachedir:
