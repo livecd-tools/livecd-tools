@@ -2,7 +2,7 @@
 # coding: utf-8
 #
 # Copyright 2009, Red Hat, Inc.
-# Copyright 2012-2019, Sugar Labs®
+# Copyright 2012-2020, Sugar Labs®
 # Forked from edit-livecd, written by Perry Myers <pmyers at redhat.com>
 #                                   & David Huff <dhuff at redhat.com>
 # Cloning code, OverlayFS, and filesystem editing added by Frederick Grose,
@@ -93,7 +93,7 @@ parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                         [-e, --exclude <exclude, s>]
                         [-i, --include <include, s>]
                         [-u, --seclude <seclude, s>]
-                        [-r, --releasefile <releasefile, s>]
+                        [-r, --releasefile <releasefile s>]
                         [-b, --builder <builder>]
                         [-p, --plugins]
                         [--clone]
@@ -102,7 +102,7 @@ parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                         [--refresh-only]
                         [--skip-refresh]
                         [--skip-seclude]
-                        [-c, --compress-type <compression type>]
+                        [-c, --compress-type <compression arg s>]
                         [--compress]
                         [--releasever <value to substitute for $releasever in repo urls>]
                         [--arch <image arch>]
@@ -194,7 +194,7 @@ parser.add_argument('-u', '--seclude', dest='secludes', metavar='PATH',
 
 parser.add_argument('-r', '--releasefile', metavar='PATH',
                     help='Specify release file/s for branding the build.\n'
-                         'Denote multiple files as "path1, path2, ..."\n ')
+                         'Denote multiple files as "path1 path2 ..."\n ')
 
 parser.add_argument('-b', '--builder', default=os.getenv('USERNAME'),
                     help='Specify the builder of a Remix.\n'
@@ -289,10 +289,11 @@ parser.add_argument('--skip-refresh', action='store_true', default=False,
 parser.add_argument('--skip-seclude', action='store_true', default=False,
                     help='Specify no seclusion of specific user files.\n ')
 
-parser.add_argument('-c', '--compress-type', metavar='TYPE',
+parser.add_argument('-c', '--compress-type', metavar='ARGS',
                     help='Specify the compression type for SquashFS.\nThis '
                          'will override the current compression or lack\n'
-                         'thereof.\n ')
+                         'thereof.  Multiple arguments should be specified in\n'
+                         'one string, i.e., --compress-type "type arg1 arg2 ..."\n ')
 
 parser.add_argument('--compress', action='store_true', default=None,
                     help='Specify compression for the filesystem image.\n'
@@ -419,11 +420,13 @@ class LiveImageEditor(LiveImageCreator):
         """The name of the Remix builder for _branding.
         Default = os.getenv('USERNAME')"""
 
-        self.compress_type = None
+        self.compress_args = None
         """mksquashfs compressor to use. Use 'None' to force reading of the
-        source image, or enter a -p --compress_type value to override the
+        source image, or enter --compress-type "arg s" to override the
         current compression or lack thereof. Compression type options vary with
-        the version of the kernel and SquashFS used."""
+        the version of the kernel and SquashFS used. Multiple arguments should
+        be specified in one string, i.e., --compress-type "type arg1 arg2 ...".
+        """
 
         self._isofstype = "iso9660"
 
@@ -796,13 +799,13 @@ class LiveImageEditor(LiveImageCreator):
             squash_img = losetup('-nO BACK-FILE', self.squashloop)
             img = squash_img
         else:
-            self.compress_type = 'gzip'
-        # 'self.compress_type = None' will force reading it from base_on.
-        if self.compress_type is None:
-            self.compress_type = squashfs_compression_type(img)
-            if self.compress_type in ('undetermined', 'unknown'):
+            self.compress_args = 'gzip'
+        # 'self.compress_args = None' will force reading it from base_on.
+        if self.compress_args is None:
+            self.compress_args = squashfs_compression_type(img)
+            if self.compress_args in ('undetermined', 'unknown'):
                 # 'gzip' for compatibility with older versions.
-                self.compress_type = 'gzip'
+                self.compress_args = 'gzip'
 
         du_args = ['du', '-csxb', '--files0-from=-']
 
@@ -2293,8 +2296,8 @@ def main():
     editor.output = output
     editor.builder = args.builder
     if args.releasefile:
-        editor.releasefile = args.releasefile.split(', ')
-    editor.compress_type = args.compress_type
+        editor.releasefile = args.releasefile.split()
+    editor.compress_args = args.compress_type
     editor.refresh_uncompressed = args.refresh_uncompressed
     editor.skip_compression = args.skip_compression
     editor.compress = args.compress

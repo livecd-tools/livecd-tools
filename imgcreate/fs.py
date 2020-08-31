@@ -98,12 +98,14 @@ def squashfs_compression_type(sqfs_img):
                     break
     return compress_type
 
-def mksquashfs(in_dir, out_img, compress_type, ops=[]):
-# Allow gzip to work for older versions of mksquashfs
-    if not compress_type or compress_type == "gzip":
-        args = ['mksquashfs', in_dir, out_img]
-    else:
-        args = ['mksquashfs', in_dir, out_img, '-comp', compress_type]
+def mksquashfs(in_dir, out_img, compress_args, ops=[]):
+
+    args = ['mksquashfs', in_dir, out_img]
+    # Allow gzip to work for older versions of mksquashfs
+    if compress_args and compress_args != 'gzip':
+        if compress_args == 'xz1m':
+            compress_args = "xz -b 1M -Xdict-size 1M -no-recovery"
+        args += ['-comp'] + compress_args.split()
 
     if not sys.stdout.isatty():
         args.append('-no-progress')
@@ -150,7 +152,7 @@ def resize2fs(fs, size=None, minimal=False, ops=''):
 
 def e2fsck(fs):
     logging.info("Checking filesystem %s" % fs)
-    return call(['e2fsck', '-f', '-y', fs])
+    return call(['e2fsck', '-f', '-y', '-E', 'discard', fs])
 
 def get_dm_table(device):
     """Return the table for a Device-mapper device."""
@@ -408,7 +410,7 @@ class LoopbackMount:
         self.losetup = False
         self.ops = ops
         self.dirmode = dirmode
-        
+
     def cleanup(self):
         self.diskmount.cleanup()
 
@@ -744,7 +746,7 @@ class DiskMount(Mount):
             ops = self.ops
         if isinstance(ops, list) and ('-r' in ops or 'ro' in ops):
             args.extend(['-o', 'ro'])
-        elif ops: 
+        elif ops:
             args.extend(['-o', ops])
 
         rc = call(args)
@@ -878,7 +880,7 @@ class OverlayFSMount(Mount):
         if self.cowmnt:
             self.cowmnt.unmount()
         self.imgmnt.unmount()
- 
+
         self.mounted = False
 
     def cleanup(self):
@@ -958,7 +960,7 @@ class BindChrootMount():
                 logging.info("lazy umount succeeded on %s" % self.dest)
                 print("lazy umount succeeded on %s" % self.dest,
                       file=sys.stdout)
- 
+
         self.mounted = False
 
     def cleanup(self):
