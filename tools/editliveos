@@ -1333,10 +1333,6 @@ class LiveImageEditor(LiveImageCreator):
                 os.mknod(urandom, 0o666 | stat.S_IFCHR, os.makedev(1,9))
                 os.umask(origumask)
 
-            resolv = os.path.join(self._instroot, 'etc', 'resolv.conf')
-            if not os.path.exists(resolv):
-                open(resolv, 'a').close()
-
             bindmounts = [('/sys', None), ('/proc', None), ('/dev/pts', None),
                           ('/dev/shm', None), ('/run', None),
                           ('/etc/resolv.conf', None),

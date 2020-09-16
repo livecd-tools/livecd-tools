@@ -64,7 +64,7 @@ def makedirs(dirname, dirmode=None):
 
     dirmode = dirmode or 0o777
     try:
-        os.makedirs(dirname, dirmode)
+        os.makedirs(dirname, dirmode, exist_ok=True)
     except OSError as e:
         if e.errno != errno.EEXIST:
             raise
@@ -891,7 +891,7 @@ class OverlayFSMount(Mount):
 
 
 class BindChrootMount():
-    """Represents a bind mount of a directory into a chroot."""
+    """Represents a bind mount of a directory or file into a chroot."""
     def __init__(self, src, chroot, dest=None, ops='', dirmode=None):
         self.src = src
         self.root = chroot
@@ -902,6 +902,7 @@ class BindChrootMount():
             dest = src
         self.dest = os.path.join(self.root, dest.lstrip('/'))
         self.mountdir = self.dest
+            # If src is a file, self.mountdir will be its mountpoint file.
 
         self.mounted = False
 
@@ -911,7 +912,12 @@ class BindChrootMount():
 
         if dirmode is None:
             dirmode = self.dirmode
-        makedirs(self.dest, dirmode)
+        if os.path.isdir(self.src):
+            makedirs(self.dest, dirmode)
+        elif os.path.isfile(self.src):
+            makedirs(os.path.dirname(os.path.realpath(self.dest)))
+            if not os.path.exists(self.dest):
+                open(self.dest, 'a').close()
         args = ['mount', '--bind', self.src, self.dest]
         rc = call(args)
         if rc != 0:

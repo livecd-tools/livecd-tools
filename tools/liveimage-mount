@@ -793,9 +793,10 @@ def main():
             subprocess.check_call(['mount', '-t', 'tmpfs', 'tmpfs', tmpfs],
                                   stderr=sys.stderr)
             tmpfs = os.path.join(destmnt, 'etc', 'resolv.conf')
-            if os.path.lexists(tmpfs):
-                os.unlink(tmpfs)
-            os.symlink('/run/NetworkManager/resolv.conf', tmpfs)
+            os.makedirs(os.path.dirname(os.path.realpath(tmpfs)), exist_ok=True)
+            if not os.path.exists(tmpfs):
+                open(tmpfs, 'a').close()
+            mount(['--bind', os.path.join('/etc', 'resolv.conf'), tmpfs])
             if dnfcache:
                 mount(['--bind', dnfcache,
                        os.path.join(destmnt, 'var', 'cache', 'dnf')])
