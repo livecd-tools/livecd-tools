@@ -129,7 +129,7 @@ class DnfLiveCD(dnf.Base):
         elif include == GROUP_ALL:
             package_types.add('optional')
         try:
-            self.group_install(grp.id, package_types, exclude=exclude)
+            self.group_install(grp.id, tuple(package_types), exclude=exclude)
         except dnf.exceptions.CompsError as e:
             # DNF raises this when it is already selected
             pass
