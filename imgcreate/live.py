@@ -1027,6 +1027,204 @@ class ppc64LiveImageCreator(ppcLiveImageCreator):
         return ["kernel.ppc"] + \
                ppcLiveImageCreator._get_excluded_packages(self)
 
+class aarch64LiveImageCreator(LiveImageCreatorBase):
+    """ImageCreator for arm machines"""
+    def __init__(self, *args, **kwargs):
+        LiveImageCreatorBase.__init__(self, *args, **kwargs)
+
+    def _get_xorrisofs_options(self, isodir):
+    # aarch64 system not have legasy boot, only UEFI
+    # dir isolinux not needed, put efiboot.img to /EFI/BOOT dir on iso
+        options = [ "-no-emul-boot", "-graft-points",
+                    "-allow-lowercase"]
+        options.extend([ "-eltorito-alt-boot",
+                         "-e", "EFI/BOOT/efiboot.img",
+                         "-no-emul-boot",
+                         "-J", "-D", "-R"])
+        return options
+
+    def _get_required_packages(self):
+        return ["grub2-efi"] \
+               + LiveImageCreatorBase._get_required_packages(self)
+
+    def __copy_kernel_and_initramfs(self, isodir, version, index):
+    # Arm system not have legasy boot, only UEFI
+    # dir isolinux not needed, put vmlinuz and initrd to /LiveOS dir on iso
+        bootdir = self._instroot + "/boot"
+        makedirs(isodir+"/LiveOS/")
+        shutil.copyfile(bootdir + "/vmlinuz-" + version,
+                        isodir + "/LiveOS/vmlinuz" + index)
+        shutil.copyfile(bootdir + "/initrd-" + version + ".img",
+                        isodir + "/LiveOS/initrd" + index + ".img")
+
+    def __is_default_kernel(self, kernel, kernels):
+        if len(kernels) == 1:
+            return True
+
+        if kernel == self._default_kernel:
+            return True
+
+        if kernel.startswith(b"kernel-") and kernel[7:] == self._default_kernel:
+            return True
+
+        return False
+
+    def __copy_efi_files(self, isodir):
+        """ Copy the efi files into /EFI/BOOT/
+            If any of them are missing, return False.
+            requires:
+              gcdaa64.efi or grubcd.efi
+              fonts/unicode.pf2
+        """
+        fail = False
+        # BOOTAA64.EFI - not signed, we use grub2 directly
+        # TODO: use shim as primary bootloader when secureboot needed
+        # temporary create dir with BOOTAA64.EFI for efiboot.img
+        makedirs("/boot/del/")
+        # TODO: May be need move "del" to tempdir?
+        #WARNING! we not delete "del" dir after create iso!
+        if os.path.exists("/boot/efi/EFI/*/gcdaa64.efi"):
+            shutil.copyfile("/boot/efi/EFI/*/gcdaa64.efi",
+                            "/boot/del/BOOTAA64.EFI")
+        elif os.path.exists("/usr/share/grub2-efi/grubcd.efi"):
+            shutil.copyfile("/usr/share/grub2-efi/grubcd.efi",
+                            "/boot/del/BOOTAA64.EFI")
+
+        makedirs(isodir+"/EFI/BOOT/fonts/")
+        files = [("/boot/grub2/fonts/unicode.pf2", "/EFI/BOOT/fonts/", True),
+                ]
+
+    for src, dest, required in files:
+            src_glob = glob.glob(self._instroot+src)
+            if not src_glob:
+                if required:
+                    logging.error("Missing EFI file (%s)" % (src,))
+                    fail = True
+            else:
+                for src_file in src_glob:
+                    shutil.copy(src_file, isodir+dest)
+        return fail
+
+    def __get_basic_efi_config(self, **args):
+        return """
+set default="1"
+
+function load_video {
+  if [ x$feature_all_video_module = xy ]; then
+    insmod all_video
+  else
+    insmod efi_gop
+    insmod ieee1275_fb
+    insmod vbe
+    insmod vga
+  fi
+}
+
+load_video
+set gfxpayload=keep
+insmod gzio
+insmod part_gpt
+insmod part_msdos
+insmod ext2
+
+set timeout=%(timeout)d
+### END /etc/grub.d/00_header ###
+
+search --no-floppy --set=root -l '%(isolabel)s'
+
+### BEGIN /etc/grub.d/10_linux ###
+""" %args
+
+    def __get_efi_image_stanza(self, **args):
+        args["rootlabel"] = "live:LABEL=%(fslabel)s" % args
+        return """menuentry '%(long)s' --class fedora --class gnu-linux --class gnu --class os {
+    linux /LiveOS/vmlinuz%(index)s root=%(rootlabel)s %(liveargs)s %(extra)s
+    initrd /LiveOS/initrd%(index)s.img
+}
+""" %args
+
+    def __get_efi_image_stanzas(self, isodir, name):
+
+        kernel_options = self._get_kernel_options()
+        checkisomd5 = self._has_checkisomd5(
+
+        cfg = ""
+
+        default = self.__is_default_kernel(kernel, kernels)
+
+        if default:
+            long = self.product
+        elif kernel.startswith(b"kernel-"):
+            long = "%s (%s)" % (self.product, kernel[7:])
+        else:
+            long = "%s (%s)" % (self.product, kernel)
+
+        for index in range(0, 9):
+            cfg += self.__get_efi_image_stanza(fslabel = self.fslabel,
+                                               liveargs = kernel_options,
+                                               long = "Start " + long,
+                                               extra = "",
+                                               index = index)
+            cfg += self.__get_efi_image_stanza(fslabel = self.fslabel,
+                                               liveargs = kernel_options,
+                                               long = "Start " + long + " in basic graphics mode",
+                                               extra = "nomodeset",
+                                               index = index)
+            #FIXME: boot from local drive need help
+            cfg += """menuentry 'Boot from local drive' {
+        reboot
+}
+"""
+            break
+
+        return cfg
+
+    def _generate_efiboot(self, isodir):
+        """Generate EFI boot images."""
+        if not glob.glob("/boot/del/BOOTAA64.EFI"):
+            logging.error("Missing BOOTAA64.EFI, skipping efiboot.img creation.")
+            return
+
+        subprocess.call(["mkefiboot", "/boot/del",
+                         isodir + "/EFI/BOOT/efiboot.img"])
+
+    def _configure_efi_bootloader(self, isodir):
+        """Set up the configuration for an EFI bootloader"""
+        if self.__copy_efi_files(isodir):
+            shutil.rmtree(isodir + "/EFI")
+            logging.warning("Failed to copy EFI files, no EFI Support will be included.")
+            return
+
+        cfg = self.__get_basic_efi_config(isolabel = self.fslabel,
+                                          timeout = self._timeout)
+        cfg += self.__get_efi_image_stanzas(isodir, self.name)
+
+        cfgf = open(isodir + "/EFI/BOOT/grub.cfg", "w")
+        cfgf.write(cfg)
+        cfgf.close()
+
+    def _configure_bootloader(self, isodir):
+        self._configure_efi_bootloader(isodir)
+        self._generate_efiboot(isodir)
+        kernels = self._get_kernel_versions()
+        index = "0"
+        for kernel, version in ((k,v) for k in kernels for v in kernels[k]):
+            self.__copy_kernel_and_initramfs(isodir, version, index)
+            if index == "0":
+                isDracut = False
+                if os.path.exists(self._instroot + "/usr/bin/dracut"):
+                    isDracut = True
+                self._isDracut = isDracut
+
+            default = self.__is_default_kernel(kernel, kernels)
+
+            if default:
+                long = self.product
+            elif kernel.startswith(b"kernel-"):
+                long = "%s (%s)" % (self.product, kernel[7:])
+            else:
+                long = "%s (%s)" % (self.product, kernel)
+
 arch = dnf.rpm.basearch(hawkey.detect_arch())
 if arch in ("i386", "x86_64"):
     LiveImageCreator = x86LiveImageCreator
@@ -1034,8 +1232,8 @@ elif arch in ("ppc",):
     LiveImageCreator = ppcLiveImageCreator
 elif arch in ("ppc64",):
     LiveImageCreator = ppc64LiveImageCreator
-elif arch.startswith(("arm", "aarch64")):
-    LiveImageCreator = LiveImageCreatorBase
+elif arch in ("aarch64",):
+    LiveImageCreator = aarch64LiveImageCreator
 elif arch in ("riscv64",):
     LiveImageCreator = LiveImageCreatorBase
 else:
