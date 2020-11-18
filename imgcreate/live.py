@@ -1074,16 +1074,20 @@ class aarch64LiveImageCreator(LiveImageCreatorBase):
             If any of them are missing, return False.
             requires:
               gcdaa64.efi or grubcd.efi
+	      shim.efi (if available)
               fonts/unicode.pf2
         """
         fail = False
-        # BOOTAA64.EFI - not signed, we use grub2 directly
-        # TODO: use shim as primary bootloader when secureboot needed
         # temporary create dir with BOOTAA64.EFI for efiboot.img
         makedirs("/boot/del/")
         # TODO: May be need move "del" to tempdir?
         #WARNING! we not delete "del" dir after create iso!
-        if os.path.exists("/boot/efi/EFI/*/gcdaa64.efi"):
+        if os.path.exists("/boot/efi/EFI/*/shim.efi"):
+            shutil.copyfile("/boot/efi/EFI/*/shim.efi",
+                            "/boot/del/BOOTAA64.EFI")
+	    shutil.copyfile("/boot/efi/EFI/*/gcdaa64.efi",
+                            "/boot/del/grubaa64.efi")
+	elif os.path.exists("/boot/efi/EFI/*/gcdaa64.efi"):
             shutil.copyfile("/boot/efi/EFI/*/gcdaa64.efi",
                             "/boot/del/BOOTAA64.EFI")
         elif os.path.exists("/usr/share/grub2-efi/grubcd.efi"):
