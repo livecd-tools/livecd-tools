@@ -323,11 +323,7 @@ class LiveImageCreatorBase(LoopImageCreator):
             args += ["-iso-level", "3"]
 
         args += ["-output", iso,
-                 "-isohybrid-mbr", "/usr/share/syslinux/isohdpfx.bin",
-                 "-eltorito-boot", "isolinux/isolinux.bin",
-                 "-eltorito-catalog", "isolinux/boot.cat",
-                 "-boot-load-size", "4",
-                 "-boot-info-table", "-no-emul-boot"]
+                 "-no-emul-boot"]
 
         args.extend(self._get_xorrisofs_options(isodir))
 
@@ -395,7 +391,11 @@ class x86LiveImageCreator(LiveImageCreatorBase):
         options = []
         if os.path.exists(os.path.join(isodir, "images/efiboot.img")):
             options += ["-eltorito-alt-boot", "-e", "images/efiboot.img",
-                        "-no-emul-boot", "-isohybrid-gpt-basdat"]
+                        "-no-emul-boot", "-isohybrid-gpt-basdat"
+                        "-isohybrid-mbr", "/usr/share/syslinux/isohdpfx.bin",
+                        "-eltorito-boot", "isolinux/isolinux.bin",
+                        "-boot-load-size", "4", "-boot-info-table",
+                        "-eltorito-catalog", "isolinux/boot.cat"]
         if os.path.exists(os.path.join(isodir, "images/macboot.img")):
             options += ["-eltorito-alt-boot", "-e", "images/macboot.img",
                         "-no-emul-boot", "-isohybrid-gpt-hfsplus"]
@@ -1027,6 +1027,186 @@ class ppc64LiveImageCreator(ppcLiveImageCreator):
         return ["kernel.ppc"] + \
                ppcLiveImageCreator._get_excluded_packages(self)
 
+class aarch64LiveImageCreator(LiveImageCreatorBase):
+    """ImageCreator for aarch64 machines"""
+    def __init__(self, *args, **kwargs):
+        LiveImageCreatorBase.__init__(self, *args, **kwargs)
+        self._efiarch = None
+
+    def _get_xorrisofs_options(self, isodir):
+        options = []
+        if os.path.exists(os.path.join(isodir, "images/efiboot.img")):
+            options += ["-eltorito-alt-boot", "-e", "images/efiboot.img",
+                        "-no-emul-boot", "-hide-rr-moved"]
+        options += ["-rational-rock", "-joliet", "-volid", self.fslabel]
+        return options
+
+    def _get_required_packages(self):
+        return ["dracut"] \
+               + LiveImageCreatorBase._get_required_packages(self)
+
+    def __copy_kernel_and_initramfs(self, isodir, version, index):
+        bootdir = self._instroot + "/boot"
+        makedirs(isodir + "/LiveOS/")
+        shutil.copyfile(bootdir + "/vmlinuz-" + version,
+                        isodir + "/LiveOS/vmlinuz" + index)
+
+        isDracut = False
+        if os.path.exists(self._instroot + "/usr/bin/dracut"):
+            isDracut = True
+
+        # FIXME: Implement a better check for how the initramfs is named...
+        if os.path.exists(bootdir + "/initramfs-" + version + ".img"):
+            shutil.copyfile(bootdir + "/initramfs-" + version + ".img",
+                            isodir + "/LiveOS/initrd" + index + ".img")
+        elif os.path.exists(bootdir + "/initrd-" + version + ".img"):
+            shutil.copyfile(bootdir + "/initrd-" + version + ".img",
+                            isodir + "/LiveOS/initrd" + index + ".img")
+        elif not self.base_on:
+            logging.error("No initramfs or initrd found for %s" % (version,))
+
+        return isDracut
+
+    def __is_default_kernel(self, kernel, kernels):
+        if len(kernels) == 1:
+            return True
+
+        if kernel == self._default_kernel:
+            return True
+
+        if kernel.startswith(b"kernel-") and kernel[7:] == self._default_kernel:
+            return True
+
+        return False
+
+    def __get_local_stanza(self, isodir):
+        return """label local
+  menu label Boot from ^local drive
+  localboot 0xffff
+"""
+
+    @property
+    def efiarch(self):
+        if not self._efiarch:
+            # for most things, we want them named boot$efiarch
+            efiarch = {"aarch32": "AA32", "aarch64": "AA64"}
+            self._efiarch = efiarch[dnf.rpm.basearch(hawkey.detect_arch())]
+        return self._efiarch
+
+    def __copy_efi_files(self, isodir):
+        fail = False
+        files = [("/usr/share/grub2-efi/grubcd.efi", "/EFI/BOOT/BOOT%s.EFI" % (self.efiarch,), True),
+                 ("/usr/share/grub/unicode.pf2", "/EFI/BOOT/fonts/", True),
+                ]
+        makedirs(isodir+"/EFI/BOOT/fonts/")
+        for src, dest, required in files:
+            src_glob = glob.glob(self._instroot+src)
+            if not src_glob:
+                if required:
+                    logging.error("Missing EFI file (%s)" % (src,))
+                    fail = True
+            else:
+                shutil.copy(src_glob[0], isodir+dest)
+        return fail
+
+    def __get_basic_efi_config(self, **args):
+        return """
+set default="1"
+
+function load_video {
+  insmod efi_gop
+  insmod efi_uga
+  insmod video_bochs
+  insmod video_cirrus
+  insmod all_video
+}
+
+load_video
+set gfxpayload=keep
+insmod gzio
+insmod part_gpt
+insmod ext2
+
+set timeout=%(timeout)d
+### END /etc/grub.d/00_header ###
+
+search --no-floppy --set=root -l '%(isolabel)s'
+
+### BEGIN /etc/grub.d/10_linux ###
+""" %args
+
+    def __get_efi_image_stanza(self, **args):
+        args["rootlabel"] = "live:LABEL=%(fslabel)s" % args
+        return """menuentry '%(long)s' --class fedora --class gnu-linux --class gnu --class os {
+	linux /LiveOS/vmlinuz%(index)s root=%(rootlabel)s %(liveargs)s %(extra)s
+	initrd /LiveOS/initrd%(index)s.img
+}
+""" %args
+
+
+    def __get_efi_image_stanzas(self, isodir, name):
+        # FIXME: this only supports one kernel right now...
+        kernels = self._get_kernel_versions()
+        kernel_options = self._get_kernel_options()
+        checkisomd5 = self._has_checkisomd5()
+
+        cfg = ""
+        index = "0"
+        for kernel, version in ((k,v) for k in kernels for v in kernels[k]):
+            self.__copy_kernel_and_initramfs(isodir, version, index)
+            cfg += self.__get_efi_image_stanza(fslabel = self.fslabel,
+                                               liveargs = kernel_options,
+                                               long = "Start " + self.product,
+                                               extra = "", index = index)
+            if checkisomd5:
+                cfg += self.__get_efi_image_stanza(fslabel = self.fslabel,
+                                                   liveargs = kernel_options,
+                                                   long = "Test this media & start " + self.product,
+                                                   extra = "rd.live.check",
+                                                   index = index)
+            cfg += """
+submenu 'Troubleshooting -->' {
+"""
+            cfg += self.__get_efi_image_stanza(fslabel = self.fslabel,
+                                               liveargs = kernel_options,
+                                               long = "Start " + self.product + " in basic graphics mode",
+                                               extra = "nomodeset", index = index)
+
+            cfg+= """}
+"""
+            break
+
+        return cfg
+
+    def _generate_efiboot(self, isodir):
+        """Generate EFI boot images."""
+        if not os.path.exists(self._instroot+"/usr/share/grub2-efi/grubcd.efi"):
+            logging.error("Missing grubcd.efi, skipping efiboot.img creation.")
+            return
+        # XXX-BCL: does this need --label?
+        makedirs(isodir+"/images")
+        subprocess.call(["mkefiboot", isodir + "/EFI/BOOT/",
+                         isodir + "/images/efiboot.img"])
+
+    def _configure_efi_bootloader(self, isodir):
+        """Set up the configuration for an EFI bootloader"""
+        if self.__copy_efi_files(isodir):
+            shutil.rmtree(isodir + "/EFI")
+            logging.warning("Failed to copy EFI files, no EFI Support will be included.")
+            return
+
+        cfg = self.__get_basic_efi_config(isolabel = self.fslabel,
+                                          timeout = self._timeout)
+        cfg += self.__get_efi_image_stanzas(isodir, self.name)
+
+        cfgf = open(isodir + "/EFI/BOOT/grub.cfg", "w")
+        cfgf.write(cfg)
+        cfgf.close()
+
+    def _configure_bootloader(self, isodir):
+        self._configure_efi_bootloader(isodir)
+        self._generate_efiboot(isodir)
+
 arch = dnf.rpm.basearch(hawkey.detect_arch())
 if arch in ("i386", "x86_64"):
     LiveImageCreator = x86LiveImageCreator
@@ -1034,7 +1214,9 @@ elif arch in ("ppc",):
     LiveImageCreator = ppcLiveImageCreator
 elif arch in ("ppc64",):
     LiveImageCreator = ppc64LiveImageCreator
-elif arch.startswith(("arm", "aarch64")):
+elif arch.startswith(("aarch64")):
+    LiveImageCreator = aarch64LiveImageCreator
+elif arch.startswith(("arm")):
     LiveImageCreator = LiveImageCreatorBase
 elif arch in ("riscv64",):
     LiveImageCreator = LiveImageCreatorBase
