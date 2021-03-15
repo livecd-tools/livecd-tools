@@ -49,8 +49,15 @@ install: man
 uninstall:
 	rm -f $(DESTDIR)/usr/bin/livecd-creator
 	rm -rf $(DESTDIR)/usr/lib/livecd-creator
-	rm -rf $(DESTDIR)/usr/share/doc/livecd-tools-$(VERSION)
+	rm -rf $(DESTDIR)/usr/share/doc/livecd-tools
 	rm -f $(DESTDIR)/usr/bin/mkbiarch
+	rm -f $(DESTDIR)/usr/bin/liveimage-mount
+	rm -f $(DESTDIR)/usr/bin/livecd-iso-to-disk
+	rm -f $(DESTDIR)/usr/bin/livecd-iso-to-pxeboot
+	rm -f $(DESTDIR)/usr/bin/editliveos
+	rm -rf $(DESTDIR)/$(PYTHONDIR)/imgcreate
+	rm -f $(DESTDIR)/usr/share/man/man8/livecd-creator.8
+	rm -f $(DESTDIR)/usr/share/man/man8/livecd-iso-to-disk.8
 
 dist : all
 	git archive --format=tar --prefix=livecd-tools-$(VERSION)/ HEAD | gzip -9v > livecd-tools-$(VERSION).tar.gz
