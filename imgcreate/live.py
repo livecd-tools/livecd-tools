@@ -238,11 +238,6 @@ class LiveImageCreatorBase(LoopImageCreator):
         # XXX-BCL: does this need --label?
         subprocess.call(["mkefiboot", isodir + "/EFI/BOOT",
                          isodir + "/images/efiboot.img"])
-        subprocess.call(["mkefiboot", "-a", isodir + "/EFI/BOOT",
-                         isodir + "/images/macboot.img", "-l", self.product,
-                         "-n", "/usr/share/pixmaps/bootloader/fedora-media.vol",
-                         "-i", "/usr/share/pixmaps/bootloader/fedora.icns",
-                         "-p", self.product])
 
     def _create_bootconfig(self):
         """Configure the image so that it's bootable."""
@@ -323,11 +318,7 @@ class LiveImageCreatorBase(LoopImageCreator):
             args += ["-iso-level", "3"]
 
         args += ["-output", iso,
-                 "-isohybrid-mbr", "/usr/share/syslinux/isohdpfx.bin",
-                 "-eltorito-boot", "isolinux/isolinux.bin",
-                 "-eltorito-catalog", "isolinux/boot.cat",
-                 "-boot-load-size", "4",
-                 "-boot-info-table", "-no-emul-boot"]
+                 "-no-emul-boot"]
 
         args.extend(self._get_xorrisofs_options(isodir))
 
@@ -395,7 +386,11 @@ class x86LiveImageCreator(LiveImageCreatorBase):
         options = []
         if os.path.exists(os.path.join(isodir, "images/efiboot.img")):
             options += ["-eltorito-alt-boot", "-e", "images/efiboot.img",
-                        "-no-emul-boot", "-isohybrid-gpt-basdat"]
+                        "-no-emul-boot", "-isohybrid-gpt-basdat"
+                        "-isohybrid-mbr", "/usr/share/syslinux/isohdpfx.bin",
+                        "-eltorito-boot", "isolinux/isolinux.bin",
+                        "-boot-load-size", "4", "-boot-info-table",
+                        "-eltorito-catalog", "isolinux/boot.cat"]
         if os.path.exists(os.path.join(isodir, "images/macboot.img")):
             options += ["-eltorito-alt-boot", "-e", "images/macboot.img",
                         "-no-emul-boot", "-isohybrid-gpt-hfsplus"]
@@ -828,6 +823,14 @@ submenu 'Troubleshooting -->' {
             os.link(isodir + "/EFI/BOOT/BOOT%s.EFI" % (self.efiarch),
                     isodir + "/EFI/BOOT/BOOT.EFI")
 
+    def _generate_efiboot(self, isodir):
+        LiveImageCreatorBase._generate_efiboot(self, isodir)
+        # add macboot data
+        subprocess.call(["mkefiboot", "-a", isodir + "/EFI/BOOT",
+                         isodir + "/images/macboot.img", "-l", self.product,
+                         "-n", "/usr/share/pixmaps/bootloader/fedora-media.vol",
+                         "-i", "/usr/share/pixmaps/bootloader/fedora.icns",
+                         "-p", self.product])
 
     def _configure_bootloader(self, isodir):
         self._configure_syslinux_bootloader(isodir)
