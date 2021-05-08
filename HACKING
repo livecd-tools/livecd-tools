@@ -4,7 +4,7 @@ SOURCE CONTROL MANAGEMENT
 
 This project is stored in git and can be checked out using
 
- git clone https://github.com/rhinstaller/livecd-tools
+ git clone https://github.com/livecd-tools/livecd-tools
 
 Change history etc. can be obtained from the web interface at the same URL.
 
