@@ -231,7 +231,7 @@ class LiveImageCreatorBase(LoopImageCreator):
 
     def _generate_efiboot(self, isodir):
         """Generate EFI boot images."""
-        if not glob.glob(self._instroot+"/boot/efi/EFI/*/shim.efi"):
+        if not glob.glob(self._instroot+"/boot/efi/EFI/*/shim*.efi"):
             logging.error("Missing shim.efi, skipping efiboot.img creation.")
             return
 
@@ -398,7 +398,9 @@ class x86LiveImageCreator(LiveImageCreatorBase):
         return options
 
     def _get_required_packages(self):
-        return ["syslinux"] \
+        return ["grub2-efi-x64", "grub2-efi-x64-cdboot", "shim-x64"] \
+               + ["grub2-efi-ia32", "grub2-efi-ia32-cdboot", "shim-ia32"] \
+               + ["syslinux"] \
                + LiveImageCreatorBase._get_required_packages(self)
 
     def _get_isolinux_stanzas(self, isodir):
@@ -709,13 +711,14 @@ menu end
         """ Copy the efi files into /EFI/BOOT/
             If any of them are missing, return False.
             requires:
-              shim.efi
+              shimx64.efi
               gcdx64.efi
               fonts/unicode.pf2
         """
         fail = False
-        files = [("/boot/efi/EFI/*/shim.efi", "/EFI/BOOT/BOOT%s.EFI" % (self.efiarch,), True),
-                 ("/boot/efi/EFI/*/gcdx64.efi", "/EFI/BOOT/grubx64.efi", True),
+        files = [("/boot/efi/EFI/*/shim%s.efi" % (self.efiarch.lower(),), "/EFI/BOOT/BOOT%s.EFI" % (self.efiarch,), True),
+                 ("/boot/efi/EFI/*/gcd%s.efi" % (self.efiarch.lower(),), "/EFI/BOOT/grub%s.efi" % (self.efiarch.lower(),), True),
+                 ("/boot/efi/EFI/*/shimia32.efi", "/EFI/BOOT/BOOTIA32.EFI", False),
                  ("/boot/efi/EFI/*/gcdia32.efi", "/EFI/BOOT/grubia32.efi", False),
                  ("/boot/efi/EFI/*/fonts/unicode.pf2", "/EFI/BOOT/fonts/", True),
                 ]
