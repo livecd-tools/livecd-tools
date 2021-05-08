@@ -82,6 +82,7 @@ class LiveImageCreatorBase(LoopImageCreator):
                           "virtio_balloon", "virtio-rng"]
 
         self._isofstype = "iso9660"
+        self._isDracut = True
         self.base_on = False
 
         self.title = title
