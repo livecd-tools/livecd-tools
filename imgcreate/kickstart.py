@@ -51,8 +51,10 @@ def read_kickstart(path):
     version = ksversion.makeVersion()
     ks = ksparser.KickstartParser(version)
     try:
-        ksfile = urlgrabber.urlgrab(path)
-        ks.readKickstart(ksfile)
+        tmpks = '.kstmp.{}'.format(os.getpid())
+        ksfile = urlgrabber.urlgrab(path, filename=tmpks)
+        ks.readKickstart(tmpks)
+        os.unlink (tmpks)
 # Fallback to e.args[0] is a workaround for bugs in urlgragger and pykickstart.
     except IOError as e:
         raise errors.KickstartError("Failed to read kickstart file "
