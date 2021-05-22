@@ -387,7 +387,7 @@ class x86LiveImageCreator(LiveImageCreatorBase):
         options = []
         if os.path.exists(os.path.join(isodir, "images/efiboot.img")):
             options += ["-eltorito-alt-boot", "-e", "images/efiboot.img",
-                        "-no-emul-boot", "-isohybrid-gpt-basdat"
+                        "-no-emul-boot", "-isohybrid-gpt-basdat",
                         "-isohybrid-mbr", "/usr/share/syslinux/isohdpfx.bin",
                         "-eltorito-boot", "isolinux/isolinux.bin",
                         "-boot-load-size", "4", "-boot-info-table",
