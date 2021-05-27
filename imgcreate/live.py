@@ -238,7 +238,7 @@ class LiveImageCreatorBase(LoopImageCreator):
 
         # XXX-BCL: does this need --label?
         subprocess.call(["mkefiboot", isodir + "/EFI/BOOT",
-                         isodir + "/images/efiboot.img"])
+                         isodir + "/isolinux/efiboot.img"])
 
     def _create_bootconfig(self):
         """Configure the image so that it's bootable."""
@@ -385,15 +385,15 @@ class x86LiveImageCreator(LiveImageCreatorBase):
 
     def _get_xorrisofs_options(self, isodir):
         options = []
-        if os.path.exists(os.path.join(isodir, "images/efiboot.img")):
-            options += ["-eltorito-alt-boot", "-e", "images/efiboot.img",
+        if os.path.exists(os.path.join(isodir, "isolinux/efiboot.img")):
+            options += ["-eltorito-alt-boot", "-e", "isolinux/efiboot.img",
                         "-no-emul-boot", "-isohybrid-gpt-basdat",
                         "-isohybrid-mbr", "/usr/share/syslinux/isohdpfx.bin",
                         "-eltorito-boot", "isolinux/isolinux.bin",
                         "-boot-load-size", "4", "-boot-info-table",
                         "-eltorito-catalog", "isolinux/boot.cat"]
-        if os.path.exists(os.path.join(isodir, "images/macboot.img")):
-            options += ["-eltorito-alt-boot", "-e", "images/macboot.img",
+        if os.path.exists(os.path.join(isodir, "isolinux/macboot.img")):
+            options += ["-eltorito-alt-boot", "-e", "isolinux/macboot.img",
                         "-no-emul-boot", "-isohybrid-gpt-hfsplus"]
         options += ["-rational-rock", "-joliet", "-volid", self.fslabel]
         return options
@@ -831,7 +831,7 @@ submenu 'Troubleshooting -->' {
         LiveImageCreatorBase._generate_efiboot(self, isodir)
         # add macboot data
         subprocess.call(["mkefiboot", "-a", isodir + "/EFI/BOOT",
-                         isodir + "/images/macboot.img", "-l", self.product,
+                         isodir + "/isolinux/macboot.img", "-l", self.product,
                          "-n", "/usr/share/pixmaps/bootloader/fedora-media.vol",
                          "-i", "/usr/share/pixmaps/bootloader/fedora.icns",
                          "-p", self.product])
