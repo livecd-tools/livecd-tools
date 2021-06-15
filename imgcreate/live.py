@@ -384,14 +384,13 @@ class x86LiveImageCreator(LiveImageCreatorBase):
         self._efiarch = None
 
     def _get_xorrisofs_options(self, isodir):
-        options = []
+        options = ["-eltorito-boot", "isolinux/isolinux.bin",
+                   "-no-emul-boot", "-boot-info-table", "-boot-load-size", "4",
+                   "-eltorito-catalog", "isolinux/boot.cat",
+                   "-isohybrid-mbr", "/usr/share/syslinux/isohdpfx.bin"]
         if os.path.exists(os.path.join(isodir, "isolinux/efiboot.img")):
             options += ["-eltorito-alt-boot", "-e", "isolinux/efiboot.img",
-                        "-no-emul-boot", "-isohybrid-gpt-basdat",
-                        "-isohybrid-mbr", "/usr/share/syslinux/isohdpfx.bin",
-                        "-eltorito-boot", "isolinux/isolinux.bin",
-                        "-boot-load-size", "4", "-boot-info-table",
-                        "-eltorito-catalog", "isolinux/boot.cat"]
+                        "-no-emul-boot", "-isohybrid-gpt-basdat"]
         if os.path.exists(os.path.join(isodir, "isolinux/macboot.img")):
             options += ["-eltorito-alt-boot", "-e", "isolinux/macboot.img",
                         "-no-emul-boot", "-isohybrid-gpt-hfsplus"]
