@@ -398,9 +398,7 @@ class x86LiveImageCreator(LiveImageCreatorBase):
         return options
 
     def _get_required_packages(self):
-        return ["grub2-efi-x64", "grub2-efi-x64-cdboot", "shim-x64"] \
-               + ["grub2-efi-ia32", "grub2-efi-ia32-cdboot", "shim-ia32"] \
-               + ["syslinux"] \
+        return ["syslinux"] \
                + LiveImageCreatorBase._get_required_packages(self)
 
     def _get_isolinux_stanzas(self, isodir):
