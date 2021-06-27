@@ -134,12 +134,7 @@ class LiveImageCreatorBase(LoopImageCreator):
     #
     def _has_checkisomd5(self):
         """Check whether checkisomd5 is available in the install root."""
-        for c in '/usr/lib/anaconda-runtime/checkisomd5', 'checkisomd5':
-            if chrootentitycheck(c, self._instroot):
-                return True
-                break
-        else:
-            return False
+        return chrootentitycheck('checkisomd5', self._instroot)
 
     #
     # Actual implementation
