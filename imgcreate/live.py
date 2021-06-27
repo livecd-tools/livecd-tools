@@ -1187,6 +1187,7 @@ submenu 'Troubleshooting -->' {
 
     def _configure_efi_bootloader(self, isodir):
         """Set up the configuration for an EFI bootloader"""
+        makedirs(isodir + "/isolinux")
         if self.__copy_efi_files(isodir):
             shutil.rmtree(isodir + "/EFI")
             logging.warning("Failed to copy EFI files, no EFI Support will be included.")
