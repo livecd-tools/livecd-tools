@@ -1041,8 +1041,8 @@ class aarch64LiveImageCreator(LiveImageCreatorBase):
 
     def _get_xorrisofs_options(self, isodir):
         options = []
-        if os.path.exists(os.path.join(isodir, "images/efiboot.img")):
-            options += ["-eltorito-alt-boot", "-e", "images/efiboot.img",
+        if os.path.exists(os.path.join(isodir, "isolinux/efiboot.img")):
+            options += ["-eltorito-alt-boot", "-e", "isolinux/efiboot.img",
                         "-no-emul-boot", "-hide-rr-moved"]
         options += ["-rational-rock", "-joliet", "-volid", self.fslabel]
         return options
