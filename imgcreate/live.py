@@ -232,8 +232,8 @@ class LiveImageCreatorBase(LoopImageCreator):
 
     def _generate_efiboot(self, isodir):
         """Generate EFI boot images."""
-        if not glob.glob(self._instroot+"/boot/efi/EFI/*/shim*.efi"):
-            logging.error("Missing shim.efi, skipping efiboot.img creation.")
+        if not glob.glob(isodir + "/EFI/BOOT/BOOT*.EFI"):
+            logging.error("Missing initial EFI bootloader, skipping efiboot.img creation.")
             return
 
         # XXX-BCL: does this need --label?
