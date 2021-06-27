@@ -703,7 +703,12 @@ menu end
     def efiarch(self):
         if not self._efiarch:
             # for most things, we want them named boot$efiarch
-            efiarch = {"i386": "IA32", "x86_64": "X64"}
+            # Note that AA64 and IA32 are in uppercase but x64 is in lowercase
+            # according to the UEFI specification
+            # "Unified Extensible Firmware Interface (UEFI) Specification, Version 2.7 Errata A, August 2017"
+            # https://uefi.org/sites/default/files/resources/UEFI%20Spec%202_7_A%20Sept%206.pdf
+            # 3.5.1.1 Removable Media Boot Behavior, Table 14. UEFI Image Types, page 159
+            efiarch = {"i386": "IA32", "x86_64": "x64"}
             self._efiarch = efiarch[dnf.rpm.basearch(hawkey.detect_arch())]
         return self._efiarch
 
