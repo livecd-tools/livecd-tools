@@ -728,7 +728,7 @@ menu end
 
     def __get_basic_efi_config(self, **args):
         return """
-set default="1"
+set default="0"
 
 function load_video {
   insmod efi_gop
@@ -1111,7 +1111,7 @@ class aarch64LiveImageCreator(LiveImageCreatorBase):
 
     def __get_basic_efi_config(self, **args):
         return """
-set default="1"
+set default="0"
 
 function load_video {
   insmod efi_gop
