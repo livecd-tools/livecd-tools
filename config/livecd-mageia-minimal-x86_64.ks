@@ -1,7 +1,7 @@
 lang en_US.UTF-8
 keyboard us
 timezone US/Eastern
-auth --useshadow --passalgo=sha512
+authselect select sssd with-silent-lastlog --force
 selinux --disabled
 firewall --disabled
 part / --size 1536
