@@ -788,7 +788,7 @@ class ImageCreator(object):
         kickstart.LanguageConfig(self._instroot).apply(ksh.lang)
         kickstart.KeyboardConfig(self._instroot).apply(ksh.keyboard)
         kickstart.TimezoneConfig(self._instroot).apply(ksh.timezone)
-        kickstart.AuthConfig(self._instroot).apply(ksh.authconfig)
+        kickstart.AuthSelect(self._instroot).apply(ksh.authselect)
         kickstart.FirewallConfig(self._instroot).apply(ksh.firewall)
         kickstart.RootPasswordConfig(self._instroot).apply(ksh.rootpw)
         kickstart.ServicesConfig(self._instroot).apply(ksh.services)

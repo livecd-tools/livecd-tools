@@ -179,17 +179,16 @@ class TimezoneConfig(KickstartConfig):
                 os.unlink(localtime)
             os.symlink("/usr/share/zoneinfo/%s" %(tz,), localtime)
 
-class AuthConfig(KickstartConfig):
-    """A class to apply a kickstart authconfig configuration to a system."""
-    def apply(self, ksauthconfig):
+class AuthSelect(KickstartConfig):
+    """A class to apply a kickstart authselect configuration to a system."""
+    def apply(self, ksauthselect):
 
-        auth = ksauthconfig.authconfig or "--useshadow --enablemd5"
-        args = ["authconfig", "--update", "--nostart"]
+        auth = ksauthselect.authselect or "select sssd with-silent-lastlog --force"
         try:
-            subprocess.call(args + auth.split(), preexec_fn=self.chroot)
+            subprocess.call(['authselect'] + auth.split(), preexec_fn=self.chroot)
         except OSError as e:
             if e.errno == errno.ENOENT:
-                logging.info('The authconfig command is not available.')
+                logging.info('The authselect command is not available.')
                 return
 
 class FirewallConfig(KickstartConfig):
