@@ -4,7 +4,7 @@
 # Copyright 2007-2012, Red Hat, Inc.
 # Copyright 2016-2018, Kevin Kofler
 # Copyright 2016, Neal Gompa
-# Copyright 2017-2018, Fedora Project
+# Copyright 2017-2021, Fedora Project
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -365,6 +365,11 @@ class LiveImageCreatorBase(LoopImageCreator):
                            self.__isodir + "/LiveOS/squashfs.img",
                            self.compress_args, ops)
                 self._LoopImageCreator__instloop.cleanup()
+                if self.docleanup:
+                    if os_image == self._instroot:
+                        os.remove(self._image)
+                    else:
+                        os.remove(os.path.join(os_image, 'LiveOS', 'rootfs.img'))
 
             self.__create_iso(self.__isodir)
         finally:
