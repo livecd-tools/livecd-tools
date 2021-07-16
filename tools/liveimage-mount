@@ -6,7 +6,7 @@
 #
 # Copyright 2011, Red Hat, Inc.
 # Copyright 2016, Neal Gompa
-# Copyright 2017-2019, Sugar Labs®
+# Copyright 2017-2021, Sugar Labs®
 #   Code for Live mounting an attached LiveOS device added by Frederick Grose,
 #   <fgrose at sugarlabs.org>
 #   Ported to Python 3 by Neal Gompa <ngompa13 at gmail.com>
@@ -24,7 +24,6 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
-from __future__ import print_function
 import os
 import sys
 import stat
@@ -209,7 +208,7 @@ def mount(userargs, ops=None):
 def loop_setup(path, ops=None):
     """Make and associate a loop device with an image file or device."""
 
-    args = ['losetup', '--direct-io', '-P', '-f', '--show', path]
+    args = ['losetup', '-P', '-f', '--show', path]
     if ops:
         args += ops.split()
     return rcall(args)[0].rstrip()
@@ -419,13 +418,14 @@ def main():
                 loop_detach(homedev)
         if os.path.exists(os.path.join('/dev', 'mapper', 'EncHome' + X)):
             cryptsetup('close EncHome')
-        if os.path.exists(os.path.join('/dev', 'mapper', 'live-rw' + X)):
-            dmsetup('remove --retry live-rw' + X)
-        loop_detach(tmpoverlayloop)
-        if os.path.exists(os.path.join('/dev', 'mapper', 'live-ro' + X)):
-            dmsetup('remove --retry live-ro' + X)
-        loop_detach(overlayloop)
-        loop_detach(imgloop)
+        if not overlayfs:
+            if os.path.exists(os.path.join('/dev', 'mapper', 'live-rw' + X)):
+                dmsetup('remove --deferred --retry live-rw' + X)
+            loop_detach(tmpoverlayloop)
+            if os.path.exists(os.path.join('/dev', 'mapper', 'live-ro' + X)):
+                dmsetup('remove --deferred --retry live-ro' + X)
+            loop_detach(overlayloop)
+            loop_detach(imgloop)
         if os.path.ismount(squashmnt):
             call(['umount', '-d', squashmnt])
         if unmount == 'yes':
@@ -778,10 +778,12 @@ def main():
         if mount_hacks:
             subprocess.check_call(['mount', '-t', 'proc', 'proc',
                              os.path.join(destmnt, 'proc')], stderr=sys.stderr)
-            subprocess.check_call(['mount', '-t', 'tmpfs', 'tmpfs',
+            subprocess.check_call(['mount', '--bind', '/run',
                        os.path.join(destmnt, 'run')], stderr=sys.stderr)
-            subprocess.check_call(['mount', '-t', 'sysfs', 'sys',
+            subprocess.check_call(['mount', '--bind', '/sys',
                 os.path.join(destmnt, 'sys')], stderr=sys.stderr)
+            subprocess.check_call(['mount', '--bind', '/dev',
+                       os.path.join(destmnt, 'dev')], stderr=sys.stderr)
             tmpfs = os.path.join(destmnt, 'dev', 'pts')
             if not os.path.exists(tmpfs):
                 os.makedirs(tmpfs)
