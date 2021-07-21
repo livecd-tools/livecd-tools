@@ -388,12 +388,14 @@ class x86LiveImageCreator(LiveImageCreatorBase):
                    "-no-emul-boot", "-boot-info-table", "-boot-load-size", "4",
                    "-eltorito-catalog", "isolinux/boot.cat",
                    "-isohybrid-mbr", "/usr/share/syslinux/isohdpfx.bin"]
-        if os.path.exists(os.path.join(isodir, "isolinux/efiboot.img")):
-            options += ["-eltorito-alt-boot", "-e", "isolinux/efiboot.img",
-                        "-no-emul-boot", "-isohybrid-gpt-basdat"]
-        if os.path.exists(os.path.join(isodir, "isolinux/macboot.img")):
-            options += ["-eltorito-alt-boot", "-e", "isolinux/macboot.img",
-                        "-no-emul-boot", "-isohybrid-gpt-hfsplus"]
+        dirs = ["images", "isolinux"]
+        for img in (("efiboot.img", "basdat"), ("macboot.img", "hfsplus")):
+            for d in dirs:
+                if os.path.exists(os.path.join(isodir, d, img[0])):
+                    options += ["-eltorito-alt-boot", "-e", d + "/" + img[0],
+                                "-no-emul-boot", "-isohybrid-gpt-" + img[1]]
+                    dirs = [d]
+                    break
         options += ["-rational-rock", "-joliet", "-volid", self.fslabel]
         return options
 
