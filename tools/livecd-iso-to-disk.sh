@@ -470,8 +470,9 @@ if (( $# < 2 )); then
 fi
 
 error_report() {
-    echo "Error detected at line $(caller)" >&2
-    exitclean err
+    RETVAL=$?
+    printf "Error %s detected at line %s\n" $RETVAL "$(caller)" >&2
+    exitclean $RETVAL
 }
 
 checkForSyslinux() {
@@ -540,12 +541,13 @@ cleanup() {
 }
 
 exitclean() {
-    local RETVAL=$?
+    RETVAL=${1:-$?}
     if [[ -d $IMGMNT || -d $SRCMNT || -d $TGTMNT ]]; then
         [[ $RETVAL == 0 ]] || echo "Cleaning up to exit..."
         cleansrc
         cleanup $RETVAL
     fi
+    trap - EXIT
     exit $RETVAL
 }
 
@@ -559,14 +561,19 @@ checkinput() {
             local re='[1-9]*([0-9])'
             case $val in
                 $re)
-                    return 0
-                    ;;
-                0*)
-                    echo -e "\nERROR: '$val' is not a valid integer entry.\n"
-                    exit 1
+                    if (($val < 512)); then
+                        echo -e "
+                        NOTE: '$val MiB' may be small for an image partition."
+                        exit 1
+                    else
+                        return 0
+                    fi
                     ;;
                 *)
-                    return 1
+                    echo -e "
+                    ERROR: '$val' is not a valid integer entry for format size
+                                  in MiB.\n"
+                    exit 1
             esac
             ;;
         timeout)
@@ -1072,20 +1079,22 @@ checkGPT() {
         exitclean
     fi
 
-    if ! [[ ${partinfo} =~ ':EFI System Partition:' ]]; then
-        printf "\n        ALERT:
-        The partition name must be 'EFI System Partition'.\n
-        This can be set with a partition editor, such as parted."
-        exitclean
-    fi
-    if ! [[ $partinfo =~ ':EFI System Partition:boot,' ]]; then
-        printf "\n        ATTENTION:
-        The partition isn't marked bootable!\n
-        You can mark the partition as bootable with the following commands:\n
-        # parted %s
- (parted) toggle <N> boot
- (parted) quit\n\n" $device
-        exitclean
+    if [[ -z $noesp ]]; then
+        if ! [[ ${partinfo} =~ ':EFI System Partition:' ]]; then
+            printf "\n        ALERT:
+            The partition name must be 'EFI System Partition'.\n
+            This can be set with a partition editor, such as parted.\n\n"
+            exitclean
+        fi
+        if ! [[ $partinfo =~ ':EFI System Partition:boot,' ]]; then
+            printf "\n        ATTENTION:
+            The partition isn't marked bootable!\n
+            Mark the partition as bootable with the following commands:\n
+            # parted %s
+     (parted) toggle <N> boot
+     (parted) quit\n\n" $device
+            exitclean
+        fi
     fi
 }
 
@@ -1289,7 +1298,7 @@ checkMounted() {
         if [[ -z ${format[1]} ]]; then
             live_mp=''
             for d in ${tgtdev}*; do
-                local mountpoint=($(findmnt -nro TARGET $d))
+                local mountpoint=($(findmnt -nro TARGET $d || :))
                 for m in "${mountpoint[@]}"; do
                     if [[ -n $m ]]; then
                         printf "\n   NOTICE:  '%s' is mounted at '%s'." $d "$m"
@@ -1747,7 +1756,7 @@ case $overlayfs in
             will use a union mount directory and does not need a
             separate --overlay-size-mb persistent overlay file.
             The option \033[1m--overlay-size-mb %s\033[0m will be ignored.
-            ' $TGTFS $(f)
+            \n\r' $TGTFS $(f)
             unset -v overlaysizeb
         fi
 esac
@@ -2078,20 +2087,39 @@ MiB () {
 
 checkDiskSpace () {
     if [[ -n ${format[1]} ]]; then
+        # f2fs has greater relative overhead at smaller sizes.
+        ((m == 4)) && ((format < 2300<<20)) && m=3
         # Filesystem metadata allowance
         local m=$((format>>m))
-        ((format-=tba+m)) || :
-        available=$format
+        i=$((tba+m))
+        if ((free < 0 )); then
+            printf '\n  ALERT:
+            The requested primary partition size, %s MiB, is %s MiB larger than
+            the available free space on this device.\n' $(MiB format) $(MiB -free)
+            d=$((p2s+p3s))
+            ((d+free > 0)) && d="
+                The --noesp option will avoid the $(MiB d) MiB needed for the
+                EFI System Partition and Apple HFS+ partition.\n" && printf "$d"
+            printf "\n          Please adjust your request.\n"
+        fi
+        if ((format < i )); then
+            printf '\n  ALERT:
+            The requested primary partition size, %s MiB, is %s MiB smaller
+            than the %s MiB installation space estimated for this image.\n
+            Please adjust your request.\n' $(MiB format) $(MiB i-format) $(MiB i)
+        fi
+        i=$format
+        available=$((format-tba-m))
         if ((free < 0)); then
             available=$free
         fi
-        ((format+=tba+m)) || :
         ((tba+=m+p2s+p3s+oio+z))
         tbd=0
     else
+        free=$((available+tbd))
         ((available-=tba-tbd)) || :
     fi
-    if ((available < 100<<20)) || ((free < 0)); then
+    if ((available < 100<<20)) || ((free < 0)) || ((format < i)); then
         local s t u
         if ((available < 0)); then
             s='may NOT fit in the space available on the target device.'
@@ -2106,7 +2134,15 @@ checkDiskSpace () {
         printf "\n  The live image + overlay, home, & swap space, if requested,
         \r  %s\n\n" "$s"
         [[ -n ${format[1]} ]] &&
-            printf "  + Total disk space: %12s  MiB\n" $(MiB f)
+            printf "    Total disk space: %12s  MiB\n" $(MiB f) &&
+            printf "  + Allocated space: %13s  MiB\n" $(MiB i) ||
+            printf "    Available space: %13s  MiB\n" $(MiB free)
+        if [[ ${format[1]} ]]; then
+            ((format != free)) &&
+            printf "    Unallocated free space:  %5s\n" $(MiB $((free+z)))
+        else
+            printf "    Free space shortage: %9s\n" $(MiB available)
+        fi
         printf "    ==============================\n"
         printf "\r    Size of live image: %10s  MiB\n" $(MiB livesize)
         [[ -n $overlaysizeb ]] &&
@@ -2134,8 +2170,6 @@ checkDiskSpace () {
         fi
         printf "    ==============================\n"
         printf "  - Total required space:  %7s  MiB\n\n" $(MiB tba)
-        ((format != free)) &&
-            printf "    Unallocated free space:  %5s\n" $(MiB $((free+z)))
         printf "    ==============================\n"
         printf "\n  To %s
         \r  free space on the target, or adjust the
@@ -2189,15 +2223,8 @@ if [[ -n ${format[1]} && -z $skipcopy ]]; then
         fi
     fi
     ((free-=oio+z+p2s+p3s))
-    if ((free < format )); then
-        printf '\n  ALERT:
-        The requested primary partition size, %s MiB, is larger than
-        the available free space, %s MiB, on this device for this image.\n
-        Please adjust your request.\n\n' $(MiB $format) $(MiB $free)
-        exitclean
-    fi
     if [[ -z $format ]]; then
-        # unspecified partition size
+        # unspecified partition size case
         format=$free
     else
         ((free-=format)) || :
@@ -2698,7 +2725,7 @@ config_efi() {
     if [[ $TGTMNT/EFI -ef $SRCMNT/EFI ]]; then
         cp $BOOTCONFIG_EFI.multi $BOOTCONFIG_EFI
     else
-        cp -Trup $SRCMNT$EFI_BOOT $TGTMNT$T_EFI_BOOT
+        cp -Trup $SRCMNT$EFI_BOOT $TGTMNT$T_EFI_BOOT >/dev/null 2>&1 || :
         cp $SRCMNT$EFI_BOOT/grub.cfg $TGTMNT$T_EFI_BOOT
 
         rm -f $TGTMNT$T_EFI_BOOT/grub.conf
@@ -3351,7 +3378,7 @@ case $TGTFS in
         # extlinux expects the config to be named extlinux.conf
         # and has to be run with the file system mounted.
         if [[ $syslinuxboot != missing ]]; then
-            extlinux -i $TGTMNT/$BOOTPATH || :  # >/dev/null 2>&1
+            extlinux -i $TGTMNT/$BOOTPATH || :
         fi
         # Starting with syslinux 4, ldlinux.sys is used on all file systems.
         if [[ -f $TGTMNT/$BOOTPATH/extlinux.sys ]]; then
@@ -3378,3 +3405,4 @@ See https://fedoraproject.org/wiki/LiveOS_image#Flash-Friendly_File_System_.28F2
     for more information.\n\n' $TGTDEV
 fi
 [[ $msg ]] && printf "$msg\n\n" || :
+trap - EXIT
