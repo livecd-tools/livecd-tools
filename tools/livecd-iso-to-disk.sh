@@ -190,8 +190,9 @@ usage() {
         When --efi is used without --format but with --reset-mbr,
           it loads a hybrid (EFI)/MBR bootloader on the device.
 
-     --noesp    (Used with --format.)
-        Skip the formatting of an EFI System Partition and Mac boot partition.
+     --noesp    (Used with --format)
+        Skips the formatting of a secondary EFI System Partition and
+          an Apple HFS+ boot partition.
         NOTE: Even with this option, EFI components are configured and loaded
               on the primary partition if they are present on the source.
 
@@ -199,7 +200,8 @@ usage() {
         Sets the Master Boot Record (MBR) of the target storage device to the
         mbr.bin or gptmbr.bin file from the installation system's syslinux
         directory.  This may be helpful in recovering a damaged or corrupted
-        device.
+        device.  Also sets the legacy_boot flag on the primary partition for
+        GPT disks.
 
     --multi
         Signals the boot configuration to accommodate multiple images on the
@@ -470,8 +472,9 @@ if (( $# < 2 )); then
 fi
 
 error_report() {
-    echo "Error detected at line $(caller)" >&2
-    exitclean err
+    RETVAL=$?
+    printf "Error %s detected at line %s\n" $RETVAL "$(caller)" >&2
+    exitclean $RETVAL
 }
 
 checkForSyslinux() {
@@ -490,8 +493,8 @@ checkForSyslinux() {
 }
 
 fscheck() {
-    fstype=$1
-    fs=$2
+    local fstype=$1
+    local fs=$2
     case $fstype in
         ext[432])
             e2fsck -yfv $fs || :
@@ -519,10 +522,12 @@ cleansrc() {
 }
 
 cleanup() {
+    sync -f $TGTMNT/$LIVEOS/
     losetup -d $l2 $l3 &> /dev/null || :
     if [[ -d $SRCMNT && -z $SRCwasMounted ]]; then
-        umount -d $SRCMNT && rmdir $SRCMNT
+        umount $SRCMNT && rmdir $SRCMNT
     fi
+    umount $TGTMNT
     for p in $(findmnt -nro TARGET -S $TGTDEV || :); do
         umount -l $p
     done
@@ -540,12 +545,13 @@ cleanup() {
 }
 
 exitclean() {
-    local RETVAL=$?
+    RETVAL=${1:-$?}
     if [[ -d $IMGMNT || -d $SRCMNT || -d $TGTMNT ]]; then
         [[ $RETVAL == 0 ]] || echo "Cleaning up to exit..."
         cleansrc
         cleanup $RETVAL
     fi
+    trap - EXIT
     exit $RETVAL
 }
 
@@ -559,14 +565,19 @@ checkinput() {
             local re='[1-9]*([0-9])'
             case $val in
                 $re)
-                    return 0
-                    ;;
-                0*)
-                    echo -e "\nERROR: '$val' is not a valid integer entry.\n"
-                    exit 1
+                    if (($val < 512)); then
+                        echo -e "
+                        NOTE: '$val MiB' may be small for an image partition."
+                        exit 1
+                    else
+                        return 0
+                    fi
                     ;;
                 *)
-                    return 1
+                    echo -e "
+                    ERROR: '$val' is not a valid integer entry for format size
+                                  in MiB.\n"
+                    exit 1
             esac
             ;;
         timeout)
@@ -781,6 +792,15 @@ getdisk() {
         local d=$(readlink -nf /sys/$p/../)
         device=${d##*/}
     fi
+    if [[ $device =~ loop ]] &&
+        ! [[ $'\n'$(lsblk -nro NAME /dev/loop[0-9]
+                    )$'\n' =~ $'\n'${device}$'\n' ]]; then
+        printf "\n        ALERT:
+        The loop device, '%s' is not attached or available.\n
+        Please attach this device or adjust your request.
+        Exiting...\n" $dev
+        exitclean
+    fi
     if [[ -z $device || ! -d /sys/block/$device || ! -b /dev/$device ]]; then
         echo -e "\n>>>  Error finding block device of '$dev'.  Aborting!\n"
         exitclean
@@ -791,11 +811,14 @@ getdisk() {
     partnum=${d##$device}
     # Strip off leading p from partnum, e.g., with /dev/mmcblk0p1
     partnum=${partnum##p}
+    ! [[ $partnum ]] && partnum=1
+    p2=$(get_partition_name $device $((partnum+1)))
+    p3=$(get_partition_name $device $((partnum+2)))
 }
 
 get_partition_name() {
     # Return an appropriate name for partition $2. Devices that end with a
-    # digit need to have a 'p' appended before the partition number.
+    # digit need to have a 'p' prepended to the partition number.
     local dev=$1
     local pn=$2
 
@@ -833,8 +856,10 @@ resetMBR() {
             echo 'Could not find gptmbr.bin (SYSLINUX).'
             exitclean
         fi
-        # Make the partition bootable from BIOS
-        run_parted --script $device set $partnum legacy_boot on
+        if [[ $resetmbr ]]; then
+            # Make the partition bootable from BIOS.
+            run_parted --script $device set $partnum legacy_boot on
+        fi
     else
         if [[ -f /usr/lib/syslinux/mbr.bin ]]; then
             cat /usr/lib/syslinux/mbr.bin > $device
@@ -858,7 +883,7 @@ checkMBR() {
         Do you want to replace the MBR on this device?
         Press Enter to continue, or Ctrl C to abort.'
         read
-        resetMBR $1
+        resetMBR
     fi
     return 0
 }
@@ -921,7 +946,7 @@ mkfs_config() {
         ext2)
             # mkfs.ext[432] maximum label length is 16 bytes.
             _label="${lbl[*]::16}"
-            [[ $fs == dev ]] && ops+='-O ^64bit '
+            [[ $_64bit ]] && [[ $fs == dev ]] && ops+='-O ^64bit '
             ops+="-F -L $_label"
             [[ -n $bs ]] && ops+=' -vb '$bs
             if [[ -n $fn ]]; then
@@ -987,20 +1012,20 @@ createFSLayout() {
     local pt=primary
     local pn=''
     f=$TGTFS
+    local boot='set 1 boot on'
     if [[ -z $noesp ]]; then
         # Allow 1 MiB gap.
         ((format-=1<<20))
+    else
+        boot+=' set 1 esp on'
     fi
     local end=$((oio+format))
-    local boot='set 1 boot on'
     if [[ -n $efi ]]; then
         partition_label_type=gpt
         pt=''
         pn="${label:=LIVE}"
-        boot=''
+        boot+=' set 1 legacy_boot on'
     fi
-    # For resetMBR or checkPartActive:
-    partnum=1
 
     mkfs_config dev "${label:=LIVE}" format
     run_parted --script $device mklabel $partition_label_type
@@ -1017,10 +1042,8 @@ createFSLayout() {
     if [[ -n $l2 ]]; then
         if [[ $partition_label_type == gpt ]]; then
             pn='"EFI System Partition"'
-            boot='set 2 boot on'
-        else
-            boot='set 2 esp on'
         fi
+        boot='set 2 esp on'
         run_parted --script $device unit B mkpart $pt "$pn" fat32 \
                      $end $((end+p2s-(1<<20))) $boot
         echo 'Waiting for devices to settle...'
@@ -1054,8 +1077,7 @@ createFSLayout() {
 }
 
 checkGPT() {
-    local dev=$1
-    
+
     local partinfo=$(run_parted --script -m $device 'print')
     if ! [[ ${partinfo} =~ :gpt: ]]; then
         printf '\n        ATTENTION:
@@ -1072,19 +1094,16 @@ checkGPT() {
         exitclean
     fi
 
-    if ! [[ ${partinfo} =~ ':EFI System Partition:' ]]; then
-        printf "\n        ALERT:
-        The partition name must be 'EFI System Partition'.\n
-        This can be set with a partition editor, such as parted."
-        exitclean
-    fi
-    if ! [[ $partinfo =~ ':EFI System Partition:boot,' ]]; then
+    partinfo=${partinfo#*$partnum:}
+    if ! [[ $partinfo =~ :boot,\ .*legacy_boot,\ esp\; ]]; then
         printf "\n        ATTENTION:
-        The partition isn't marked bootable!\n
-        You can mark the partition as bootable with the following commands:\n
+        The partition isn't marked as an EFI System bootable.\n
+        Mark the partition as bootable with the following commands:\n
         # parted %s
- (parted) toggle <N> boot
- (parted) quit\n\n" $device
+ (parted) set %s boot on
+ (parted) set %s legacy_boot on
+ (parted) set %s esp on
+ (parted) quit\n\n" $device $partnum $partnum $partnum
         exitclean
     fi
 }
@@ -1289,7 +1308,7 @@ checkMounted() {
         if [[ -z ${format[1]} ]]; then
             live_mp=''
             for d in ${tgtdev}*; do
-                local mountpoint=($(findmnt -nro TARGET $d))
+                local mountpoint=($(findmnt -nro TARGET $d || :))
                 for m in "${mountpoint[@]}"; do
                     if [[ -n $m ]]; then
                         printf "\n   NOTICE:  '%s' is mounted at '%s'." $d "$m"
@@ -1369,7 +1388,12 @@ detectsrctype() {
                                           press 'Enter' to continue.\n" $f $k
             read
         fi
-        umount -l $IMGMNT $IMGMNT || :
+        if [[ $TGTFS == ext4 ]]; then
+            f="$(sed -nr '0,/SYSLINUX ([^ ]+) .*/ s//\1/ p' /usr/bin/syslinux)
+6.04"
+            [[ $f == $(sort -rV <<< "$f") ]] || _64bit=_64bit
+        fi
+        umount -l $IMGMNT $IMGMNT 2>/dev/null || :
     fi
     [[ -n $srctype ]] && return
 
@@ -1747,7 +1771,7 @@ case $overlayfs in
             will use a union mount directory and does not need a
             separate --overlay-size-mb persistent overlay file.
             The option \033[1m--overlay-size-mb %s\033[0m will be ignored.
-            ' $TGTFS $(f)
+            \n\r' $TGTFS $(f)
             unset -v overlaysizeb
         fi
 esac
@@ -1871,10 +1895,10 @@ if [[ -n $flat_squashfs ]]; then
             OverlayFS.\n
             Exiting...\n\n"
             exitclean
-        elif [[ -n $overlaysizeb ]]; then
-            overlayfs=$TGTFS
-        else
+        elif [[ -z $overlaysizeb ]]; then
             overlayfs=temp
+        else
+            overlayfs=$TGTFS
         fi
     elif [[ -n $overlaysizeb ]] && [[ $TGTFS != @(vfat|msdos) ]]; then
         printf  "\n        Notice:
@@ -2078,20 +2102,39 @@ MiB () {
 
 checkDiskSpace () {
     if [[ -n ${format[1]} ]]; then
+        # f2fs has greater relative overhead at smaller sizes.
+        ((m == 4)) && ((format < 2300<<20)) && m=3
         # Filesystem metadata allowance
         local m=$((format>>m))
-        ((format-=tba+m)) || :
-        available=$format
+        i=$((tba+m))
+        if ((free < 0 )); then
+            printf '\n  ALERT:
+            The requested primary partition size, %s MiB, is %s MiB larger than
+            the available free space on this device.\n' $(MiB format) $(MiB -free)
+            d=$((p2s+p3s))
+            ((d+free > 0)) && d="
+                The --noesp option will avoid the $(MiB d) MiB needed for the
+                EFI System Partition and Apple HFS+ partition.\n" && printf "$d"
+            printf "\n          Please adjust your request.\n"
+        fi
+        if ((format < i )); then
+            printf '\n  ALERT:
+            The requested primary partition size, %s MiB, is %s MiB smaller
+            than the %s MiB installation space estimated for this image.\n
+            Please adjust your request.\n' $(MiB format) $(MiB i-format) $(MiB i)
+        fi
+        i=$format
+        available=$((format-tba-m))
         if ((free < 0)); then
             available=$free
         fi
-        ((format+=tba+m)) || :
         ((tba+=m+p2s+p3s+oio+z))
         tbd=0
     else
+        free=$((available+tbd))
         ((available-=tba-tbd)) || :
     fi
-    if ((available < 100<<20)) || ((free < 0)); then
+    if ((available < 100<<20)) || ((free < 0)) || ((format < i)); then
         local s t u
         if ((available < 0)); then
             s='may NOT fit in the space available on the target device.'
@@ -2106,7 +2149,15 @@ checkDiskSpace () {
         printf "\n  The live image + overlay, home, & swap space, if requested,
         \r  %s\n\n" "$s"
         [[ -n ${format[1]} ]] &&
-            printf "  + Total disk space: %12s  MiB\n" $(MiB f)
+            printf "    Total disk space: %12s  MiB\n" $(MiB f) &&
+            printf "  + Allocated space: %13s  MiB\n" $(MiB i) ||
+            printf "    Available space: %13s  MiB\n" $(MiB free)
+        if [[ ${format[1]} ]]; then
+            ((format != free)) &&
+            printf "    Unallocated free space:  %5s\n" $(MiB $((free+z)))
+        else
+            printf "    Free space shortage: %9s\n" $(MiB available)
+        fi
         printf "    ==============================\n"
         printf "\r    Size of live image: %10s  MiB\n" $(MiB livesize)
         [[ -n $overlaysizeb ]] &&
@@ -2134,8 +2185,6 @@ checkDiskSpace () {
         fi
         printf "    ==============================\n"
         printf "  - Total required space:  %7s  MiB\n\n" $(MiB tba)
-        ((format != free)) &&
-            printf "    Unallocated free space:  %5s\n" $(MiB $((free+z)))
         printf "    ==============================\n"
         printf "\n  To %s
         \r  free space on the target, or adjust the
@@ -2189,15 +2238,8 @@ if [[ -n ${format[1]} && -z $skipcopy ]]; then
         fi
     fi
     ((free-=oio+z+p2s+p3s))
-    if ((free < format )); then
-        printf '\n  ALERT:
-        The requested primary partition size, %s MiB, is larger than
-        the available free space, %s MiB, on this device for this image.\n
-        Please adjust your request.\n\n' $(MiB $format) $(MiB $free)
-        exitclean
-    fi
     if [[ -z $format ]]; then
-        # unspecified partition size
+        # unspecified partition size case
         format=$free
     else
         ((free-=format)) || :
@@ -2214,21 +2256,18 @@ if [[ -n ${format[1]} && -z $skipcopy ]]; then
 
     createFSLayout $device
     resetMBR
-else
-    p2=$(get_partition_name $device $((partnum+1)))
-    p3=$(get_partition_name $device $((partnum+2)))
 fi
 
-if [[ -n $efi ]] || [[ gpt == $(lsblk -ndro PTTYPE $device) ]] ; then
-    checkGPT $TGTDEV
+if [[ -n $efi ]] || [[ gpt == $(lsblk -ndro PTTYPE $TGTDEV) ]]; then
+    checkGPT
 else
 # Because we can't set boot flag for EFI Protective on msdos partition tables.
     checkPartActive $TGTDEV
 fi
 
-[[ -n $resetmbr ]] && resetMBR $TGTDEV
+[[ $resetmbr ]] && resetMBR
 
-checkMBR $TGTDEV
+checkMBR
 
 fs_label_msg() {
     case $TGTFS in
@@ -2322,8 +2361,8 @@ fi
 
 # Identify the initial installation directory name.
 [[ -f $TGTMNT/syslinux/$CONFIG_FILE ]] &&
-_1stindir=$(sed -n -r '/^\s*label\s+linux/{n;n;n
-                       s/^\s*append\s+.*rd\.live\.dir=([^ ]+)( .*|$)/\1/p}
+_1stindir=$(sed -n -r '/^\s*label\s+linux/I {n;n;n
+                       s/^\s*append\s+.*rd\.live\.dir=(\S+)( .*|$)/\1/Ip}
                       ' $TGTMNT/syslinux/$CONFIG_FILE)
 [[ -z $_1stindir ]] && _1stindir=LiveOS
 # Special case for the reconfiguration of a non-default initial installation
@@ -2663,16 +2702,16 @@ if ! [[ -f $BOOTCONFIG ]]; then
         [[ -f $f ]] && mv $f $BOOTCONFIG && break
     done
 fi
-TITLE=$(sed -n -r '/^\s*label\s+linux/{n
-                   s/^\s*menu\s+label\s+\^(Start|Install)\s+(.*)/\1 \2/p}
+TITLE=$(sed -n -r '/^\s*label\s+linux/I {n
+                   s/^\s*menu\s+label\s+\^\S+\s+(.*)/\1/Ip;q}
                   ' $BOOTCONFIG)
-# Escape any special characters \/;& for sed replacement strings.
-_TITLE=$(sed 's/[\/;&]/\\&/g' <<< $TITLE)
+# # Escape special characters for sed regex and replacement strings.
+_TITLE=$(sed 's/[]\/;$*.^?+|{}&[]/\\&/g' <<< $TITLE)
 
 # Copy LICENSE and README.
 if [[ -z $skipcopy ]]; then
     for f in $SRCMNT/LICENSE $SRCMNT/Fedora-Legal-README.txt; do
-        [[ -f $f ]] && cp $f $TGTMNT
+        [[ -f $f ]] && cp $f $TGTMNT || :
     done
 fi
 
@@ -2698,7 +2737,7 @@ config_efi() {
     if [[ $TGTMNT/EFI -ef $SRCMNT/EFI ]]; then
         cp $BOOTCONFIG_EFI.multi $BOOTCONFIG_EFI
     else
-        cp -Trup $SRCMNT$EFI_BOOT $TGTMNT$T_EFI_BOOT
+        cp -Trup $SRCMNT$EFI_BOOT $TGTMNT$T_EFI_BOOT >/dev/null 2>&1 || :
         cp $SRCMNT$EFI_BOOT/grub.cfg $TGTMNT$T_EFI_BOOT
 
         rm -f $TGTMNT$T_EFI_BOOT/grub.conf
@@ -2815,13 +2854,12 @@ if [[ $srctype == live ]]; then
         # Restore configuration entries to a base state.
         sed -i -r "s/^\s*timeout\s+.*/timeout 600/I
 /^\s*totaltimeout\s+.*/Iz
-s/(^\s*menu\s+title\s+Welcome\s+to)\s+.*/\1 $_TITLE/I
-s/\<(kernel)\>\s+[^\n.]*(vmlinuz.?)/\1 \2/
+0,/^\s*menu\s+title\s+Multi Live Image Boot Menu/I {
+s/^\s*(menu\s+title\s+).*/\1$_TITLE/I}
+s/^(\s*\<kernel)\>\s+\S*(vmlinuz.?)/\1 \2/
+/^\s*append\>/I {
 s/\<(initrd=).*(initrd.?\.img)\>/\1\2/
-s/\<(root=live:[^ ]*)\s+[^\n.]*\<(rd\.live\.image|liveimg)/\1 \2/
-/^\s*label\s+linux\>/I,/^\s*label\s+check\>/Is/(rd\.live\.image|liveimg).*/\1 quiet/
-/^\s*label\s+check\>/I,/^\s*label\s+vesa\>/Is/(rd\.live\.image|liveimg).*/\1 rd.live.check quiet/
-/^\s*label\s+vesa\>/I,/^\s*label\s+memtest\>/Is/(rd\.live\.image|liveimg).*/\1 nomodeset quiet/
+s/\<rd\.live\.[^c]\S+\s+//2g}
                   " $BOOTCONFIG
     fi
 
@@ -2831,16 +2869,13 @@ s/\<(root=live:[^ ]*)\s+[^\n.]*\<(rd\.live\.image|liveimg)/\1 \2/
         # If --multi, distinguish the new grub menuentry with '$LIVEOS ~'.
         [[ -f $BOOTCONFIG_EFI.multi ]] && [[ $_1stindir != $LIVEOS ]] && livedir=$_LIVEOS\ ~
         sed -i -r "s/^\s*set\s+timeout=.*/set timeout=60/
-/^\s*menuentry\s+'Start\s+/,/\s+}/ {s/(\s+'Start\s+)[^ ]*\s+~/\1/
-s/\s+'Start\s+/&$livedir/
-s/(rd\.live\.image|liveimg).*/\1 quiet/}
-/^\s*menuentry\s+'Test\s+/,/\s+}/ {s/(\s+&\s+start\s+)[^ ]*\s+~/\1/
-s/\s+&\s+start\s+/&$livedir/
-s/(rd\.live\.image|liveimg).*/\1 rd.live.check quiet/}
-/^\s*submenu\s+'Trouble/,/\s+}/ s/(rd\.live\.image|liveimg).*/\1 nomodeset quiet/
-s/(linuxefi\s+[^ ]+vmlinuz.?)\s+.*\s+(root=live:[^\s+]*)/\1 \2/
-s_(linuxefi|initrdefi)\s+[^ ]+(initrd.?\.img|vmlinuz.?)_\1 /images/pxeboot/\2_
-              " $BOOTCONFIG_EFI
+/^\s*menuentry/ {
+s/\S+\s+~$_TITLE/$_TITLE/
+s/(^\s*menuentry\s+'.*)$_TITLE(.*')/\1$livedir$_TITLE\2/}
+/^\s+linuxefi|initrdefi/ {
+s_(linuxefi|initrdefi)\s+\S+(initrd.?\.img|vmlinuz.?)_\1 /images/pxeboot/\2_
+s/\<rd\.live\.[^c]\S+\s+//2g}
+                 " $BOOTCONFIG_EFI
     fi
 fi
 
@@ -2864,13 +2899,11 @@ echo "Updating boot config files."
 sed -i -r "s/\<root=[^ ]*/root=live:$TGTLABEL/g
         s;inst.stage2=hd:LABEL=[^ ]*;inst.stage2=hd:$TGTLABEL:$_multi/images/install.img;g
         s/\<rootfstype=[^ ]*\>/rootfstype=$TGTFS/" $BOOTCONFIG $BOOTCONFIG_EFI
+
 if [[ -n $kernelargs ]]; then
-    sed -i -r "s;=initrd.?\.img\>;& ${kernelargs} ;
-               s;/vmlinuz.?\>;& ${kernelargs} ;" $BOOTCONFIG $BOOTCONFIG_EFI
-fi
-if [[ $LIVEOS != LiveOS ]]; then
-    sed -i -r "s;rd\.live\.image|liveimg;& rd.live.dir=$_LIVEOS;
-              " $BOOTCONFIG $BOOTCONFIG_EFI
+    sed -i -r "/^\s*append|linuxefi/I {
+    s/\s+(rd\.live\.image)(.*)$/ \1 ${kernelargs} \2/
+    }" $BOOTCONFIG $BOOTCONFIG_EFI
 fi
 
 if [[ -n $BOOTCONFIG_EFI ]]; then
@@ -3046,9 +3079,15 @@ if ((homesizeb > 0)) && [[ -z $skipcopy ]]; then
     chmod 0600 $HOMEPATH &> /dev/null || :
 fi
 
+if [[ $LIVEOS != LiveOS ]]; then
+    sed -i -r "s;rd\.live\.image|liveimg;& rd.live.dir=$_LIVEOS;
+              " $BOOTCONFIG $BOOTCONFIG_EFI
+fi
+
 if [[ live = $srctype ]]; then
-    sed -i -r 's/\s+ro(\s+|$)/ /g
-               s/rd\.live\.image|liveimg/& rw/' $BOOTCONFIG $BOOTCONFIG_EFI
+    sed -i -r '/^\s*append|linuxefi/I {
+              s/\s+ro\>//g
+              s/rd\.live\.image|liveimg/rw &/}' $BOOTCONFIG $BOOTCONFIG_EFI
 fi
 
 # create the forth files for booting on the XO if requested
@@ -3157,6 +3196,12 @@ EOF
 _LIVEOS=*$_LIVEOS
 fi
 
+# Remove duplicated entries (mid/end line) and double whitespace after words.
+sed  -i -r '/^\s*append|linuxefi/I {
+            :w;s/(\s+\S+)\s*(.*)\1(\s+|$)/\1 \2\3/g;tw
+            s/\>\s\s+/ /g
+            s/\s+$//}' $BOOTCONFIG $BOOTCONFIG_EFI
+
 mv $TGTMNT/$SYSLINUXPATH/isolinux.cfg $TGTMNT/$SYSLINUXPATH/$CONFIG_FILE
 
 if [[ -n $MENUS ]]; then
@@ -3172,7 +3217,7 @@ sed -i -r "s/\s+[^ ]*menu\.c32\>/ $UI/g" $TGTMNT/$SYSLINUXPATH/$CONFIG_FILE
 
 if [[ -f $BOOTCONFIG_EFI.multi ]]; then
     # (Implies --multi and the presence of EFI components.)
-    # Insert marker and delete any conflicting menu entries.
+    # Insert marker and delete any menu entries with conflicting paths.
     sed -i -r "1 i\
 ...
                /^\s*menuentry\s+.*/ {N;N;N;N;N;N;N;N;N;N;N;N;N
@@ -3217,7 +3262,8 @@ for f in ldlinux.c32 libcom32.c32 libutil.c32; do
 done
 
 if [[ -n $BOOTCONFIG_EFI ]]; then
-    if [[ -b $p2 ]]; then
+    if [[ $(lsblk -no PARTTYPE $p2 2>/dev/null) == \
+        c12a7328-f81f-11d2-ba4b-00a0c93ec93b ]]; then
         d=$(mktemp -d)
         mount $p2 $d
         if ! [[ $nouefi ]] && [[ $TGTFS == f2fs ]] && [[ $xa ]]; then
@@ -3316,7 +3362,8 @@ sudo $f$efi\n\n        (You may choose any suitable label.)\n"
         umount $d && rmdir $d
         fsck.fat -avVw $p2 || :
     fi
-    if [[ -b $p3 ]]; then
+    if [[ $(lsblk -no PARTTYPE $p3 2>/dev/null) == \
+        48465300-0000-11aa-aa11-00306543ecac ]]; then
         d=$(mktemp -d)
         mount -t hfsplus $p3 $d
         for f in $TGTMNT$T_EFI_BOOT/BOOT.conf $TGTMNT$T_EFI_BOOT/grub.cfg \
@@ -3351,7 +3398,7 @@ case $TGTFS in
         # extlinux expects the config to be named extlinux.conf
         # and has to be run with the file system mounted.
         if [[ $syslinuxboot != missing ]]; then
-            extlinux -i $TGTMNT/$BOOTPATH || :  # >/dev/null 2>&1
+            extlinux -i $TGTMNT/$BOOTPATH || :
         fi
         # Starting with syslinux 4, ldlinux.sys is used on all file systems.
         if [[ -f $TGTMNT/$BOOTPATH/extlinux.sys ]]; then
@@ -3378,3 +3425,4 @@ See https://fedoraproject.org/wiki/LiveOS_image#Flash-Friendly_File_System_.28F2
     for more information.\n\n' $TGTDEV
 fi
 [[ $msg ]] && printf "$msg\n\n" || :
+trap - EXIT
