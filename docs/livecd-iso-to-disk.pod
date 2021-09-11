@@ -86,15 +86,15 @@ This option is necessary for most Intel Macs.
 
 When --efi is used without --format but with --reset-mbr, it loads a hybrid (EFI)/MBR bootloader on the device.
 
-=item --noesp    (Used with --format.)
+=item --noesp    (Used with --format)
 
-Skip the formatting of an EFI System Partition and Mac boot partition.
+Skips the formatting of a secondary EFI System Partition and an Apple HFS+ boot partition.
 
 Note: Even with this option, EFI components are configured and loaded on the primary partition if they are present on the source.
 
 =item --reset-mbr|--resetmbr
 
-Sets the Master Boot Record (MBR) of the target storage device to the F<mbr.bin> or F<gptmbr.bin> file from the installation system's F<syslinux> directory.  This may be helpful in recovering a damaged or corrupted device.
+Sets the Master Boot Record (MBR) of the target storage device to the F<mbr.bin> or F<gptmbr.bin> file from the installation system's F<syslinux> directory.  This may be helpful in recovering a damaged or corrupted device.  Also sets the legacy_boot flag on the primary partition for GPT disks.
 
 =item --multi
 

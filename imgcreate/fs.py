@@ -265,10 +265,13 @@ def fsck(fs, fstype):
     elif fstype == 'hfsplus':
         args = ['fsck.hfsplus', '-yfp']
 
-    out, err, rc = rcall(args + [fs])
-    print(out, '\n', err, '\n', rc)
+    if fs and args:
+        out, err, rc = rcall(args + [fs])
+        print(out, '\n', err, '\n', rc)
 
-    return rc
+        return rc
+    else:
+        return 1
 
 def get_dm_table(device):
     """Return the table for a Device-mapper device."""
@@ -1693,7 +1696,7 @@ class LiveImageMount(object):
                 size = None
                 self.ovltype = 'dir'
             else:
-                self.overlay = tempfile.NamedTemporaryFile(dir=self.mountdir,
+                self.overlay = tempfile.NamedTemporaryFile(prefix='ovl-',
                                                            delete=False).name
                 self.overlay = self.cowloop = SparseLoopbackDisk(
                                                   self.overlay, 32 * 1024 ** 3)
@@ -1732,8 +1735,8 @@ class LiveImageMount(object):
             self.ovlmnt.mount()
         if not self.overlay:
             device = findmnt('-no UUID,LABEL -T', self.srcdir)
-            device = device.partition(' ')
-            label = device[2].strip()
+            device = device.split()
+            label = device[1].strip()
             if ovl_fstype != 'dir' and any(n in ' \t\n\r\f\v' for n in label):
                 source = findmnt('-no SOURCE,FSTYPE -T', self.srcdir).split()
                 print("\nALERT:\tThe filesystem label on '", source[0],
@@ -1797,7 +1800,7 @@ class LiveImageMount(object):
             ovldev = self.ovlmnt.disk.device + ':'
             overfile = overfile.replace(self.ovlmnt.mountdir + os.sep, ovldev)
         self.overlay = overfile
-        return self.overlay
+        return (self.overlay, device[0])
 
     def resize_overlay(self, overlay_size_mb, existing_size, ovl_fstype,
                        ovl_blksz):
