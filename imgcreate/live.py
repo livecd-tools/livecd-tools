@@ -292,7 +292,7 @@ class LiveImageCreatorBase(LoopImageCreator):
         f = open(path, "a")
         f.write('filesystems+="' + self.__extra_filesystems() + ' "\n')
         f.write('add_drivers+="' + self.__extra_drivers() + ' "\n')
-        f.write('add_dracutmodules+=" dmsquash-live pollcdrom "\n')
+        f.write('add_dracutmodules+=" livenet dmsquash-live pollcdrom "\n')
         f.write('hostonly="no"\n')
         f.write('dracut_rescue_image="no"\n')
         f.close()
