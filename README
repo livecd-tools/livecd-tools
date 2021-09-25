@@ -162,7 +162,7 @@ livecd-iso-to-disk script, like the following:
    livecd-iso-to-disk /path/to/live.iso /dev/sdb1
 
 Replace the '/dev/sdb1' argument above with the (unmounted) partition where you
-wish to load the live image.  This is not a destructive process; any data you 
+wish to load the live image.  This is not a destructive process; any data you
 currently have on your USB stick will be preserved.
 
 Multiple images may be loaded onto a single USB stick.
@@ -185,10 +185,11 @@ Live OS images may be edited using the editliveos script:
 
    editliveos [options] <LiveOS_source>
 
-This script may be used to merge a persistent overlay, insert files, clone a
+This script may be used to merge a persistent overlay, run software updates
+including kernel and initial RAM filesystem updates, insert files, clone a
 customized instance, adjust the root or home filesystem or overlay sizes and
 filesystem or overlay types, seclude private or user-specific files, rebuild
-the image into a new, .iso image distribution file, and refresh the source's
+the image into a new .iso image distribution file, and refresh the source's
 persistent filesystem overlay.
 
 See editliveos --help for more options and instructions.

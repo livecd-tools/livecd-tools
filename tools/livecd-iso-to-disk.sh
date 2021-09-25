@@ -940,13 +940,15 @@ mkfs_config() {
                 [[ $bs != @(''|512) ]] && syslinuxboot=''
             fi
             ;;
-        ext[43])
-            ops='-j '
+        ext4)
+            [[ $_64bit ]] && [[ $fs == dev ]] && ops+='-O ^64bit '
             ;&      # Execute the next block without testing its pattern.
+        ext[43])
+            ops+='-j '
+            ;&
         ext2)
             # mkfs.ext[432] maximum label length is 16 bytes.
             _label="${lbl[*]::16}"
-            [[ $_64bit ]] && [[ $fs == dev ]] && ops+='-O ^64bit '
             ops+="-F -L $_label"
             [[ -n $bs ]] && ops+=' -vb '$bs
             if [[ -n $fn ]]; then
@@ -1030,11 +1032,12 @@ createFSLayout() {
     mkfs_config dev "${label:=LIVE}" format
     run_parted --script $device mklabel $partition_label_type
     run_parted --script $device unit B mkpart $pt $pn $f $oio $end $boot
-    echo 'Waiting for devices to settle...'
+    echo -e '\nWaiting for devices to settle...'
     TGTDEV=$(get_partition_name $device '1')
     udevadm settle -E $TGTDEV
     umount $TGTDEV &> /dev/null || :
     $mkfs $ops $TGTDEV
+    echo
     udevadm settle -E /dev/disk/by-label/"$_label"
     label=$(lsblk -ndo LABEL $TGTDEV)
 
@@ -1053,6 +1056,7 @@ createFSLayout() {
         umount $p2 &> /dev/null || :
         losetup -d $l2
         fsck.fat -avVw $p2
+        echo
     fi
 
     if [[ -n $l3 ]]; then
@@ -1061,11 +1065,17 @@ createFSLayout() {
         run_parted --script $device unit B mkpart $pt "$pn" hfs+ \
                      $end $((end+p3s))
         p3=$(get_partition_name $device '3')
+        mkfs.hfsplus $p3 -v Apple
+        f=$(mktemp -d)
         udevadm settle -E $p3
-        dd if=$l3 of=$p3
-        umount $p3 &> /dev/null || :
+        mount $p3 $f
+        d=$(mktemp -d)
+        mount -t hfsplus $l3 $d >/dev/null 2>&1
+        cp -Trp $d $f
+        umount $d $f >/dev/null 2>&1 || :
         losetup -d $l3
-        if ! fsck.hfsplus -ydfp $p3 ; then
+        rmdir $f $d
+        if ! fsck.hfsplus -yrdfp $p3 ; then
             printf '\n        NOTICE:
             The macboot.img failed the filesystem check after copying.
             Macintosh booting will fail.\n
@@ -1373,24 +1383,12 @@ detectsrctype() {
             done
             mount -r $RFSIMG $IMGMNT || exitclean
         fi
-        kver=($(ls -vr $IMGMNT/usr/lib/modules))
-        f=$(file $SRCMNT/???linux/vmlinuz*)
-        f=${f#*version }; f=${f%% *}
-        if ! [[ "${kver[*]}" =~ $f ]]; then
-            local k="${kver[*]}"; k="${k// /$'\n'}"
-            printf "\n   NOTICE:  The boot kernel version, '%s', is not in
-            the base root filesystem, which contains:
-            \r%s.\n
-            The kernel may have been upgraded and reside in an overlay.
-            If the boot kernel version is not available in the root filesystem,
-            the booted operating system will most likely fail.\n
-            Press Ctrl C to abort, or, if this is expected,
-                                          press 'Enter' to continue.\n" $f $k
-            read
-        fi
+        # list file as deleted module directory may have remnant files.
+        kver=($(ls -vr $IMGMNT/usr/lib/modules/*/vmlinuz))
+        kver=(${kver[@]%/*}); kver=(${kver[@]##*/})
         if [[ $TGTFS == ext4 ]]; then
-            f="$(sed -nr '0,/SYSLINUX ([^ ]+) .*/ s//\1/ p' /usr/bin/syslinux)
-6.04"
+            f=$(which syslinux)
+            f="$(sed -nr '0,/SYSLINUX (\S+) .*/ s//\1/ p' $f)"$'\n'6.04
             [[ $f == $(sort -rV <<< "$f") ]] || _64bit=_64bit
         fi
         umount -l $IMGMNT $IMGMNT 2>/dev/null || :
@@ -1720,6 +1718,7 @@ if ! [[ -b $TGTDEV || live == $TGTDEV ]]; then
     ERROR:  '$TGTDEV' is not a block device."
     exit 1
 fi
+echo -e "\nSource image is '$SRC'"
 
 # Do some basic sanity checks.
 checkForSyslinux
@@ -1866,6 +1865,7 @@ elif ! [[ -b $SRC ]]; then
     exitclean
 elif [[ -b $SRC ]] && [[ $(lsblk -ndo TYPE $SRC) == part ]]; then
     SRCwasMounted=$(lsblk -nro MOUNTPOINT $SRC)
+    [[ $SRC -ef $TGTDEV ]] && srcmountopts=''
 else
     printf "\n    ATTENTION:
     '%s' is not a block device partition.
@@ -1960,8 +1960,8 @@ efibootdir() {
 TGTMNT=$(mktemp -d /run/tgttmp.XXXXXX)
 if ! [[ ${format[1]} ]]; then
     if [[ $TGTFS == f2fs ]]; then
-        ! [[ $(fsck.f2fs -f $TGTDEV) =~ extra_attr ]] || xa=force
-    else
+        ! [[ $(dump.f2fs $TGTDEV) =~ extra_attr ]] || xa=force
+    elif ! findmnt -no SOURCE $TGTDEV >/dev/null 2>&1; then
         fscheck $TGTFS $TGTDEV
     fi
 
@@ -2015,8 +2015,39 @@ elif [[ -d $SRCMNT/syslinux/ ]]; then
     [[ -d $SRCMNT/$srcdir/syslinux ]] && CONFIG_SRC="$srcdir"/
     CONFIG_SRC="$SRCMNT/${CONFIG_SRC}syslinux"
 fi
+i=${CONFIG_SRC}/initrd*.img
+cd /tmp
+rm -rf usr
+ikernel=$(lsinitrd $i --unpack -f usr/lib/modules/*/kernel -v 2>&1)
+ikernel=${ikernel%/*}; ikernel=${ikernel##*/}
+rm -rf usr
+cd - >/dev/null 2>&1
+f=$(file ${CONFIG_SRC}/vmlinuz*)
+f=${f#*version }; f=${f%% *}
+a=''; d=''
+if ! [[ "${kver[*]}" =~ $f ]]; then
+    k="${kver[*]}"; k="${k// /$'\n'}"
+    a="* is not among those installed in the base root filesystem:
+    $'\r'$k$'\n'"
+fi
+[[ $ikernel != $kver ]] &&
+    d="* does not match that in the initial ram filesystem, '${ikernel}'"
+if [[ $a || $d ]]; then
+    printf "\n  NOTICE:  The boot kernel version, '%s',
+    %s
+    %s
 
-if [[ -n $overlayfs && -z $(lsinitrd $CONFIG_SRC/initrd*.img\
+    The kernel may have been upgraded and reside in an overlay.
+
+    If the boot kernel version is not available in the root filesystem
+    or match the initial ram filesystem version, the booted operating system
+    will most likely fail.\n
+    Press Ctrl C to abort, or, if this is expected,
+                               press 'Enter' to continue.\n" $f "$a" "$d"
+    read
+fi
+
+if [[ -n $overlayfs && -z $(lsinitrd $i\
     -f usr/lib/dracut/hooks/cmdline/30-parse-dmsquash-live.sh | \
     sed -n -r '/(dev\/root|rootfsbase)/p') ]]; then
     printf "\n    NOTICE:
@@ -2691,7 +2722,7 @@ fi
 # Bootloader is always reconfigured, so keep this out of the -z skipcopy stuff.
 [[ ! -d $TGTMNT/$SYSLINUXPATH ]] && mkdir -p $TGTMNT/$SYSLINUXPATH
 
-cp $CONFIG_SRC/* $TGTMNT/$SYSLINUXPATH
+cp -p $CONFIG_SRC/* $TGTMNT/$SYSLINUXPATH >/dev/null 2>&1 || :
 
 BOOTCONFIG=$TGTMNT/$SYSLINUXPATH/isolinux.cfg
 # Adjust syslinux sources for replication of installed images
@@ -2711,7 +2742,7 @@ _TITLE=$(sed 's/[]\/;$*.^?+|{}&[]/\\&/g' <<< $TITLE)
 # Copy LICENSE and README.
 if [[ -z $skipcopy ]]; then
     for f in $SRCMNT/LICENSE $SRCMNT/Fedora-Legal-README.txt; do
-        [[ -f $f ]] && cp $f $TGTMNT || :
+        [[ -f $f ]] && cp -p $f $TGTMNT >/dev/null 2>&1 || :
     done
 fi
 
@@ -3163,7 +3194,7 @@ for f in vesamenu.c32 menu.c32; do
         UI=$f
         for d in /usr/share/syslinux /usr/lib/syslinux; do
             if [[ -f $d/$f ]]; then
-                cp $d/$f $TGTMNT/$BOOTPATH/$f
+                cp -p $d/$f $TGTMNT/$BOOTPATH/$f >/dev/null 2>&1 || :
                 break 2
             fi
         done
@@ -3249,7 +3280,7 @@ fi
 # not be available on the source, so copy them from the host, when available.
 for f in ldlinux.c32 libcom32.c32 libutil.c32; do
     if [[ -f /usr/share/syslinux/$f ]]; then
-        cp /usr/share/syslinux/$f $TGTMNT/$BOOTPATH/$f
+        cp -p /usr/share/syslinux/$f $TGTMNT/$BOOTPATH/$f >/dev/null 2>&1 || :
     elif [[ $syslinuxboot == missing ]]; then
         break
     else
@@ -3297,11 +3328,12 @@ if [[ -n $BOOTCONFIG_EFI ]]; then
             f="efibootmgr --create --disk $device --part 2 \
 --loader \\linux_$LIVEOS.efi \\
 --label "
+            y=$(date +%Y)
             p="
     NOTICE:
             Flash-Friendly File System (F2FS) formatted devices with
             extra_attr or compression fail to boot with
-            2020-21 versions of SYSLINUX-EXTLINUX or GNU GRUB.
+            year $y versions of SYSLINUX-EXTLINUX or GNU GRUB.
 
             Booting is possible with an EFI Boot Stub loader.\n"
             if ! [[ $force ]]; then
@@ -3337,7 +3369,7 @@ sudo $f$efi\n\n        (You may choose any suitable label.)\n"
             fi
             cleansrc
         fi
-        cp -a $TGTMNT/EFI $d &> /dev/null || :
+        cp -a $TGTMNT/EFI $d >/dev/null 2>&1 || :
 
         if [[ $TGTFS == f2fs ]] && ! [[ $xa ]] && ! [[ $b ]]; then
             mv $TGTMNT$T_EFI_BOOT/BOOTX64.EFI $TGTMNT$T_EFI_BOOT/BOOTX64.EFI.orig
@@ -3361,6 +3393,7 @@ sudo $f$efi\n\n        (You may choose any suitable label.)\n"
         [[ -f $BOOTCONFIG_EFI.prev ]] && cp $BOOTCONFIG_EFI.prev $d$T_EFI_BOOT
         umount $d && rmdir $d
         fsck.fat -avVw $p2 || :
+        echo
     fi
     if [[ $(lsblk -no PARTTYPE $p3 2>/dev/null) == \
         48465300-0000-11aa-aa11-00306543ecac ]]; then
@@ -3373,7 +3406,8 @@ sudo $f$efi\n\n        (You may choose any suitable label.)\n"
         cp $TGTMNT$T_EFI_BOOT/grub.cfg $d/System/Library/CoreServices
         [[ -f $BOOTCONFIG_EFI.prev ]] && cp $BOOTCONFIG_EFI.prev $d$T_EFI_BOOT
         umount $d && rmdir $d
-        fsck.hfsplus -ydfp $p3
+        fsck.hfsplus -yrdfp $p3
+        echo
     fi
 fi
 
