@@ -2,7 +2,7 @@
 # util.py : Various utility methods
 #
 # Copyright 2010, Red Hat, Inc.
-# Copyright 2017, Fedora Project
+# Copyright 2017-2021, Fedora Project
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@
 import subprocess
 import logging
 import io
+from errors import *
 
 def call(*popenargs, **kwargs):
     """
