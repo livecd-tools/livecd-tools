@@ -213,7 +213,7 @@ class ImageCreator(object):
         """
         pass
 
-    def _stage_final_image(self):
+    def _stage_final_image(self, ops=[]):
         """Stage the final system image in _outdir.
 
         This is the hook where subclasses should place the image in _outdir

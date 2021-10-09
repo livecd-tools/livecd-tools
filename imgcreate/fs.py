@@ -939,7 +939,6 @@ class OverlayFSMount(Mount):
         self.cowmnt = ExtDiskMount(self.cowloop, self.cowmnt.mountdir, fstype,
                                    blksz, 'overlay', ops=ops, dirmode=0o755)
         self.cowmnt._ExtDiskMount__create()
-        self.cowmnt._ExtDiskMount__format_filesystem()
         self.cowmnt.mount()
         self.size = self.cowloop.size
         d = os.path.join(self.cowmnt.mountdir, 'overlayfs')
@@ -1727,8 +1726,8 @@ class LiveImageMount(object):
         if self.ovlmnt:
             self.ovlmnt.unmount()
 
-    def make_overlay(self, size=512*1024**2, existing_size=0, ovl_fstype='',
-                     ovl_blksz=None, ops='', dirmode=None):
+    def make_overlay(self, size=512*1024**2, existing_size=0, ovltype='',
+                     ovl_fstype='', ovl_blksz=None, ops='', dirmode=None):
         """Register a new or modified LiveOS overlay."""
 
         if self.ovlmnt:
@@ -1753,7 +1752,10 @@ class LiveImageMount(object):
                     args = ['e2label']
                 elif source[1] == 'btrfs':
                     args = ['btrfs', 'filesystem', 'label']
-                args += [source[0], label]
+                elif source[1] == 'xfs':
+                    args = ['xfs_admin', '-L', label, source[0]]
+                if source[1] != 'xfs':
+                    args += [source[0], label]
                 if call(args) != 0:
                     print('ERROR:\nRelabel of', source[0], 'has failed.\n')
 
@@ -1784,6 +1786,7 @@ class LiveImageMount(object):
             self.overlay = SparseLoopbackDisk(overfile, size)
             self.overlay.create(ops=ops, dirmode=dirmode)
             self.overlay.cleanup()
+            self.ovltype = 'DM_snapshot_cow'
         if ovl_fstype not in ('', 'temp', 'DM_snapshot_cow'):
             if self.imgloop == self.squashloop:
                 lower = self.squashmnt
@@ -1792,8 +1795,8 @@ class LiveImageMount(object):
             self.livemount = OverlayFSMount('overlayfs', lower, overfile, None,
                                             self.mountdir, size=size,
                                             ops=ops, dirmode=dirmode)
-            if ovl_fstype != 'dir':
-                self.resize_overlay(size, existing_size, ovl_fstype, ovl_blksz)
+        if ovl_fstype != 'dir':
+            self.resize_overlay(size, existing_size, ovl_fstype, ovl_blksz)
 
         self.ovltype = ovl_fstype
         if self.ovlmnt:
@@ -1806,17 +1809,13 @@ class LiveImageMount(object):
                        ovl_blksz):
         if ovl_fstype in ('', 'temp', 'DM_snapshot_cow'):
             overlay = self.overlay
+            self.reset_overlay()
+            if overlay_size_mb > existing_size:
+                overlay.expand(create=True, size=overlay_size_mb)
+            else:
+                overlay.truncate(size=overlay_size_mb)
         else:
             overlay = self.livemount.cowloop
-
-        if overlay_size_mb > existing_size:
-            overlay.expand(create=True, size=overlay_size_mb)
-        else:
-            overlay.truncate(size=overlay_size_mb)
-
-        if ovl_fstype in ('', 'temp', 'DM_snapshot_cow'):
-            self.reset_overlay()
-        else:
             self.livemount.create_ovlfs(ovl_fstype, ovl_blksz, 'overlayfs',
                                         dirmode=0o755)
 
