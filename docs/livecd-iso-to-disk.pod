@@ -92,6 +92,10 @@ Skips the formatting of a secondary EFI System Partition and an Apple HFS+ boot 
 
 Note: Even with this option, EFI components are configured and loaded on the primary partition if they are present on the source.
 
+=item --nomac    (Used with --format)
+
+Skips the formatting of an Apple HFS+ boot partition.  Useful when hfsplus-tools are not available.
+
 =item --reset-mbr|--resetmbr
 
 Sets the Master Boot Record (MBR) of the target storage device to the F<mbr.bin> or F<gptmbr.bin> file from the installation system's F<syslinux> directory.  This may be helpful in recovering a damaged or corrupted device.  Also sets the legacy_boot flag on the primary partition for GPT disks.
@@ -162,6 +166,32 @@ Skip the boot menu, and automatically boot the 'linux' label item.
 
 Specifies additional kernel arguments, <arg s>, that will be inserted into the syslinux and EFI boot configurations.  Multiple arguments should be specified in one string, I<i.e.>, --extra-kernel-args "arg1 arg2 ..."
 
+=item --overlay-size-mb <size>[,fstype[,blksz]]
+
+Specifies creation of a filesystem overlay of <size> mebibytes (integer values only).  [fstype] and [blksz] are relevant only for creating OverlayFS overlay filesystems on vfat-formatted primary devices.  An overlay makes persistent storage available to the live operating system, if permitted and installed on writable media.  The overlay holds a snapshot of changes to the root filesystem.
+
+B<Note well> that deletion of any original files in the read-only root filesystem does not recover any storage space on your LiveOS device.  Storage in the persistent F</LiveOS/overlay-<device_id>> file is allocated as needed.  If the overlay storage space is filled, the overlay will enter an 'Overflow' state where the root filesystem will continue to operate in a read-only mode.  There will not be an explicit warning or signal when this happens, but applications may begin to report errors due to the restriction.  If significant changes or updates to the root filesystem are to be made, carefully watch the fraction of space allocated in the overlay by issuing the C<dmsetup status> command at a command line of the running LiveOS image.  Some consumption of root filesystem and overlay space can be avoided by specifying a persistent home filesystem for user files, see --home-size-mb below.  The target storage device must have enough free space for the image and the overlay.  A maximum <size> of 4096 MiB is permitted for vfat-formatted devices.  If there is not enough room on your device, you will be given information to help in adjusting your settings.
+
+=item --overlayfs [temp]   (add --overlay-size-mb for persistence on vfat devices)
+
+Specifies the creation of an OverlayFS type overlay.  If the option is followed by C<temp>, a temporary overlay will be used.  On vfat or msdos formatted devices, --overlay-size-mb <size> must also be provided for a persistent overlay.  OverlayFS overlays are directories of the files that have changed on the read-only root filesystem.  With non-vfat-formatted devices, the OverlayFS can extend the available root filesystem space up to the capacity of the Live USB device.
+
+The --overlayfs option requires an initial boot image based on dracut version 045 or greater to use the OverlayFS feature.  Lacking this, the device boots with a temporary Device-mapper overlay.
+
+=item --copy-overlay
+
+This option allows one to copy the persistent overlay from one live image to the new image.  Changes already made in the source image will be propagated to the new installation.
+
+=over 4
+
+B<WARNING:>  User sensitive information such as password cookies and application or user data will be copied to the new image!  Scrub this information before using this option.
+
+=back
+
+=item --reset-overlay
+
+This option will reset the persistent overlay to an unallocated state.  This might be used if installing a new or refreshed image onto a device with an existing overlay, and avoids the writing of a large file on a vfat-formatted device.  This option also renames the overlay to match the current device filesystem label and UUID.
+
 =item --compress    (default state for the original root filesystem)
 
 The default, compressed SquashFS filesystem image is copied on installation.  (This option has no effect if the source filesystem is already expanded.)
@@ -174,32 +204,6 @@ Expands the source F<squashfs.img> on installation into the read-only F</LiveOS/
 
 Installs a kernel option, C<rd.live.overlay=none>, that signals the live boot process to create a writable, linear Device-mapper target for an uncompressed F</LiveOS/rootfs.img> filesystem image file.  Read-write by default (unless a kernel argument of C<rd.live.overlay.readonly> is given) this configuration avoids the complications of using an overlay of fixed size for persistence when storage format and space allows.
 
-=item --overlayfs [temp]   (add --overlay-size-mb for persistence on vfat devices)
-
-Specifies the creation of an OverlayFS type overlay.  If the option is followed by C<temp>, a temporary overlay will be used.  On vfat or msdos formatted devices, --overlay-size-mb <size> must also be provided for a persistent overlay.  OverlayFS overlays are directories of the files that have changed on the read-only root filesystem.  With non-vfat-formatted devices, the OverlayFS can extend the available root filesystem space up to the capacity of the Live USB device.
-
-The --overlayfs option requires an initial boot image based on dracut version 045 or greater to use the OverlayFS feature.  Lacking this, the device boots with a temporary Device-mapper overlay.
-
-=item --overlay-size-mb <size>[,fstype[,blksz]]
-
-Specifies creation of a filesystem overlay of <size> mebibytes (integer values only).  [fstype] and [blksz] are relevant only for creating OverlayFS overlay filesystems on vfat-formatted primary devices.  An overlay makes persistent storage available to the live operating system, if permitted and installed on writable media.  The overlay holds a snapshot of changes to the root filesystem.
-
-B<Note well> that deletion of any original files in the read-only root filesystem does not recover any storage space on your LiveOS device.  Storage in the persistent F</LiveOS/overlay-<device_id>> file is allocated as needed.  If the overlay storage space is filled, the overlay will enter an 'Overflow' state where the root filesystem will continue to operate in a read-only mode.  There will not be an explicit warning or signal when this happens, but applications may begin to report errors due to the restriction.  If significant changes or updates to the root filesystem are to be made, carefully watch the fraction of space allocated in the overlay by issuing the C<dmsetup status> command at a command line of the running LiveOS image.  Some consumption of root filesystem and overlay space can be avoided by specifying a persistent home filesystem for user files, see --home-size-mb below.  The target storage device must have enough free space for the image and the overlay.  A maximum <size> of 4096 MiB is permitted for vfat-formatted devices.  If there is not enough room on your device, you will be given information to help in adjusting your settings.
-
-=item --copy-overlay
-
-This option allows one to copy the persistent overlay from one live image to the new image.  Changes already made in the source image will be propagated to the new installation.
-
-=over 4
-
-B<WARNING:> User sensitive information such as password cookies and application or user data will be copied to the new image!  Scrub this information before using this option.
-
-=back
-
-=item --reset-overlay
-
-This option will reset the persistent overlay to an unallocated state.  This might be used if installing a new or refreshed image onto a device with an existing overlay, and avoids the writing of a large file on a vfat-formatted device.  This option also renames the overlay to match the current device filesystem label and UUID.
-
 =item --home-size-mb <size>[,fstype[,blksz]]
 
 Specifies creation of a home filesystem of <size> mebibytes (integer values only).  A persistent home directory will be stored in the F</LiveOS/home.img> filesystem image file.  This filesystem is encrypted by default and not compressed  (one may bypass encryption with the --unencrypted-home option).  When the home filesystem storage space is full, one will get out-of-space warnings from the operating system.  The target storage device must have enough free space for the image, any overlay, and the home filesystem.  Note that the --delete-home option must also be selected to replace an existing persistent home with a new, empty one.  A maximum <size> of 4096 MiB is permitted for vfat-formatted devices.  If there is not enough room on your device, you will be given information to help in adjusting your settings.
@@ -210,7 +214,7 @@ This option allows one to copy a persistent F<home.img> filesystem from the sour
 
 =over 4
 
-B<WARNING:> User-sensitive information, such as password cookies and user and application data, will be copied to the new image! Scrub this information before using this option.
+B<WARNING:>  User-sensitive information, such as password cookies and user and application data, will be copied to the new image! Scrub this information before using this option.
 
 =back
 

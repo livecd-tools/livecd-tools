@@ -31,14 +31,14 @@ shortusage() {
     SYNTAX
 
     livecd-iso-to-disk [--format [<size>[,fstype[,blksz[,extra_attr,s]]]]]
-                       [--msdos] [--efi] [--noesp] [--reset-mbr] [--multi]
-                       [--livedir <directory>] [--skipcopy] [--noverify]
-                       [--force] [--xo] [--xo-no-home] [--timeout <duration>]
-                       [--totaltimeout <duration>] [--nobootmsg] [--nomenu]
-                       [--extra-kernel-args <arg s>] [--compress]
-                       [--skipcompress] [--no-overlay] [--overlayfs [temp]]
+                       [--msdos] [--efi] [--noesp] [--nomac] [--reset-mbr]
+                       [--multi] [--livedir <directory>] [--skipcopy]
+                       [--noverify] [--force] [--xo] [--xo-no-home]
+                       [--timeout <duration>] [--totaltimeout <duration>]
+                       [--nobootmsg] [--nomenu] [--extra-kernel-args <arg s>]
                        [--overlay-size-mb <size>[,fstype[,blksz]]]
-                       [--copy-overlay] [--reset-overlay]
+                       [--overlayfs [temp]] [--copy-overlay] [--reset-overlay]
+                       [--compress] [--skipcompress] [--no-overlay]
                        [--home-size-mb <size>[,fstype,blksz]]] [--copy-home]
                        [--delete-home] [--crypted-home] [--unencrypted-home]
                        [--swap-size-mb <size>] [--updates <updates.img>]
@@ -196,6 +196,10 @@ usage() {
         NOTE: Even with this option, EFI components are configured and loaded
               on the primary partition if they are present on the source.
 
+     --nomac    (Used with --format)
+        Skips the formatting of an Apple HFS+ boot partition.  Useful when
+        hfsplus-tools are not available.
+
    --reset-mbr|--resetmbr
         Sets the Master Boot Record (MBR) of the target storage device to the
         mbr.bin or gptmbr.bin file from the installation system's syslinux
@@ -294,38 +298,6 @@ usage() {
         should be specified in one string, i.e.,
             --extra-kernel-args \"arg1 arg2 ...\"
 
-    --compress   (default state for the original root filesystem)
-        The default, compressed SquashFS filesystem image is copied on
-        installation.  (This option has no effect if the source filesystem is
-        already expanded.)
-
-    --skipcompress   (default option when  --xo is specified)
-        Expands the source SquashFS.img on installation into the read-only
-        /LiveOS/rootfs.img root filesystem image file.  This avoids the system
-        overhead of decompression during use at the expense of storage space
-        and bus I/O.
-
-    --no-overlay   (effective only with skipcompress or an uncompressed image)
-        Installs a kernel option, rd.live.overlay=none, that signals the live
-        boot process to create a writable, linear Device-mapper target for an
-        uncompressed /LiveOS/rootfs.img filesystem image file.  Read-write by
-        default (unless a kernel argument of rd.live.overlay.readonly is given)
-        this configuration avoids the complications of using an overlay of
-        fixed size for persistence when storage format and space allows.
-
-    --overlayfs [temp]  (add --overlay-size-mb for persistence on vfat devices)
-        Specifies the creation of an OverlayFS type overlay.  If the option is
-        followed by 'temp', a temporary overlay will be used.  On vfat or msdos
-        formatted devices, --overlay-size-mb <size> must also be provided for a
-        persistent overlay.  OverlayFS overlays are directories of the files
-        that have changed on the read-only root filesystem.  With non-vfat-
-        formatted devices, the OverlayFS can extend the available root
-        filesystem space up to the capacity of the Live USB/SD device.
-
-        The --overlayfs option requires an initial boot image based on dracut
-        version 045 or greater to use the OverlayFS feature.  Lacking this, the
-        device boots with a temporary Device-mapper overlay.
-
     --overlay-size-mb size[,fstype[,blksz]]
         Specifies creation of a filesystem overlay of <size> mebibytes (integer
         values only).  [fstype] and [blksz] are relevant only for creating
@@ -351,11 +323,24 @@ usage() {
         devices.  If there is not enough room on your device, you will be given
         information to help in adjusting your settings.
 
+    --overlayfs [temp]  (add --overlay-size-mb for persistence on vfat devices)
+        Specifies the creation of an OverlayFS type overlay.  If the option is
+        followed by 'temp', a temporary overlay will be used.  On vfat or msdos
+        formatted devices, --overlay-size-mb <size> must also be provided for a
+        persistent overlay.  OverlayFS overlays are directories of the files
+        that have changed on the read-only root filesystem.  With non-vfat-
+        formatted devices, the OverlayFS can extend the available root
+        filesystem space up to the capacity of the Live USB/SD device.
+
+        The --overlayfs option requires an initial boot image based on dracut
+        version 045 or greater to use the OverlayFS feature.  Lacking this, the
+        device boots with a temporary Device-mapper overlay.
+
     --copy-overlay
         This option allows one to copy the persistent overlay from one live
         image to the new image.  Changes already made in the source image will
         be propagated to the new installation.
-            WARNING: User sensitive information such as password cookies and
+            WARNING:  User sensitive information such as password cookies and
             application or user data will be copied to the new image!  Scrub
             this information before using this option.
 
@@ -365,6 +350,25 @@ usage() {
         with an existing overlay, and avoids the writing of a large file on a
         vfat-formatted device.  This option also renames the overlay to match
         the current device filesystem label and UUID.
+
+    --compress   (default state for the original root filesystem)
+        The default, compressed SquashFS filesystem image is copied on
+        installation.  (This option has no effect if the source filesystem is
+        already expanded.)
+
+    --skipcompress   (default option when  --xo is specified)
+        Expands the source SquashFS.img on installation into the read-only
+        /LiveOS/rootfs.img root filesystem image file.  This avoids the system
+        overhead of decompression during use at the expense of storage space
+        and bus I/O.
+
+    --no-overlay   (effective only with skipcompress or an uncompressed image)
+        Installs a kernel option, rd.live.overlay=none, that signals the live
+        boot process to create a writable, linear Device-mapper target for an
+        uncompressed /LiveOS/rootfs.img filesystem image file.  Read-write by
+        default (unless a kernel argument of rd.live.overlay.readonly is given)
+        this configuration avoids the complications of using an overlay of
+        fixed size for persistence when storage format and space allows.
 
     --home-size-mb <size>[,fstype[,blksz]]
         Specifies creation of a home filesystem of <size> mebibytes (integer
@@ -384,7 +388,7 @@ usage() {
         This option allows one to copy a persistent home.img filesystem from
         the source LiveOS image to the target image.  Changes already made in
         the source home directory will be propagated to the new image.
-            WARNING: User-sensitive information, such as password cookies and
+            WARNING:  User-sensitive information, such as password cookies and
             user and application data, will be copied to the new image! Scrub
             this information before using this option.
 
@@ -1538,6 +1542,9 @@ while true ; do
         --noesp)
             noesp=noesp
             ;;
+        --nomac)
+            nomac=nomac
+            ;;
         --skipcopy|--reconfig)
             skipcopy=skipcopy
             ;;
@@ -2028,7 +2035,7 @@ a=''; d=''
 if ! [[ "${kver[*]}" =~ $f ]]; then
     k="${kver[*]}"; k="${k// /$'\n'}"
     a="* is not among those installed in the base root filesystem:
-    $'\r'$k$'\n'"
+$k"
 fi
 [[ $ikernel != $kver ]] &&
     d="* does not match that in the initial ram filesystem, '${ikernel}'"
@@ -2261,11 +2268,13 @@ if [[ -n ${format[1]} && -z $skipcopy ]]; then
             # Set partition size to whole 4-MiB or OPT-IO units.
             ((p2s=(p2s/oio+1)*oio))
         fi
-        l3=$SRCMNT/images/macboot.img
-        ! [[ -f $l3 ]] && l3=$SRCMNT/isolinux/macboot.img
-        if [[ -f $l3 ]]; then
-            l3=$(losetup --show -fr $l3)
-            ((p3s=($(partSize $l3)/oio+1)*oio))
+        if [[ -z $nomac ]]; then
+            l3=$SRCMNT/images/macboot.img
+            ! [[ -f $l3 ]] && l3=$SRCMNT/isolinux/macboot.img
+            if [[ -f $l3 ]]; then
+                l3=$(losetup --show -fr $l3)
+                ((p3s=($(partSize $l3)/oio+1)*oio))
+            fi
         fi
     fi
     ((free-=oio+z+p2s+p3s))
@@ -3294,7 +3303,7 @@ done
 
 if [[ -n $BOOTCONFIG_EFI ]]; then
     if [[ $(lsblk -no PARTTYPE $p2 2>/dev/null) == \
-        c12a7328-f81f-11d2-ba4b-00a0c93ec93b ]]; then
+        @(c12a7328-f81f-11d2-ba4b-00a0c93ec93b|0xef) ]]; then
         d=$(mktemp -d)
         mount $p2 $d
         if ! [[ $nouefi ]] && [[ $TGTFS == f2fs ]] && [[ $xa ]]; then
@@ -3369,6 +3378,8 @@ sudo $f$efi\n\n        (You may choose any suitable label.)\n"
             fi
             cleansrc
         fi
+        [[ -f $d$T_EFI_BOOT/grub.cfg ]] &&
+            cp -p $d$T_EFI_BOOT/grub.cfg $TGTMNT$T_EFI_BOOT/grub.cfg.prev
         cp -a $TGTMNT/EFI $d >/dev/null 2>&1 || :
 
         if [[ $TGTFS == f2fs ]] && ! [[ $xa ]] && ! [[ $b ]]; then
@@ -3390,13 +3401,12 @@ sudo $f$efi\n\n        (You may choose any suitable label.)\n"
             \rOther EFI binaries in /EFI/BOOT lack FSFS support at this time."
             cp $d/EFI/BOOT/BOOTX64.EFI $TGTMNT$T_EFI_BOOT/BOOTX64.EFI
         fi
-        [[ -f $BOOTCONFIG_EFI.prev ]] && cp $BOOTCONFIG_EFI.prev $d$T_EFI_BOOT
         umount $d && rmdir $d
         fsck.fat -avVw $p2 || :
         echo
     fi
     if [[ $(lsblk -no PARTTYPE $p3 2>/dev/null) == \
-        48465300-0000-11aa-aa11-00306543ecac ]]; then
+        @(48465300-0000-11aa-aa11-00306543ecac|0xaf) ]]; then
         d=$(mktemp -d)
         mount -t hfsplus $p3 $d
         for f in $TGTMNT$T_EFI_BOOT/BOOT.conf $TGTMNT$T_EFI_BOOT/grub.cfg \

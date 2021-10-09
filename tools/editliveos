@@ -398,7 +398,10 @@ class LiveImageEditor(LiveImageCreator):
         directory for merging in base_on()."""
 
         self.ovltype = None
-        """Specifies the type of overlay ('dir', or fstype)."""
+        """Specifies the type of overlay ('dir', or 'temp')."""
+
+        self.ovl_fstype = None
+        """Specifies the type of filesystem in the overlay."""
 
         self.includes = []
         """A string of file or directory paths to copy to the .iso file in
@@ -574,7 +577,7 @@ class LiveImageEditor(LiveImageCreator):
         ops = ''
         f = ''  # variable & flag for iso-scan/filename booted host.
         self.ovl_size = 0
-        if self.src_type in ('live', 'OFS'):
+        if self.src_type == 'live':
             src = os.path.join('/run', 'initramfs', 'isoscandev')
                 # (^ Requires dracut verion 051 or greater.)
             if os.path.exists(src):
@@ -612,14 +615,15 @@ class LiveImageEditor(LiveImageCreator):
                     self._overlay = src[1][src[1].find(
                                     'upperdir=')+9:src[1].find(',workdir=')]
                     if not f and os.path.islink(self._overlay):
-                        self._overlay = os.path.dirname(
-                                            os.path.realpath(self._overlay))
+                        self.ovltype = 'dir'
+                        self._overlay = os.path.realpath(self._overlay)
                         self.overlayloop = findmnt('-no SOURCE', self._overlay)
                         if self.overlayloop:
+                            self.ovltype = 'OFS'
                             self.srcdir = os.path.join(self.srcmntdir,
                                        os.path.dirname(losetup('-nO BACK-FILE',
                                           self.overlayloop)).lstrip(os.sep))
-                    if not os.path.islink(self._overlay):
+                    elif not os.path.islink(self._overlay):
                         self.ovltype = 'tempdir'
                     self.imgloop = findmnt('-no SOURCE', base_mp)
             else:
@@ -631,7 +635,7 @@ class LiveImageEditor(LiveImageCreator):
                     self.ovltype = overlay = 'DM_linear'
             if not f:
                 self.liveossrc = None
-            if not f and self.ovltype not in ('DM_linear', 'tempdir'):
+            if not f and self.ovltype not in ('DM_linear', 'tempdir', 'dir'):
                 self._overlay = find_overlay(base_on)
                 if self._overlay:
                     if os.path.isdir(self._overlay):
@@ -656,7 +660,9 @@ class LiveImageEditor(LiveImageCreator):
             # need recovery.
             self.liveosmnt._LiveImageMount__create(ops='rw', dirmode=0o700)
             if isinstance(self.liveosmnt.livemount, OverlayFSMount):
-                self.src_type = 'embedded-OFS'
+                self.src_type = 'OFS'
+                if self.liveosmnt.cowloop:
+                    self.src_type = 'embedded-OFS'
                 # src_type dir with no overlay also passes here.
             if self.liveosmnt.ovltype in ('', 'temp'):
                 self._overlay = self.liveosmnt.cowloop.lofile
@@ -684,7 +690,7 @@ class LiveImageEditor(LiveImageCreator):
                     tgt = self.liveosmnt.homemnt.diskmount.disk.lofile
                 self._fsck_img(tgt, self.liveosmnt.homemnt.fstype)
             ops = 'ro'
-        if self.src_type not in ('live', 'OFS'):
+        if self.src_type != 'live':
             try:
                 # Read-only devices speed image copying.
                 self.liveosmnt.mount(ops=ops, dirmode=0o400)
@@ -710,7 +716,7 @@ class LiveImageEditor(LiveImageCreator):
             self.srcmntdir = findmnt('-no TARGET -T', losm.srcdir)
             self.imgloop = losm.imgloop.device
 
-        if self.src_type in ('OFS', 'live'):
+        if self.src_type == 'live':
             if not self.imgloop:
                 self.imgloop = os.path.realpath('/dev/live-base')
             for i in ('0', '1'):
@@ -760,9 +766,13 @@ class LiveImageEditor(LiveImageCreator):
             self._LoopImageCreator__fstype = self.root_fstype
         if not os.path.exists(self.liveosdir):
             raise CreatorError("No LiveOS directory on %s" % base_on)
-        self.bootfolder = os.path.join(self.liveosmnt.srcdir, 'syslinux')
+        self.bootfolder = os.path.join(self.srcdir, 'syslinux')
+        self.imagesdir = os.path.join(self.srcdir, 'images')
+        if not os.path.exists(self.imagesdir):
+            self.imagesdir = os.path.join(self.srcmntdir, 'images')
+            self.bootfolder = os.path.join(self.srcmntdir, 'syslinux')
         if not os.path.exists(self.bootfolder):
-            self.bootfolder = os.path.join(self.srcmntdir, 'isolinux')
+            self.bootfolder = os.path.join(self.srcdir, 'isolinux')
 
         self.home_img = os.path.join(self.liveosdir, 'home.img')
         self.isohome_img = os.path.join(self._LiveImageCreatorBase__isodir,
@@ -865,6 +875,7 @@ class LiveImageEditor(LiveImageCreator):
         if self.is_squashed:
             squash_img = losetup('-nO BACK-FILE', self.squashloop)
             img = squash_img
+            required = int(get_blockdev_size(self.squashloop))
         else:
             self.compress_args = 'gzip'
         # 'self.compress_args = None' will force reading it from base_on.
@@ -895,10 +906,10 @@ class LiveImageEditor(LiveImageCreator):
         if findmnt('-no FSTYPE -T', fsroot) == 'overlay':
             rootfs_used = int(rcall(['df', '-B1', '--output=used', fsroot],
                                     raise_err=False)[0].split()[-1])
-            required = self._LoopImageCreator__image_size
         else:
             rootfs_used = int(rcall(du_args, fsroot,
                                     raise_err=False)[0].split()[-2])
+        if rootfs_used > required:
             required = rootfs_used
 
         self.home_used = int(rcall(du_args, os.path.join(fsroot, 'home'),
@@ -931,7 +942,7 @@ class LiveImageEditor(LiveImageCreator):
                 self.home_size_mb = self.home_img_size + self.home_size_mb
             if self.home_size_mb < self.home_used and self.home_size_mb != 0:
                 self.home_size_mb = self.home_used + self.home_used // 8
-            if self.src_type in ('live', 'OFS') and self.home_size_mb > 0:
+            if self.src_type == 'live' and self.home_size_mb > 0:
                 # space for staging new home.img filesystem
                 required += self.home_size_mb
             homesize = self.home_size_mb
@@ -1036,7 +1047,7 @@ class LiveImageEditor(LiveImageCreator):
                       ' extra bytes set to be copied from the sources.')
                      ).format(tobe_copied),)
         print(''.join((' ', self.fmt,
-                    ' bytes are in the LiveOS filesystem in {1:s}.\n')).format(
+                   ' bytes used in the LiveOS filesystem in {1:s}.\n')).format(
                        rootfs_used, self.src))
         if homesize > 0:
             print(''.join(('(', self.fmt,
@@ -1111,7 +1122,7 @@ class LiveImageEditor(LiveImageCreator):
 
         if os.path.exists(self.home_img):
             ops = []
-            if self.src_type in ('live', 'OFS'):
+            if self.src_type == 'live':
                 self.newhome_img = tempfile.mkstemp(suffix='.img', prefix='h-',
                                    dir=self._LoopImageCreator__imagedir)[1]
                 self.newhomemnt.disk.lofile = self.newhome_img
@@ -1167,7 +1178,7 @@ class LiveImageEditor(LiveImageCreator):
         shutil.copytree(src, dst, symlinks=True,
                         ignore=shutil.ignore_patterns(*ignore_list))
 
-        for src in (self.bootfolder, os.path.join(self.srcdir, 'images')):
+        for src in (self.bootfolder, self.imagesdir):
             copypaths([src], isodir)
 
         for src in ('LICENSE', 'Fedora-Legal-README.txt', 'EFI'):
@@ -1209,7 +1220,7 @@ class LiveImageEditor(LiveImageCreator):
         elif dm_table_list[2] == 'linear':
             self.overlayloop = None
         self.osminloop = None
-        if self.src_type in ('live', 'OFS'):
+        if self.src_type == 'live':
             dm_table_list = get_dm_table('live-osimg-min').split()
             if dm_table_list:
                 self.osminloop = '/dev/loop' + dm_table_list[4].split(':')[1]
@@ -1295,7 +1306,7 @@ class LiveImageEditor(LiveImageCreator):
         homedir = os.path.join(self._ImageCreator_instroot, 'home')
         if self.home_size_mb and self.home_size_mb >= 0:
             if self.home_size_mb == 0:
-                if self.src_type in ('live', 'OFS'):
+                if self.src_type == 'live':
                     homeroot = '/home'
                 else:
                     if self.liveosmnt.EncHome:
@@ -1323,7 +1334,7 @@ class LiveImageEditor(LiveImageCreator):
                 os.rmdir(p)
                 if not os.listdir(os.path.join(homedir, 'lost+found')):
                     os.rmdir(os.path.join(homedir, 'lost+found'))
-                if self.src_type not in ('live', 'OFS'):
+                if self.src_type != 'live':
                     tmphome_mnt.cleanup()
                 os.remove(self.home_img)
                 if liveosmnt:
@@ -1345,8 +1356,7 @@ class LiveImageEditor(LiveImageCreator):
                     print('Copying home.img to source device.')
                     shutil.copy2(self.newhome_img, self.home_img)
                 self.newhomemnt.mountdir = homedir
-            elif ((self.src_type in ('live', 'OFS')
-                 or self.EncHomeReq is not None)
+            elif ((self.src_type == 'live' or self.EncHomeReq is not None)
                  and hasattr(self, 'newhome_img')):
                 os.remove(self.home_img)
                 print('Copying home.img to source device.')
@@ -1374,7 +1384,7 @@ class LiveImageEditor(LiveImageCreator):
                                                            self.isohome_img,
                                                            self.home_img_size),
                                             homedir)
-            if self.src_type in ('live', 'OFS'):
+            if self.src_type == 'live':
                 self.newhomemnt = BindChrootMount('/home', self._instroot,
                                                   None)
             elif self.liveosmnt.homemnt:
@@ -1451,31 +1461,31 @@ class LiveImageEditor(LiveImageCreator):
         if not os.path.exists(self.initrd):
             self.initrd = os.path.join(isodir, 'initrd0.img')
         img = os.path.basename(self.initrd)
-        if msg == 'update' and self.kernels != self.kernels0:
-            print('Updating kernel & initial ram filesystem images...')
+        if msg == 'update':
             cmd = ['sort', '-rV']
             a, err, rc = rcall(cmd, '\n'.join(self.kernels))
             a = a.split('\n')[0]
-            rc = os.path.join(self._instroot, 'boot',
-                                               'initramfs-' + a + '.img')
-            d = os.path.join(self._instroot, 'usr', 'lib', 'modules', a)
-            cmd = ['dracut', rc, '--kmoddir', d, '--kver', a, '--no-hostonly',
-                   '--add', 'dmsquash-live', '--force']
-            if self.src_fstype == 'f2fs':
-                cmd += ['--add-drivers', 'f2fs']
-            print('using this command:\n%s' % cmd)
-            call(cmd)
-            a = os.path.join(d, vm)
-            imagedirs = [os.path.join(self.srcdir, 'syslinux'),
-                os.path.join(self.srcdir, 'images', 'pxeboot'),
-                os.path.join(self._LiveImageCreatorBase__isodir, 'isolinux'),
-                os.path.join(self._LiveImageCreatorBase__isodir, 'images',
-                             'pxeboot')]
-            if not os.access(imagedirs[1], os.W_OK):
-                del imagedirs[0:2]
-            [shutil.copy2(rc, os.path.join(d, img)) for d in imagedirs]
-            [shutil.copy2(a, os.path.join(d, vm)) for d in imagedirs]
-        if msg == 'update':
+            if self.kernels != self.kernels0 or self.initrd_kernel != a:
+                print('Updating kernel & initial ram filesystem images...')
+                rc = os.path.join(self._instroot, 'boot',
+                                                   'initramfs-' + a + '.img')
+                d = os.path.join(self._instroot, 'usr', 'lib', 'modules', a)
+                cmd = ['dracut', rc, '--kmoddir', d, '--kver', a,
+                       '--no-hostonly', '--add', 'dmsquash-live', '--force']
+                if self.src_fstype == 'f2fs':
+                    cmd += ['--add-drivers', 'f2fs']
+                print('using this command:\n%s' % cmd)
+                call(cmd)
+                a = os.path.join(d, vm)
+                imagedirs = [self.bootfolder,
+                  os.path.join(self.imagesdir, 'pxeboot'),
+                  os.path.join(self._LiveImageCreatorBase__isodir, 'isolinux'),
+                  os.path.join(self._LiveImageCreatorBase__isodir, 'images',
+                               'pxeboot')]
+                if not os.access(imagedirs[1], os.W_OK):
+                    del imagedirs[0:2]
+                [shutil.copy2(rc, os.path.join(d, img)) for d in imagedirs]
+                [shutil.copy2(a, os.path.join(d, vm)) for d in imagedirs]
             return
 
         print('Checking kernel versions in %s...' % msg)
@@ -1874,7 +1884,7 @@ s/\s+$//}}'''
             # No overlay to look below.
             return
 
-        if self.src_type in ('live', 'OFS'):
+        if self.src_type == 'live':
             imgloop = LoopbackDisk(self.imgloop, 0, 'ro')
         else:
             imgloop = self.liveosmnt.imgloop
@@ -1987,8 +1997,7 @@ s/\s+$//}}'''
         """
         (Hijacked either the _LiveImageCreatorBase__implant_md5sum or
         _LiveImageCreatorBase__create_isobase method) to insert code to refresh
-        a running or livemounted image's rootfs_img and overlay files (just
-        before the staged files are deleted).
+        a running or livemounted image's rootfs_img and overlay files.
         """
         if not self.refresh_only:
             # Implant an isomd5sum.
@@ -2119,12 +2128,12 @@ s/\s+$//}}'''
         else:
             overlay = args.overlay
 
+        ovlmntdir = self.srcmntdir
         if self.src_type == 'live' and not (self.flatten_squashfs or
                                             self.overlay_size_mb or
                                             self.ovltype == 'DM_linear'):
             self.overlay_size_mb = self.ovl_size
             self.ovl_fstype = self.ovltype
-            ovlmntdir = self.srcmntdir
             if self.liveosmnt and self.liveosmnt.ovlmnt:
                 self.liveosmnt.ovlmnt.mount()
                 ovlmntdir = self.liveosmnt.ovlmntdir
@@ -2138,15 +2147,17 @@ s/\s+$//}}'''
             'DM_snapshot_cow')) or (self.overlay_size_mb and
             self.ovltype in ('', 'DM_snapshot_cow', 'DM_linear') and
             self.ovl_fstype not in ('', 'temp','DM_snapshot_cow')):
+            # Represents need for a new OverlayFSMount.
+            self.ovltype = 'dir'
             if not self.overlay_size_mb:
                 self.overlay_size_mb = self.ovl_size
-                self.ovl_fstype = 'dir'
-                ovlmntdir = self.srcmntdir
+#                self.ovl_fstype = 'dir'
                 if self.liveosmnt and self.liveosmnt.ovlmnt:
                     self.liveosmnt.ovlmnt.mount()
                     ovlmntdir = self.liveosmnt.ovlmntdir
-                if findmnt('-no FSTYPE -T', ovlmntdir) == 'vfat':
-                    self.ovl_fstype = 'ext4'
+            if self.src_fstype == 'vfat' and not self.ovl_fstype:
+                self.ovltype = 'embedded-OFS'
+                self.ovl_fstype = 'ext4'
                 self.ovl_blksz = 4096
 
             cmd[3:] = [
@@ -2165,10 +2176,41 @@ s/\s+$//}}'''
             cmd[3:] = [r'/{0}/ s/ rd\.live\.overlay\.overlayfs//g'.format(dn),
                        EFI_config]
             call(cmd)
+
+        self.liveosmnt = self.new_liveos_mount(self.src, args.rootfsimg,
+                                               overlay, self.mntdir)
+        self.liveosmnt._LiveImageMount__create(ops='rw', dirmode=0o700)
+
+        if self.overlay_size_mb:
+            self.liveosmnt.overlay = None
+
+            overlay = self.liveosmnt.make_overlay(self.overlay_size_mb,
+                                                  self.ovl_size,
+                                                  self.ovltype,
+                                                  self.ovl_fstype,
+                                                  self.ovl_blksz)
+            self.liveosmnt.cleanup()
+            self.liveosmnt.overlay = overlay[0]
+            cmd[3:] = [r'''/^\s*append/ {{
+            s/rd\.live\.image|liveimg/& rd.live.overlay=UUID={0}/}}
+            '''.format(overlay[1]), cfgf]
+            call(cmd)
+            cmd[3:] = [r'''/{0}\/syslinux\/vmlinuz/ {{
+            s/rd\.live\.image|liveimg/& rd.live.overlay=UUID={1}/}}
+            '''.format(dn, overlay[1]), EFI_config]
+            call(cmd)
+        elif self.ovltype != 'DM_linear':
+            self.liveosmnt.reset_overlay()
+
+        cmd[3:] = [r'''/^\s*append|linuxefi/I {{
+        :w;s/(\s+\S+)\s*(.*)\1(\s+|$)/\1 \2\3/g;tw
+        s/\>\s\s+/ /g
+        s/\s+$//}}''', cfgf, EFI_config]
+        call(cmd)
+
         shutil.copy2(EFI_config, c)
 
         self.src_partition = findmnt('-no SOURCE', self.srcmntdir)
-
         c = lsblk('-no NAME,PKNAME', self.src_partition).split()
         d = '/dev/' + c[1]
         p = c[0][len(c[1]):]
@@ -2188,10 +2230,10 @@ s/\s+$//}}'''
                           dirmode=0o700)
             e.mount()
             d = e.mountdir
+            EFI_config_p = os.path.join(d, EFI_dir, 'grub.cfg')
             if os.access(d, os.W_OK):
                 for f in ('BOOT.conf.prev', 'grub.cfg.prev'):
-                    shutil.copy2(EFI_config + '.prev',
-                                 os.path.join(d, EFI_dir, f))
+                    shutil.copy2(EFI_config_p, os.path.join(d, EFI_dir, f))
                 for f in ('BOOT.conf', 'grub.cfg'):
                     shutil.copy2(EFI_config, os.path.join(d, EFI_dir, f))
                 if p == p3[0]:
@@ -2203,39 +2245,14 @@ s/\s+$//}}'''
             e.cleanup()
             return [p, e]
 
-        for p in [[p2, 'c12a7328-f81f-11d2-ba4b-00a0c93ec93b'],
-                  [p3, '48465300-0000-11aa-aa11-00306543ecac']]:
+        for p in [[p2, 'c12a7328-f81f-11d2-ba4b-00a0c93ec93b', '0xef'],
+                  [p3, '48465300-0000-11aa-aa11-00306543ecac', '0xaf']]:
             c = lsblk('-no NAME,PARTTYPE', p[0][0]).split()
-            if c and c[1] == p[1]:
+            if c and (c[1] == p[1] or c[1] == p[2]):
                 p[0] += cp_cfg(p[0][0])
             else:
                 p[0][0] = ''
                 p[0] += [False]
-
-        self.liveosmnt = self.new_liveos_mount(self.src, args.rootfsimg,
-                                               overlay, self.mntdir)
-        self.liveosmnt._LiveImageMount__create(ops='rw', dirmode=0o700)
-
-        if self.overlay_size_mb:
-            self.liveosmnt.overlay = None
-            overlay = self.liveosmnt.make_overlay(self.overlay_size_mb,
-                                                  self.ovl_size,
-                                                  self.ovl_fstype,
-                                                  self.ovl_blksz)
-            self.liveosmnt.cleanup()
-            self.liveosmnt.overlay = overlay[0]
-            cmd[3:] = [r'''/^\s*append/ {{
-            s/rd\.live\.image|liveimg/& rd.live.overlay=UUID={0}/
-            :w;s/(\s+\S+)\s*(.*)\1(\s+|$)/\1 \2\3/g;tw}}
-            '''.format(overlay[1]), cfgf]
-            call(cmd)
-            cmd[3:] = [r'''/{0}\/syslinux\/vmlinuz/ {{
-            s/rd\.live\.image|liveimg/& rd.live.overlay=UUID={1}/
-            :w;s/(\s+\S+)\s*(.*)\1(\s+|$)/\1 \2\3/g;tw}}
-            '''.format(dn, overlay[1]), EFI_config]
-            call(cmd)
-        elif self.ovltype != 'DM_linear':
-            self.liveosmnt.reset_overlay()
 
         cmd = ['sed', '-n', '-r']
         sedscript = r'''/^\s*label\s+linux/I {n;n;n
@@ -2243,8 +2260,9 @@ s/\s+$//}}'''
         cmd.extend([sedscript, cfgf])
         kcmdline, err, rc = rcall(cmd)
         kcmdline = kcmdline.rstrip()
-        self.kernel_release = get_file_info(self.kernel)[7]
 
+        # self.kernel_release below is from last invocation of
+        #  check_kernel_versions(editor.bootfolder, 'source image')
         if self.src_fstype == 'f2fs' and p2[0]:
             d, err, rc = rcall(['dump.f2fs', self.src_partition])
             if 'extra_attr' in d:
@@ -2480,6 +2498,13 @@ def main():
             print("\nNOTICE:  An overlay is unsuitable for '%s'.\n" % 
                   args.liveos, file=sys.stderr) 
             return 1
+    if src_fstype == 'f2fs' and not args.skip_refresh and not os.path.exists(
+        os.path.join('/', 'usr', 'sbin', 'fsck.f2fs')):
+        print('''
+        \rNOTICE:  The host system must have the 'f2fs-tools' package
+         installed in order to complete this editliveos session.\n
+         Run 'sudo dnf install f2fs-tools'.\n''')
+        return 1
     if args.name:
         name = args.name
         if any(n in os.sep for n in name):
@@ -2494,7 +2519,7 @@ def main():
         output = args.output
     elif src_type == 'iso':
         output = os.path.dirname(os.path.normpath(args.liveos))
-    elif src_type in ('live', 'OFS', 'dir', 'blk'):
+    elif src_type in ('live', 'dir', 'blk'):
         output = args.tmpdir
 
     editor = LiveImageEditor(name, docleanup=not args.nocleanup)
@@ -2603,8 +2628,8 @@ def main():
         isodir = editor.bootfolder
         editor.kernels = None
         editor.check_kernel_versions(editor.bootfolder, 'current image')
-        editor.check_kernel_versions(os.path.join(editor.srcdir, 'images',
-            'pxeboot'), 'current .iso')
+        editor.check_kernel_versions(os.path.join(editor.imagesdir, 'pxeboot'),
+            'current .iso')
         editor.kernel_version0 = editor.kernel_release
         editor.initrd_kernel0 = editor.initrd_kernel
         editor.kernels0 = editor.kernels
@@ -2637,8 +2662,8 @@ def main():
             editor.check_kernel_versions(isodir, 'new install image')
         if ((not editor.src_type == 'iso' or editor.skip_refresh) and
             not hasattr(editor, 'isosrcmnt')):
-            editor.check_kernel_versions(os.path.join(editor.srcdir,
-                'images', 'pxeboot'), 'source PXE')
+            editor.check_kernel_versions(os.path.join(editor.imagesdir,
+                'pxeboot'), 'source PXE')
             editor.check_kernel_versions(editor.bootfolder, 'source image')
         if editor.liveosmnt:
             if editor.refresh_only:
