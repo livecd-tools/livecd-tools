@@ -720,7 +720,7 @@ menu end
                  ("/boot/efi/EFI/*/gcd%s.efi" % (self.efiarch.lower(),), "/EFI/BOOT/grub%s.efi" % (self.efiarch.lower(),), True),
                  ("/boot/efi/EFI/*/shimia32.efi", "/EFI/BOOT/BOOTIA32.EFI", False),
                  ("/boot/efi/EFI/*/gcdia32.efi", "/EFI/BOOT/grubia32.efi", False),
-                 ("/boot/efi/EFI/*/fonts/unicode.pf2", "/EFI/BOOT/fonts/", True),
+                 ("/usr/share/grub/unicode.pf2", "/EFI/BOOT/fonts/", True),
                 ]
         makedirs(isodir+"/EFI/BOOT/fonts/")
         for src, dest, required in files:
