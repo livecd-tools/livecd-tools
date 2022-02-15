@@ -253,12 +253,13 @@ def main():
 
     return 0
 
-def do_nss_sss_hack():
+def do_nss_libs_hack():
     import ctypes as forgettable
     hack = forgettable._dlopen('libnss_sss.so.2')
+    hack = [ hack, forgettable._dlopen('libnss_systemd.so.2') ]
     del forgettable
     return hack
 
 if __name__ == "__main__":
-    hack = do_nss_sss_hack()
+    hack = do_nss_libs_hack()
     sys.exit(main())
