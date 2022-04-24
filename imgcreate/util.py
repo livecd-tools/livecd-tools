@@ -20,7 +20,7 @@
 import subprocess
 import logging
 import io
-from errors import *
+from imgcreate.errors import *
 
 def call(*popenargs, **kwargs):
     """
