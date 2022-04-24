@@ -35,6 +35,12 @@ import time
 from imgcreate.util import *
 from imgcreate.errors import *
 
+umount_fail_fmt = ("Unable to unmount filesystem at %s. The process using the "
+                   "imgcreate module, or one of the libraries used by that "
+                   "process, leaked a reference to the filesystem. Please "
+                   "report a bug at "
+                   "<https://github.com/livecd-tools/livecd-tools/issues>.")
+
 def chrootentitycheck(entity, chrootdir):
     """Check for entity availability in the chroot image.
 
@@ -815,22 +821,10 @@ class DiskMount(Mount):
         if self.mounted:
             logging.info("Unmounting directory %s" % self.mountdir)
             rc = call(['umount', self.mountdir])
-            if rc == 0:
-                self.mounted = False
-            else:
-                logging.warning("Unmounting directory %s failed, using lazy "
-                             "umount" % self.mountdir)
-                print("Unmounting directory %s failed, using lazy umount" %
-                      self.mountdir, file=sys.stdout)
-                rc = call(['umount', '-l', self.mountdir])
-                if rc != 0:
-                    raise MountError("Unable to unmount filesystem at %s" %
-                                     self.mountdir)
-                else:
-                    logging.info("lazy umount succeeded on %s" % self.mountdir)
-                    print("lazy umount succeeded on %s" % self.mountdir,
-                          file=sys.stdout)
-                    self.mounted = False
+            if rc != 0:
+                call(['umount', '-l', self.mountdir])
+                raise MountError(umount_fail_fmt % self.mountdir)
+            self.mounted = False
 
         if self.rmdir and not self.mounted:
             try:
@@ -989,15 +983,8 @@ class OverlayFSMount(Mount):
 
         rc = call(['umount', self.mountdir])
         if rc != 0:
-            logging.info("Unable to unmount %s normally, using lazy unmount" %
-                         self.mountdir)
-            rc = call(['umount', '-l', self.mountdir])
-            if rc != 0:
-                raise MountError("Unable to unmount fs at %s" % self.mountdir)
-            else:
-                logging.info("lazy umount succeeded on %s" % self.mountdir)
-                print("lazy umount succeeded on '%s'" % (self.mountdir),
-                      sys.stdout)
+            call(['umount', '-l', self.mountdir])
+            raise MountError(umount_fail_fmt % self.mountdir)
         if self.cowmnt:
             self.cowmnt.unmount()
         self.imgmnt.unmount()
@@ -1072,16 +1059,8 @@ class BindChrootMount():
 
         rc = call(['umount', self.dest])
         if rc != 0:
-            logging.info("Unable to unmount %s normally, using lazy unmount" %
-                         self.dest)
-            rc = call(['umount', '-l', self.dest])
-            if rc != 0:
-                raise MountError("Unable to unmount fs at %s" % self.dest)
-            else:
-                logging.info("lazy umount succeeded on %s" % self.dest)
-                print("lazy umount succeeded on %s" % self.dest,
-                      file=sys.stdout)
-
+            call(['umount', '-l', self.dest])
+            raise MountError(umount_fail_fmt % self.dest)
         self.mounted = False
 
     def cleanup(self):
