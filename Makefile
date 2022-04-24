@@ -63,7 +63,7 @@ dist : all
 	git archive --format=tar --prefix=livecd-tools-$(VERSION)/ HEAD | gzip -9v > livecd-tools-$(VERSION).tar.gz
 
 release: dist
-	git tag -s -a -m "Tag as livecd-tools-$(VERSION)" livecd-tools-$(VERSION)
+	git tag -a -m "Tag as livecd-tools-$(VERSION)" livecd-tools-$(VERSION)
 
 clean:
 	rm -f *~ creator/*~ installer/*~ config/*~ docs/*.8
