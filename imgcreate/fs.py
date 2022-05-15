@@ -1028,6 +1028,8 @@ class BindChrootMount():
             makedirs(os.path.dirname(os.path.realpath(self.dest)))
             if not os.path.exists(self.dest):
                 open(self.dest, 'a').close()
+            else:
+                return
         args = ['mount', '--bind', self.src, self.dest]
         rc = call(args)
         if rc != 0:
