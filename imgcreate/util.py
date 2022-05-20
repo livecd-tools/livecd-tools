@@ -20,6 +20,7 @@
 import subprocess
 import logging
 import io
+import base64
 from imgcreate.errors import *
 
 def call(*popenargs, **kwargs):
@@ -71,3 +72,32 @@ def rcall(args, stdin='', raise_err=True, cwd=None, env=None):
                                (args, environ, out, err, p.returncode))
     finally:
         return out.decode('utf-8'), err.decode('utf-8'), p.returncode
+
+def gpg_keys_from_linesiter(linesiter):
+    """
+        Parses ASCII-armored GPG key blocks from an iterator
+        that produces lines of text. Returns a generator
+        which will read each GPG key found and convert it to
+        a binary byte string.
+
+        The generator may throw if the base64 decode fails.
+    """
+    key = ''
+    reading_key = False
+    for line in filter(
+            lambda line: not line.startswith('#') and line.find(':') < 0,
+            linesiter):
+        if reading_key and \
+            not line.startswith('-----END ') and \
+            not line.startswith('='):
+            # note: base64 lines starting with '=' are a CRC
+            # which should be ignored.
+            key += line
+        elif not reading_key and line.startswith('-----BEGIN '):
+            reading_key = True
+            key = ''
+        else:
+            reading_key = False
+            key_bin = base64.b64decode(key)
+            if key_bin:
+                yield key_bin

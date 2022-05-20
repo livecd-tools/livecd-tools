@@ -30,6 +30,7 @@ from dnf.exceptions import Error as DnfBaseError
 
 import imgcreate
 from imgcreate.errors import KickstartError
+from imgcreate.util import gpg_keys_from_linesiter
 
 class Usage(Exception):
     def __init__(self, msg = None, no_error = False):
@@ -78,6 +79,13 @@ def parse_options(args):
     imgopt.add_option("", "--releasever", type="string", dest="releasever",
                       default=None,
                       help="Value to substitute for $releasever in kickstart repo urls")
+    imgopt.add_option("", "--repo-keys", type="string", dest="repo_keys",
+                      default=None,
+                      help="If present, require that all installed RPMs be signed with "
+                           "the public key(s) listed in this file. The file must "
+                           "contain one or more GPG public keys in ascii-armor format. "
+                           "Use the GPG signing keys from your distro's website. If "
+                           "omitted, no signature-checking is performed.")
     parser.add_option_group(imgopt)
 
     # options related to the config of your system
@@ -201,6 +209,16 @@ def main():
         print("Kickstart (%s) must have at least one repository." % (options.kscfg), file=sys.stderr)
         return 1
 
+    repo_keys = []
+    if options.repo_keys:
+        repo_keys = read_gpg_keys(options.repo_keys)
+        if not repo_keys:
+            print("GPG keyfile (%s) must contain at least one GPG "
+                  "public key in ascii armor format." %
+                  (options.repo_keys), file=sys.stderr)
+            return 1
+        logging.info("RPM signatures will be checked against %u GPG keys", len(repo_keys))
+
     try:
         if options.image_type == 'livecd':
             creator = imgcreate.LiveImageCreator(ks, name,
@@ -231,7 +249,7 @@ def main():
 
     try:
         creator.mount(options.base_on, options.cachedir)
-        creator.install()
+        creator.install(repo_keys=repo_keys)
         if (options.flat_squashfs and
           'rd.live.overlay.overlayfs' not in ks.handler.bootloader.appendLine):
             ks.handler.bootloader.appendLine += 'rd.live.overlay.overlayfs'
@@ -259,6 +277,11 @@ def do_nss_libs_hack():
     hack = [ hack, forgettable._dlopen('libnss_systemd.so.2') ]
     del forgettable
     return hack
+
+def read_gpg_keys(gpg_keyfile):
+    with open(gpg_keyfile, "r") as infile:
+        lines = infile.read()
+    return list(gpg_keys_from_linesiter(lines.splitlines()))
 
 if __name__ == "__main__":
     hack = do_nss_libs_hack()
