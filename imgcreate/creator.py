@@ -676,7 +676,7 @@ class ImageCreator(object):
                     raise CreatorError("Failed to find package '%s' : %s" %
                                        (pkg_name, e))
 
-    def install(self, repo_urls = {}):
+    def install(self, repo_urls = {}, repo_keys = []):
         """Install packages into the install root.
 
         This function installs the packages listed in the supplied kickstart
@@ -687,12 +687,29 @@ class ImageCreator(object):
                      if supplied, this causes any repository URLs specified in
                      the kickstart to be overridden.
 
+        repo_keys -- a list which contains GPG signing keys for RPM package
+                     verification. Entries should be bytes which contain the
+                     binary representation of a GPG public key. When present,
+                     all packages installed via %install must be signed with
+                     one of these keys.
         """
         dnf_conf = self._mktemp(prefix = "dnf.conf-")
 
         dbo = DnfLiveCD(releasever=self.releasever, useplugins=self.useplugins)
         dbo.setup(dnf_conf, self._instroot, cacheonly=self.cacheonly,
                    excludeWeakdeps=self.excludeWeakdeps)
+
+        if repo_keys:
+            ts = rpm.TransactionSet(self._instroot)
+            for key in repo_keys:
+                if 0 != ts.pgpImportPubkey(key):
+                    raise CreatorError(
+                        "Failed to install a repo_key signing key "
+                        "(%u bytes). Keys must be GPG public keys "
+                        "in binary format. ASCII-armored keys are not "
+                        "supported" % (len(key))
+                    )
+            rpm.addMacro("_pkgverify_level", "all")
 
         for repo in kickstart.get_repos(self.ks, repo_urls):
             (name, baseurl, mirrorlist, proxy, inc, exc, cost, sslverify) = repo
