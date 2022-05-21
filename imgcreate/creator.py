@@ -799,7 +799,11 @@ class ImageCreator(object):
         self._create_bootconfig()
 
         self._run_post_scripts()
-        kickstart.SelinuxConfig(self._instroot).apply(ksh.selinux)
+        try:
+            self._undo_bindmounts()
+            kickstart.SelinuxConfig(self._instroot).apply(ksh.selinux)
+        finally:
+            self._do_bindmounts()
 
     def launch_shell(self):
         """Launch a shell in the install root.
