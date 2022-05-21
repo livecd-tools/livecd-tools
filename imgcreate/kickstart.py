@@ -26,7 +26,6 @@ import subprocess
 import time
 import logging
 
-import selinux
 import urlgrabber
 
 import pykickstart.commands as kscommands
@@ -464,7 +463,8 @@ class NetworkConfig(KickstartConfig):
 
 class SelinuxConfig(KickstartConfig):
     """A class to apply a kickstart selinux configuration to a system."""
-    def relabel(self, ksselinux):
+
+    def relabel(self, ksselinux, policy_name):
         # touch some files which get unhappy if they're not labeled correctly
         for fn in ("/etc/resolv.conf",):
             path = self.path(fn)
@@ -476,10 +476,15 @@ class SelinuxConfig(KickstartConfig):
         if ksselinux.selinux == ksconstants.SELINUX_DISABLED:
             return
 
+        # detect selinux policy file locations
+        policy_file = self.find_policy_file(policy_name)
+        file_context = '/etc/selinux/%s/contexts/files/file_contexts' % (policy_name)
+
         try:
-            rc = subprocess.call(['setfiles', '-p', '-e', '/proc',
+            rc = subprocess.call(['setfiles', '-F', '-p', '-e', '/proc',
                                   '-e', '/sys', '-e', '/dev',
-                                  selinux.selinux_file_context_path(), '/'],
+                                  '-c', policy_file,
+                                  file_context, '/'],
                                  preexec_fn=self.chroot)
         except OSError as e:
             if e.errno == errno.ENOENT:
@@ -505,8 +510,11 @@ class SelinuxConfig(KickstartConfig):
         else:
             return
 
-        # Replace the SELINUX line in the config
+        # Detect policy name
         lines = open(self.instroot+selinux_config).readlines()
+        policy_name = next(_findprefix('SELINUXTYPE=', lines), 'targeted')
+
+        # Replace the SELINUX line in the config
         with open(self.instroot+selinux_config, "w") as f:
             for line in lines:
                 if line.startswith("SELINUX="):
@@ -514,7 +522,18 @@ class SelinuxConfig(KickstartConfig):
                 else:
                     f.write(line)
 
-        self.relabel(ksselinux)
+        self.relabel(ksselinux, policy_name)
+
+    def find_policy_file(self, policy_name):
+        """ Search for the SELinux binary policy file for policy_name """
+        guest_path = '/etc/selinux/%s/policy/' % (policy_name)
+        with os.scandir('%s%s' % (self.instroot, guest_path)) as sd:
+            for entry in sd:
+                if entry.is_file() and entry.name.startswith('policy.'):
+                    return guest_path + entry.name
+        raise errors.CreatorError(
+            "Unable to find SELinux binary policy file in \"%s\"" %
+            (guest_path))
 
 def get_image_size(ks, default = None):
     __size = 0
@@ -647,3 +666,12 @@ def get_post_scripts(ks):
 def selinux_enabled(ks):
     return ks.handler.selinux.selinux in (ksconstants.SELINUX_ENFORCING,
                                           ksconstants.SELINUX_PERMISSIVE)
+
+def _findprefix(prefix, linesiter):
+    """ Searches for lines starting with prefix
+        Emits only matching lines without the prefix. """
+    def getmatch(line):
+        if line.startswith(prefix):
+            return line[len(prefix):].rstrip()
+
+    return filter(None, map(getmatch, linesiter))
