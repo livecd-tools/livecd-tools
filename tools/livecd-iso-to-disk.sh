@@ -522,16 +522,16 @@ fscheck() {
 
 cleansrc() {
     umount $IMGMNT $IMGMNT &> /dev/null || :
-    rmdir $IMGMNT
+    rmdir $IMGMNT &> /dev/null || :
 }
 
 cleanup() {
-    sync -f $TGTMNT/$LIVEOS/
+    sync -f $TGTMNT/$LIVEOS/ &> /dev/null || :
     losetup -d $l2 $l3 &> /dev/null || :
     if [[ -d $SRCMNT && -z $SRCwasMounted ]]; then
         umount $SRCMNT && rmdir $SRCMNT
     fi
-    umount $TGTMNT
+    umount $TGTMNT &> /dev/null || :
     for p in $(findmnt -nro TARGET -S $TGTDEV || :); do
         umount -l $p
     done
@@ -1337,7 +1337,7 @@ checkMounted() {
             fi
         fi
         if [[ $p == /devices/virtual/block/loop* ]] &&
-           [[ 1 == $(losetup --raw -nO RO $tgtdev) ]]; then
+           [[ 1 == $(lsblk -rno RO $tgtdev) ]]; then
             printf "\n   NOTICE: '%s' is attached READ-ONLY.
             The target device must be writable.
             Please adjust this.
@@ -2172,7 +2172,7 @@ checkDiskSpace () {
         free=$((available+tbd))
         ((available-=tba-tbd)) || :
     fi
-    if ((available < 100<<20)) || ((free < 0)) || ((format < i)); then
+    if ((available < 100<<20)) || ((free < 0)); then
         local s t u
         if ((available < 0)); then
             s='may NOT fit in the space available on the target device.'
