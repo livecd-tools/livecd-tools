@@ -676,17 +676,24 @@ class ImageCreator(object):
                     raise CreatorError("Failed to find package '%s' : %s" %
                                        (pkg_name, e))
 
-    def install(self, repo_urls = {}):
+    def install(self, repo_urls = {}, repo = None):
         """Install packages into the install root.
 
         This function installs the packages listed in the supplied kickstart
         into the install root. By default, the packages are installed from the
-        repository URLs specified in the kickstart.
+        repository URLs specified in the kickstart. For advanced configuration,
+        you can opt to ignore the kickstart repositories entirely and use
+        repo configuration files like in /etc/yum.repos.d/. This is useful
+        for specifying GPG key options—which are not part of kickstart.
 
         repo_urls -- a dict which maps a repository name to a repository URL;
                      if supplied, this causes any repository URLs specified in
                      the kickstart to be overridden.
 
+        repo      -- use RPM repositories defined in .repo config files in
+                     this file or directory. If this argument is provided,
+                     repos defined in the kickstart are ignored. This is useful
+                     for setting advanced dnf options like gpg keys.
         """
         dnf_conf = self._mktemp(prefix = "dnf.conf-")
 
@@ -694,19 +701,23 @@ class ImageCreator(object):
         dbo.setup(dnf_conf, self._instroot, cacheonly=self.cacheonly,
                    excludeWeakdeps=self.excludeWeakdeps)
 
-        for repo in kickstart.get_repos(self.ks, repo_urls):
-            (name, baseurl, mirrorlist, proxy, inc, exc, cost, sslverify) = repo
+        if repo:
+            dbo.addRepositoryFromConfigFile(repo)
+        else:
+            for repo in kickstart.get_repos(self.ks, repo_urls):
+                (name, baseurl, mirrorlist, proxy,
+                inc, exc, cost, sslverify) = repo
 
-            yr = dbo.addRepository(name, baseurl, mirrorlist)
-            if inc:
-                yr.includepkgs = inc
-            if exc:
-                yr.exclude = exc
-            if proxy:
-                yr.proxy = proxy
-            if cost is not None:
-                yr.cost = cost
-            yr.sslverify = sslverify
+                yr = dbo.addRepository(name, baseurl, mirrorlist)
+                if inc:
+                    yr.includepkgs = inc
+                if exc:
+                    yr.exclude = exc
+                if proxy:
+                    yr.proxy = proxy
+                if cost is not None:
+                    yr.cost = cost
+                yr.sslverify = sslverify
 
         if kickstart.exclude_docs(self.ks):
             rpm.addMacro("_excludedocs", "1")

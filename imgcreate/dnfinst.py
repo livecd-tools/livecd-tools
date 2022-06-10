@@ -26,11 +26,14 @@
 from __future__ import print_function
 import glob
 import os
+import os.path
 import sys
 import logging
 import itertools
+from urllib.parse import urljoin
 
 import dnf
+import dnf.conf.read
 import dnf.rpm
 # FIXME: Why are these hidden inside dnf.cli? Any text-mode app should be able
 #        to make use of these.
@@ -48,6 +51,8 @@ class DnfLiveCD(dnf.Base):
         """
         dnf.Base.__init__(self)
         self.releasever = releasever
+        if releasever:
+            self.conf.substitutions['releasever'] = releasever
         self.useplugins = useplugins
 
     def doFileLogSetup(self, uid, logfile):
@@ -195,6 +200,62 @@ class DnfLiveCD(dnf.Base):
         self.repos.add(repo)
         return repo
 
+    def addRepositoryFromConfigFile(self, repo):
+        """
+        Import repository configuration from a DNF repo file instead of
+        from kickstart. If repo is a directory, all *.repo files in that
+        directory are imported.
+        """
+
+        def _to_abs_paths(basedir, paths):
+            # replace filenames (relative to basedir) with absolute URLs
+            for path in map(str, paths):
+                path = os.path.expanduser(path)
+                absurl = urljoin(
+                    'file://%s/' % os.path.abspath(basedir),
+                    path
+                )
+                yield absurl
+
+        logging.debug("searching for DNF repositories in \"%s\"", repo)
+        if os.path.isdir(repo):
+            repo_dir = repo
+            self.conf.reposdir = (repo)
+            self.conf.config_file_path = '/dev/null'
+        elif os.path.exists(repo):
+            repo_dir = os.path.dirname(repo)
+            self.conf.reposdir = ()
+            self.conf.config_file_path = repo
+        else:
+            raise CreatorError(\
+                "Unable to read repo configuration: \"%s\" does not exist" \
+                    % (repo))
+
+        self.read_all_repos()
+
+        # override configuration
+        found_enabled_repos = 0
+        for repo in self.repos.iter_enabled():
+            logging.debug("repo:\n%s", repo.dump())
+            logging.info('repo: %s (gpg=%s): %s', repo.id,
+                         repo.gpgcheck, repo.name)
+
+            repo.set_progress_bar(DownloadProgress())
+            repo.gpgkey = list(_to_abs_paths(repo_dir, repo.gpgkey))
+            found_enabled_repos += 1
+
+        # read_all_repos() may pass errors silently
+        # check that the command loaded at least one enabled repo
+        if found_enabled_repos <= 0:
+            with_dir = ''
+            if os.path.isdir(repo):
+                with_dir = ' .repo files with'
+            raise CreatorError(
+                "Unable to read repo configuration: \"%s\" does not " % repo +
+                "contain any%s enabled RPM repositories. " % with_dir +
+                "Check that this path contains dnf INI-style repo " +
+                "definitions like /etc/yum.repos.d. See `man 5 dnf.conf`.")
+
     def runInstall(self):
         import dnf.exceptions
         os.environ["HOME"] = "/"
@@ -211,7 +272,20 @@ class DnfLiveCD(dnf.Base):
 
         dlpkgs = self.transaction.install_set
         self.download_packages(dlpkgs, DownloadProgress())
-        # FIXME: sigcheck?
+
+        # check gpg signatures (repo must be gpgcheck=1)
+        #   We auto-import all dnf repository keys as we
+        #   encounter them.
+        for pkg in dlpkgs:
+            res, err = self.package_signature_check(pkg)
+            if res == 0:
+                continue
+            elif res == 1:
+                self.package_import_key(pkg, lambda _x, _y, _z: True)
+                res, err = self.package_signature_check(pkg)
+
+            if res != 0:
+                raise CreatorError(err)
 
         ret = self.do_transaction(TransactionProgress())
         print("")

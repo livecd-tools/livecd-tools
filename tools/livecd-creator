@@ -78,6 +78,11 @@ def parse_options(args):
                            "Multiple arguments should be specified in "
                            'one string, i.e., --compression-type "type arg1 arg2 ...".',
                       default="xz")
+    imgopt.add_option("", "--repo", type="string", dest="repo",
+                      default=None,
+                      help="Configure RPM repositories from a .repo file or directory "
+                           "instead of kickstart. See /etc/yum.repos.d/ for example "
+                           "configuration files.")
     imgopt.add_option("", "--releasever", type="string", dest="releasever",
                       default=None,
                       help="Value to substitute for $releasever in kickstart repo urls")
@@ -200,9 +205,13 @@ def main():
         logging.error("kickstart error: %s", e)
         return 1
 
-    if not ks.handler.repo.seen:
+    if not ks.handler.repo.seen and not options.repo:
         print("Kickstart (%s) must have at least one repository." % (options.kscfg), file=sys.stderr)
         return 1
+
+    if ks.handler.repo.seen and options.repo:
+        print("Ignoring kickstart (%s) repo definitions in favor of \"%s\"" %
+              (options.kscfg, options.repo), file=sys.stderr)
 
     try:
         if options.image_type == 'livecd':
@@ -235,7 +244,7 @@ def main():
 
     try:
         creator.mount(options.base_on, options.cachedir)
-        creator.install()
+        creator.install({}, options.repo)
         if (options.flat_squashfs and
           'rd.live.overlay.overlayfs' not in ks.handler.bootloader.appendLine):
             ks.handler.bootloader.appendLine += 'rd.live.overlay.overlayfs'
