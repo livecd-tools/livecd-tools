@@ -800,6 +800,7 @@ class ImageCreator(object):
 
         self._run_post_scripts()
         try:
+            self.__destroy_selinuxfs()
             self._undo_bindmounts()
             kickstart.SelinuxConfig(self._instroot).apply(ksh.selinux)
         finally:
