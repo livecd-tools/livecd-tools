@@ -80,6 +80,15 @@ def parse_options(args):
                       help="Configure RPM repositories from a .repo file or directory "
                            "instead of kickstart. See /etc/yum.repos.d/ for example "
                            "configuration files.")
+    imgopt.add_option("", "--pkgverify-level",
+                      type="choice",
+                      choices=["all", "signature", "digest", "none"],
+                      dest="pkgverify_level",
+                      default=None,
+                      help="Configures RPM package verification. Use \"all\" to enforce "
+                           "trusted GPG signatures and strong digests for every "
+                           "package. Only affects packages installed during the "
+                           "%install step.")
     imgopt.add_option("", "--releasever", type="string", dest="releasever",
                       default=None,
                       help="Value to substitute for $releasever in kickstart repo urls")
@@ -210,6 +219,12 @@ def main():
         print("Ignoring kickstart (%s) repo definitions in favor of \"%s\"" %
               (options.kscfg, options.repo), file=sys.stderr)
 
+    if options.pkgverify_level in ("all", "signature") and not options.repo:
+        print(f"Option --pkgverify-level={options.pkgverify_level} requires "
+              "the use of --repo=PATH for repo configuration",
+              file=sys.stderr)
+        return 1
+
     try:
         if options.image_type == 'livecd':
             creator = imgcreate.LiveImageCreator(ks, name,
@@ -240,7 +255,7 @@ def main():
 
     try:
         creator.mount(options.base_on, options.cachedir)
-        creator.install({}, options.repo)
+        creator.install({}, options.repo, options.pkgverify_level)
         if (options.flat_squashfs and
           'rd.live.overlay.overlayfs' not in ks.handler.bootloader.appendLine):
             ks.handler.bootloader.appendLine += 'rd.live.overlay.overlayfs'

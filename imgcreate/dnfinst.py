@@ -35,6 +35,7 @@ from urllib.parse import urljoin
 import dnf
 import dnf.conf.read
 import dnf.rpm
+import rpm
 # FIXME: Why are these hidden inside dnf.cli? Any text-mode app should be able
 #        to make use of these.
 from dnf.cli.progress import MultiFileProgressMeter as DownloadProgress
@@ -45,7 +46,7 @@ from pykickstart.constants import GROUP_DEFAULT, GROUP_REQUIRED, GROUP_ALL
 from imgcreate.errors import *
 
 class DnfLiveCD(dnf.Base):
-    def __init__(self, releasever=None, useplugins=False):
+    def __init__(self, releasever=None, useplugins=False, pkgverify_level=None):
         """
         releasever = optional value to use in replacing $releasever in repos
         """
@@ -54,6 +55,7 @@ class DnfLiveCD(dnf.Base):
         if releasever:
             self.conf.substitutions['releasever'] = releasever
         self.useplugins = useplugins
+        self.pkgverify_level = pkgverify_level
 
     def doFileLogSetup(self, uid, logfile):
         # don't do the file log for the livecd as it can lead to open fds
@@ -256,7 +258,22 @@ class DnfLiveCD(dnf.Base):
                 "Check that this path contains dnf INI-style repo " +
                 "definitions like /etc/yum.repos.d. See `man 5 dnf.conf`.")
 
+    def setPkgVerifyLevel(self, pkgverify_level):
+        """
+        Configure RPM's %_pkgverify_level macro
+
+        Enforced package verification level (see /usr/lib/rpm/macros):
+          all           require valid digest(s) and signature(s)
+          signature     require valid signature(s)
+          digest        require valid digest(s)
+          none          traditional rpm behavior, nothing required
+        """
+        self.pkgverify_level = pkgverify_level
+
     def runInstall(self):
+        """
+        Install packages
+        """
         import dnf.exceptions
         os.environ["HOME"] = "/"
         try:
@@ -276,16 +293,20 @@ class DnfLiveCD(dnf.Base):
         # check gpg signatures (repo must be gpgcheck=1)
         #   We auto-import all dnf repository keys as we
         #   encounter them.
-        for pkg in dlpkgs:
-            res, err = self.package_signature_check(pkg)
-            if res == 0:
-                continue
-            elif res == 1:
-                self.package_import_key(pkg, lambda _x, _y, _z: True)
+        if self.pkgverify_level not in ('digest', 'none'):
+            for pkg in dlpkgs:
                 res, err = self.package_signature_check(pkg)
+                if res == 0:
+                    continue
+                elif res == 1:
+                    self.package_import_key(pkg, lambda _x, _y, _z: True)
+                    res, err = self.package_signature_check(pkg)
 
-            if res != 0:
-                raise CreatorError(err)
+                if res != 0:
+                    raise CreatorError(err)
+
+        if self.pkgverify_level:
+            rpm.addMacro("_pkgverify_level", self.pkgverify_level)
 
         ret = self.do_transaction(TransactionProgress())
         print("")

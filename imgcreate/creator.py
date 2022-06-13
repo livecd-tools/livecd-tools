@@ -676,7 +676,7 @@ class ImageCreator(object):
                     raise CreatorError("Failed to find package '%s' : %s" %
                                        (pkg_name, e))
 
-    def install(self, repo_urls = {}, repo = None):
+    def install(self, repo_urls={}, repo=None, pkgverify_level=None):
         """Install packages into the install root.
 
         This function installs the packages listed in the supplied kickstart
@@ -694,6 +694,12 @@ class ImageCreator(object):
                      this file or directory. If this argument is provided,
                      repos defined in the kickstart are ignored. This is useful
                      for setting advanced dnf options like gpg keys.
+
+        pkgverify_level  -- sets RPM's %_pkgverify_level macro for enforcing
+                            GPG signature and/or digest verification. Set to
+                            "all" to enforce trusted GPG signatures for all
+                            installed packages. Omit to use RPM's default
+                            setting. See /usr/lib/rpm/macros.
         """
         dnf_conf = self._mktemp(prefix = "dnf.conf-")
 
@@ -731,7 +737,8 @@ class ImageCreator(object):
 
         try:
             self.__apply_selections(dbo)
-
+            if pkgverify_level:
+                dbo.setPkgVerifyLevel(pkgverify_level)
             dbo.runInstall()
         except (dnf.exceptions.DownloadError, dnf.exceptions.RepoError) as e:
             raise CreatorError("Unable to download from repo : %s" % (e,))
