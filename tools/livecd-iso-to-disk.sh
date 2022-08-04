@@ -1695,8 +1695,8 @@ else
     SRC=$(readlink -f "$1") || :
 fi
 if [[ $2 == live ]]; then
-    TGTDEV=$(realpath $(readlink /run/initramfs/livedev)) || printf "
-    ERROR:  There is no running LiveOS system to target.\n\n" && exitclean
+    TGTDEV=$(realpath $(readlink /run/initramfs/livedev)) || (printf "
+    ERROR:  There is no running LiveOS system to target.\n\n" && exitclean)
 else
     TGTDEV=$(readlink -f "$2") || :
 fi
