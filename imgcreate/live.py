@@ -1103,7 +1103,7 @@ class aarch64LiveImageCreator(LiveImageCreatorBase):
         fail = False
         files = [("/boot/efi/EFI/*/shim%s.efi" % (self.efiarch.lower(),), "/EFI/BOOT/BOOT%s.EFI" % (self.efiarch,), True),
                  ("/boot/efi/EFI/*/gcd%s.efi" % (self.efiarch.lower(),), "/EFI/BOOT/grub%s.efi" % (self.efiarch.lower(),), True),
-                 ("/boot/efi/EFI/*/fonts/unicode.pf2", "/EFI/BOOT/fonts/", True),
+                 ("/usr/share/grub/unicode.pf2", "/EFI/BOOT/fonts/", True),
                 ]
         makedirs(isodir+"/EFI/BOOT/fonts/")
         for src, dest, required in files:
