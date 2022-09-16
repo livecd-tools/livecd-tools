@@ -647,7 +647,7 @@ class ImageCreator(object):
                                        (env, e))
 
         for group in kickstart.get_groups(self.ks):
-            if group.name == 'core' or group.name in excludedGroups:
+            if (group.name == 'core' and not kickstart.nocore(self.ks)) or group.name in excludedGroups:
                 continue
 
             try:
