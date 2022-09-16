@@ -50,10 +50,16 @@ def read_kickstart(path):
     version = ksversion.makeVersion()
     ks = ksparser.KickstartParser(version)
     try:
-        tmpks = '.kstmp.{}'.format(os.getpid())
-        ksfile = urlgrabber.urlgrab(path, filename=tmpks)
-        ks.readKickstart(tmpks)
-        os.unlink (tmpks)
+        # If kickstart file exists on the local filesystem, open it directly
+        # so pykickstart knows how to handle relative %include. Otherwise,
+        # treat as URL and download to temporary file before parsing.
+        if os.path.exists(path):
+            ks.readKickstart(path)
+        else:
+            tmpks = '.kstmp.{}'.format(os.getpid())
+            ksfile = urlgrabber.urlgrab(path, filename=tmpks)
+            ks.readKickstart(tmpks)
+            os.unlink(tmpks)
 # Fallback to e.args[0] is a workaround for bugs in urlgragger and pykickstart.
     except IOError as e:
         raise errors.KickstartError("Failed to read kickstart file "
