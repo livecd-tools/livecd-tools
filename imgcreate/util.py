@@ -32,14 +32,12 @@ def call(*popenargs, **kwargs):
                          stderr=subprocess.STDOUT, **kwargs)
     rc = p.wait()
     fp = io.open(p.stdout.fileno(), mode="r", encoding="utf-8", closefd=False)
-    stdout = fp.read().split()
+    stdout = fp.read().splitlines(keepends=False)
     fp.close()
 
     # Log output using logging module
     for buf in stdout:
-        if not buf:
-            break
-        logging.debug("%s", buf.rstrip())
+        logging.debug("%s", buf)
 
     return rc
 
