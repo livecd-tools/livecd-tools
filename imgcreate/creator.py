@@ -695,7 +695,7 @@ class ImageCreator(object):
                    excludeWeakdeps=self.excludeWeakdeps)
 
         for repo in kickstart.get_repos(self.ks, repo_urls):
-            (name, baseurl, mirrorlist, proxy, inc, exc, cost, sslverify) = repo
+            (name, baseurl, mirrorlist, proxy, inc, exc, priority, cost, sslverify) = repo
 
             yr = dbo.addRepository(name, baseurl, mirrorlist)
             if inc:
@@ -704,6 +704,8 @@ class ImageCreator(object):
                 yr.exclude = exc
             if proxy:
                 yr.proxy = proxy
+            if priority is not None:
+                yr.priority = priority
             if cost is not None:
                 yr.cost = cost
             yr.sslverify = sslverify
