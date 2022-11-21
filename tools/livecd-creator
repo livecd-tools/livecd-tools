@@ -50,6 +50,9 @@ def parse_options(args):
                       help="Title used by syslinux.cfg file"),
     imgopt.add_option("", "--product", type="string", dest="product",
                       help="Product name used in syslinux.cfg boot stanzas and countdown"),
+    imgopt.add_option("", "--nomacboot", action="store_true",
+                      dest="nomacboot", default=False,
+                      help="Do not create HFS boot image")
     # Provided for img-create compatibility
     imgopt.add_option("-n", "--name", type="string", dest="fslabel",
                       help=optparse.SUPPRESS_HELP)
@@ -225,6 +228,7 @@ def main():
 
     creator.compress_args = options.compress_args
     creator.skip_compression = options.skip_compression
+    creator.skip_hfs = options.nomacboot
     creator.skip_minimize = options.skip_minimize
     if options.cachedir:
         options.cachedir = os.path.abspath(options.cachedir)

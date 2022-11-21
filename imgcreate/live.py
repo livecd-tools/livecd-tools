@@ -68,6 +68,9 @@ class LiveImageCreatorBase(LoopImageCreator):
         self.skip_compression = False
         """Controls whether to use squashfs to compress the image."""
 
+        self.skip_hfs = False
+        """Controls whether to create a hfs boot image."""
+
         self._timeout = kickstart.get_timeout(self.ks, 10)
         """The bootloader timeout from kickstart."""
 
@@ -829,11 +832,12 @@ submenu 'Troubleshooting -->' {
     def _generate_efiboot(self, isodir):
         LiveImageCreatorBase._generate_efiboot(self, isodir)
         # add macboot data
-        subprocess.call(["mkefiboot", "-a", isodir + "/EFI/BOOT",
-                         isodir + "/isolinux/macboot.img", "-l", self.product,
-                         "-n", "/usr/share/pixmaps/bootloader/fedora-media.vol",
-                         "-i", "/usr/share/pixmaps/bootloader/fedora.icns",
-                         "-p", self.product])
+        if not self.skip_hfs:
+            subprocess.call(["mkefiboot", "-a", isodir + "/EFI/BOOT",
+                             isodir + "/isolinux/macboot.img", "-l", self.product,
+                             "-n", "/usr/share/pixmaps/bootloader/fedora-media.vol",
+                             "-i", "/usr/share/pixmaps/bootloader/fedora.icns",
+                             "-p", self.product])
 
     def _configure_bootloader(self, isodir):
         self._configure_syslinux_bootloader(isodir)
