@@ -195,6 +195,36 @@ class DnfLiveCD(dnf.Base):
         self.repos.add(repo)
         return repo
 
+    def gpgsigcheck(self, pkgs):
+        """Perform GPG signature verification on the given packages,
+        installing keys if possible.
+
+        :param pkgs: a list of package objects to verify the GPG
+           signatures of
+        :return: non-zero if execution should stop due to an error
+        :raises: Will raise :class:`Error` if there's a problem
+        """
+        for po in pkgs:
+            result, errmsg = self._sig_check_pkg(po)
+
+            if result == 0:
+                # Verified ok, or verify not req'd
+                continue
+
+            elif result == 1:
+                # Keys are provided through kickstart, so treat this as consent
+                # for importing them - the second parameter is callback
+                # acceping key import
+                # This function perform another signature check and raise
+                # dnf.exceptions.Error if it fails
+                self._get_key_for_package(po, lambda x, y, z: True)
+
+            else:
+                # Fatal error
+                raise dnf.exceptions.Error(errmsg)
+
+        return 0
+
     def runInstall(self):
         import dnf.exceptions
         os.environ["HOME"] = "/"
@@ -211,7 +241,9 @@ class DnfLiveCD(dnf.Base):
 
         dlpkgs = self.transaction.install_set
         self.download_packages(dlpkgs, DownloadProgress())
-        # FIXME: sigcheck?
+
+        # Check GPG signatures
+        self.gpgsigcheck(dlpkgs)
 
         ret = self.do_transaction(TransactionProgress())
         print("")

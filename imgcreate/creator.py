@@ -695,7 +695,7 @@ class ImageCreator(object):
                    excludeWeakdeps=self.excludeWeakdeps)
 
         for repo in kickstart.get_repos(self.ks, repo_urls):
-            (name, baseurl, mirrorlist, proxy, inc, exc, cost, sslverify) = repo
+            (name, baseurl, mirrorlist, proxy, inc, exc, cost, sslverify, gpgkey) = repo
 
             yr = dbo.addRepository(name, baseurl, mirrorlist)
             if inc:
@@ -707,6 +707,10 @@ class ImageCreator(object):
             if cost is not None:
                 yr.cost = cost
             yr.sslverify = sslverify
+            if gpgkey:
+                yr.gpgcheck = True
+                gpgkey = gpgkey.replace("$releasever", dbo.releasever)
+                yr.gpgkey = gpgkey
 
         if kickstart.exclude_docs(self.ks):
             rpm.addMacro("_excludedocs", "1")
