@@ -169,7 +169,38 @@ Multiple images may be loaded onto a single USB stick.
 
 See livecd-iso-to-disk --help for more options and instructions.
 
-6. MOUNTING LIVE IMAGES 
+6. SECURE IMAGE GENERATION
+
+Due to limitations in kickstart, the default invocation of livecd-creator
+cannot verify RPM package signatures. Package signatures are an essential
+security function which protects RPMs against tampering during storage or
+transfer.
+
+If possible, you should enable signature checks with the --repo option:
+
+  livecd-creator \
+    --config=/usr/share/doc/livecd-tools/livecd-fedora-minimal.ks \
+    --repo=/etc/yum.repos.d
+
+--repo configures RPM sources using DNF ".repo" configuration files instead of
+kickstart. If you are building a different distro than your host system, be sure
+to use configuration files for that distro.
+
+Your --repo file or directory can use any configuration options available to
+DNF. The following options must be set in order to verify signatures:
+
+  gpgcheck=1
+
+  gpgkey=path/to/key.asc
+         file:///url/to/another/key.asc
+
+In this mode, the %repo directive(s) in the kickstart file, if any,
+are ignored.
+
+Additionally, use --pkgverify-level=all to enforce valid, trusted
+signatures on all packages installed.
+
+7. MOUNTING LIVE IMAGES
 
 A live CD .iso file or an installed live USB device may be mounted with the
 liveimage-mount script to peer into the live OS filesystem, or even edit it on

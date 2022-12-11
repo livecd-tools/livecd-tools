@@ -48,6 +48,11 @@ Title used by F<syslinux.cfg> file.
 
 Product name used in F<syslinux.cfg> boot stanzas and countdown.
 
+=item --repo=PATH
+
+Configure RPM repositories from the given file or directory of L<dnf.conf(5)>
+C<.repo> files. C<%repo> directives in the kickstart file will be ignored.
+
 =item  -p, --plugins
 
 Use DNF plugins during image creation.
@@ -67,6 +72,25 @@ Multiple arguments should be specified in one string, i.e., C<--compression-type
 =item --releasever=VER
 
 Set the value to substitute for $releasever in kickstart repo urls.
+
+=item --pkgverify-level=LEVEL
+
+Sets GPG signature and package digest options for RPM.
+See "C<%_pkgverify_level>" in F</usr/lib/rpm/macros>.
+
+=over 1
+
+=item C<all> require valid digest(s) and signature(s)
+
+=item C<signature> require valid signature(s)
+
+=item C<digest> require valid digest(s)
+
+=item C<none> traditional rpm behavior, nothing required
+
+=back
+
+GPG signature verification requires the use of C<--repo>.
 
 =back
 
@@ -144,6 +168,37 @@ repo --name=fedora --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo
 Note that in a chroot environment (like koji) the rpmdb is not available,
 so either don't use $releasever in that case, or pass --releasever=VER.
 
+=head1 SECURE IMAGE GENERATION
+
+Due to limitations in kickstart, the default invocation of livecd-creator
+cannot verify RPM package signatures. Package signatures are an essential
+security function which protects RPMs against tampering during storage or
+transfer.
+
+If possible, you should enable signature checks with the C<--repo> option:
+
+  livecd-creator \
+    --config=/usr/share/doc/livecd-tools/livecd-fedora-minimal.ks \
+    --repo=/etc/yum.repos.d
+
+--repo configures RPM sources using L<dnf.conf(5)> configuration files
+instead of kickstart. If you are building a different distro than your
+host system, be sure to use configuration files for that distro.
+
+Your --repo file or directory can use any configuration options available to
+DNF. The following options must be set in order to verify signatures:
+
+  gpgcheck=1
+
+  gpgkey=path/to/key.asc
+         file:///url/to/another/key.asc
+
+In this mode, the C<%repo> directive(s) in the kickstart file, if any,
+are ignored.
+
+Additionally, use C<--pkgverify-level=all> to enforce valid, trusted
+signatures on all packages installed.
+
 =head1 CONTRIBUTORS
 
 David Zeuthen, Jeremy Katz, Douglas McClendon and a team of many other contributors. See the AUTHORS file in the source distribution for the complete list of credits. 
@@ -158,6 +213,6 @@ Copyright (C) Fedora Project 2008,2009,2020, and various contributors. This is f
 
 =head1 SEE ALSO
 
-C<livecd-iso-to-disk(8)>, project website L<http://fedoraproject.org/wiki/FedoraLiveCD>
+L<livecd-iso-to-disk(8)>, L<dnf.conf(5)>, project website L<http://fedoraproject.org/wiki/FedoraLiveCD>
 
 =cut
