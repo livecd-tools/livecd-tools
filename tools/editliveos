@@ -198,9 +198,9 @@ parser.add_argument('-r', '--releasefile', metavar='PATH',
                     help='Specify release file/s for branding the build.\n'
                          'Denote multiple files as "path1 path2 ..."\n ')
 
-parser.add_argument('-b', '--builder', default=os.getenv('USERNAME'),
+parser.add_argument('-b', '--builder', default=os.getenv('USERNAME', 'Fedora User'),
                     help='Specify the builder of a Remix.\n'
-                         'default = "' + os.getenv('USERNAME') + '" (the '
+                         'default = "' + os.getenv('USERNAME', 'Fedora User') + '" (the '
                          'current system user)\n ')
 
 parser.add_argument('--clone', action='store_true', default=False,
@@ -427,9 +427,9 @@ class LiveImageEditor(LiveImageCreator):
         """A string of file or directory paths to include in _brand().  This
         variable is later reused to hold the modified release name."""
 
-        self.builder = os.getenv('USERNAME')
+        self.builder = os.getenv('USERNAME', 'Fedora User')
         """The name of the Remix builder for _branding.
-        Default = os.getenv('USERNAME')"""
+        Default = os.getenv('USERNAME', 'Fedora User')"""
 
         self.compress_args = None
         """mksquashfs compressor to use. Use 'None' to force reading of the
