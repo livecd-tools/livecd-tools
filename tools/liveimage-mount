@@ -6,7 +6,7 @@
 #
 # Copyright 2011, Red Hat, Inc.
 # Copyright 2016, Neal Gompa
-# Copyright 2017-2021, Sugar Labs®
+# Copyright 2017-2023, Sugar Labs®
 #   Code for Live mounting an attached LiveOS device added by Frederick Grose,
 #   <fgrose at sugarlabs.org>
 #   Ported to Python 3 by Neal Gompa <ngompa13 at gmail.com>
@@ -337,6 +337,7 @@ def main():
     ovl_mp = ''
     dnfcache = ''
     tempfile.tempdir = '/tmp'
+    overlayfs = None
     for o, a in ops:
         if o in ('-h', '-?', '--help'):
             usage()
@@ -589,12 +590,10 @@ def main():
             mount([liveos, liveosmnt], ops)
             unmount = 'yes'
 
-        cfgf = os.path.join(liveosmnt, 'syslinux', 'syslinux.cfg')
-        if not os.path.exists(cfgf):
-            cfgf = os.path.join(liveosmnt, 'syslinux', 'extlinux.conf')
+        cfgf = os.path.join(liveosmnt, 'EFI', 'BOOT', 'grub.cfg')
         cmd = ['sed', '-n', '-r']
-        sedscript = r'''/^\s*label\s+linux/{n;n;n
-                        s/^\s*append\s+.*rd\.live\.dir=([^ ]*) .*/\1/p}'''
+        sedscript = r'''0,/^\s*linuxefi/ {
+                s/^\s*linuxefi\s+\\images.*rd\.live\.dir=(\S+)( .*|$)/\1/p}'''
         cmd.extend([sedscript, cfgf])
         liveosdir, err, rc = rcall(cmd)
         liveosdir = liveosdir.rstrip()
@@ -749,7 +748,6 @@ def main():
         d = os.path.join(destmnt, 'dev', 'live-base')
         if os.path.lexists(d):
             os.unlink(d)
-        os.symlink(imgloop, d)
 
         home_path = os.path.join(liveosdir, 'home.img')
         if os.path.exists(home_path):

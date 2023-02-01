@@ -4,7 +4,7 @@
 # Copyright 2007, Red Hat, Inc.
 # Copyright 2016, Kevin Kofler
 # Copyright 2016, Neal Gompa
-# Copyright 2017, Fedora Project
+# Copyright 2017-2023, Fedora Project
 #
 # Portions from Anaconda dnfpayload.py
 # DNF/rpm software payload management.
@@ -350,8 +350,7 @@ class ImageCreator(object):
         filesystem.
 
         """
-        self.__bindmounts.reverse()
-        for b in self.__bindmounts:
+        for b in reversed(self.__bindmounts):
             b.unmount()
 
     def _chroot(self):
@@ -481,13 +480,15 @@ class ImageCreator(object):
                 os.symlink(src, self._instroot + dest)
         os.umask(origumask)
 
-    def __create_selinuxfs(self, force=False):
-        if not os.path.exists(self.__selinux_mountpoint):
-            return
-
+    def __load_selinuxfs(self):
         arglist = ["mount", "--bind", "/dev/null",
                    self._instroot + self.__selinux_mountpoint + "/load"]
         subprocess.call(arglist, close_fds = True)
+
+    def __create_selinuxfs(self, force=False):
+        if not os.path.exists(self.__selinux_mountpoint):
+            return
+        self.__load_selinuxfs()
 
         if force or kickstart.selinux_enabled(self.ks):
             # label the fs like it is a root before the bind mounting
@@ -536,7 +537,8 @@ class ImageCreator(object):
 
         self._mount_instroot(base_on)
 
-        for d in ("/dev/pts", "/etc", "/boot", "/var/log", "/var/cache/dnf", "/sys", "/proc"):
+        for d in ("/boot", "/dev", "/dev/pts", "/etc", "/proc", "/sys",
+                  "/var/cache/dnf", "/var/log"):
             makedirs(self._instroot + d)
 
         cachesrc = cachedir or (self.__builddir + "/dnf-cache")
@@ -553,7 +555,7 @@ class ImageCreator(object):
         # bind mount system directories into _instroot
         for (f, dest) in [("/sys", None), ("/proc", None),
                           ("/dev/pts", None), ("/dev/shm", None),
-                          (self.__selinux_mountpoint, self.__selinux_mountpoint),
+                          (self.__selinux_mountpoint, None),
                           (cachesrc, "/var/cache/dnf")]:
             if os.path.exists(f):
                 self.__bindmounts.append(BindChrootMount(f, self._instroot, dest))
@@ -818,20 +820,24 @@ class ImageCreator(object):
 
         self._run_post_scripts()
         try:
+            # Avoid relabelling host files.
             self.__destroy_selinuxfs()
             self._undo_bindmounts()
             kickstart.SelinuxConfig(self._instroot).apply(ksh.selinux)
         finally:
             self._do_bindmounts()
 
-    def launch_shell(self):
+    def launch_shell(self, PS1='\\s-\\v\\$ '):
         """Launch a shell in the install root.
 
         This method is launches a bash shell chroot()ed in the install root;
         this can be useful for debugging.
 
         """
-        subprocess.call("bash", preexec_fn=self._chroot)
+        env = os.environ.copy()
+        env['PS1'] = PS1
+
+        subprocess.call("bash", preexec_fn=self._chroot, env=env)
 
     def package(self, destdir='.', ops=[]):
         """Prepares the created image for final delivery.
@@ -932,7 +938,7 @@ class LoopImageCreator(ImageCreator):
     def __get_image(self):
         if self.__imgdir is None:
             raise CreatorError("_image is not valid before calling mount()")
-        return self.__imgdir + "/ext3fs.img"
+        return self.__imgdir + "/rootfs.img"
     _image = property(__get_image)
     """The location of the image file.
 
@@ -988,8 +994,7 @@ class LoopImageCreator(ImageCreator):
         return self.__instloop.resparse(size)
 
     def _base_on(self, base_on):
-        shutil.copyfile(base_on, self._image)
-        
+        shutil.copy2(base_on, self._image)
     #
     # Actual implementation
     #

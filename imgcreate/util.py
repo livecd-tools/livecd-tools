@@ -42,8 +42,8 @@ def call(*popenargs, **kwargs):
     return rc
 
 def rcall(args, stdin='', raise_err=True, cwd=None, env=None):
-    """Return stdout, stderr, & returncode from a subprocess call."""
-
+    """Return stdout, stderr, & returncode from a subprocess call.
+    """
     out, err, p, environ = '', '', None, None
     if env is not None:
         environ = os.environ.copy()

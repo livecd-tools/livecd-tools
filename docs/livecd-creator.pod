@@ -42,22 +42,33 @@ Defines the file system label. The default is based on the configuration name.
 
 =item --title=TITLE
 
-Title used by F<syslinux.cfg> file.
+Title used in F<syslinux.cfg> file.
 
 =item --product=PRODUCT
 
-Product name used in F<syslinux.cfg> boot stanzas and countdown.
+Product name used in boot configuration stanzas and countdown.
 
-=item --repo=PATH
+=item --releasever=VER
 
-Configure RPM repositories from the given file or directory of L<dnf.conf(5)>
-C<.repo> files. C<%repo> directives in the kickstart file will be ignored.
+Set the value to substitute for $releasever in kickstart repo urls.
 
-=item  -p, --plugins
+=item --syslinux
 
-Use DNF plugins during image creation.
+Use SYSLINUX for BIOS booting (default: False).
 
-=item --compression-type=COMPRESS_ARGS
+=item --nomacboot
+
+Do not create an HFS+ boot image and partition (default: False). Only
+operative when SYSLINUX BIOS booting is called (as HFS boot images are not
+needed or standard).
+
+=item --flat-squashfs
+
+Specify squashing the root filesystem directly. This eliminates the
+intermediate LiveOS directory holding another filesystem image file.  This is
+suitable only for OverlayFS overlays. (default=False).
+
+=item --compression-type="TYPE ARG1 ARG2 ..."
 
 Specify a compressor recognized by mksquashfs.
 C<xz> is the default and works with 2.6.38 and later kernels.
@@ -69,9 +80,28 @@ Set to C<None> to force reading the compressor used in BASE_ON.
 If C<gzip> is used, the -comp option is not passed to mksquashfs to allow the use of older versions of mksquashfs.
 Multiple arguments should be specified in one string, i.e., C<--compression-type "type arg1 arg2 ...">.
 
-=item --releasever=VER
+=item --dracut-args="[+]ARG0 ARG1 ..."
 
-Set the value to substitute for $releasever in kickstart repo urls.
+The arguments that will be used by dracut to configure the initrd and be saved
+at F</etc/dracut.conf.d/99-liveos.conf>. This file persists only for the life of
+the install_root mount.  (A pending version of dracut will save this file in
+the initrd under F<*/lib/dracut/conffiles/> or another regular path.) Each argument
+consists of an attribute and a value (see L<dracut.conf(5)>).
+
+If the first argument string is prefixed with a '+' character, the additional
+arguments will be appended to the default set (superseding any there):
+
+  mdadmconf=no
+  lvmconf=no
+  compress=xz
+  add_dracutmodules+=" livenet dmsquash-live dmsquash-live-ntfs convertfs pollcdrom qemu qemu-net "
+  omit_dracutmodules+=" plymouth "
+  hostonly=no
+  early_microcode=no
+
+=item  -p, --plugins
+
+Use DNF plugins during image creation.
 
 =item --pkgverify-level=LEVEL
 
@@ -104,6 +134,15 @@ These options define directories used on your system for creating the live image
 
 defines the temporary directory to use. The default directory is F</var/tmp>.
 
+=item -o, PATH --output=PATH
+
+The output directory path where the image .iso will be saved (default: F<'.'>).
+
+=item --repo=PATH
+
+Configure RPM repositories from the given file or directory of L<dnf.conf(5)>
+C<.repo> files. C<%repo> directives in the kickstart file will be ignored.
+
 =item --cache=CACHEDIR
 
 Defines the cache directory to use (default: private cache).
@@ -112,9 +151,17 @@ Defines the cache directory to use (default: private cache).
 
 Work offline from cache, use together with --cache (default: False).
 
+=item -l, --shell
+
+Launch a change root shell in the installation root filesystem.
+This includes bind mounts to the host directories F</dev>, F</dev/pts>,
+F</dev/shm>, F</proc>, F</sys>, F</sys/fs/selinux>, the creator iso stageing
+directory (mounted at F</run/iso>), and the host root filesystem (mounted at
+F</run/hostroot>).  Useful for F<ad hoc> custimization during a build session.
+
 =item --nocleanup
 
-Skip cleanup of temporary files.
+Skip cleanup of temporary files (default: False).
 
 =back
 
@@ -146,14 +193,14 @@ Save debug information to FILE.
 
 Barebones LiveCD
 
-livecd-creator \
---config=/usr/share/livecd-tools/livecd-fedora-minimal.ks
+  livecd-creator \
+    --config=/usr/share/livecd-tools/livecd-fedora-minimal.ks
 
 Fedora Desktop Live CD
 
-livecd-creator \
---config=/usr/share/livecd-tools/livecd-fedora-desktop.ks \
---fslabel=Fedora9-LiveCD-foo
+  livecd-creator \
+    --config=/usr/share/livecd-tools/livecd-fedora-desktop.ks \
+    --fslabel=Fedora9-LiveCD-foo
 
 =head1 REPO EXTENSIONS
 
@@ -163,7 +210,7 @@ are replaced with the system arch, basearch and release version respectively.
 When no --releasever is passed it defaults to the current system's version.
 This allows the use of repo commands such as the following:
 
-repo --name=fedora --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=fedora-$releasever&arch=$basearch
+  repo --name=fedora --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=fedora-$releasever&arch=$basearch
 
 Note that in a chroot environment (like koji) the rpmdb is not available,
 so either don't use $releasever in that case, or pass --releasever=VER.
@@ -209,10 +256,10 @@ Report bugs to the mailing list L<http://www.redhat.com/mailman/listinfo/fedora-
 
 =head1 COPYRIGHT
 
-Copyright (C) Fedora Project 2008,2009,2020, and various contributors. This is free software. You may redistribute copies of it under the terms of the GNU General Public License L<http://www.gnu.org/licenses/gpl.html>. There is NO WARRANTY, to the extent permitted by law.
+Copyright (C) Fedora Project 2008,2009,2020,2023 and various contributors. This is free software. You may redistribute copies of it under the terms of the GNU General Public License L<http://www.gnu.org/licenses/gpl.html>. There is NO WARRANTY, to the extent permitted by law.
 
 =head1 SEE ALSO
 
-L<livecd-iso-to-disk(8)>, L<dnf.conf(5)>, project website L<http://fedoraproject.org/wiki/FedoraLiveCD>
+L<livecd-iso-to-disk(8)>, L<dnf.conf(5)>, L<dracut.conf(5)>, project website L<http://fedoraproject.org/wiki/FedoraLiveCD>
 
 =cut

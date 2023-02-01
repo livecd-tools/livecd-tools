@@ -4,6 +4,7 @@
 # Copyright 2007, Red Hat  Inc.
 # Copyright 2016, Kevin Kofler
 # Copyright 2016, Neal Gompa
+# Copyright 2023, Fedora Project
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -528,6 +529,7 @@ class SelinuxConfig(KickstartConfig):
                 else:
                     f.write(line)
 
+        print('Setting SELinux contexts...')
         self.relabel(ksselinux, policy_name)
 
     def find_policy_file(self, policy_name):
@@ -564,7 +566,7 @@ def get_timeout(ks, default = None):
         return default
     return int(ks.handler.bootloader.timeout)
 
-def get_kernel_args(ks, default = "ro rd.live.image quiet"):
+def get_kernel_args(ks, default="ro rd.live.image"):
     if not hasattr(ks.handler.bootloader, "appendLine"):
         return default
     if ks.handler.bootloader.appendLine is None:

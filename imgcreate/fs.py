@@ -114,8 +114,9 @@ def mksquashfs(in_dir, out_img, compress_args, ops=[]):
     if not sys.stdout.isatty():
         args.append('-no-progress')
 
-    if ops:
-        ops.remove('show-squashing')
+    if ops or '-progress' in args:
+        if 'show-squashing' in ops:
+            ops.remove('show-squashing')
         args += ops
         p = subprocess.Popen(args, stdout=None, stderr=subprocess.STDOUT)
         p.wait()
@@ -257,6 +258,11 @@ def resizefs(fs, fstype, size=None, blksz=None, minimal=False, ops=''):
 
 def fsck(fs, fstype):
     logging.info("Checking filesystem %s" % fs)
+
+    if not fstype:
+        fstype = rcall(['blkid', '-o', 'value', '-s', 'TYPE', fs])[0].strip()
+        if not fstype:
+            raise CreatorError("A filesystem type was not found for %s" % (fs,))
 
     if fstype.startswith('ext'):
         args = ['e2fsck', '-f', '-y', '-E', 'discard']
@@ -720,7 +726,8 @@ class LoopbackDisk(Disk):
                              self.lofile)
         self.device = device
         call(['udevadm', 'settle'])
-        self.fstype = lsblk('-ndo FSTYPE', device)
+        self.fstype = rcall([
+            'blkid', '-o', 'value', '-s', 'TYPE', device])[0].strip()
 
     def cleanup(self):
         if self.device is None:
@@ -1059,7 +1066,7 @@ class BindChrootMount():
             self.mounted = False
             return
 
-        rc = call(['umount', self.dest])
+        rc = call(['umount', '-R', self.dest])
         if rc != 0:
             call(['umount', '-l', self.dest])
             raise MountError(umount_fail_fmt % self.dest)
@@ -1099,7 +1106,7 @@ class ExtDiskMount(DiskMount):
             ver = rcall(['mkfs.f2fs', '-V'])[0].split()[2].strip('()').replace('-', '')
             if int(ver) >= 20200824:
                 # ver 1.14.0 (2020-08-24)
-                args += ['-O', 'extra_attr,compression']
+                args += ['-O', 'sb_checksum']
         args += [self.disk.device]
         logging.info("Formating args: %s" % args)
         rc = call(args)
@@ -1198,7 +1205,12 @@ class ExtDiskMount(DiskMount):
         return self.__get_size_from_filesystem()
 
     def resparse(self, size=None, ops=None):
-        self.cleanup()
+        if self.fstype and not self.disk.fstype:
+            self.disk.fstype = self.fstype
+        if not self.disk.fstype:
+            self.disk.fstype = rcall(
+            ['blkid', '-o', 'value', '-s', 'TYPE', self.disk.device])[0].strip()
+            self.fstype = self.disk.fstype
         minsize = self.__resize_to_minimal(ops=ops)
         self.disk.truncate(minsize)
         self.__resize_filesystem(size, ops=ops)
@@ -1578,12 +1590,20 @@ class LiveImageMount(object):
             return
         if not ops:
             ops = self.ops
-        cfgf = os.path.join(self.srcdir, 'syslinux', 'syslinux.cfg')
-        if not os.path.exists(cfgf):
-            cfgf = os.path.join(self.srcdir, 'syslinux', 'extlinux.conf')
+        for f in ('syslinux/syslinux.cfg', 'syslinux/extlinux.conf',
+                  '../EFI/BOOT/grub.cfg', '../EFI/boot/grub.cfg'):
+            cfgf = os.path.join(self.srcdir, f)
+            if os.path.exists(cfgf):
+                break
         cmd = ['sed', '-n', '-r']
-        sedscript = r'''/^\s*label\s+linux/{n;n;n
-                        s/^\s*append\s+.*rd\.live\.dir=([^ ]*) .*/\1/p}'''
+        if 'linux' in cfgf:
+            sedscript = r'''/^\s*label\s+linux/{n;n;n
+                            s/^\s*append\s+.*rd\.live\.dir=([^ ]*) .*/\1/p}'''
+        else:
+            self.liveosdir = os.path.basename(self.srcdir)
+            sedscript = r'''0,/^\s*linuxefi\s+\/{0}\// {{
+            s/^\s*linuxefi\s+\/{0}\/.*rd\.live\.dir=(\S+)( .*|$)/\1/p}}
+            '''.format(self.liveosdir)
         cmd.extend([sedscript, cfgf])
         self.liveosdir, err, rc = rcall(cmd)
         self.liveosdir = self.liveosdir.rstrip()
@@ -1632,7 +1652,7 @@ class LiveImageMount(object):
             ovldev = overlay[0]
             self.ovlmntdir = findmnt('-nfro TARGET', ovldev)
             if not self.ovlmntdir:
-                self.ovlmntdir = tempfile.mkdtemp('', 'ovl-','/run')
+                self.ovlmntdir = tempfile.mkdtemp('', 'ovl-', '/run')
             self.overlay = os.path.join(self.ovlmntdir, overlay[1])
             self.ovlmnt = DiskMount(RawDisk(None, ovldev), self.ovlmntdir,
                                     dirmode=dirmode)
@@ -1669,7 +1689,7 @@ class LiveImageMount(object):
                 self.ovltype = 'DM_linear'
                 self.overlay = None
             elif self.imgloop == self.squashloop:
-                self.overlay = tempfile.mkdtemp('', 'cow-','/run')
+                self.overlay = tempfile.mkdtemp('', 'cow-', '/run')
                 work = os.path.join(self.overlay, '..', 'ovlwork')
                 makedirs(work, 0o755)
                 cow = self.overlay
@@ -1846,11 +1866,11 @@ class LiveImageMount(object):
     def unmount(self):
         if not self.mounted:
             return
+        if self.livemount:
+            self.livemount.unmount()
         if self.homemnt:
             self.homemnt.unmount()
             time.sleep(2)
-        if self.livemount:
-            self.livemount.unmount()
         if self.ovlmnt:
             self.ovlmnt.unmount()
         self.mounted = False
@@ -1867,14 +1887,16 @@ class LiveImageMount(object):
             self.livemount = None
         if self.imgloop:
             self.imgloop.cleanup()
+        if self.squashmnt:
+            self.squashmnt.cleanup()
         if isinstance(self.cowloop, LoopbackDisk):
             self.cowloop.cleanup()
             self.cowloop = None
         if self.ovlmnt:
             self.ovlmnt.cleanup()
         if self.overlay:
+            if isinstance(self.overlay, LoopbackDisk):
+                self.overlay.cleanup()
             self.overlay = None
-        if self.squashmnt:
-            self.squashmnt.cleanup()
         self.__created = False
 
