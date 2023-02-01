@@ -41,7 +41,7 @@ doc2 = '''
               /path/to/build.iso, or, if mounted, through the mount point
               directory path.  A Live CD-ROM image is addressed through its
               device node, such as /dev/sr0.  Even a directory containing a
-              LiveOS and iso/syslinux folders with the appropriate files can
+              LiveOS and bootpath folders with the appropriate files can
               be edited or cloned through that parent directory path.
 
               The --clone option copies the home.img filesystem to the new
@@ -90,10 +90,10 @@ parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                         [-N, --noshell]
                         [-t, --tmpdir <tmpdir>]
                         [-f, --dnfcache, -y, --yumcache <cachedir>]
-                        [-e, --exclude <exclude s>]
-                        [-i, --include <include s>]
-                        [-u, --seclude <seclude s>]
-                        [-r, --releasefile <releasefile s>]
+                        [-e, --exclude <"exclude paths">]
+                        [-i, --include <"include paths">]
+                        [-u, --seclude <"seclude paths">]
+                        [-r, --releasefile <"releasefile paths">]
                         [-b, --builder <builder>]
                         [-p, --plugins]
                         [--clone]
@@ -102,7 +102,7 @@ parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                         [--refresh-only]
                         [--skip-refresh]
                         [--skip-seclude]
-                        [-c, --compress-type <compression arg s>]
+                        [-c, --compress-type <"compression arg s">]
                         [--compress]
                         [--releasever <value to substitute for $releasever in repo urls>]
                         [--arch <image arch>]
@@ -114,7 +114,8 @@ parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                         [--encrypted-home]
                         [--unencrypted-home]
                         [--overlay-size-mb [+|-]<size>[,<fstype>[,<blksz>]]]
-                        [-a, --extra-kernel-args <arg s>]
+                        [-a, --extra-kernel-args <"arg s">]
+                        [--dracut-args <"[+]arg s">]
                         [--extra-space-mb <size>]
                         [--cacheonly]
                         [--nocleanup]
@@ -161,22 +162,22 @@ parser.add_argument('-t', '--tmpdir', default='/var/tmp', metavar='PATH',
                     help='Temporary directory to use for staging the build.\n'
                          'default = /var/tmp\n ')
 
-parser.add_argument('-f', '--dnfcache', '-y', '--yumcache', dest='cachedir', 
+parser.add_argument('-f', '--dnfcache', '-y', '--yumcache', dest='cachedir',
                     metavar='PATH',
                     help='Directory to use for for the DNF or Yum cache.\n'
                          'Bind mounts to /var/cache/dnf and /var/cache/yum\n'
                          'will be created.    default = None  (A temporary\n'
                          'filesystem cache will be used.)\n ')
 
-parser.add_argument('-e', '--exclude', dest='excludes', metavar='PATH',
+parser.add_argument('-e', '--exclude', dest='excludes', metavar='"PATH ..."',
     help='A string of filename patterns to exclude from the copy\nof the '
     'outer device filesystem.  See _copy_src_root().\nDenote multiple '
     'patterns as "pattern1 pattern2 ..."\nThe default is to exclude all '
-    'device content except for\nthe iso/syslinux, EFI, and LiveOS directories. '
+    'device content except for\nthe bootpath, EFI, and LiveOS directories. '
     'Entering\nanything to be excluded will have the effect of\nincluding '
     'everything else but the excluded items.\n ')
 
-parser.add_argument('-i', '--include', dest='includes', metavar='PATH',
+parser.add_argument('-i', '--include', dest='includes', metavar='"PATH ..."',
     help='A string of file or directory paths to copy to the .iso\nfile in '
     '_copy_src_root().  Denote multiple files as\n"path1 path2 ..."  '
     '(The paths are referenced\nrelative to the source mount directory, '
@@ -186,7 +187,7 @@ parser.add_argument('-i', '--include', dest='includes', metavar='PATH',
     '../../../../<mount point>/INCLUDE may be used,\nrespectively, to '
     'include files from other branches of\nthe active hierarchy.)\n ')
 
-parser.add_argument('-u', '--seclude', dest='secludes', metavar='PATH',
+parser.add_argument('-u', '--seclude', dest='secludes', metavar='"PATH ..."',
     help='A string of file or directory paths in the LiveOS\nfilesystem to '
     'seclude from the final build\nconfiguration. The user directory may '
     'be denoted with\n~/.  Denote multiple files as "path1 path2 ..."\n'
@@ -194,14 +195,14 @@ parser.add_argument('-u', '--seclude', dest='secludes', metavar='PATH',
     'secluded from the packaged iso image.\nSee seclude_from_isoimage() '
     'and scrub_system() in the\ncode for the specific files.\n ')
 
-parser.add_argument('-r', '--releasefile', metavar='PATH',
+parser.add_argument('-r', '--releasefile', metavar='"PATH ..."',
                     help='Specify release file/s for branding the build.\n'
                          'Denote multiple files as "path1 path2 ..."\n ')
 
-parser.add_argument('-b', '--builder', default=os.getenv('USERNAME'),
+parser.add_argument('-b', '--builder', default=os.getenv('USERNAME', 'Somebody'),
                     help='Specify the builder of a Remix.\n'
-                         'default = "' + os.getenv('USERNAME') + '" (the '
-                         'current system user)\n ')
+                         'default = "' + os.getenv('USERNAME', 'Somebody') +
+                          '" (the current system user)\n ')
 
 parser.add_argument('--clone', action='store_true', default=False,
                     help='Specify copying of the home.img filesystem or\nthe'
@@ -295,7 +296,7 @@ parser.add_argument('--skip-refresh', action='store_true', default=False,
 parser.add_argument('--skip-seclude', action='store_true', default=False,
                     help='Specify no seclusion of specific user files.\n ')
 
-parser.add_argument('-c', '--compress-type', metavar='ARGS',
+parser.add_argument('-c', '--compress-type', metavar='"TYPE ARG1 ARG2 ..."',
                     help='Specify the compression type for SquashFS.\nThis '
                          'will override the current compression or lack\n'
                          'thereof.  Multiple arguments should be specified '
@@ -330,11 +331,32 @@ parser.add_argument('--flatten-squashfs', action="store_true",
                          '\noption.\n ')
 
 parser.add_argument('-a', '--extra-kernel-args', dest='kernelargs',
-                    metavar='ARGS', default='',
+                    metavar='"ARG0 ARG1 ..."', default='',
                     help='Specify extra kernel arguments to include in the '
                          'new\n.iso file boot configuration.  Multiple '
                          'arguments\nshould be specified in one string, '
                          'i.e.,\n--extra-kernel-args "arg1 arg2 ..."\n ')
+
+parser.add_argument('--dracut-args', dest='dracut_args', default='',
+                    metavar='"[+]ARG0 ARG1 ..."',
+                    help='The arguments to be used by dracut to configure '
+                    'the initrd.\nSaved at /etc/dracut.conf.d/99-liveos.conf. '
+                    'This file persists\nonly for the life of the install_root '
+                    'mount. (A future version\nof dracut will save this file '
+                    'in the initrd under\n/usr/lib/dracut/conffiles/ or '
+                    'another regular path.)  Multiple\narguments should be '
+                    'specified in one string, i.e.,\n--dracut-args "[+]arg1 arg2 ..." '
+                    ' Each argument consists of\nan attribute and a value (see '
+                    'dracut.conf.5). If the first\nargument is prefixed with a '
+                    '\'+\' character, the additional\narguments will be appended '
+                    'to the default set\n(superseding any there):\n\n'
+                      'mdadmconf=no\n'
+                      'lvmconf=no\n'
+                      'compress=xz\n'
+                      'add_dracutmodules+=" livenet dmsquash-live dmsquash-live-ntfs convertfs pollcdrom qemu qemu-net "\n'
+                      'omit_dracutmodules+=" plymouth "\n'
+                      'hostonly=no\n'
+                      'early_microcode=no\n ')
 
 parser.add_argument('--extra-space-mb', type=int, default=2, metavar='SIZE',
                     help='Specify extra space in MiB to reserve for\n'
@@ -343,19 +365,19 @@ parser.add_argument('--extra-space-mb', type=int, default=2, metavar='SIZE',
 parser.add_argument('--nocleanup', action='store_true', default=False,
                     help='Skip cleanup of temporary files.\n ')
 
-parser.add_argument('--releasever', type=str, dest='releasever', 
-                    default=None, 
+parser.add_argument('--releasever', type=str, dest='releasever',
+                    default=None,
                     help='Value to substitute for $releasever in kickstart '
                          'repo urls.\n ')
 
 parser.add_argument('--arch', type=str, dest='arch', 
-                    default=dnf.rpm.basearch(hawkey.detect_arch()), 
+                    default=dnf.rpm.basearch(hawkey.detect_arch()),
                     help='Computer instruction set architecture for the '
                          'final image.\n'
                          'default = dnf.rpm.basearch(hawkey.detect_arch())\n ')
 
 parser.add_argument('-p', '--plugins', action='store_true', dest='plugins',
-                    default=False, 
+                    default=False,
                     help='Use DNF plugins during image creation.\n ')
 
 parser.add_argument('--cacheonly', action='store_true', dest='cacheonly',
@@ -417,19 +439,22 @@ class LiveImageEditor(LiveImageCreator):
         """A string of filename patterns to exclude from the copy of the outer
         device filesystem.  See _copy_src_root().  Denote multiple patterns as
         "pattern1, pattern2, ..."  Default is all content outside of the LiveOS
-        and iso/syslinux directories."""
+        and bootpath directories."""
 
         self.secludes = []
         """A string of file or directory paths to seclude from the built .iso
         file but maintain (restore to) in the refreshed filesystems."""
 
+        self.product = ''
+        """A string providing the product name or release name."""
+
         self.releasefile = []
         """A string of file or directory paths to include in _brand().  This
         variable is later reused to hold the modified release name."""
 
-        self.builder = os.getenv('USERNAME')
+        self.builder = os.getenv('USERNAME', 'Somebody')
         """The name of the Remix builder for _branding.
-        Default = os.getenv('USERNAME')"""
+        Default = os.getenv('USERNAME', 'Somebody')"""
 
         self.compress_args = None
         """mksquashfs compressor to use. Use 'None' to force reading of the
@@ -444,6 +469,15 @@ class LiveImageEditor(LiveImageCreator):
         self.root_fstype = None
 
         self.root_blksz = None
+
+        self._imgdir = 'images/pxeboot'
+        """Directory for kernel and initrd images."""
+
+        self._losdn = ''
+        """Escaped liveosdir name for sed scripts."""
+
+        self.skip_hfs = False
+        """Controls whether to create a hfs boot image."""
 
         self._ImageCreator__builddir = None
         """The staging directory for the build contents and mount points."""
@@ -550,9 +584,8 @@ class LiveImageEditor(LiveImageCreator):
 
         base_on --  the <LiveOS_source> a LiveOS.iso file, an attached LiveOS
                     device, such as, /dev/sdd1 (or similar), the path to a
-                    directory or mount point containing the LiveOS and iso/
-                    syslinux folders, or "live" for a currently running LiveOS
-                    image.
+                    directory or mount point containing the LiveOS and bootpath
+                    folders, or "live" for a currently running LiveOS image.
         rootfsimg - An optional <file path> to the root filesystem image
                     relative to the mount point for the <LiveOS_source>.
         overlay   - An optional [<devspec>:]<path> to the overlay device and
@@ -579,7 +612,7 @@ class LiveImageEditor(LiveImageCreator):
         self.ovl_size = 0
         if self.src_type == 'live':
             src = os.path.join('/run', 'initramfs', 'isoscandev')
-                # (^ Requires dracut verion 051 or greater.)
+                # (^ Requires dracut version 051 or greater.)
             if os.path.exists(src):
                 base_on = os.path.realpath(os.readlink(src))
                 src = os.path.join('/proc', 'cmdline')
@@ -747,6 +780,7 @@ class LiveImageEditor(LiveImageCreator):
                 self._LoopImageCreator__fstype = findmnt('-no FSTYPE', img)
         else:
             self.liveosdir = self.liveosmnt.liveosdir
+            losm = self.liveosmnt
             img = losm.imgloop.device
             self._LoopImageCreator__fstype = losm.imgloop.fstype
 
@@ -766,13 +800,18 @@ class LiveImageEditor(LiveImageCreator):
             self._LoopImageCreator__fstype = self.root_fstype
         if not os.path.exists(self.liveosdir):
             raise CreatorError("No LiveOS directory on %s" % base_on)
-        self.bootfolder = os.path.join(self.srcdir, 'syslinux')
         self.imagesdir = os.path.join(self.srcdir, 'images')
+        self.bootdir = os.path.join(self.srcmntdir, 'boot')
+        self.bootpath = os.path.join(self.imagesdir, 'pxeboot')
+        bootpath = os.path.join(self.srcdir, 'syslinux')
         if not os.path.exists(self.imagesdir):
             self.imagesdir = os.path.join(self.srcmntdir, 'images')
-            self.bootfolder = os.path.join(self.srcmntdir, 'syslinux')
-        if not os.path.exists(self.bootfolder):
-            self.bootfolder = os.path.join(self.srcdir, 'isolinux')
+            self.bootpath = os.path.join(self.imagesdir, 'pxeboot')
+            bootpath = os.path.join(self.srcmntdir, 'syslinux')
+        if not os.path.exists(bootpath):
+            bootpath = os.path.join(self.srcdir, 'isolinux')
+        if os.path.exists(bootpath):
+            self.bootpath = bootpath
 
         self.home_img = os.path.join(self.liveosdir, 'home.img')
         self.isohome_img = os.path.join(self._LiveImageCreatorBase__isodir,
@@ -837,7 +876,7 @@ class LiveImageEditor(LiveImageCreator):
         attached, or refreshed device.  Optionally, pass a rootfsimg or
         overlay reference.
         """
-        if os.path.isfile(base_on):
+        if os.path.isfile(base_on) or self.src_type == 'iso':
             self.liveossrc = DiskMount(LoopbackDisk(base_on, None, '-r'),
                              tempfile.mkdtemp(dir=mntdir, prefix='iso-'))
             self.srcdir = self.liveossrc.mountdir
@@ -1024,7 +1063,7 @@ class LiveImageEditor(LiveImageCreator):
         if self.exclude_all:
             files0from = os.path.join(self.srcdir)
             files0from = '\0'.join((files0from, os.path.join(srcmntdir,
-                                    os.path.basename(self.bootfolder))))
+                                    os.path.basename(self.bootpath))))
         elif not self.refresh_only:
             for i, fn in enumerate(self.includes):
                 src = os.path.join(srcmntdir, fn.lstrip(os.sep))
@@ -1157,7 +1196,8 @@ class LiveImageEditor(LiveImageCreator):
         isodir = self._LiveImageCreatorBase__isodir
 
         ignore_list = [self.rootfs_img, 'squashfs.img', 'ovlwork', 'osmin.img',
-         'home.img', 'swap.img', 'overlay-*', 'images', 'syslinux', 'isolinux']
+         'home.img', 'swap.img', 'overlay-*', 'images', 'syslinux', 'isolinux',
+         'boot']
         if self.clone and not self.home_size_mb and self.EncHomeReq is None:
             ignore_list.remove('home.img')
 
@@ -1178,8 +1218,12 @@ class LiveImageEditor(LiveImageCreator):
         shutil.copytree(src, dst, symlinks=True,
                         ignore=shutil.ignore_patterns(*ignore_list))
 
-        for src in (self.bootfolder, self.imagesdir):
-            copypaths([src], isodir)
+        if os.path.exists(self.bootdir):
+            copypaths([self.bootdir], isodir)
+            self.bootdir = isodir + '/boot'
+        copypaths([self.imagesdir], isodir)
+        if 'linux' in self.bootpath:
+            copypaths([self.bootpath], isodir)
 
         for src in ('LICENSE', 'Fedora-Legal-README.txt', 'EFI'):
             src = os.path.join(self.srcmntdir, src)
@@ -1202,7 +1246,7 @@ class LiveImageEditor(LiveImageCreator):
                     if os.path.exists(link):
                         os.unlink(link)
                         os.symlink(os.path.join('../..', os.path.basename(
-                                                   self.bootfolder), fn), link)
+                                                   self.bootpath), fn), link)
 
         if os.path.exists(self.isohome_img):
             print('Checking home.img')
@@ -1414,9 +1458,9 @@ class LiveImageEditor(LiveImageCreator):
                 os.mknod(urandom, 0o666 | stat.S_IFCHR, os.makedev(1, 9))
                 os.umask(origumask)
 
-            bindmounts = [('/sys', None), ('/proc', None), ('/dev/pts', None),
-                          ('/dev/shm', None), ('/run', None),
-                          ('/etc/resolv.conf', None),
+            bindmounts = [('/proc', None), ('/run', None), ('/sys', None),
+                          ('/dev', None), ('/dev/pts', None),
+                          ('/dev/shm', None), ('/etc/resolv.conf', None),
                           (cachesrc, '/var/cache/dnf'),
                           (cachesrc, '/var/cache/yum'),
                           (self._LiveImageCreatorBase__isodir, '/mnt/live'),
@@ -1465,23 +1509,28 @@ class LiveImageEditor(LiveImageCreator):
             cmd = ['sort', '-rV']
             a, err, rc = rcall(cmd, '\n'.join(self.kernels))
             a = a.split('\n')[0]
+            # Update to latest kernel & initrd.
             if self.kernels != self.kernels0 or self.initrd_kernel != a:
                 print('Updating kernel & initial ram filesystem images...')
                 rc = os.path.join(self._instroot, 'boot',
                                                    'initramfs-' + a + '.img')
                 d = os.path.join(self._instroot, 'usr', 'lib', 'modules', a)
-                cmd = ['dracut', rc, '--kmoddir', d, '--kver', a,
-                       '--no-hostonly', '--add', 'dmsquash-live', '--force']
+                # '--sysroot' argument requires dracut version 051 or greater.
+                cmd = ['dracut', rc, '--sysroot', self._instroot, '--kmoddir',
+                       d, '--kver', a, '--zstd', '--no-hostonly', '--add',
+                       'dmsquash-live', '--force']
                 if self.src_fstype == 'f2fs':
                     cmd += ['--add-drivers', 'f2fs']
                 print('using this command:\n%s' % cmd)
                 call(cmd)
                 a = os.path.join(d, vm)
-                imagedirs = [self.bootfolder,
+                imagedirs = [self.bootpath,
                   os.path.join(self.imagesdir, 'pxeboot'),
                   os.path.join(self._LiveImageCreatorBase__isodir, 'isolinux'),
                   os.path.join(self._LiveImageCreatorBase__isodir, 'images',
                                'pxeboot')]
+                if not 'linux' in self.bootpath:
+                    del imagedirs[2]
                 if not os.access(imagedirs[1], os.W_OK):
                     del imagedirs[0:2]
                 [shutil.copy2(rc, os.path.join(d, img)) for d in imagedirs]
@@ -1529,7 +1578,7 @@ class LiveImageEditor(LiveImageCreator):
             elif s == 's' and 'current' in msg:
                 self.shell = True
             elif s == 's':
-                self.launch_shell()
+                self.launch_shell(PS1='[\\u@\\H:install_root\\w:]\\n\\$ ')
                 self.check_kernel_versions(isodir, msg)
 
 
@@ -1538,18 +1587,43 @@ class LiveImageEditor(LiveImageCreator):
         Adjust the image branding to show its variation from the original
         source by name, builder, and build date.
         """
+
+        if os.path.exists(self.liveosdir + '/images'):
+            # Escape directory name.
+            self._losdn = _esc(os.path.basename(self.liveosdir.rstrip('/')))
+        else:
+            self._losdn = ' '
+
+        for dn in ('BOOT', 'boot'):
+            EFI_config = os.path.join(isodir, 'EFI', dn, 'grub.cfg')
+            if os.path.exists(EFI_config):
+                break
+            else:
+                EFI_config = None
+        self.EFI_config = EFI_config
+
         for f in ('isolinux.cfg', 'syslinux.cfg', 'extlinux.conf'):
-            self.cfgf = os.path.join(isodir, f)
-            if os.path.exists(self.cfgf): break
+            self.cfgf = os.path.join(isodir, 'isolinux', f)
+            if os.path.exists(self.cfgf):
+                break
+        if os.path.exists(self.cfgf):
+            self._imgdir = 'isolinux'
+            self.BIOSbooter = 'SYSLINUX'
+            sedscript = r'''/^\s*label\s+linux/I {n
+                  s/^\s*menu\s+label\s+\^\S+\s+(.*)/\1/Ip;q}'''
+        else:
+            self.cfgf = self.EFI_config
+            self.BIOSbooter = 'GRUB'
+            #FIXME: limited to first matching menu item.
+            sedscript = r'''
+/^menuentry/ s/.*Start\s*{0}( ~|)(.*)'\s+.*/\2/ p'''.format(self._losdn)
         # Get release name from boot configuration file.
         cmd = ['sed', '-n', '-r']
-        sedscript = r'''/^\s*label\s+linux/I {n
-                      s/^\s*menu\s+label\s+\^\S+\s+(.*)/\1/Ip;q}'''
         cmd.extend([sedscript, self.cfgf])
         release, err, rc = rcall(cmd)
         if not release:
             return
-        self.release = release = release.strip()
+        self.product = release = release.strip()
         f = release.find('Remix-')
         if f > -1:
             release = release[f+6:]
@@ -1597,83 +1671,96 @@ class LiveImageEditor(LiveImageCreator):
                         f.close()
             self.releasefile = nametext
 
-        sedscript = r'''/^\s*label\s+linux/I {n;n;n
-                      s/^\s*append\s+initrd=\S+\s+(.*)/\1/Ip;q}'''
-        cmd[3:] = [sedscript, self.cfgf]
-        self.kcmdline0, err, rc = rcall(cmd)
-        self.kcmdline0 = self.kcmdline0.rstrip()
-
 
     def _configure_bootloader(self, isodir):
         """Restore the boot configuration files for an iso image boot."""
 
-        isocfgf = os.path.join(isodir, 'isolinux', 'isolinux.cfg')
+        isocfgf = os.path.join(isodir, self._imgdir, 'isolinux.cfg')
         if os.path.exists(isocfgf):
             self.cfgf = isocfgf
-        else:
+        elif 'linux' in self.cfgf:
             os.rename(self.cfgf, isocfgf)
+        else:
+            isocfgf = None
+
+        if 'linux' in self.cfgf:
+            sedscript = r'''/^\s*label\s+linux/I {n;n;n
+                            s/^\s*append\s+initrd=\S+\s+(.*)/\1/Ip;q}'''
+        else:
+            self.cfgf = self.EFI_config
+            #FIXME: limited to first matching menu item.
+            sedscript = r'''
+0,/^\s*linuxefi\s*\/{0}/ s/^\s*linuxefi\s*\/{0}\S+vmlinuz?*\s+(.*)/\1/p'''.format(self._losdn)
+        cmd = ['sed', '-n', '-r', sedscript, self.cfgf]
+        self.kcmdline0, err, rc = rcall(cmd)
+        self.kcmdline0 = self.kcmdline0.rstrip()
 
         cmd = ['sed', '-i', '-r']
-
-        for dn in ('BOOT', 'boot'):
-            EFI_config = os.path.join(isodir, 'EFI', dn, 'grub.cfg')
-            if os.path.exists(EFI_config):
-                break
-            else:
-                EFI_config = None
-        self.EFI_config = EFI_config
-
         # Keep only the menu entries up through the first submenu.
         sedscript = r'''/\s+}$/ { N
                         /\n}$/ { n;Q}}'''
-        cmd.extend([sedscript, EFI_config])
+        cmd.extend([sedscript, self.EFI_config])
         call(cmd)
         # Remove a netinst Rescue submenu.
         sedscript = r'''/^\s*menuentry 'Rescue .*/I {N;N;N;d}'''
-        cmd[3:] = [sedscript, EFI_config]
+        cmd[3:] = [sedscript, self.EFI_config]
         call(cmd)
 
-        # Remove labels from any multi boot configurations.
-        sedscript = r'''/^\s*label .*/I,/^\s*label linux\>/I{
-                        /^\s*label linux\>/I ! {N;N;N;N
-                        /\<kernel\s+[^ ]*menu.c32\>/d};}'''
-        cmd[3:] = [sedscript, isocfgf]
-        call(cmd)
-        sedscript = r'''/^\s*menu\s+end/I,$ {
-                        /^\s*menu\s+end/I ! d}'''
-        cmd[3:] = [sedscript, isocfgf]
-        call(cmd)
+        if isocfgf:
+            # Remove labels from any multi boot configurations.
+            sedscript = r'''/^\s*label .*/I,/^\s*label linux\>/I{
+                            /^\s*label linux\>/I ! {N;N;N;N
+                            /\<kernel\s+[^ ]*menu.c32\>/d};}'''
+            cmd[3:] = [sedscript, isocfgf]
+            call(cmd)
+            sedscript = r'''/^\s*menu\s+end/I,$ {
+                            /^\s*menu\s+end/I ! d}'''
+            cmd[3:] = [sedscript, isocfgf]
+            call(cmd)
+        else:
+            sedscript = r'''s;syslinux;images\/pxeboot;'''
+            cmd[3:] = [sedscript, self.EFI_config]
+            call(cmd)
 
-        sedscript = r'''s/(root=[^ ]*|inst.stage2=[^ ]*)/root=live:CDLABEL={0}/
+        sedscript = r'''0,/^menuentry/ s/.*'Start\s+(\S+\s+~|)(.*)'\s+.*/\2/ p'''
+        # Get release name from boot configuration file.
+        cmd = ['sed', '-n', '-r']
+        cmd.extend([sedscript, self.cfgf])
+        release, err, rc = rcall(cmd)
+        release = release.rstrip()
+
+        sedscript = r'''s/(search\s+.*--set=root\s+-).*/\1l '{0}'/
+s/(root=[^ ]*|inst.stage2=[^ ]*)/root=live:CDLABEL={0}/
 s/^\s*timeout\s+.*/timeout 600/I
 /^\s*totaltimeout\s+.*/Iz
 s/\<{1}\>/{2}/g
 /^\s*append|linuxefi/I s/\<rd\.live\.[^c]\S+\s+//2g
-'''.format(self.fslabel, self.release, self.releasefile)
-        cmd = ['sed', '-i', '-r', sedscript, isocfgf]
-        if EFI_config:
-            cmd.append(EFI_config)
+'''.format(_esc(self.fslabel), _esc(release), _esc(self.releasefile))
+        cmd = ['sed', '-i', '-r', sedscript]
+        if isocfgf:
+            cmd.append(isocfgf)
+        if self.EFI_config:
+            cmd.append(self.EFI_config)
         call(cmd)
-
-        sedscript = r'''s/\<(kernel)\>\s+\S*(vmlinuz.?)/\1 \2/
+        if isocfgf:
+            sedscript = r'''s/\<(kernel)\>\s+\S*(vmlinuz.?)/\1 \2/
 /\s+append/I {{
 s/\<(initrd=).*(initrd.?\.img)\>/\1\2/
 s/\s+rw\>//g}}'''
-        cmd[3:] = [sedscript, isocfgf]
-        call(cmd)
+            cmd[3:] = [sedscript, isocfgf]
+            call(cmd)
 
-        if EFI_config:
-            iso_boot = os.path.join('images', 'pxeboot')
+        if self.EFI_config:
+            iso_boot = 'images/pxeboot'
             if not os.path.exists(os.path.join(isodir, iso_boot)):
                 iso_boot = 'isolinux'
             sedscript = r'''/^\s*insmod\s+(fat|xfs|f2fs|btrfs)\s*$/ s/(fat|xfs|f2fs|btrfs)/ext2/
-s/(--set=root ).+'/\1-l '{0}'/
 s/^\s*set\s+timeout=.*/set timeout=60/
-s_(linuxefi|initrdefi)\s+\S+(vmlinuz.?|initrd.?\.img)_\1 /{1}/\2_
+s_(linuxefi|initrdefi)\s+\S+(vmlinuz.?|initrd.?\.img)_\1 /{0}/\2_
 /^\s*menuentry/ {{
-s/\S+\s+~{2}/{2}/
-s/\s+rw\>//g}}'''.format(self.fslabel, iso_boot, self.releasefile)
-            cmd[3:] = [sedscript, EFI_config]
+s/\S+\s+~{1}/{1}/
+s/\s+rw\>//g}}'''.format(_esc(iso_boot), _esc(self.releasefile))
+            cmd[3:] = [sedscript, self.EFI_config]
             call(cmd)
 
         sedscript = r'''/^\s*append|linuxefi/I {{
@@ -1682,7 +1769,7 @@ s/\s+rw\>//g}}'''.format(self.fslabel, iso_boot, self.releasefile)
             self.kernelargs = 'rd.live.overlay.overlayfs ' + self.kernelargs
         if self.kernelargs:
             sedscript += r'''s/\s+(rd\.live\.image|liveimg)(.*)$/ \1 {0} \2/
-'''.format(self.kernelargs)
+'''.format(_esc(self.kernelargs))
         if self.ks:
             # bootloader --append "!opt-to-remove opt-to-add"
             for param in kickstart.get_kernel_args(self.ks, "").split():
@@ -1696,12 +1783,15 @@ s/\s+rw\>//g}}'''.format(self.fslabel, iso_boot, self.releasefile)
                     sedscript += r'''s/$/ %s/
 ''' % param
 
-        sedscript += r''':w;s/(\s+\S+)\s*(.*)\1(\s+|$)/\1 \2\3/g;tw
+        # Remove duplicate words, double spaces, & space at line end.
+        sedscript += r''':w;s/(\s+\S+)\s+(.*)\1(\s+|$)/\1 \2\3/g;tw
 s/\>\s\s+/ /g
 s/\s+$//}}'''
-        cmd[3:] = [sedscript, isocfgf]
-        if EFI_config:
-            cmd.append(EFI_config)
+        cmd[3:] = [sedscript]
+        if isocfgf:
+            cmd.append(isocfgf)
+        if self.EFI_config:
+            cmd.append(self.EFI_config)
 
         try:
             call(cmd)
@@ -1716,12 +1806,37 @@ s/\s+$//}}'''
         if os.path.exists(isocfgf):
             os.remove(isocfgf)
         # Synchronize redundant configuration files.
-        EFI_config = os.path.join(os.path.dirname(EFI_config), 'BOOT.conf')
+        EFI_config = os.path.join(os.path.dirname(self.EFI_config), 'BOOT.conf')
         shutil.copy2(self.EFI_config, EFI_config)
         EFI_config = EFI_config + '.prev'
         if os.path.exists(EFI_config):
             os.remove(EFI_config)
 
+        if os.path.exists(self.bootdir):
+            chain = '''	menuentry 'Boot first drive' --class fedora --class gnu-linux --class gnu --class os {
+		chainloader (hd0)+1
+	}
+	menuentry 'Boot second drive' --class fedora --class gnu-linux --class gnu --class os {
+		chainloader (hd1)+1
+	}
+}'''
+            EFI_config = self.bootdir + "/grub2/grub.cfg"
+            shutil.copy2(self.EFI_config, EFI_config)
+            sedscript = r'''/^\s+insmod\s+(efi_gop|efi_uga|video_bochs|video_cirrus)/ d
+/^\s*insmod\s+part_/ a insmod chain
+s/linuxefi/linux/
+s/initrdefi/initrd/
+$,/^}$/ d'''
+            cmd[3:] = [sedscript, EFI_config]
+            call(cmd)
+            with open(EFI_config, 'a') as f:
+                f.write(chain)
+
+        if os.path.exists(self.srcmntdir + "/EFI/BOOT"):
+            self._generate_efiboot(isodir)
+
+        self._LiveImageCreatorBase__write_dracut_conf(
+            self._instroot + "/etc/dracut.conf.d/99-liveos.conf")
 
     def tar_cmd(self, operation, opfile, destdir=None, ops=None):
         """Return arguments for tar call and append tarfile name to list."""
@@ -2072,33 +2187,25 @@ s/\s+$//}}'''
         else:
             _proclists('squashfs.img', self.rootfs_img, rootfsimg)
 
-        for f in ('syslinux.cfg', 'extlinux.conf'):
-            cfgf = os.path.join(self.bootfolder, f)
-            if os.path.exists(cfgf): break
-        shutil.copy2(cfgf, cfgf + '.prev')
-        cmd = ['sed', '-i', '-r',]
-        cmd[3:] = [
-        r'''/^\s*menu\s+title\>/I,/^\s*label\s+memtest\>/I s/{0}/{1}/'''.format(
-                     self.release, self.releasefile), cfgf]
-        call(cmd)
+        cmd = ['sed', '-i', '-r']
+        if 'linux' in self.bootpath:
+            for f in ('syslinux.cfg', 'extlinux.conf'):
+                cfgf = os.path.join(self.bootpath, f)
+                if os.path.exists(cfgf): break
 
-        if os.path.dirname(self.bootfolder) != self.srcmntdir:
-            e = os.path.basename(self.liveosdir.rstrip('/'))
-            dn = ''
-            for c in e:
-                if c in r']\/;$*.^?+|{}&[':
-                    dn += '\\' + c
-                else:
-                    dn += c
-
-            f = cfgf.replace(e + os.sep, '')
-            shutil.copy2(f, f + '.prev')
-            cmd[3:] = [r'''/^\s*label\s+{0}/I {{N;
-                      /{0}/ s/{1}/{2}/}}'''.format(
-                       dn, self.release, self.releasefile), f]
+            shutil.copy2(cfgf, cfgf + '.prev')
+            cmd[3:] = [
+r'''/^\s*menu\s+title\>/I,/^\s*label\s+memtest\>/I s/{0}/{1}/'''.format(
+                         _esc(self.product), _esc(self.releasefile)), cfgf]
             call(cmd)
-        else:
-            dn = ' '
+
+            if os.path.exists(self.liveosdir + '/images'):
+                f = cfgf.replace(e + os.sep, '')
+                shutil.copy2(f, f + '.prev')
+                cmd[3:] = [r'''/^\s*label\s+{0}/I {{N;
+                          /{0}/ s/{1}/{2}/}}'''.format(
+                self._losdn, _esc(self.product), _esc(self.releasefile)), f]
+                call(cmd)
 
         for c in ('BOOT', 'boot'):
             EFI_config = os.path.join(self.srcmntdir,
@@ -2110,8 +2217,8 @@ s/\s+$//}}'''
         c = os.path.join(os.path.dirname(EFI_config), 'BOOT.conf')
         shutil.copy2(c, c + '.prev')
         cmd[3:] = [r'''/^\s*menuentry/ {{N;
-        /{0}\/syslinux\/vmlinuz/ s/{1}/{2}/}}'''.format(
-                    dn, self.release, self.releasefile), EFI_config]
+                       /{0}.*\/vmlinuz/ s/{1}/{2}/}}'''.format(
+          self._losdn, _esc(self.product), _esc(self.releasefile)), EFI_config]
         call(cmd)
 
         # Copy or move new rootfs_img or squashfs.img.
@@ -2151,7 +2258,6 @@ s/\s+$//}}'''
             self.ovltype = 'dir'
             if not self.overlay_size_mb:
                 self.overlay_size_mb = self.ovl_size
-#                self.ovl_fstype = 'dir'
                 if self.liveosmnt and self.liveosmnt.ovlmnt:
                     self.liveosmnt.ovlmnt.mount()
                     ovlmntdir = self.liveosmnt.ovlmntdir
@@ -2160,20 +2266,21 @@ s/\s+$//}}'''
                 self.ovl_fstype = 'ext4'
                 self.ovl_blksz = 4096
 
-            cmd[3:] = [
-            's/rd\.live\.image|liveimg/& rd.live.overlay.overlayfs/', cfgf]
-            call(cmd)
+            if 'linux' in self.bootpath:
+                cmd[3:] = [
+                's/rd\.live\.image|liveimg/& rd.live.overlay.overlayfs/', cfgf]
+                call(cmd)
 
-            cmd[3:] = [r'''/{0}\/syslinux\/vmlinuz/ {{
+            cmd[3:] = [r'''/{0}.*\/vmlinuz/ {{
             s/rd\.live\.image|liveimg/& rd.live.overlay.overlayfs/}}
-            '''.format(dn), EFI_config]
+            '''.format(self._losdn), EFI_config]
             call(cmd)
 
         elif self.overlay_size_mb and self.ovl_fstype == 'DM_snapshot_cow':
             cmd[3:] = ['s/ rd\.live\.overlay\.overlayfs//g', cfgf]
             call(cmd)
 
-            cmd[3:] = [r'/{0}/ s/ rd\.live\.overlay\.overlayfs//g'.format(dn),
+            cmd[3:] = [r'/{0}/ s/ rd\.live\.overlay\.overlayfs//g'.format(self._losdn),
                        EFI_config]
             call(cmd)
 
@@ -2191,21 +2298,26 @@ s/\s+$//}}'''
                                                   self.ovl_blksz)
             self.liveosmnt.cleanup()
             self.liveosmnt.overlay = overlay[0]
-            cmd[3:] = [r'''/^\s*append/ {{
-            s/rd\.live\.image|liveimg/& rd.live.overlay=UUID={0}/}}
-            '''.format(overlay[1]), cfgf]
-            call(cmd)
-            cmd[3:] = [r'''/{0}\/syslinux\/vmlinuz/ {{
+            if 'linux' in self.bootpath:
+                cmd[3:] = [r'''/^\s*append/ {{
+                s/rd\.live\.image|liveimg/& rd.live.overlay=UUID={0}/}}
+                '''.format(overlay[1]), cfgf]
+                call(cmd)
+            cmd[3:] = [r'''/{0}.*\/vmlinuz/ {{
             s/rd\.live\.image|liveimg/& rd.live.overlay=UUID={1}/}}
-            '''.format(dn, overlay[1]), EFI_config]
+            '''.format(self._losdn, overlay[1]), EFI_config]
             call(cmd)
         elif self.ovltype != 'DM_linear':
             self.liveosmnt.reset_overlay()
 
         cmd[3:] = [r'''/^\s*append|linuxefi/I {{
-        :w;s/(\s+\S+)\s*(.*)\1(\s+|$)/\1 \2\3/g;tw
+        :w;s/(\s+\S+)\s+(.*)\1(\s+|$)/\1 \2\3/g;tw
         s/\>\s\s+/ /g
-        s/\s+$//}}''', cfgf, EFI_config]
+        s/\s+$//}}''']
+        if 'linux' in self.bootpath:
+            cmd.append(cfgf)
+        if EFI_config:
+            cmd.append(EFI_config)
         call(cmd)
 
         shutil.copy2(EFI_config, c)
@@ -2254,23 +2366,27 @@ s/\s+$//}}'''
                 p[0][0] = ''
                 p[0] += [False]
 
-        cmd = ['sed', '-n', '-r']
-        sedscript = r'''/^\s*label\s+linux/I {n;n;n
-                      s/^\s*append\s+initrd=\S+\s+(.*)/\1/Ip;q}'''
-        cmd.extend([sedscript, cfgf])
+        if 'linux' in self.bootpath:
+            cmd[3:] = r'''/^\s*label\s+linux/I {n;n;n
+                            s/^\s*append\s+initrd=\S+\s+(.*)/\1/Ip;q}'''
+            cmd.append(cfgf)
+        if EFI_config:
+            cmd[3:] = r'''0,/^\s*linuxefi\s*{0}/ {{
+            s/^\s*linuxefi\s*{0}\S+vmlinuz?*\s+(.*)/\1/p'''.format(self._losdn)
+            cmd.append(EFI_config)
         kcmdline, err, rc = rcall(cmd)
         kcmdline = kcmdline.rstrip()
 
         # self.kernel_release below is from last invocation of
-        #  check_kernel_versions(editor.bootfolder, 'source image')
+        #  check_kernel_versions(editor.bootpath, 'source image')
         if self.src_fstype == 'f2fs' and p2[0]:
             d, err, rc = rcall(['dump.f2fs', self.src_partition])
             if 'extra_attr' in d:
                 p2[2].mount()
                 d = p2[2].mountdir
-                if dn == ' ':
-                    dn = 'LiveOS'
-                e = os.path.join(d, 'linux_' + dn + '.efi')
+                if self._losdn == ' ':
+                    self._losdn = 'LiveOS'
+                e = os.path.join(d, 'linux_' + self._losdn + '.efi')
                 cmd = ['sed', '-znr']
                 cmd[2:] = [r'''1,/^[0-9]+\.[0-9]+\.[0-9]+/ {
                 s/^([0-9]+\.[0-9]+\.[0-9]+\S+)\s+.*/\1/p}''', e]
@@ -2280,13 +2396,14 @@ s/\s+$//}}'''
                 if (kcmdline != self.kcmdline0 or (efistub_kernel and
                     self.kernel_release != efistub_kernel)):
                     self.liveosmnt.mount()
-                    dracut_cmd = ['dracut', e, '--uefi', '--kmoddir',
-                    os.path.join(self.liveosmnt.mountdir, 'usr', 'lib',
-                    'modules', self.kernel_release), '--kver',
-                    self.kernel_release, '--no-machineid', '--kernel-image',
-                    os.path.join(self.bootfolder, 'vmlinuz'), '--no-hostonly',
-                    '--add', 'dmsquash-live', '--add-drivers', 'f2fs',
-                    '--kernel-cmdline', kcmdline, '--force']
+                    dracut_cmd = ['dracut', e, '--uefi', '--sysroot',
+                    self.liveosmnt.mountdir, '--kmoddir', os.path.join(
+                    self.liveosmnt.mountdir, 'usr', 'lib', 'modules',
+                    self.kernel_release), '--kver', self.kernel_release,
+                    '--no-machineid', '--kernel-image', os.path.join(
+                    self.bootpath, 'vmlinuz'), '--no-hostonly', '--add',
+                    'dmsquash-live', '--add-drivers', 'f2fs',
+                    '--kernel-cmdline', kcmdline, '--zstd', '--force']
                     print('\nUpdating %s using this command:\n\n%s' %
                           (os.path.basename(e), dracut_cmd))
                     call(dracut_cmd)
@@ -2297,12 +2414,14 @@ s/\s+$//}}'''
             self.liveosmnt.mount('rw')
             restore_from_tar(self.liveosmnt.mountdir)
             [os.remove(f) for f in self.seclude_tar]
-#           TODO Implement homefsck support, such as below.
-#            if self.src_type == 'live' and os.path.exists(self.home_img):
-#                # Tag to signal a home fsck, if implemented in startup script.
-#                fd = open(os.path.join(self.liveosmnt.mountdir,
-#                                       'forcehomefsck'), 'w')
-#                fd.close()
+
+#       TODO Implement homefsck support in livesys scripts.
+        if self.src_type == 'live' and os.path.exists(self.home_img):
+            # Tag to signal a home fsck, if implemented in startup script.
+            with open(os.path.join(self.liveosdir,
+                                   'forcehomefsck'), 'w') as f:
+                f.write(self.liveosdir)
+                f.flush()
 
         if hasattr(self, 'newhome_img'):
             self.newhomemnt.cleanup()
@@ -2337,7 +2456,7 @@ s/\s+$//}}'''
         if self.newhomemnt:
             self.newhomemnt.cleanup()
         if self._LoopImageCreator__instloop:
-            self._LoopImageCreator__instloop.cleanup()
+            self._LoopImageCreator__instloop.unmount()
 
 
     class simpleCallback:
@@ -2400,6 +2519,18 @@ def copypaths(pathlist, dst_dir, ignore_list=[], parents=None, message=None):
                     raise CreatorError("Failed to copy '%s': %s" % (fp, e))
     if tgt_list and message:
         print("\n%s\n  %s" % (message, tgt_list))
+
+def _esc(str):
+    """
+    Escape a variable string needed in sed scripts.
+    """
+    _str = ''
+    for c in str:
+        if c in r']\/;$*.^?+|{}&[':
+            _str += '\\' + c
+        else:
+            _str += c
+    return _str
 
 
 def main():
@@ -2609,6 +2740,7 @@ def main():
               "mapper type overlay.\n", file=sys.stderr)
         return 1
     editor.kernelargs = args.kernelargs
+    editor.dracut_args = args.dracut_args
     editor.extra_space = int(args.extra_space_mb) * 1024 ** 2
 
     try:
@@ -2625,20 +2757,18 @@ def main():
                                                    editor.ks)
         editor._pre_mount(args.liveos, args.rootfsimg, args.overlay)
         editor.mount(editor.cachedir)
-        isodir = editor.bootfolder
         editor.kernels = None
-        editor.check_kernel_versions(editor.bootfolder, 'current image')
-        editor.check_kernel_versions(os.path.join(editor.imagesdir, 'pxeboot'),
-            'current .iso')
+        editor.check_kernel_versions(editor.bootpath, 'current image')
+        if not editor.bootpath == os.path.join(editor.imagesdir, 'pxeboot'):
+            editor.check_kernel_versions(os.path.join(
+                                  editor.imagesdir, 'pxeboot'), 'current .iso')
         editor.kernel_version0 = editor.kernel_release
         editor.initrd_kernel0 = editor.initrd_kernel
         editor.kernels0 = editor.kernels
-        if not editor.refresh_only:
-            isodir = os.path.join(editor._LiveImageCreatorBase__isodir,
-                                  'isolinux')
+        isodir = editor._LiveImageCreatorBase__isodir
         editor._brand(isodir)
         if not editor.refresh_only:
-            editor._configure_bootloader(editor._LiveImageCreatorBase__isodir)
+            editor._configure_bootloader(isodir)
         if editor.ks:
             # Run_pre_scripts same code as ImageCreator_run_post_scripts
             # editor._run_post_scripts()
@@ -2651,20 +2781,26 @@ def main():
             print('''Launching shell. Exit (Ctrl D) to continue.
                   \r-------------------------------------------''')
             ops = None
-            editor.launch_shell()
+            editor.launch_shell(PS1='[\\u@\\H:install_root\\w:]\\n\\$ ')
 
         editor.kernels = None
-        editor.check_kernel_versions(isodir, 'update')
+        editor.bootpath = os.path.join(isodir, editor._imgdir)
+        editor.check_kernel_versions(editor.bootpath, 'update')
         if not editor.refresh_only:
-            editor.check_kernel_versions(os.path.join(
-                editor._LiveImageCreatorBase__isodir, 'images', 'pxeboot'),
-                'new .iso')
-            editor.check_kernel_versions(isodir, 'new install image')
+            editor.check_kernel_versions(
+                os.path.join(isodir, 'images', 'pxeboot'), 'new .iso')
+            if not editor.bootpath == os.path.join(isodir, 'images', 'pxeboot'):
+                editor.check_kernel_versions(
+                    editor.bootpath, 'new install image')
+            if os.path.exists(
+                editor._instroot + '/etc/dracut.conf.d/99-liveos.conf'):
+                os.remove(
+                    editor._instroot + '/etc/dracut.conf.d/99-liveos.conf')
         if ((not editor.src_type == 'iso' or editor.skip_refresh) and
             not hasattr(editor, 'isosrcmnt')):
             editor.check_kernel_versions(os.path.join(editor.imagesdir,
                 'pxeboot'), 'source PXE')
-            editor.check_kernel_versions(editor.bootfolder, 'source image')
+            editor.check_kernel_versions(editor.bootpath, 'source image')
         if editor.liveosmnt:
             if editor.refresh_only:
                 editor.liveosmnt.cleanup()
@@ -2695,13 +2831,12 @@ def main():
         if not editor.refresh_only and not editor.skip_seclude:
             editor.seclude_from_isoimage()
         if editor.liveosmnt:
-            editor.liveosmnt.cleanup()
+            editor.liveosmnt.unmount()
 
         editor.unmount()
 
-        if editor.src_type == 'iso':
-            editor.liveosmnt.imgloop.cleanup()
-            editor.liveossrc.cleanup()
+        if hasattr(editor.liveosmnt, 'squashmnt'):
+            editor.liveosmnt.squashmnt.cleanup()
         editor._LiveImageCreatorBase__implant_md5sum = editor.refresh
         print('The new image will now be packaged. Please wait...')
         ops = ['show-squashing']
@@ -2709,6 +2844,8 @@ def main():
             ops += ['flatten-squashfs']
         # package() calls refresh(), if requested.
         editor.package(output, ops)
+        if editor.liveossrc:
+            editor.liveossrc.cleanup()
 
         if not editor.refresh_only:
             print("\n%s.iso saved to %s"  % (editor.name, editor.output))

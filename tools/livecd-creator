@@ -5,6 +5,7 @@
 # Copyright 2007, Red Hat  Inc.
 # Copyright 2016, Kevin Kofler
 # Copyright 2016, Neal Gompa
+# Copyright 2023, Fedora Project
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,7 +20,6 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
-from __future__ import print_function
 import os
 import os.path
 import sys
@@ -46,28 +46,32 @@ def parse_options(args):
                       help="Add packages to an existing live CD iso9660 image.")
     imgopt.add_option("-f", "--fslabel", type="string", dest="fslabel",
                       help="File system label (default based on config name)")
-    imgopt.add_option("", "--title", type="string", dest="title",
-                      help="Title used by syslinux.cfg file"),
-    imgopt.add_option("", "--product", type="string", dest="product",
-                      help="Product name used in syslinux.cfg boot stanzas and countdown"),
-    imgopt.add_option("", "--nomacboot", action="store_true",
-                      dest="nomacboot", default=False,
-                      help="Do not create HFS boot image")
-    # Provided for img-create compatibility
+    # Provided for imgcreate compatibility
     imgopt.add_option("-n", "--name", type="string", dest="fslabel",
                       help=optparse.SUPPRESS_HELP)
-    imgopt.add_option("-p", "--plugins", action="store_true", dest="plugins",
-                      help="Use DNF plugins during image creation",
-                      default=False)
-    imgopt.add_option("", "--image-type", type="string", dest="image_type",
-                      help=optparse.SUPPRESS_HELP)
+    imgopt.add_option("", "--title", type="string", dest="title",
+                      help="Title used in syslinux.cfg file"),
+    imgopt.add_option("", "--product", type="string", dest="product",
+                      help="Product name used in boot configurationstanzas and "
+                           "countdown."),
+    imgopt.add_option("", "--releasever", type="string", dest="releasever",
+                      default=None,
+                      help="Value to substitute for $releasever in kickstart repo urls")
+    imgopt.add_option("", "--syslinux", action="store_true",
+                      dest="syslinux", default=False,
+                      help="Use SYSLINUX for BIOS booting.")
+    imgopt.add_option("", "--nomacboot", action="store_true",
+                      dest="nomacboot", default=False,
+                      help="Do not create HFS+ boot image or partition.")
     imgopt.add_option("", "--flat-squashfs", action="store_true",
                       dest="flat_squashfs",
                       help="Specify squashing the root filesystem directly. "
                            "This eliminates the intermediate LiveOS directory "
-                           "and is suitable only for OverlayFS overlays.",
+                           "holding another filesystem image file.  This is "
+                           "suitable only for OverlayFS overlays.",
                       default=False)
     imgopt.add_option("", "--compression-type", type="string", dest="compress_args",
+                      metavar='"TYPE ARG1 ARG2 ..."',
                       help="Compression type recognized by mksquashfs. "
                            "(The default, xz, needs a 2.6.38+ kernel; gzip works "
                            "with all kernels; lzo needs a 2.6.36+ kernel; lz4 "
@@ -78,6 +82,29 @@ def parse_options(args):
                            "Multiple arguments should be specified in "
                            'one string, i.e., --compression-type "type arg1 arg2 ...".',
                       default="xz")
+    imgopt.add_option("", "--dracut-args", type="string",
+                      dest="dracut_args", default="", metavar='"[+]ARG0 ARG1 ..."',
+                      help="The arguments to be used by dracut to configure "
+                           "the initrd. Saved at /etc/dracut.conf.d/99-liveos.conf. "
+                           "This file persists only for the life of the install_root "
+                           "mount.  (A future version of dracut will save this file "
+                           "in the initrd under /usr/lib/dracut/conffiles/ or another "
+                           "regular path.)  Each argument consists of an attribute and "
+                           "a value (see dracut.conf.5). If the first argument string is "
+                           "prefixed with a '+' character, the additional arguments will "
+                           "be appended to the default set (superseding any there):\n "
+                           "mdadmconf=no "
+                           "lvmconf=no "
+                           "compress=xz "
+                           "add_dracutmodules+=\" livenet dmsquash-live dmsquash-live-ntfs convertfs pollcdrom qemu qemu-net \" "
+                           "omit_dracutmodules+=\" plymouth \" "
+                           "hostonly=no "
+                           "early_microcode=no ")
+    imgopt.add_option("-p", "--plugins", action="store_true", dest="plugins",
+                      help="Use DNF plugins during image creation",
+                      default=False)
+    imgopt.add_option("", "--image-type", type="string", dest="image_type",
+                      help=optparse.SUPPRESS_HELP)
     imgopt.add_option("", "--repo", type="string", dest="repo",
                       default=None,
                       help="Configure RPM repositories from a .repo file or directory "
@@ -92,35 +119,39 @@ def parse_options(args):
                            "trusted GPG signatures and strong digests for every "
                            "package. Only affects packages installed during the "
                            "%install step.")
-    imgopt.add_option("", "--releasever", type="string", dest="releasever",
-                      default=None,
-                      help="Value to substitute for $releasever in kickstart repo urls")
     parser.add_option_group(imgopt)
 
     # options related to the config of your system
     sysopt = optparse.OptionGroup(parser, "System directory options",
-                                  "These options define directories used on your system for creating the live image")
+            "These options define directories used on your system for creating the live image")
     sysopt.add_option("-t", "--tmpdir", type="string",
                       dest="tmpdir", default="/var/tmp",
                       help="Temporary directory to use (default: /var/tmp)")
+    sysopt.add_option("-o", "--output", type="string",
+                      dest="destdir", default=".",
+                      help="The directory path where the image .iso will be saved (default: '.')")
     sysopt.add_option("", "--cache", type="string",
                       dest="cachedir", default=None,
                       help="Cache directory to use (default: private cache")
     sysopt.add_option("", "--cacheonly", action="store_true",
                       dest="cacheonly", default=False,
                       help="Work offline from cache, use together with --cache (default: False)")
+    # Start a shell in the chroot for post-configuration.
+    sysopt.add_option("-l", "--shell", action="store_true", dest="give_shell",
+                      help="Launch a change root shell in the installation "
+                           "root filesystem. This includes bind mounts to the host "
+                           "directories /dev, /dev/pts, /dev/shm, /proc, /sys, "
+                           "/sys/fs/selinux, the creator iso directory (mounted at "
+                           "/run/iso), and the host root filesystem (mounted at "
+                           "/run/hostroot).")
     sysopt.add_option("", "--nocleanup", action="store_true",
                       dest="nocleanup", default=False,
                       help="Skip cleanup of temporary files")
-
     parser.add_option_group(sysopt)
 
     imgcreate.setup_logging(parser)
 
     # debug options not recommended for "production" images
-    # Start a shell in the chroot for post-configuration.
-    parser.add_option("-l", "--shell", action="store_true", dest="give_shell",
-                      help=optparse.SUPPRESS_HELP)
     # Don't compress the image.
     parser.add_option("-s", "--skip-compression", action="store_true", dest="skip_compression",
                       help=optparse.SUPPRESS_HELP)
@@ -250,6 +281,13 @@ def main():
         logging.error(u"%s creation failed: %s", options.image_type, e)
         return 1
 
+    if options.syslinux:
+        creator.BIOSbooter = 'SYSLINUX'
+    else:
+        creator.BIOSbooter = 'GRUB'
+
+    creator.dracut_args = options.dracut_args
+    creator.flat_squashfs = options.flat_squashfs
     creator.compress_args = options.compress_args
     creator.skip_compression = options.skip_compression
     creator.skip_hfs = options.nomacboot
@@ -260,19 +298,32 @@ def main():
     try:
         creator.mount(options.base_on, options.cachedir)
         creator.install({}, options.repo, options.pkgverify_level)
-        if (options.flat_squashfs and
-          'rd.live.overlay.overlayfs' not in ks.handler.bootloader.appendLine):
-            ks.handler.bootloader.appendLine += 'rd.live.overlay.overlayfs'
         creator.configure()
         if options.give_shell:
-            print("Launching shell. Exit to continue.")
-            print("----------------------------------")
-            creator.launch_shell()
+            creator._ImageCreator__load_selinuxfs()
+            bindmounts = [('/dev', None), ('/run', None),
+                          ('/etc/resolv.conf', None),
+                          (creator._LiveImageCreatorBase__isodir, '/run/iso'),
+                          ('/', '/run/hostroot')]
+            for (f, dest) in bindmounts:
+                if os.path.exists(f):
+                    creator._ImageCreator__bindmounts.extend(
+                    [imgcreate.fs.BindChrootMount(f, creator._instroot, dest)])
+                else:
+                    logging.warning("Skipping (%s, %s) because source doesn't "
+                                 "exist." % (f, dest))
+            creator._do_bindmounts()
+            print("Launching shell. Exit (Ctrl D) to continue.")
+            print("-------------------------------------------")
+            creator.launch_shell(PS1='[\\u@\\H:install_root\\w:]\\n\\$ ')
+            creator._ImageCreator__destroy_selinuxfs()
+            imgcreate.ImageCreator._undo_bindmounts(creator)
+            imgcreate.kickstart.SelinuxConfig(creator._instroot).apply(creator.ks.handler.selinux)
         creator.unmount()
         ops = []
-        if 'rd.live.overlay.overlayfs' in ks.handler.bootloader.appendLine:
+        if options.flat_squashfs:
             ops += ['flatten-squashfs']
-        creator.package(ops=ops)
+        creator.package(options.destdir, ops=ops)
     except (imgcreate.CreatorError, DnfBaseError) as e:
         logging.error(u"Error creating Live CD : %s" % e)
         return 1
