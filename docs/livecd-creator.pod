@@ -80,7 +80,7 @@ Set to C<None> to force reading the compressor used in BASE_ON.
 If C<gzip> is used, the -comp option is not passed to mksquashfs to allow the use of older versions of mksquashfs.
 Multiple arguments should be specified in one string, i.e., C<--compression-type "type arg1 arg2 ...">.
 
-=item --dracut-args="[+]ARG0 ARG1 ..."
+=item --dracut-conf-args="[+]ARG0 ARG1 ..."
 
 The arguments that will be used by dracut to configure the initrd and be saved
 at F</etc/dracut.conf.d/99-liveos.conf>. This file persists only for the life of
@@ -89,13 +89,12 @@ the initrd under F<*/lib/dracut/conffiles/> or another regular path.) Each argum
 consists of an attribute and a value (see L<dracut.conf(5)>).
 
 If the first argument string is prefixed with a '+' character, the additional
-arguments will be appended to the default set (superseding any there):
+arguments will be appended to the default set (superseding any there by default):
 
   mdadmconf=no
   lvmconf=no
-  compress=xz
-  add_dracutmodules+=" livenet dmsquash-live dmsquash-live-ntfs convertfs pollcdrom qemu qemu-net "
-  omit_dracutmodules+=" plymouth "
+  compress=zstd
+  add_dracutmodules+=" livenet dmsquash-live dmsquash-live-autooverlay dmsquash-live-ntfs overlayfs convertfs pollcdrom qemu qemu-net "
   hostonly=no
   early_microcode=no
 

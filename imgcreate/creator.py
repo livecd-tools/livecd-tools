@@ -481,6 +481,7 @@ class ImageCreator(object):
         os.umask(origumask)
 
     def __load_selinuxfs(self):
+        print('Setting SELinux contexts...')
         arglist = ["mount", "--bind", "/dev/null",
                    self._instroot + self.__selinux_mountpoint + "/load"]
         subprocess.call(arglist, close_fds = True)
@@ -570,7 +571,8 @@ class ImageCreator(object):
 
         self.__create_minimal_dev()
 
-        os.symlink("/proc/self/mounts", self._instroot + "/etc/mtab")
+        if not os.path.lexists(self._instroot + "/etc/mtab"):
+            os.symlink("/proc/self/mounts", self._instroot + "/etc/mtab")
 
         self.__write_fstab()
 
@@ -1001,15 +1003,15 @@ class LoopImageCreator(ImageCreator):
     def _mount_instroot(self, base_on = None):
         self.__imgdir = self._mkdtemp()
 
-        if not base_on is None:
-            self._base_on(base_on)
-
         self.__instloop = ExtDiskMount(SparseLoopbackDisk(self._image,
                                                           self.__image_size),
                                        self._instroot,
                                        self._fstype,
                                        self.__blocksize,
                                        self.fslabel)
+
+        if not base_on is None:
+            self._base_on(base_on)
 
         try:
             self.__instloop.mount()

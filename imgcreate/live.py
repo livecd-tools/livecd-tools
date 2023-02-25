@@ -62,8 +62,8 @@ class LiveImageCreatorBase(LoopImageCreator):
                                   cacheonly=cacheonly,
                                   docleanup=docleanup)
 
-        self.dracut_args = ""
-        """dracut arguments to use."""
+        self.dracut_conf_args = ""
+        """dracut conf arguments to use."""
 
         self.compress_args = "xz"
         """mksquashfs compressor arguments to use."""
@@ -153,13 +153,14 @@ class LiveImageCreatorBase(LoopImageCreator):
     # Actual implementation
     #
     def _base_on(self, base_on):
-        """helper function to extract ext3 file system from a live CD ISO"""
+        """helper function to extract the root filesystem from a live CD ISO
+        """
         isoloop = DiskMount(LoopbackDisk(base_on, 0), self._mkdtemp())
 
         try:
             isoloop.mount()
         except MountError as e:
-            raise CreatorError("Failed to loopback mount '%s' : %s" %
+            raise CreatorError("Failed to loop mount '%s' : %s" %
                                (base_on, e))
 
         # Copy the initrd%d.img and xen%d.gz files over to self._imgdir
@@ -170,9 +171,9 @@ class LiveImageCreatorBase(LoopImageCreator):
         makedirs(dest)
         pattern = re.compile(r"(initrd\d+\.img|xen\d+\.gz)")
         files = [f for f in os.listdir(src) if pattern.search(f)
-                                               and os.path.isfile(src+f)]
+                                               and os.path.isfile(src+'/'+f)]
         for f in files:
-            shutil.copy2(src+f, dest+f)
+            shutil.copy2(src+'/'+f, dest+'/'+f)
 
         # legacy LiveOS filesystem layout support, remove for F9 or F10
         if os.path.exists(isoloop.mountdir + "/squashfs.img"):
@@ -196,13 +197,14 @@ class LiveImageCreatorBase(LoopImageCreator):
             try:
                 squashloop.mount()
             except MountError as e:
-                raise CreatorError("Failed to loopback mount squashfs.img "
+                raise CreatorError("Failed to loop mount squashfs.img "
                                    "from '%s' : %s" % (base_on, e))
 
             # Test for flattened squashfs.
-            os_image = os.path.join(squashloop.mountdir, 'proc')
+            os_image = os.path.join(squashloop.mountdir, 'bin')
             if os.path.isdir(os_image):
                 os_image = squashimg
+                squashloop.unmount()
             else:
                 for f in ('rootfs.img', 'ext3fs.img'):
                     os_image = os.path.join(squashloop.mountdir, 'LiveOS', f)
@@ -214,10 +216,22 @@ class LiveImageCreatorBase(LoopImageCreator):
                 "LiveOS/rootfs.img, ext3fs.img, nor squashfs.img exist" %
                 base_on)
 
-            try:
-                shutil.copy2(os_image, self._image)
-            except IOError as e:
-                raise CreatorError("Failed to copy base live image to %s for modification: %s" %(self._image, e))
+            print('Copying base-on image from %s...' % base_on)
+            if os_image == squashimg:
+                try:
+                    self._LoopImageCreator__instloop.mount()
+                except MountError as e:
+                    raise CreatorError("Failed to loop mount the new rootfs "
+                                   "on '%s' : %s" % (self._instroot, e))
+
+                args = ['unsquashfs', '-f', '-d', self._instroot, squashimg]
+                subprocess.call(args)
+            else:
+                try:
+                    shutil.copy2(os_image, self._image)
+                except IOError as e:
+                    raise CreatorError("Failed to copy base-on image to %s "
+                        "for modification: %s" % (self._image, e))
         finally:
             squashloop.cleanup()
             isoloop.cleanup()
@@ -275,7 +289,7 @@ class LiveImageCreatorBase(LoopImageCreator):
         return env
 
     def __extra_filesystems(self):
-        return "vfat msdos isofs ext4 xfs btrfs squashfs";
+        return "vfat msdos isofs ext4 xfs btrfs f2fs squashfs";
 
     def __extra_drivers(self):
         retval = "sr_mod sd_mod cdrom "
@@ -313,15 +327,14 @@ class LiveImageCreatorBase(LoopImageCreator):
         f.write('MODULES+="' + self.__extra_drivers() + '"\n')
         f.close()
 
-    def __dracut_args(self, args=''):
+    def __dracut_conf_args(self, args=''):
         if not args or args[0] == '+':
             args = """
 mdadmconf=no
 lvmconf=no
-compress=xz
-add_dracutmodules+=" livenet dmsquash-live dmsquash-live-ntfs convertfs \
-pollcdrom qemu qemu-net "
-omit_dracutmodules+=" plymouth "
+compress=zstd
+add_dracutmodules+=" livenet dmsquash-live dmsquash-live-autooverlay \
+dmsquash-live-ntfs overlayfs convertfs pollcdrom qemu qemu-net "
 hostonly=no
 early_microcode=no
 """ + args[1:]
@@ -336,7 +349,7 @@ early_microcode=no
     def __write_dracut_conf(self, path):
         if not os.path.exists(os.path.dirname(path)):
             makedirs(os.path.dirname(path))
-        cfg = self.__dracut_args(self.dracut_args)
+        cfg = self.__dracut_conf_args(self.dracut_conf_args)
 
         with open(path, 'a') as f:
             f.write(cfg)

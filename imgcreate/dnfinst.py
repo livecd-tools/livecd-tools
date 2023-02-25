@@ -85,6 +85,8 @@ class DnfLiveCD(dnf.Base):
         conf += "obsoletes=1\n"
         conf += "best=1\n"
         conf += "tsflags=nocontexts\n"
+        # For testing purposes only:
+        # conf += "tsflags=nocrypto\n"
 
         f = open(confpath, "w+")
         f.write(conf)
