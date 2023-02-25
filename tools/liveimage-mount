@@ -865,9 +865,9 @@ def main():
                 Please wait if large files were written.''')
             if os.path.ismount(src):
                 call(['umount', src])
-                if os.path.exists(src):
-                    os.rmdir(src)
             cleanup()
+            if os.path.exists(src):
+                os.rmdir(src)
 
     sys_exit(ecode)
 

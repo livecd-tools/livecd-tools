@@ -82,8 +82,8 @@ def parse_options(args):
                            "Multiple arguments should be specified in "
                            'one string, i.e., --compression-type "type arg1 arg2 ...".',
                       default="xz")
-    imgopt.add_option("", "--dracut-args", type="string",
-                      dest="dracut_args", default="", metavar='"[+]ARG0 ARG1 ..."',
+    imgopt.add_option("", "--dracut-conf-args", type="string",
+                      dest="dracut_conf_args", default="", metavar='"[+]ARG0 ARG1 ..."',
                       help="The arguments to be used by dracut to configure "
                            "the initrd. Saved at /etc/dracut.conf.d/99-liveos.conf. "
                            "This file persists only for the life of the install_root "
@@ -286,7 +286,7 @@ def main():
     else:
         creator.BIOSbooter = 'GRUB'
 
-    creator.dracut_args = options.dracut_args
+    creator.dracut_conf_args = options.dracut_conf_args
     creator.flat_squashfs = options.flat_squashfs
     creator.compress_args = options.compress_args
     creator.skip_compression = options.skip_compression
@@ -297,7 +297,8 @@ def main():
 
     try:
         creator.mount(options.base_on, options.cachedir)
-        creator.install({}, options.repo, options.pkgverify_level)
+        if not (options.give_shell and options.base_on):
+            creator.install({}, options.repo, options.pkgverify_level)
         creator.configure()
         if options.give_shell:
             creator._ImageCreator__load_selinuxfs()
@@ -316,6 +317,7 @@ def main():
             print("Launching shell. Exit (Ctrl D) to continue.")
             print("-------------------------------------------")
             creator.launch_shell(PS1='[\\u@\\H:install_root\\w:]\\n\\$ ')
+            os.system('umount -R ' + creator._instroot + '/dev')
             creator._ImageCreator__destroy_selinuxfs()
             imgcreate.ImageCreator._undo_bindmounts(creator)
             imgcreate.kickstart.SelinuxConfig(creator._instroot).apply(creator.ks.handler.selinux)
