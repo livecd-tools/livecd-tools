@@ -271,6 +271,33 @@ class DnfLiveCD(dnf.Base):
         """
         self.pkgverify_level = pkgverify_level
 
+    def setModules(self, module_list):
+        """
+        Enables/disables repo modules as requested by kickstart 'module' commands
+        """
+        if not module_list:
+            return
+        try:
+            import dnf.module.module_base
+        except ImportError:
+            raise CreatorError(
+                "Unable to setup modules: your DNF does not seem to support modules")
+        enabled = []
+        disabled = []
+        for (name, stream, enable) in module_list:
+            if enable:
+                if stream:
+                    enabled.append("%s:%s" %(name, stream))
+                else:
+                    enabled.append(name)
+            else:
+                disabled.append(name)
+        module_base = dnf.module.module_base.ModuleBase(self)
+        if enabled:
+            module_base.enable(enabled)
+        if disabled:
+            module_base.disable(disabled)
+
     def runInstall(self):
         """
         Install packages

@@ -580,6 +580,12 @@ def get_default_kernel(ks, default = None):
         return default
     return ks.handler.bootloader.default
 
+def get_modules(ks):
+    modules = []
+    for module in ks.handler.module.moduleList:
+        modules.append((module.name, module.stream, module.enable if hasattr(module, "enable") else True))
+    return modules
+
 def get_repos(ks, repo_urls = {}):
     repos = {}
     for repo in ks.handler.repo.repoList:
