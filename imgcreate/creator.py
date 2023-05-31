@@ -1023,6 +1023,6 @@ class LoopImageCreator(ImageCreator):
         if not self.__instloop is None:
             self.__instloop.cleanup()
 
-    def _stage_final_image(self):
+    def _stage_final_image(self, ops=[]):
         self._resparse()
         shutil.move(self._image, self._outdir + "/" + self.name + ".img")
