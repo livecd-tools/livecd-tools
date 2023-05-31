@@ -738,6 +738,7 @@ class ImageCreator(object):
 
         dbo.fill_sack(load_system_repo = os.path.exists(self._instroot + "/var/lib/rpm/Packages"))
         dbo.read_comps()
+        dbo.setModules(kickstart.get_modules(self.ks))
 
         try:
             self.__apply_selections(dbo)
