@@ -2021,6 +2021,8 @@ if [[ -d $SRCMNT/isolinux/ ]]; then
 elif [[ -d $SRCMNT/syslinux/ ]]; then
     [[ -d $SRCMNT/$srcdir/syslinux ]] && CONFIG_SRC="$srcdir"/
     CONFIG_SRC="$SRCMNT/${CONFIG_SRC}syslinux"
+elif [[ -d $SRCMNT/EFI/ ]]; then
+    CONFIG_SRC=$SRCMNT/images/pxeboot
 fi
 i=${CONFIG_SRC}/initrd*.img
 cd /tmp
