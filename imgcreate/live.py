@@ -823,7 +823,7 @@ menu end
         return fail
 
     def __get_basic_efi_config(self, **args):
-        return """set default="1"
+        return """set default="0"
 
 function load_video {
   insmod efi_gop
@@ -935,7 +935,7 @@ search --no-floppy --set=root -l '%(isolabel)s'
                      "-p", self.product])
 
     def __get_basic_grub2_bios_config(self, **args):
-        return """set default="1"
+        return """set default="0"
 
 function load_video {
   insmod all_video
