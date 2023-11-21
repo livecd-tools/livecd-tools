@@ -332,7 +332,7 @@ class LiveImageCreatorBase(LoopImageCreator):
             args = """
 mdadmconf=no
 lvmconf=no
-compress=zstd
+compress=""" + self.compress_args + """
 add_dracutmodules+=" livenet dmsquash-live dmsquash-live-autooverlay \
 dmsquash-live-ntfs overlayfs convertfs pollcdrom qemu qemu-net "
 hostonly=no
