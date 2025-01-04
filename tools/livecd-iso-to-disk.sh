@@ -1058,7 +1058,7 @@ createFSLayout() {
         udevadm settle -E $p2
         mkfs.fat -v -n ESP $p2
         umount $p2 &> /dev/null || :
-        losetup -d $l2
+        losetup -d $l2 &> /dev/null || :
         fsck.fat -avVw $p2
         echo
     fi
@@ -2021,9 +2021,15 @@ if [[ -d $SRCMNT/isolinux/ ]]; then
 elif [[ -d $SRCMNT/syslinux/ ]]; then
     [[ -d $SRCMNT/$srcdir/syslinux ]] && CONFIG_SRC="$srcdir"/
     CONFIG_SRC="$SRCMNT/${CONFIG_SRC}syslinux"
-elif [[ -d $SRCMNT/EFI/ ]]; then
+elif [[ -d $SRCMNT/images/pxeboot/ ]]; then
     CONFIG_SRC=$SRCMNT/images/pxeboot
 fi
+if [[ ! -d ${CONFIG_SRC} ]]; then
+    printf '\n        ATTENTION:
+    A bootable kernel and initial ram disk could not be found.  Exiting...\n'
+    exitclean
+fi
+
 i=${CONFIG_SRC}/initrd*.img
 cd /tmp
 rm -rf usr
@@ -2265,11 +2271,15 @@ if [[ -n ${format[1]} && -z $skipcopy ]]; then
                 ((free < 30*10**9)) && ((p2s+=1<<27)) ||
                     ((p2s+=free/(15*10**9)<<27))
             fi
-            # Guarantee that there is at least 1 MiB of extra space for a gap.
-            ((oio-p2s%oio < 1<<20)) && ((p2s+=1<<20))
-            # Set partition size to whole 4-MiB or OPT-IO units.
-            ((p2s=(p2s/oio+1)*oio))
+        else
+            # Force a 100 MB ESP partition
+            p2s=100*1024*1024
         fi
+        # Guarantee that there is at least 1 MiB of extra space for a gap.
+        ((oio-p2s%oio < 1<<20)) && ((p2s+=1<<20))
+        # Set partition size to whole 4-MiB or OPT-IO units.
+        ((p2s=(p2s/oio+1)*oio))
+
         if [[ -z $nomac ]]; then
             l3=$SRCMNT/images/macboot.img
             ! [[ -f $l3 ]] && l3=$SRCMNT/isolinux/macboot.img
@@ -2744,6 +2754,16 @@ if ! [[ -f $BOOTCONFIG ]]; then
         [[ -f $f ]] && mv $f $BOOTCONFIG && break
     done
 fi
+if [[ ! -f $BOOTCONFIG ]]; then
+    # Dummy-up a boot configuration file when missing for EFI boot
+    if [[ -n $efi ]]; then
+	echo "#### Unused dummy boot loader configuration file ####" > $BOOTCONFIG
+    else
+	echo "ERROR: Unable to find a non-UEFI boot configuration file."
+	exitclean
+    fi
+fi
+
 TITLE=$(sed -n -r '/^\s*label\s+linux/I {n
                    s/^\s*menu\s+label\s+\^\S+\s+(.*)/\1/Ip;q}
                   ' $BOOTCONFIG)
