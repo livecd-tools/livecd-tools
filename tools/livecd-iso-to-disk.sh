@@ -2758,6 +2758,7 @@ if [[ ! -f $BOOTCONFIG ]]; then
     # Dummy-up a boot configuration file when missing for EFI boot
     if [[ -n $efi ]]; then
 	echo "#### Unused dummy boot loader configuration file ####" > $BOOTCONFIG
+	echo "SAY BIOS boot not supported. Use UEFI boot." >> $BOOTCONFIG
     else
 	echo "ERROR: Unable to find a non-UEFI boot configuration file."
 	exitclean
