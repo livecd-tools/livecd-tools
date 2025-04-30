@@ -1483,6 +1483,7 @@ ks=''
 label=''
 SRCwasMounted=''
 syslinuxboot=syslinux
+bootloaderarch=''
 
 while true ; do
     case $1 in
@@ -2023,6 +2024,13 @@ elif [[ -d $SRCMNT/syslinux/ ]]; then
     CONFIG_SRC="$SRCMNT/${CONFIG_SRC}syslinux"
 elif [[ -d $SRCMNT/images/pxeboot/ ]]; then
     CONFIG_SRC=$SRCMNT/images/pxeboot
+else
+    for arch in aarch64 ppc64le x86_64; do
+        if [[ -d $SRCMNT/boot/$arch/loader ]]; then
+	    CONFIG_SRC="$SRCMNT/boot/$arch/loader"
+	    bootloaderarch=$arch
+        fi
+    done
 fi
 if [[ ! -d ${CONFIG_SRC} ]]; then
     printf '\n        ATTENTION:
@@ -2030,14 +2038,14 @@ if [[ ! -d ${CONFIG_SRC} ]]; then
     exitclean
 fi
 
-i=${CONFIG_SRC}/initrd*.img
+i=${CONFIG_SRC}/initrd?(*.img)
 cd /tmp
 rm -rf usr
 ikernel=$(lsinitrd $i --unpack -f usr/lib/modules/*/kernel -v 2>&1)
 ikernel=${ikernel%/*}; ikernel=${ikernel##*/}
 rm -rf usr
 cd - >/dev/null 2>&1
-f=$(file ${CONFIG_SRC}/vmlinuz*)
+f=$(file ${CONFIG_SRC}/?(vm)linu[xz]*)
 f=${f#*version }; f=${f%% *}
 a=''; d=''
 if ! [[ "${kver[*]}" =~ $f ]]; then
@@ -2803,6 +2811,13 @@ config_efi() {
         cp -Trup $SRCMNT$EFI_BOOT $TGTMNT$T_EFI_BOOT >/dev/null 2>&1 || :
         cp $SRCMNT$EFI_BOOT/grub.cfg $TGTMNT$T_EFI_BOOT
 
+	# Manipulate full bootloader version of grub.cfg not the stub
+	if [[ -n $bootloaderarch && -f $SRCMNT/boot/grub2/grub.cfg ]]; then
+	    cp $SRCMNT/boot/grub2/grub.cfg $TGTMNT$T_EFI_BOOT
+	    # Remove fallback because it causes a constant system reset
+	    rm -f $TGTMNT$T_EFI_BOOT/fb*.efi >/dev/null 2>&1 || :
+	fi
+
         rm -f $TGTMNT$T_EFI_BOOT/grub.conf
     fi
 
@@ -2868,6 +2883,11 @@ if [[ -z $skipcopy ]]; then
         sources="$SRCMNT/images"
     fi
     p=${sources%/images}
+    # Fedora42: Images are now under target-specific bootloader directory
+    if [[ -n $bootloaderarch && ! -d $sources ]]; then
+	sources="$SRCMNT/boot/$bootloaderarch/loader"
+	p=${sources%/loader}
+    fi
     for f in $(find $sources); do
         if [[ -d $f ]]; then
             if ! [[ -d $TGTMNT/$multi${f#$p} ]]; then
@@ -2877,6 +2897,10 @@ if [[ -z $skipcopy ]]; then
             $copyFile $f $TGTMNT/$multi${f#$p} || exitclean
         fi
     done
+    # Fedora42: Rename directory to images
+    if [[ -n $bootloaderarch && -d "$TGTMNT/loader" ]]; then
+	mv "$TGTMNT/loader" "$TGTMNT/images"
+    fi
 fi
 
 # Copy packages over.
@@ -2992,6 +3016,11 @@ if [[ -n $BOOTCONFIG_EFI ]]; then
                s;/isolinux/;/$_SYSLINUXPATH/;g
                s;/images/pxeboot/;/$_SYSLINUXPATH/;g
                s;findiso;;g" $BOOTCONFIG_EFI
+    # Fedora42: Change root search to use UUID and adjust image locations as above
+    if [[ -n $bootloaderarch ]]; then
+	sed -i -r "s;\\(\\\$root\\)/boot/$bootloaderarch/loader/;/$_SYSLINUXPATH/;
+                   s;^\s*search.*--set=root.*$;search --no-floppy --set=root -u '$TGTUUID';" $BOOTCONFIG_EFI
+    fi
 fi
 
 # DVD Installer for netinst
