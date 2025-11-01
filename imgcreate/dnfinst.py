@@ -160,7 +160,7 @@ class DnfLiveCD(dnf.Base):
         for groupid in set(self.environmentGroups(env_id, optional=False)) - set(excluded):
             self.selectGroup(groupid, excludedPkgs)
 
-    def addRepository(self, name, url = None, mirrorlist = None):
+    def addRepository(self, name, url = None, mirrorlist = None, metalink = None):
         def _varSubstitute(option):
             # takes a variable and substitutes like dnf configs do
             arch = hawkey.detect_arch()
@@ -198,6 +198,8 @@ class DnfLiveCD(dnf.Base):
             repo.baseurl += (_varSubstitute(url),)
         if mirrorlist:
             repo.mirrorlist = _varSubstitute(mirrorlist)
+        if metalink:
+            repo.metalink = _varSubstitute(metalink)
         repo.enable()
         repo.set_progress_bar(DownloadProgress())
         self.repos.add(repo)

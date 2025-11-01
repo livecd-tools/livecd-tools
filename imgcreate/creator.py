@@ -715,10 +715,10 @@ class ImageCreator(object):
             dbo.addRepositoryFromConfigFile(repo)
         else:
             for repo in kickstart.get_repos(self.ks, repo_urls):
-                (name, baseurl, mirrorlist, proxy,
+                (name, baseurl, mirrorlist, metalink, proxy,
                 inc, exc, cost, sslverify) = repo
 
-                yr = dbo.addRepository(name, baseurl, mirrorlist)
+                yr = dbo.addRepository(name, baseurl, mirrorlist, metalink)
                 if inc:
                     yr.includepkgs = inc
                 if exc:
