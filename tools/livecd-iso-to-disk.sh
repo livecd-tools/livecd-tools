@@ -1908,7 +1908,8 @@ if [[ -n $flat_squashfs ]]; then
         else
             overlayfs=$TGTFS
         fi
-    elif [[ -n $overlaysizeb ]] && [[ $TGTFS != @(vfat|msdos) ]]; then
+    fi
+    if [[ -n $overlaysizeb ]] && [[ $TGTFS != @(vfat|msdos) ]]; then
         printf  "\n        Notice:
         The source has a flat SquashFS structure that requires an OverlayFS
         overlay.\n
