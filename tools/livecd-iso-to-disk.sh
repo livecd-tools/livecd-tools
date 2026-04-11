@@ -2070,13 +2070,16 @@ if [[ $a || $d ]]; then
     read
 fi
 
-if [[ -n $overlayfs && -z $(lsinitrd $i\
-    -f usr/lib/dracut/hooks/cmdline/30-parse-dmsquash-live.sh | \
-    sed -n -r '/(dev\/root|rootfsbase)/p') ]]; then
+d=$(lsinitrd $i usr/lib/dracut/dracut-*)
+case "${d#dracut-}" in
+    [1-9]* | R* | 04[5-9]* | 0[56]*) d='' ;;
+esac
+if [[ $overlayfs ]] && [[ $d ]]; then
     printf "\n    NOTICE:
     The --overlayfs option requires an initial boot image based on
     dracut version 045 or greater to use the OverlayFS feature.\n
-    Lacking this, the device boots with a temporary Device-mapper overlay.\n
+    This image is from '$d', so the device will boot with a temporary
+    Device-mapper overlay.\n
     Also, be sure that initrd.img contains the dracut module 'dmsquash-live'.\n
     Press Enter to continue, or Ctrl C to abort.\n"
     read
