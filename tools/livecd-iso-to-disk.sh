@@ -1191,7 +1191,7 @@ checkFilesystem() {
             CONFIG_FILE=extlinux.conf
             if [[ -n ${format[1]} ]]; then
                 # Check extlinux version & set mkfs version for boot partition.
-                dev=($(extlinux -v 2>&1))
+                dev=($(extlinux -v 2>&1)) || dev=''
                 t=ext4
                 case ${dev[1]} in
                     3.*)
@@ -1201,7 +1201,7 @@ checkFilesystem() {
                     4.[0-9][0-9]|5.00)
                         [[ $TGTFS != xfs ]] && t=$TGTFS
                         ;;
-                    5.[0-9][1-9]|[6-9].[0-9][0-9]|extlinux:)
+                    5.[0-9][1-9]|[6-9].[0-9][0-9]|extlinux:|'')
                     # case extlinux: when command not found...
                         t=$TGTFS
                 esac
@@ -1390,7 +1390,7 @@ detectsrctype() {
         # list file as deleted module directory may have remnant files.
         kver=($(ls -vr $IMGMNT/usr/lib/modules/*/vmlinuz))
         kver=(${kver[@]%/*}); kver=(${kver[@]##*/})
-        if [[ $TGTFS == ext4 ]]; then
+        if [[ $TGTFS == ext4 ]] && command -v syslinux; then
             f=$(which syslinux)
             f="$(sed -nr '0,/SYSLINUX (\S+) .*/ s//\1/ p' $f)"$'\n'6.04
             [[ $f == $(sort -rV <<< "$f") ]] || _64bit=_64bit
