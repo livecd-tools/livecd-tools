@@ -31,7 +31,9 @@ import resource
 import logging
 import tempfile
 import time
+import re
 
+from packaging.version import Version
 from imgcreate.util import *
 from imgcreate.errors import *
 
@@ -104,7 +106,18 @@ def squashfs_compression_type(sqfs_img):
 
 def mksquashfs(in_dir, out_img, compress_args, ops=[]):
 
-    args = ['mksquashfs', in_dir, out_img]
+    mksquashfs_version_str = subprocess.run(['mksquashfs', '-version'], stdout=subprocess.PIPE, encoding='utf8').stdout
+    mksquashfs_version_match = re.search(r'\d+\.\d+\.\d+', version_str)
+    if mksquashfs_version_match:
+        version = Version(mksquashfs_version_match.group(0))
+    else:
+        version = Version('0')
+
+    if version >= Version('4.7.3'):
+        args = ['mksquashfs', '-action', 'align(4K)@filesize(>=32K)', in_dir, out_img]
+    else:
+        args = ['mksquashfs', in_dir, out_img]
+
     # Allow gzip to work for older versions of mksquashfs
     if compress_args and compress_args != 'gzip':
         if compress_args in ('xz1m', 'xz1M'):
